@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 '''
-    simulate sequences given per-site frequencies and germline
-        sequences shmulate
+    simulate sequences given germline sequences shmulate
 
 '''
 
@@ -71,6 +70,7 @@ def parse_args():
 
 
 def read_bcr_hd5(path, remove_gap=True):
+    ''' read hdf5 parameter file and process '''
 
     # we need the 'germline' column later so...
     sites = pd.read_hdf(re.sub('-params', '', path), 'sites')
@@ -124,17 +124,15 @@ def simulate(args):
     # or randomly sample however many from parameter file
 
     params = read_bcr_hd5(args.param_path)
-    genes = params['gene'].unique()
 
     for group in range(args.n_germlines):
-        gene = np.random.choice(genes)
+        gene = np.random.choice(params['gene'].unique())
         current_params = params[params['gene'] == gene]
         group_name = 'Group'+str(group+1)
-        germline = current_params['germline']
-        ancestor = ''.join(list(germline)).upper()
+        ancestor = ''.join(list(current_params['germline'])).upper()
+
         run_shmulate(args.n_taxa, args.output_file, args.log_dir,
                 group_name, ancestor, args.n_mutes)
-
 
         # write to file in the BASELINe format
         with open(args.output_file+'_'+group_name, 'r') as simseqs:
