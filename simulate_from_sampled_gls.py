@@ -86,7 +86,7 @@ def run_shmulate(n_taxa, output_file, log_dir, group_name, germline, n_mutes):
     ''' run shmulate through Rscript '''
 
     call = ['Rscript',
-            'shmulate_hack_ver2.r',
+            'shmulate_driver.r',
             str(n_taxa),
             output_file+'_'+group_name,
             germline,
