@@ -102,7 +102,7 @@ def run_shmulate(n_taxa, output_file, log_dir, group_name, germline, n_mutes):
             rout.write(sout)
         except subprocess.CalledProcessError, err:
             rout.write(err.output)
-            rout.write(call)
+            rout.write(' '.join(call))
             print(err)
 
 
