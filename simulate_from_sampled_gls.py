@@ -15,6 +15,7 @@ import numpy as np
 import os
 import os.path
 import re
+from Bio import SeqIO
 
 
 def parse_args():
@@ -44,7 +45,7 @@ def parse_args():
     parser_simulate.add_argument('--output_file',
         type=str,
         help='simulated data destination file',
-        default='./_output/seqs.fasta')
+        default='./_output/seqs.csv')
     parser_simulate.add_argument('--log_dir',
         type=str,
         help='log directory',
@@ -113,7 +114,7 @@ def simulate(args):
         os.makedirs(output_dir)
 
     with open(args.output_file, 'w') as fil:
-        fil.write('')
+        fil.write('germline_name,sequence_name,sequence\n')
 
     # Read parameters from file
     params = read_bcr_hd5(args.param_path)
@@ -125,23 +126,24 @@ def simulate(args):
     else:
         n_mute_vec = [args.n_mutes] * args.n_germlines
 
+    genes = np.random.choice(params['gene'].unique(), size=args.n_germlines)
+    # write genes to file
+
     # For each germline, run shmulate to obtain mutated sequences
     for group in range(args.n_germlines):
-        gene = np.random.choice(params['gene'].unique())
-        current_params = params[params['gene'] == gene]
+        current_params = params[params['gene'] == genes[group]]
         group_name = 'Group'+str(group+1)
         ancestor = ''.join(list(current_params['base'])).upper()
 
         run_shmulate(args.n_taxa, args.output_file, args.log_dir,
                 group_name, ancestor, n_mute_vec[group], args.seed)
 
-        # write to file in the BASELINe format
-        with open(args.output_file+'_'+group_name, 'r') as simseqs:
-            with open(args.output_file, 'a') as outseqs:
-                outseqs.write('>>'+gene+'\n')
-                outseqs.write(ancestor+'\n')
-                for line in simseqs:
-                    outseqs.write(line)
+        # write to file in csv format
+        seqs = SeqIO.parse(args.output_file+'_'+group_name, 'fasta')
+        with open(args.output_file, 'a') as outseqs:
+            for seq in seqs:
+                outseqs.write(genes[group] + ',' + str(seq.id) + ',' \
+                        + str(seq.seq) + '\n')
 
 
 def main(args=sys.argv[1:]):
