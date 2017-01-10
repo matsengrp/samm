@@ -15,7 +15,7 @@ class MutationOrderSampler:
         num_pos_to_mutate = len(unmutated_positions)
         mutation_order = []
         for step_i in range(num_pos_to_mutate):
-            feature_vecs = self.feature_generator.create_feature_vecs(
+            feature_vecs = self.feature_generator.create_for_sequence(
                 intermediate_seq,
                 do_feat_vec_pos=unmutated_positions,
             )
