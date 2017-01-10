@@ -10,7 +10,6 @@ from __future__ import print_function
 import subprocess
 import sys
 import argparse
-import random
 import pandas as pd
 import numpy as np
 import os
@@ -37,7 +36,7 @@ def parse_args():
     parser_simulate.add_argument('--param_path',
         type=str,
         help='parameter file path',
-        default='/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01-params.h5')
+        default='/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5')
     parser_simulate.add_argument('--seed',
         type=int,
         help='rng seed for replicability',
@@ -72,12 +71,10 @@ def parse_args():
 def read_bcr_hd5(path, remove_gap=True):
     ''' read hdf5 parameter file and process '''
 
-    # we need the 'germline' column later so...
-    sites = pd.read_hdf(re.sub('-params', '', path), 'sites')
-    sites.columns = [s.replace('base', 'germline') for s in sites.columns]
+    sites = pd.read_hdf(path, 'sites')
 
     if remove_gap:
-        return sites.query('germline != "-"')
+        return sites.query('base != "-"')
     else:
         return sites
 
@@ -118,23 +115,22 @@ def simulate(args):
     with open(args.output_file, 'w') as fil:
         fil.write('')
 
-    np.random.seed(args.seed)
-
-    #germlines = ['IGHV1-18*01', 'IGHV3-53*01', 'IGHV3-23D*01']
-    # or randomly sample however many from parameter file
-
+    # Read parameters from file
     params = read_bcr_hd5(args.param_path)
 
+    # Randomly generate number of mutations or use default
+    np.random.seed(args.seed)
     if args.n_mutes < 0:
         n_mute_vec = 2 + np.random.randint(10, size=args.n_germlines)
     else:
         n_mute_vec = [args.n_mutes] * args.n_germlines
 
+    # For each germline, run shmulate to obtain mutated sequences
     for group in range(args.n_germlines):
         gene = np.random.choice(params['gene'].unique())
         current_params = params[params['gene'] == gene]
         group_name = 'Group'+str(group+1)
-        ancestor = ''.join(list(current_params['germline'])).upper()
+        ancestor = ''.join(list(current_params['base'])).upper()
 
         run_shmulate(args.n_taxa, args.output_file, args.log_dir,
                 group_name, ancestor, n_mute_vec[group], args.seed)
