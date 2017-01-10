@@ -10,9 +10,20 @@ class FeatureGenerator:
     """
     NUCLEOTIDES = "atcg"
 
-    def generate(self, seq_mut_order):
+    def create_for_sequence(self, sequence, no_feat_vec_pos=None, do_feat_vec_pos=None):
         """
-        @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
+        @param sequence: current sequence
+        @param no_feat_vec_pos: do NOT generate feature vectors for these positions
+        @param do_feat_vec_pos: do generate feature vectors for these positions
+        @return: list of sparse feature vectors
+        """
+        raise NotImplementedError()
+
+    def create_for_mutation_steps(self, seq_mut_order):
+        """
+        @param seq_mut_order: a ImputedSequenceMutations
+        @return: list of sparse feature vectors for all positions in the risk group after the i-th mutation,
+                 for all mutation steps in seq_mut_order
         """
         raise NotImplementedError()
 
@@ -23,8 +34,24 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         self.flank_end_len = submotif_len/2
         self.feature_vec_len = np.power(4, submotif_len) + 1
 
+    def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
+        """
+        @param no_feat_vec_pos: don't create feature vectors for these positions
+        """
+        feature_vec_dict = dict()
+        if do_feat_vec_pos is None:
+            do_feat_vec_pos = range(len(sequence))
+
+        for pos in do_feat_vec_pos:
+            if pos in no_feat_vec_pos:
+                # don't generate any feature vector for this position since it is not in the risk group
+                continue
+            feature_vec_dict[pos] = self._create_feature_vec_for_pos(pos, sequence)
+
+        return feature_vec_dict
+
     # TODO: make this a real feature generator
-    def generate(self, seq_mut_order):
+    def create_for_mutation_steps(self, seq_mut_order):
         """
         Feature vector are just indicators for which submotif. To get the index for a submotif
         indicator, vary the early positions fastest and later positions slowest.
@@ -34,7 +61,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq
         feature_vec_dicts = [
-            self._create_feature_vec(intermediate_seq, [])
+            self.create_for_sequence(intermediate_seq)
         ]
         for i, mutation_pos in enumerate(seq_mut_order.mutation_order):
             # update to get the new sequence after the i-th mutation
@@ -44,28 +71,22 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 seq_mut_order.obs_seq_mutation.mutation_pos_dict[mutation_pos]
             )
             feature_vec_dicts.append(
-                self._create_feature_vec(intermediate_seq, seq_mut_order.mutation_order[:i + 1])
+                self.create_for_sequence(intermediate_seq, no_feat_vec_pos=seq_mut_order.mutation_order[:i + 1])
             )
         return feature_vec_dicts
 
-    def _create_feature_vec(self, intermediate_seq, no_feat_vec_pos):
+    def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """
         @param no_feat_vec_pos: don't create feature vectors for these positions
         """
-        feature_vec_dict = dict()
-        for pos in range(len(intermediate_seq)):
-            if pos in no_feat_vec_pos:
-                # don't generate any feature vector for this position since it is not in the risk group
-                continue
-            if pos < self.flank_end_len or pos > self.flank_end_len + 1:
-                # do special stuff cause positions are at the ends
-                # TODO: update this. right now it sets all extreme positions to the same feature
-                idx = self.feature_vec_len - 1
-            else:
-                submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
-                idx = 0
-                for submotif_i, submotif_nuc in enumerate(submotif):
-                    nuc_idx = FeatureGenerator.NUCLEOTIDES.index(submotif_nuc)
-                    idx += nuc_idx * np.power(4, submotif_i)
-            feature_vec_dict[pos] = [idx]
-        return feature_vec_dict
+        if pos < self.flank_end_len or pos > self.flank_end_len + 1:
+            # do special stuff cause positions are at the ends
+            # TODO: update this. right now it sets all extreme positions to the same feature
+            idx = self.feature_vec_len - 1
+        else:
+            submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
+            idx = 0
+            for submotif_i, submotif_nuc in enumerate(submotif):
+                nuc_idx = FeatureGenerator.NUCLEOTIDES.index(submotif_nuc)
+                idx += nuc_idx * np.power(4, submotif_i)
+        return [idx]

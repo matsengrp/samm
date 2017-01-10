@@ -9,7 +9,7 @@ class SurvivalProblem:
         theta = Variable(feature_generator.feature_vec_len)
         obj = 0
         for sample in self.samples:
-            all_feature_vecs = feature_generator.generate(sample)
+            all_feature_vecs = feature_generator.create_for_mutation_steps(sample)
             for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, all_feature_vecs):
                 # vec_mutation_step are the feature vectors of the at-risk group after mutation i
                 feature_vec_mutated = vecs_at_mutation_step[mutating_pos]
