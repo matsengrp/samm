@@ -17,7 +17,7 @@ class ObservedSequenceMutations:
             self.mutation_pos_dict,
         )
 
-class SequenceMutationOrder:
+class ImputedSequenceMutations:
     def __init__(self, obs_seq_mutation, mutation_order):
         self.obs_seq_mutation = obs_seq_mutation
         self.seq_len = len(obs_seq_mutation.start_seq)
