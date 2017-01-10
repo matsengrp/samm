@@ -33,7 +33,7 @@ def parse_args():
     parser_simulate.add_argument('--n_taxa',
         type=int,
         help='number of taxa to simulate',
-        default=20)
+        default=2)
     parser_simulate.add_argument('--param_path',
         type=str,
         help='parameter file path',
@@ -41,7 +41,7 @@ def parse_args():
     parser_simulate.add_argument('--seed',
         type=int,
         help='rng seed for replicability',
-        default=1337)
+        default=1533)
     parser_simulate.add_argument('--output_file',
         type=str,
         help='simulated data destination file',
@@ -53,11 +53,11 @@ def parse_args():
     parser_simulate.add_argument('--n_germlines',
         type=int,
         help='number of germline genes to sample',
-        default=5)
+        default=2)
     parser_simulate.add_argument('--n_mutes',
         type=int,
-        help='number of mutations from germline',
-        default=5)
+        help='number of mutations from germline (default: -1 meaning choose at random)',
+        default=-1)
 
     parser_simulate.set_defaults(subcommand=simulate)
 
@@ -82,7 +82,7 @@ def read_bcr_hd5(path, remove_gap=True):
         return sites
 
 
-def run_shmulate(n_taxa, output_file, log_dir, group_name, germline, n_mutes):
+def run_shmulate(n_taxa, output_file, log_dir, group_name, germline, n_mutes, seed):
     ''' run shmulate through Rscript '''
 
     call = ['Rscript',
@@ -91,7 +91,8 @@ def run_shmulate(n_taxa, output_file, log_dir, group_name, germline, n_mutes):
             output_file+'_'+group_name,
             germline,
             group_name,
-            str(n_mutes)]
+            str(n_mutes),
+            str(seed)]
 
     print('Now executing:')
     print(' '.join(call))
@@ -117,13 +118,17 @@ def simulate(args):
     with open(args.output_file, 'w') as fil:
         fil.write('')
 
-    rng = random.Random()
-    rng.seed(args.seed)
+    np.random.seed(args.seed)
 
     #germlines = ['IGHV1-18*01', 'IGHV3-53*01', 'IGHV3-23D*01']
     # or randomly sample however many from parameter file
 
     params = read_bcr_hd5(args.param_path)
+
+    if args.n_mutes < 0:
+        n_mute_vec = 2 + np.random.randint(10, size=args.n_germlines)
+    else:
+        n_mute_vec = [args.n_mutes] * args.n_germlines
 
     for group in range(args.n_germlines):
         gene = np.random.choice(params['gene'].unique())
@@ -132,7 +137,7 @@ def simulate(args):
         ancestor = ''.join(list(current_params['germline'])).upper()
 
         run_shmulate(args.n_taxa, args.output_file, args.log_dir,
-                group_name, ancestor, args.n_mutes)
+                group_name, ancestor, n_mute_vec[group], args.seed)
 
         # write to file in the BASELINe format
         with open(args.output_file+'_'+group_name, 'r') as simseqs:
