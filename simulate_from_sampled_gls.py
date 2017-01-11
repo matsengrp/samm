@@ -15,6 +15,7 @@ import numpy as np
 import os
 import os.path
 from Bio import SeqIO
+import csv
 
 
 def parse_args():
@@ -139,14 +140,16 @@ def simulate(args):
             for gene in germline_genes]
 
     # write genes to file
-    with open(args.output_genes, 'w') as outgenes:
-        outgenes.write('germline_name,germline_sequence\n')
+    with open(args.output_genes, 'w') as outgermlines:
+        germline_file = csv.writer(outgermlines)
+        germline_file.writerow(['germline_name','germline_sequence'])
         for gene, sequence in zip(germline_genes, germline_nucleotides):
-            outgenes.write(gene+','+sequence+'\n')
+            germline_file.writerow([gene,sequence])
 
     # For each germline gene, run shmulate to obtain mutated sequences
     with open(args.output_file, 'w') as outseqs:
-        outseqs.write('germline_name,sequence_name,sequence\n')
+        seq_file = csv.writer(outseqs)
+        seq_file.writerow(['germline_name','sequence_name','sequence'])
         for run, (gene, sequence, n_mutes) in \
                 enumerate(zip(germline_genes, germline_nucleotides, n_mute_vec)):
             # Creates a file with a single run of simulated sequences.
@@ -158,8 +161,7 @@ def simulate(args):
             # write to file in csv format
             shmulated_seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
             for seq in shmulated_seqs:
-                outseqs.write(','.join([gene, str(seq.id), str(seq.seq)]) + \
-                        '\n')
+                seq_file.writerow([gene, str(seq.id), str(seq.seq)])
 
 
 def main(args=sys.argv[1:]):
