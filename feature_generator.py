@@ -10,12 +10,16 @@ class FeatureGenerator:
     """
     NUCLEOTIDES = "atcg"
 
-    def create_for_sequence(self, sequence, no_feat_vec_pos=None, do_feat_vec_pos=None):
+    def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
         """
         @param sequence: current sequence
         @param no_feat_vec_pos: do NOT generate feature vectors for these positions
-        @param do_feat_vec_pos: do generate feature vectors for these positions
+        @param do_feat_vec_pos: do generate feature vectors for these positions.
+                                By default, this will be set to all positions in the sequence.
         @return: list of sparse feature vectors
+
+        If there are positions in both no_feat_vec_pos and do_feat_vec_pos, then
+        no feature vector is generated for that position.
         """
         raise NotImplementedError()
 
@@ -35,9 +39,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         self.feature_vec_len = np.power(4, submotif_len) + 1
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
-        """
-        @param no_feat_vec_pos: don't create feature vectors for these positions
-        """
         feature_vec_dict = dict()
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(sequence))

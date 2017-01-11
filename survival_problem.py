@@ -6,6 +6,7 @@ class SurvivalProblem:
         self.samples = samples
 
     def solve(self, feature_generator):
+        # TODO: Add theta for different mutation types
         theta = Variable(feature_generator.feature_vec_len)
         obj = 0
         for sample in self.samples:

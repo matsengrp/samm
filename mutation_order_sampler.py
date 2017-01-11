@@ -14,6 +14,7 @@ class MutationOrderSampler:
         intermediate_seq = obs_seq_mutation.start_seq
         num_pos_to_mutate = len(unmutated_positions)
         mutation_order = []
+        # TODO: Make more efficent! Most features stay the same at each mutation step.
         for step_i in range(num_pos_to_mutate):
             feature_vecs = self.feature_generator.create_for_sequence(
                 intermediate_seq,
