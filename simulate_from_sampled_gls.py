@@ -139,14 +139,17 @@ def simulate(args):
     germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
             for gene in germline_genes]
 
-    # write genes to file
+    # Write germline genes to file with two columns: name of gene and
+    # corresponding sequence.
     with open(args.output_genes, 'w') as outgermlines:
         germline_file = csv.writer(outgermlines)
         germline_file.writerow(['germline_name','germline_sequence'])
         for gene, sequence in zip(germline_genes, germline_nucleotides):
             germline_file.writerow([gene,sequence])
 
-    # For each germline gene, run shmulate to obtain mutated sequences
+    # For each germline gene, run shmulate to obtain mutated sequences.
+    # Write sequences to file with three columns: name of germline gene
+    # used, name of simulated sequence and corresponding sequence.
     with open(args.output_file, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
