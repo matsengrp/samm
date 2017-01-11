@@ -14,7 +14,6 @@ import pandas as pd
 import numpy as np
 import os
 import os.path
-import re
 from Bio import SeqIO
 
 
@@ -129,7 +128,7 @@ def simulate(args):
         n_mute_vec = [args.n_mutes] * args.n_germlines
 
     genes = np.random.choice(params['gene'].unique(), size=args.n_germlines)
-    ancestors = [''.join(list(params[params['gene']==gene]['base'])) \
+    ancestors = [''.join(list(params[params['gene'] == gene]['base'])) \
             for gene in genes]
 
     # write genes to file
