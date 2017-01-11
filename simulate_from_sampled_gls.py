@@ -141,22 +141,20 @@ def simulate(args):
     # For each germline, run shmulate to obtain mutated sequences
     with open(args.output_file, 'w') as outseqs:
         outseqs.write('germline_name,sequence_name,sequence\n')
+        run = 0
+        for gene, ancestor, n_mutes in zip(genes, ancestors, n_mute_vec):
+            # Creates a file with a single run of simulated sequences.
+            # The seed is modified so we aren't generating the same
+            # mutations on each run
+            run_shmulate(args.n_taxa, args.output_file, args.log_dir,
+                    run, ancestor, n_mutes, args.seed)
 
-    run = 0
-    for gene, ancestor, n_mutes in zip(genes, ancestors, n_mute_vec):
-        # Creates a file with a single run of simulated sequences.
-        # The seed is modified so we aren't generating the same
-        # mutations on each run
-        run_shmulate(args.n_taxa, args.output_file, args.log_dir,
-                run, ancestor, n_mutes, args.seed)
-
-        # write to file in csv format
-        seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
-        with open(args.output_file, 'a') as outseqs:
+            # write to file in csv format
+            seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
             for seq in seqs:
                 outseqs.write(gene + ',' + str(seq.id) + ',' \
-                        + str(seq.seq) + '\n')
-        run += 1
+                    + str(seq.seq) + '\n')
+            run += 1
 
 
 def main(args=sys.argv[1:]):
