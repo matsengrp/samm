@@ -127,33 +127,39 @@ def simulate(args):
     else:
         n_mute_vec = [args.n_mutes] * args.n_germlines
 
-    genes = np.random.choice(params['gene'].unique(), size=args.n_germlines)
-    ancestors = [''.join(list(params[params['gene'] == gene]['base'])) \
-            for gene in genes]
+    # Select, with replacement, args.n_germlines germline genes from our
+    # parameter file and place them into a numpy array.
+    # Here 'germline_gene' is something like IGHV1-2*01.
+    germline_genes = np.random.choice(params['gene'].unique(),
+            size=args.n_germlines)
+
+    # Put the nucleotide content of each selected germline gene into a
+    # corresponding list.
+    germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
+            for gene in germline_genes]
 
     # write genes to file
     with open(args.output_genes, 'w') as outgenes:
         outgenes.write('germline_name,germline_sequence\n')
-        for gene, ancestor in zip(genes, ancestors):
-            outgenes.write(gene+','+ancestor+'\n')
+        for gene, sequence in zip(germline_genes, germline_nucleotides):
+            outgenes.write(gene+','+sequence+'\n')
 
-    # For each germline, run shmulate to obtain mutated sequences
+    # For each germline gene, run shmulate to obtain mutated sequences
     with open(args.output_file, 'w') as outseqs:
         outseqs.write('germline_name,sequence_name,sequence\n')
-        run = 0
-        for gene, ancestor, n_mutes in zip(genes, ancestors, n_mute_vec):
+        for run, (gene, sequence, n_mutes) in \
+                enumerate(zip(germline_genes, germline_nucleotides, n_mute_vec)):
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
             run_shmulate(args.n_taxa, args.output_file, args.log_dir,
-                    run, ancestor, n_mutes, args.seed)
+                    run, sequence, n_mutes, args.seed)
 
             # write to file in csv format
-            seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
-            for seq in seqs:
-                outseqs.write(gene + ',' + str(seq.id) + ',' \
-                    + str(seq.seq) + '\n')
-            run += 1
+            shmulated_seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
+            for seq in shmulated_seqs:
+                outseqs.write(','.join([gene, str(seq.id), str(seq.seq)]) + \
+                        '\n')
 
 
 def main(args=sys.argv[1:]):
