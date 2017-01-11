@@ -46,6 +46,10 @@ def parse_args():
         type=str,
         help='simulated data destination file',
         default='./_output/seqs.csv')
+    parser_simulate.add_argument('--output_genes',
+        type=str,
+        help='germline genes used in csv file',
+        default='./_output/genes.csv')
     parser_simulate.add_argument('--log_dir',
         type=str,
         help='log directory',
@@ -80,22 +84,22 @@ def read_bcr_hd5(path, remove_gap=True):
         return sites
 
 
-def run_shmulate(n_taxa, output_file, log_dir, group_name, germline, n_mutes, seed):
+def run_shmulate(n_taxa, output_file, log_dir, run, germline, n_mutes, seed):
     ''' run shmulate through Rscript '''
 
     call = ['Rscript',
             'shmulate_driver.r',
             str(n_taxa),
-            output_file+'_'+group_name,
+            output_file+'_'+str(run),
             germline,
-            group_name,
+            'Run'+str(run),
             str(n_mutes),
-            str(seed)]
+            str(seed+run)]
 
     print('Now executing:')
     print(' '.join(call))
 
-    with open(log_dir+'/'+group_name+'.Rout', 'w') as rout:
+    with open(log_dir+'/'+str(run)+'.Rout', 'w') as rout:
         try:
             sout = subprocess.check_output(call, stderr=subprocess.STDOUT)
             rout.write(sout)
@@ -113,37 +117,46 @@ def simulate(args):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    with open(args.output_file, 'w') as fil:
-        fil.write('germline_name,sequence_name,sequence\n')
-
     # Read parameters from file
     params = read_bcr_hd5(args.param_path)
 
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
+
     if args.n_mutes < 0:
         n_mute_vec = 2 + np.random.randint(10, size=args.n_germlines)
     else:
         n_mute_vec = [args.n_mutes] * args.n_germlines
 
     genes = np.random.choice(params['gene'].unique(), size=args.n_germlines)
+    ancestors = [''.join(list(params[params['gene']==gene]['base'])) \
+            for gene in genes]
+
     # write genes to file
+    with open(args.output_genes, 'w') as outgenes:
+        outgenes.write('germline_name,germline_sequence\n')
+        for gene, ancestor in zip(genes, ancestors):
+            outgenes.write(gene+','+ancestor+'\n')
 
     # For each germline, run shmulate to obtain mutated sequences
-    for group in range(args.n_germlines):
-        current_params = params[params['gene'] == genes[group]]
-        group_name = 'Group'+str(group+1)
-        ancestor = ''.join(list(current_params['base'])).upper()
+    with open(args.output_file, 'w') as outseqs:
+        outseqs.write('germline_name,sequence_name,sequence\n')
 
+    run = 0
+    for gene, ancestor, n_mutes in zip(genes, ancestors, n_mute_vec):
+        # Creates a file with a single run of simulated sequences.
+        # The seed is modified so we aren't generating the same
+        # mutations on each run
         run_shmulate(args.n_taxa, args.output_file, args.log_dir,
-                group_name, ancestor, n_mute_vec[group], args.seed)
+                run, ancestor, n_mutes, args.seed)
 
         # write to file in csv format
-        seqs = SeqIO.parse(args.output_file+'_'+group_name, 'fasta')
+        seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
         with open(args.output_file, 'a') as outseqs:
             for seq in seqs:
-                outseqs.write(genes[group] + ',' + str(seq.id) + ',' \
+                outseqs.write(gene + ',' + str(seq.id) + ',' \
                         + str(seq.seq) + '\n')
+        run += 1
 
 
 def main(args=sys.argv[1:]):
