@@ -4,7 +4,6 @@
 
 # Packages
 
-import json
 import os
 from os.path import join
 from nestly.scons import SConsWrap
@@ -21,33 +20,35 @@ AddOption('--nreps',
           action='store',
           help='number of replicates')
 
+AddOption('--output_name',
+          dest='output_name',
+          default='output',
+          type='str',
+          nargs=1,
+          help='name of output directory')
+
 env = Environment(ENV=os.environ, 
-                  NREPS = GetOption('nreps'))
+                  NREPS = GetOption('nreps'),
+                  OUTPUT_NAME = GetOption('output_name'))
 
 
 # Set up state
-base = {'nreps': env['NREPS']}
+base = {'nreps': env['NREPS'],
+        'output_name': env['OUTPUT_NAME']}
 
-# Simulation methods
-#sim_methods = ['survival_data', 'mutation_data']
+# Potential nests: simulation methods, estimation methods, number of germlines,
+# number of taxa from germline, frequency of mutation from germline
+
+nest = SConsWrap(Nest(base_dict=base), '_'+env['OUTPUT_NAME'], alias_environment=env)
+
+# Nest for simulation methods
 sim_methods = ['mutation_data']
-
-# Estimation methods
-est_methods = ['null_model', 'survival_model']
-
-# Potential nests: number of germlines, number of taxa from germline,
-# frequency of mutation from germline
-
-# Nests for replicates
-
-name = 'output'
-nest = SConsWrap(Nest(base_dict=base), '_'+name, alias_environment=env)
 
 nest.add(
     'simulation_methods',
     sim_methods)
 
-nest.add_aggregate('overall', list)
+# Nest for replicates
 
 nest.add(
     'replicate',
@@ -74,6 +75,8 @@ def generate(env, outdir, c):
         [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
         [],
         ' '.join(map(str, cmd)))
+
+## Future nests
 
 # Nest for model fitting
 
