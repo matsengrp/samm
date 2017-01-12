@@ -1,3 +1,5 @@
+NUCLEOTIDES = "atcg"
+
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
     Mutate a string

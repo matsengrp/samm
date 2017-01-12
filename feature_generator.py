@@ -1,5 +1,6 @@
 import numpy as np
 from common import mutate_string
+from common import NUCLEOTIDES
 
 class FeatureGenerator:
     """
@@ -8,7 +9,6 @@ class FeatureGenerator:
     Each feature vector will just be the positions that are one.
     We call these "sparse feature vectors"
     """
-    NUCLEOTIDES = "atcg"
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
         """
@@ -88,6 +88,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
             idx = 0
             for submotif_i, submotif_nuc in enumerate(submotif):
-                nuc_idx = FeatureGenerator.NUCLEOTIDES.index(submotif_nuc)
+                nuc_idx = NUCLEOTIDES.index(submotif_nuc)
                 idx += nuc_idx * np.power(4, submotif_i)
         return [idx]
