@@ -64,7 +64,6 @@ nest.add(
 
 @nest.add_target_with_env(env)
 def generate(env, outdir, c):
-    # TODO: put log files in scons tree or remove them
     cmd = ['python simulate_from_sampled_gls.py',
            'simulate',
            '--seed',
@@ -76,53 +75,53 @@ def generate(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
-# Nest for model fitting
-
-nest.add_aggregate('per_rep', list)
-
-nest.add(
-    'estimation_method',
-    est_methods)
-
-@nest.add_target_with_env(env)
-def fit(env, outdir, c):
-    # TODO: remove dummy code and put in model fitting code
-    # using c['estimation_method'] for whatever model
-    # fitting code we have
-    cmd = 'echo $SOURCES > $TARGET'
-
-    model_fit = env.Command(
-        join(outdir, 'fit.csv'),
-        [c['generate'][0], c['generate'][1]],
-        cmd)
-    c['per_rep'].append(model_fit)
-
-# Aggregate over different fitting methods
-
-nest.pop('estimation_method')
-
-@nest.add_target_with_env(env)
-def calculate_per_rep_score(env, outdir, c):
-    # TODO: remove dummy code
-    cmd = 'echo $SOURCES > $TARGET'
-    predictions = env.Command(
-        join(outdir, 'per_replicate_predictions.csv'),
-        c['per_rep'],
-        cmd)
-    c['overall'].append(predictions)
-
-
-# Aggregate over all replicates
-
-nest.pop('replicate')
-
-@nest.add_target_with_env(env)
-def calculate_overall_scores(env, outdir, c):
-    # TODO: remove dummy code
-    return env.Command(join(outdir, 'predictions.csv'),
-                       c['overall'],
-                       'echo $SOURCES > $TARGET')
-
-
-# Plot results?
+## Nest for model fitting
+#
+#nest.add_aggregate('per_rep', list)
+#
+#nest.add(
+#    'estimation_method',
+#    est_methods)
+#
+#@nest.add_target_with_env(env)
+#def fit(env, outdir, c):
+#    # TODO: remove dummy code and put in model fitting code
+#    # using c['estimation_method'] for whatever model
+#    # fitting code we have
+#    cmd = 'echo $SOURCES > $TARGET'
+#
+#    model_fit = env.Command(
+#        join(outdir, 'fit.csv'),
+#        [c['generate'][0], c['generate'][1]],
+#        cmd)
+#    c['per_rep'].append(model_fit)
+#
+## Aggregate over different fitting methods
+#
+#nest.pop('estimation_method')
+#
+#@nest.add_target_with_env(env)
+#def calculate_per_rep_score(env, outdir, c):
+#    # TODO: remove dummy code
+#    cmd = 'echo $SOURCES > $TARGET'
+#    predictions = env.Command(
+#        join(outdir, 'per_replicate_predictions.csv'),
+#        c['per_rep'],
+#        cmd)
+#    c['overall'].append(predictions)
+#
+#
+## Aggregate over all replicates
+#
+#nest.pop('replicate')
+#
+#@nest.add_target_with_env(env)
+#def calculate_overall_scores(env, outdir, c):
+#    # TODO: remove dummy code
+#    return env.Command(join(outdir, 'predictions.csv'),
+#                       c['overall'],
+#                       'echo $SOURCES > $TARGET')
+#
+#
+## Plot results?
 
