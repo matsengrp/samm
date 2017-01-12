@@ -45,15 +45,15 @@ def parse_args():
     parser_simulate.add_argument('--output_file',
         type=str,
         help='simulated data destination file',
-        default='./_output/seqs.csv')
+        default='_output/seqs.csv')
     parser_simulate.add_argument('--output_genes',
         type=str,
         help='germline genes used in csv file',
-        default='./_output/genes.csv')
+        default='_output/genes.csv')
     parser_simulate.add_argument('--log_dir',
         type=str,
         help='log directory',
-        default='./_output')
+        default='_output')
     parser_simulate.add_argument('--n_germlines',
         type=int,
         help='number of germline genes to sample',
@@ -62,6 +62,9 @@ def parse_args():
         type=int,
         help='number of mutations from germline (default: -1 meaning choose at random)',
         default=-1)
+    parser_simulate.add_argument('--verbose',
+        action='store_true',
+        help='output R log')
 
     parser_simulate.set_defaults(subcommand=simulate)
 
@@ -84,7 +87,7 @@ def read_bcr_hd5(path, remove_gap=True):
         return sites
 
 
-def run_shmulate(n_taxa, output_file, log_dir, run, germline, n_mutes, seed):
+def run_shmulate(n_taxa, output_file, log_dir, run, germline, n_mutes, seed, verbose):
     ''' run shmulate through Rscript '''
 
     call = ['Rscript',
@@ -99,15 +102,17 @@ def run_shmulate(n_taxa, output_file, log_dir, run, germline, n_mutes, seed):
     print('Now executing:')
     print(' '.join(call))
 
-    with open(log_dir+'/'+str(run)+'.Rout', 'w') as rout:
-        try:
-            sout = subprocess.check_output(call, stderr=subprocess.STDOUT)
-            rout.write(sout)
-        except subprocess.CalledProcessError, err:
-            rout.write(err.output)
-            rout.write(' '.join(call))
+    try:
+        sout = subprocess.check_output(call, stderr=subprocess.STDOUT)
+        if verbose:
+            with open(log_dir+'/'+str(run)+'.Rout', 'w') as rout:
+                rout.write(sout)
+    except subprocess.CalledProcessError, err:
+        if verbose:
+            with open(log_dir+'/'+str(run)+'.Rout', 'w') as rout:
+                rout.write(err.output)
+                rout.write(' '.join(call))
             print(err)
-
 
 def simulate(args):
     ''' simulate submodule '''
@@ -159,12 +164,14 @@ def simulate(args):
             # The seed is modified so we aren't generating the same
             # mutations on each run
             run_shmulate(args.n_taxa, args.output_file, args.log_dir,
-                    run, sequence, n_mutes, args.seed)
+                    run, sequence, n_mutes, args.seed, args.verbose)
 
             # write to file in csv format
             shmulated_seqs = SeqIO.parse(args.output_file+'_'+str(run), 'fasta')
             for seq in shmulated_seqs:
                 seq_file.writerow([gene, str(seq.id), str(seq.seq)])
+
+            os.remove(args.output_file+'_'+str(run))
 
 
 def main(args=sys.argv[1:]):
