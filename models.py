@@ -3,7 +3,7 @@ class ObservedSequenceMutations:
         assert(len(start_seq) == len(end_seq))
 
         self.start_seq = start_seq
-        self.end_sed = end_seq
+        self.end_seq = end_seq
 
         # Make mutation position dictionary
         self.mutation_pos_dict = dict()
@@ -20,7 +20,6 @@ class ObservedSequenceMutations:
 class ImputedSequenceMutations:
     def __init__(self, obs_seq_mutation, mutation_order):
         self.obs_seq_mutation = obs_seq_mutation
-        self.seq_len = len(obs_seq_mutation.start_seq)
         self.mutation_order = mutation_order
 
     def __str__(self):
@@ -28,3 +27,30 @@ class ImputedSequenceMutations:
             self.obs_seq_mutation.start_seq,
             self.mutation_order,
         )
+
+class FullSequenceMutations:
+    def __init__(self, obs_seq_mutation, mutations):
+        """
+        @param obs_seq_mutation: ObservedSequenceMutations
+        @param mutations: a list of MutationPosTime
+        """
+        self.obs_seq_mutation = obs_seq_mutation
+        self.mutations = mutations
+
+    def __str__(self):
+        return "%s => %s" % (
+            self.obs_seq_mutation.start_seq,
+            self.obs_seq_mutation.end_seq
+        )
+
+class MutationEvent:
+    """
+    Stores information on what happened during a mutation event
+    """
+    def __init__(self, time, pos, target_nucleotide):
+        self.time = time
+        self.pos = pos
+        self.target_nucleotide = target_nucleotide
+
+    def __str__(self):
+        return "%d=%s" % (self.pos, self.target_nucleotide)
