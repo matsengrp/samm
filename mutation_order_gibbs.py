@@ -84,15 +84,20 @@ class MutationOrderGibbsSampler:
 
                 full_orderings.append(possible_full_order)
                 # multiply the sequence of multinomials to get the probability of the full ordering
+                # the product in {eq:full_ordering}
                 full_ordering_probs.append(np.prod(multinomial_sequence))
 
             # now perform a draw from the multinomial distribution of full orderings
+            # the multinomial folows the distribution in {eq:order_conditional_prob}
             sampled_order_idx = sample_multinomial(full_ordering_probs)
             # update the ordering
             curr_order = full_orderings[sampled_order_idx]
         return curr_order
 
     def _get_multinomial_prob(self, feat_vec_dict, numerator_pos):
+        """
+        a single term in {eq:full_ordering}
+        """
         # guard against blowups when calculating exp - use a renormalization term
         theta_sums = [np.sum(self.theta[feat_vec]) for feat_vec in feat_vec_dict.values()]
         renorm_factor = np.max(theta_sums)

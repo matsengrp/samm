@@ -17,7 +17,9 @@ class SurvivalProblem:
                 obj += sum_entries(theta[feature_vec_mutated]) - log_sum_exp(vstack(*[
                     sum_entries(theta[f]) for f in vecs_at_mutation_step.values()
                 ]))
-        problem = Problem(Maximize(obj))
+        # maximize the average log likelihood (normalization makes it easier to track EM
+        # since the number of E-step samples grows)
+        problem = Problem(Maximize(1.0/len(self.samples) * obj))
         problem.solve()
         assert(problem.status == OPTIMAL)
-        return theta.value
+        return theta.value, problem.value

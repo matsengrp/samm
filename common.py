@@ -16,3 +16,12 @@ def sample_multinomial(pvals):
     norm_pvals = np.array(pvals)/np.sum(pvals)
     sample = np.random.multinomial(1, norm_pvals)
     return np.where(sample == 1)[0][0]
+
+def get_random_dna_seq(seq_length, nucleotide_probs=[1,1,1,1]):
+    """
+    Generate a random dna sequence
+    """
+    random_nucleotides = [
+        NUCLEOTIDES[sample_multinomial(nucleotide_probs)] for i in range(seq_length)
+    ]
+    return "".join(random_nucleotides)
