@@ -10,6 +10,8 @@ class ObservedSequenceMutations:
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
                 self.mutation_pos_dict[i] = end_seq[i]
+        self.num_mutations = len(self.mutation_pos_dict.keys())
+        self.seq_len = len(start_seq)
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (

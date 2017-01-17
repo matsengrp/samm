@@ -12,7 +12,7 @@ class FeatureGenerator:
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
         """
-        @param sequence: current sequence
+        @param sequence: current sequence (string)
         @param no_feat_vec_pos: do NOT generate feature vectors for these positions
         @param do_feat_vec_pos: do generate feature vectors for these positions.
                                 By default, this will be set to all positions in the sequence.
@@ -71,16 +71,33 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 mutation_pos,
                 seq_mut_order.obs_seq_mutation.mutation_pos_dict[mutation_pos]
             )
-            feature_vec_dicts.append(
-                self.create_for_sequence(intermediate_seq, no_feat_vec_pos=seq_mut_order.mutation_order[:i + 1])
+            # Get the feature vectors for the positions that might be affected by the latest mutation
+            # Don't calculate feature vectors for positions that have mutated already
+            no_feat_vec_pos = seq_mut_order.mutation_order[:i + 1]
+            # Calculate feature vectors for positions that are close to the mutation
+            do_feat_vec_pos = range(
+                max(mutation_pos - self.flank_end_len, 0),
+                min(mutation_pos + self.flank_end_len, seq_mut_order.obs_seq_mutation.seq_len),
             )
+            feat_vec_dict_update = self.create_for_sequence(
+                intermediate_seq,
+                no_feat_vec_pos=no_feat_vec_pos,
+                do_feat_vec_pos=do_feat_vec_pos,
+            )
+            # Populate rest of dict with the previously calculated feature vectors
+            for p in range(seq_mut_order.obs_seq_mutation.seq_len):
+                if p not in no_feat_vec_pos and p not in do_feat_vec_pos:
+                    feat_vec_dict_update[p] = feature_vec_dicts[-1][p]
+
+            feature_vec_dicts.append(feat_vec_dict_update)
+
         return feature_vec_dicts
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """
         @param no_feat_vec_pos: don't create feature vectors for these positions
         """
-        if pos < self.flank_end_len or pos > self.flank_end_len + 1:
+        if pos < self.flank_end_len or pos > len(intermediate_seq) - 1 - self.flank_end_len:
             # do special stuff cause positions are at the ends
             # TODO: update this. right now it sets all extreme positions to the same feature
             idx = self.feature_vec_len - 1

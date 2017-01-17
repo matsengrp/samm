@@ -68,7 +68,7 @@ class MutationOrderGibbsSampler:
             full_orderings.append(full_order_last)
             full_ordering_probs.append(np.prod(multinomial_sequence))
 
-            # iterate through the rest of the possible mutation orders given this partial order
+            # iterate through the rest of the possible full mutation orders consistent with this partial order
             for i in reversed(range(self.num_mutations - 1)):
                 possible_full_order = partial_order[:i] + [position] + partial_order[i:]
                 feat_vec_dicts = self.feature_generator.create_for_mutation_steps(
@@ -77,23 +77,24 @@ class MutationOrderGibbsSampler:
                         possible_full_order
                     )
                 )
-                # multiply the sequence of multinomials to get the probability of the full ordering
+                # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
+                # the position that mutates right after it), rest are the same
                 multinomial_sequence[i] = self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
                 multinomial_sequence[i + 1] = self._get_multinomial_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
 
                 full_orderings.append(possible_full_order)
+                # multiply the sequence of multinomials to get the probability of the full ordering
                 full_ordering_probs.append(np.prod(multinomial_sequence))
 
-            # now perform a draw from this multinomial distribution
-            # print "full_ordering_probs", full_ordering_probs
+            # now perform a draw from the multinomial distribution of full orderings
             sampled_order_idx = sample_multinomial(full_ordering_probs)
             # update the ordering
             curr_order = full_orderings[sampled_order_idx]
         return curr_order
 
     def _get_multinomial_prob(self, feat_vec_dict, numerator_pos):
-        numerator = np.exp(self.theta[feat_vec_dict[numerator_pos]])
+        numerator = np.exp(np.sum(self.theta[feat_vec_dict[numerator_pos]]))
         denominator = np.sum([
-            np.exp(self.theta[feat_vec]) for feat_vec in feat_vec_dict.values()
+            np.exp(np.sum(self.theta[feat_vec])) for feat_vec in feat_vec_dict.values()
         ])
         return numerator / denominator
