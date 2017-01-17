@@ -93,8 +93,10 @@ class MutationOrderGibbsSampler:
         return curr_order
 
     def _get_multinomial_prob(self, feat_vec_dict, numerator_pos):
-        numerator = np.exp(np.sum(self.theta[feat_vec_dict[numerator_pos]]))
-        denominator = np.sum([
-            np.exp(np.sum(self.theta[feat_vec])) for feat_vec in feat_vec_dict.values()
-        ])
+        # guard against blowups when calculating exp - use a renormalization term
+        theta_sums = [np.sum(self.theta[feat_vec]) for feat_vec in feat_vec_dict.values()]
+        renorm_factor = np.max(theta_sums)
+
+        numerator = np.exp(np.sum(self.theta[feat_vec_dict[numerator_pos]]) - renorm_factor)
+        denominator = np.sum([np.exp(t - renorm_factor) for t in theta_sums])
         return numerator / denominator
