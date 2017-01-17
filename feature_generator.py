@@ -4,10 +4,11 @@ from common import NUCLEOTIDES
 
 class FeatureGenerator:
     """
-    Subclass this to have various types of feature vector generators
-    We assume all feature vectors are composed of ones and zeros
-    Each feature vector will just be the positions that are one.
-    We call these "sparse feature vectors"
+    Subclass this to have various types of feature vector generators.
+    We assume all feature vectors are composed of ones and zeros.
+    Each feature vector will a dictionary keyed on motifs with values being the
+    corresponding index in the list of motifs (changing the left-hand bases
+    first). We call these "sparse feature vectors".
     """
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
@@ -51,7 +52,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return feature_vec_dict
 
-    # TODO: make this a real feature generator
+    # TODO: make this a real feature generator (deal with ends properly)
     def create_for_mutation_steps(self, seq_mut_order):
         """
         Feature vector are just indicators for which submotif. To get the index for a submotif
