@@ -19,6 +19,10 @@ class ObservedSequenceMutations:
 
 class ImputedSequenceMutations:
     def __init__(self, obs_seq_mutation, mutation_order):
+        """
+        @param obs_seq_mutation: ObservedSequenceMutations
+        @param mutation_order: a list of the positions in the order they mutated
+        """
         self.obs_seq_mutation = obs_seq_mutation
         self.mutation_order = mutation_order
 

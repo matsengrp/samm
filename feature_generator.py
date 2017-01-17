@@ -57,7 +57,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         Feature vector are just indicators for which submotif. To get the index for a submotif
         indicator, vary the early positions fastest and later positions slowest.
 
-        @param seq_mut_order: SequenceMutationOrder
+        @param seq_mut_order: ImputedSequenceMutations
         @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
         """
         intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq
