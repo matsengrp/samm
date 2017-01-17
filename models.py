@@ -10,6 +10,8 @@ class ObservedSequenceMutations:
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
                 self.mutation_pos_dict[i] = end_seq[i]
+        self.num_mutations = len(self.mutation_pos_dict.keys())
+        self.seq_len = len(start_seq)
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (
@@ -19,6 +21,10 @@ class ObservedSequenceMutations:
 
 class ImputedSequenceMutations:
     def __init__(self, obs_seq_mutation, mutation_order):
+        """
+        @param obs_seq_mutation: ObservedSequenceMutations
+        @param mutation_order: a list of the positions in the order they mutated
+        """
         self.obs_seq_mutation = obs_seq_mutation
         self.mutation_order = mutation_order
 
