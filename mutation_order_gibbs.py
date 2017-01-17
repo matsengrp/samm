@@ -42,6 +42,7 @@ class MutationOrderGibbsSampler:
         One gibbs sweep is a gibbs sampling step for all the positions
         """
         # sample full ordering from conditional prob for this position
+        # TODO: make this go through a randomly ordered gibbs sampler
         for position in self.mutated_positions:
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
@@ -53,7 +54,7 @@ class MutationOrderGibbsSampler:
             # It's here right now cause it makes life easy
             full_orderings = []
 
-            # first consider the full ordering with the mutate in the last position
+            # first consider the full ordering with position under consideration mutating last
             full_order_last = partial_order + [position]
             feat_vec_dicts = self.feature_generator.create_for_mutation_steps(
                 ImputedSequenceMutations(

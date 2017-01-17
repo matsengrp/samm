@@ -64,7 +64,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         feature_vec_dicts = [
             self.create_for_sequence(intermediate_seq)
         ]
-        for i, mutation_pos in enumerate(seq_mut_order.mutation_order):
+        for i, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
             # update to get the new sequence after the i-th mutation
             intermediate_seq = mutate_string(
                 intermediate_seq,
@@ -85,6 +85,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 do_feat_vec_pos=do_feat_vec_pos,
             )
             # Populate rest of dict with the previously calculated feature vectors
+            # TODO: maybe we can copy the dict faster
             for p in range(seq_mut_order.obs_seq_mutation.seq_len):
                 if p not in no_feat_vec_pos and p not in do_feat_vec_pos:
                     feat_vec_dict_update[p] = feature_vec_dicts[-1][p]
