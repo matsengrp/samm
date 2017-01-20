@@ -65,7 +65,7 @@ class MCMC_EM:
                 # Calculate lower bound to determine if we need to rerun
                 autocorr = self.calculate_autocorr(lik_vec)
                 neff = len(e_step_samples) / autocorr
-                ase = np.sqrt(np.var(like_vec) / neff)
+                ase = np.sqrt(np.var(lik_vec) / neff)
 
                 # TODO: should we just have a table of z scores?
                 lower_bound = lik_ratio_mean - 1.65 * ase
