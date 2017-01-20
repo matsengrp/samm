@@ -56,11 +56,11 @@ class MCMC_EM:
                 prev_theta = theta
 
                 # Do M-step
-                problem = SurvivalProblem(e_step_samples)
-                theta, exp_log_lik = problem.solve(self.feat_generator, verbose=verbose)
+                problem = SurvivalProblem(e_step_samples, self.feat_generator)
+                theta, exp_log_lik = problem.solve(verbose=verbose)
 
                 # Get statistics
-                log_lik_vec = problem.calculate_log_lik_vec(self.feat_generator, theta, prev_theta, e_step_samples)
+                log_lik_vec = problem.calculate_log_lik_vec(theta, prev_theta, e_step_samples)
                 log_lik_ratio_mean = np.mean(log_lik_vec)
 
                 # Calculate lower bound to determine if we need to rerun
