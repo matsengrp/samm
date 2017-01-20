@@ -25,3 +25,6 @@ def get_random_dna_seq(seq_length, nucleotide_probs=[1,1,1,1]):
         NUCLEOTIDES[sample_multinomial(nucleotide_probs)] for i in range(seq_length)
     ]
     return "".join(random_nucleotides)
+
+def checkEqual(L1, L2):
+    return len(L1) == len(L2) and sorted(L1) == sorted(L2)

@@ -1,7 +1,7 @@
 import numpy as np
 
 from models import ImputedSequenceMutations
-from common import sample_multinomial
+from common import *
 
 from sampler_collection import Sampler
 
@@ -9,6 +9,8 @@ class MutationOrderGibbsSampler(Sampler):
     def run(self, init_order, burn_in, num_samples):
         self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
+
+        assert(checkEqual(init_order, self.mutated_positions))
 
         curr_order = init_order
         samples = []
