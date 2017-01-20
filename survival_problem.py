@@ -8,7 +8,7 @@ class SurvivalProblem:
         self.samples = samples
         self.feature_generator = feature_generator
 
-    def solve(self, verbose=False):
+    def solve(self, lasso_param, verbose=False):
         # TODO: Add theta for different mutation types
         theta = Variable(self.feature_generator.feature_vec_len)
         obj = 0
@@ -16,7 +16,7 @@ class SurvivalProblem:
             obj += self.calculate_per_sample_log_lik(theta, sample)
         # maximize the average log likelihood (normalization makes it easier to track EM
         # since the number of E-step samples grows)
-        problem = Problem(Maximize(1.0/len(self.samples) * obj - norm(theta, 1)))
+        problem = Problem(Maximize(1.0/len(self.samples) * obj - lasso_param * norm(theta, 1)))
         problem.solve(verbose=verbose)
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value

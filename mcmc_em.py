@@ -18,8 +18,9 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.num_threads = num_threads
 
+
     # TODO: find a reasonable choice for upper_stop
-    def run(self, max_iters=10, verbose=False, upper_stop=1.):
+    def run(self, lasso_param=1, max_iters=10, verbose=False, upper_stop=1.):
         # initialize theta vector
         theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
@@ -57,7 +58,7 @@ class MCMC_EM:
 
                 # Do M-step
                 problem = SurvivalProblem(e_step_samples, self.feat_generator)
-                theta, exp_log_lik = problem.solve(verbose=verbose)
+                theta, exp_log_lik = problem.solve(lasso_param, verbose=verbose)
 
                 # Get statistics
                 log_lik_vec = problem.calculate_log_lik_vec(theta, prev_theta, e_step_samples)
