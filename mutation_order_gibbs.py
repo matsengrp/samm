@@ -1,41 +1,25 @@
 import numpy as np
+
 from models import ImputedSequenceMutations
-from common import sample_multinomial
+from common import *
 
-class MutationOrderGibbsSampler:
-    def __init__(self, theta, feature_generator, obs_seq_mutation):
-        """
-        @param theta: numpy vector of model parameters
-        @param feature_generator: FeatureGenerator
-        @param obs_seq_mutation: a ObservedSequenceMutations to know the starting and ending sequence
-        """
-        self.theta = theta
-        self.feature_generator = feature_generator
-        self.obs_seq_mutation = obs_seq_mutation
-        self.mutated_positions = obs_seq_mutation.mutation_pos_dict.keys()
+from sampler_collection import Sampler
+
+class MutationOrderGibbsSampler(Sampler):
+    def run(self, init_order, burn_in, num_samples):
+        self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
-        self.samples = []
 
-    def sample_burn_in(self, init_order, burn_in_sweeps):
+        assert(checkEqual(init_order, self.mutated_positions))
+
         curr_order = init_order
-        for i in range(burn_in_sweeps):
-            sample = self._do_gibbs_sweep(curr_order)
-        self.samples = [sample]
-
-    def sample_orders(self, num_samples):
-        """
-        @param num_samples: number of samples needed
-        @return a list of sampled mutation order with model theta
-        The gibbs sampler will start from its latest sample
-        """
-        if len(self.samples) == 0:
-            raise ValueError("Please do burn-in first")
-
-        curr_order = self.samples[-1]
-        for i in range(num_samples):
+        samples = []
+        for i in range(burn_in + num_samples):
             curr_order = self._do_gibbs_sweep(curr_order)
-            self.samples.append(curr_order)
-        return self.samples[-num_samples:]
+            samples.append(curr_order)
+
+        sampled_orders = samples[-num_samples:]
+        return [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in sampled_orders]
 
     def _do_gibbs_sweep(self, curr_order):
         """
