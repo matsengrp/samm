@@ -60,17 +60,17 @@ class MCMC_EM:
                 theta, exp_log_lik = problem.solve(self.feat_generator, verbose=verbose)
 
                 # Get statistics
-                lik_vec = problem.calculate_lik_vec(self.feat_generator, theta, prev_theta, e_step_samples)
-                lik_ratio_mean = np.mean(lik_vec)
+                log_lik_vec = problem.calculate_log_lik_vec(self.feat_generator, theta, prev_theta, e_step_samples)
+                log_lik_ratio_mean = np.mean(log_lik_vec)
 
                 # Calculate lower bound to determine if we need to rerun
-                autocorr = self.calculate_autocorr(lik_vec)
+                autocorr = self.calculate_autocorr(log_lik_vec)
                 neff = len(e_step_samples) / autocorr
-                ase = np.sqrt(np.var(lik_vec) / neff)
+                ase = np.sqrt(np.var(log_lik_vec) / neff)
 
                 # TODO: should we just have a table of z scores?
-                lower_bound = lik_ratio_mean - ZSCORE * ase
-                upper_bound = lik_ratio_mean + ZSCORE * ase
+                lower_bound = log_lik_ratio_mean - ZSCORE * ase
+                upper_bound = log_lik_ratio_mean + ZSCORE * ase
                 lower_bound_is_negative = (lower_bound < 0)
                 upper_bound_is_large = (upper_bound > upper_stop)
 
@@ -93,13 +93,13 @@ class MCMC_EM:
         sampled_orders = mut_order_sampler.sample_orders(num_samples)
         return [ImputedSequenceMutations(obs_seq, order) for order in sampled_orders]
 
-    def calculate_autocorr(self, lik_ratios):
+    def calculate_autocorr(self, log_lik_ratios):
         # Definition from p. 151 of Carlin/Louis:
         # \kappa = 1 + 2\sum_{k=1}^\infty \rho_k
         # So we don't take the self-correlation
         # TODO: do we worry about cutting off small values?
         # Glynn/Whitt say we could use batch estimation with batch sizes going to
         # infinity. Is this a viable option?
-        result = np.correlate(lik_ratios, lik_ratios, mode='full')
+        result = np.correlate(log_lik_ratios, log_lik_ratios, mode='full')
         return 1 + 2*np.sum(result[1+result.size/2:])
 
