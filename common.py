@@ -1,6 +1,7 @@
 import numpy as np
 
 NUCLEOTIDES = "atcg"
+ZSCORE = 1.65
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
