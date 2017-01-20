@@ -10,7 +10,7 @@ class MutationOrderGibbsSampler(Sampler):
         self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
 
-        assert(checkEqual(init_order, self.mutated_positions))
+        assert(check_unordered_equal(init_order, self.mutated_positions))
 
         curr_order = init_order
         samples = []

@@ -43,6 +43,12 @@ class SamplerCollection:
             ],
         )
         pool.close()
+
+        # If one of the gibbs samplers fails, we should... fail the whole thing for now.
+        # We'll deal with this when this becomes a real issue. Maybe we need to try to
+        # rerun that particular sampler.
+        assert(None not in sampled_orders_list)
+
         return sampled_orders_list
 
 def _run_sampler(sampler_worker):

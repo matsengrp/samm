@@ -17,7 +17,7 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.num_threads = num_threads
 
-    def run(self, max_iters=10, verbose=False):
+    def run(self, lasso_param=1, max_iters=10, verbose=False):
         # initialize theta vector
         theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
@@ -46,7 +46,7 @@ class MCMC_EM:
 
             # Do M-step
             problem = SurvivalProblem(e_step_samples)
-            theta, exp_log_lik = problem.solve(self.feat_generator, verbose=verbose)
+            theta, exp_log_lik = problem.solve(lasso_param, self.feat_generator, verbose=verbose)
         return theta
 
     def get_e_samples(self, obs_seq, theta, init_order, num_samples):
