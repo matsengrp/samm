@@ -68,7 +68,6 @@ class MCMC_EM:
                     autocorr = self.calculate_autocorr(all_lik_ratios[:run])
                     neff = len(e_step_samples) / autocorr
                     ase = np.sqrt(lik_ratio_var / neff)
-                    print run, autocorr, neff
 
                     # TODO: should we just have a table of z scores?
                     lower_bound = lik_ratio_mean - 1.65 * np.sqrt(lik_ratio_var / neff)
