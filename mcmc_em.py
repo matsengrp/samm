@@ -70,8 +70,8 @@ class MCMC_EM:
                     ase = np.sqrt(lik_ratio_var / neff)
 
                     # TODO: should we just have a table of z scores?
-                    lower_bound = lik_ratio_mean - 1.65 * np.sqrt(lik_ratio_var / neff)
-                    upper_bound = lik_ratio_mean + 1.65 * np.sqrt(lik_ratio_var / neff)
+                    lower_bound = lik_ratio_mean - 1.65 * ase
+                    upper_bound = lik_ratio_mean + 1.65 * ase
                     lower_bound_is_negative = (lower_bound < 0)
                     upper_bound_is_large = (upper_bound > upper_stop)
                     prev_samples = e_step_samples
