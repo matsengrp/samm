@@ -71,11 +71,6 @@ class MCMC_EM:
                 # TODO: should we just have a table of z scores?
                 lower_bound = log_lik_ratio_mean - ZSCORE * ase
                 lower_bound_is_negative = (lower_bound < 0)
-
-                print len(e_step_samples)
-                print autocorr
-                print theta
-                print log_lik_vec
             run += 1
         return theta
 
