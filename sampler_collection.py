@@ -42,7 +42,7 @@ class SamplerCollection:
                 for sampler, init_order in zip(self.samplers, init_orders_for_iter)
             ],
         )
-
+        pool.close()
         return sampled_orders_list
 
 def _run_sampler(sampler_worker):
