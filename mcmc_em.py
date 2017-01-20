@@ -2,6 +2,7 @@ import time
 import numpy as np
 
 from models import *
+from common import *
 from feature_generator import SubmotifFeatureGenerator
 # from mutation_order_sampler import MutationOrderSampler
 from mutation_order_gibbs import MutationOrderGibbsSampler
@@ -39,20 +40,20 @@ class MCMC_EM:
                 self.num_threads,
             )
 
-            sampled_orders_list = sampler_collection.get_samples(
-                init_orders,
-                num_e_samples,
-                self.burn_in,
-            )
-            # the last sampled mutation order from each list
-            # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
-            init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
+            e_step_samples = []
             while lower_bound_is_negative:
-                prev_theta = theta
+                sampled_orders_list = sampler_collection.get_samples(
+                    init_orders,
+                    num_e_samples,
+                    self.burn_in,
+                )
+                # the last sampled mutation order from each list
+                # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
+                init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
-                e_step_samples = [o for orders in sampled_orders_list for o in orders]
-                # append previous samples
-                e_step_samples += prev_samples
+                e_step_samples += [o for orders in sampled_orders_list for o in orders]
+
+                prev_theta = theta
 
                 # Do M-step
                 problem = SurvivalProblem(e_step_samples)
@@ -68,20 +69,15 @@ class MCMC_EM:
                 ase = np.sqrt(np.var(lik_vec) / neff)
 
                 # TODO: should we just have a table of z scores?
-                lower_bound = lik_ratio_mean - 1.65 * ase
-                upper_bound = lik_ratio_mean + 1.65 * ase
+                lower_bound = lik_ratio_mean - ZSCORE * ase
+                upper_bound = lik_ratio_mean + ZSCORE * ase
                 lower_bound_is_negative = (lower_bound < 0)
                 upper_bound_is_large = (upper_bound > upper_stop)
-                prev_samples = e_step_samples
 
                 # Take enough samples next time to get large enough neff
                 assert(autocorr > 1)
-                num_e_samples = np.ceil((autocorr - 1) * num_e_samples)
-                sampled_orders_list = sampler_collection.get_samples(
-                    init_orders,
-                    int(num_e_samples),
-                    self.burn_in,
-                )
+                num_e_samples = int(np.ceil((autocorr - 1) * num_e_samples))
+
             run += 1
         return theta
 
