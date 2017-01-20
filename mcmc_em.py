@@ -25,10 +25,9 @@ class MCMC_EM:
         theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
-        upper_bound_is_large = True
         run = 0
         # TODO: use a separate burn-in value for computing ESS?
-        while upper_bound_is_large and run < max_iters:
+        while run < max_iters:
             prev_samples = []
             lower_bound_is_negative = True
             num_e_samples = self.base_num_e_samples
@@ -60,25 +59,23 @@ class MCMC_EM:
                 problem = SurvivalProblem(e_step_samples, self.feat_generator)
                 theta, exp_log_lik = problem.solve(lasso_param, verbose=verbose)
 
+
                 # Get statistics
-                log_lik_vec = problem.calculate_log_lik_vec(theta, prev_theta, e_step_samples)
+                log_lik_vec = problem.calculate_log_lik_vec(theta, prev_theta)
                 log_lik_ratio_mean = np.mean(log_lik_vec)
 
                 # Calculate lower bound to determine if we need to rerun
                 autocorr = self.calculate_autocorr(log_lik_vec)
-                neff = len(e_step_samples) / autocorr
-                ase = np.sqrt(np.var(log_lik_vec) / neff)
+                ase = np.sqrt(autocorr * np.var(log_lik_vec) / len(e_step_samples))
 
                 # TODO: should we just have a table of z scores?
                 lower_bound = log_lik_ratio_mean - ZSCORE * ase
-                upper_bound = log_lik_ratio_mean + ZSCORE * ase
                 lower_bound_is_negative = (lower_bound < 0)
-                upper_bound_is_large = (upper_bound > upper_stop)
 
-                # Take enough samples next time to get large enough neff
-                assert(autocorr > 1)
-                num_e_samples = int(np.ceil((autocorr - 1) * num_e_samples))
-
+                print len(e_step_samples)
+                print autocorr
+                print theta
+                print log_lik_vec
             run += 1
         return theta
 
