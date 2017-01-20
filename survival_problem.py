@@ -1,3 +1,4 @@
+import time
 from cvxpy import *
 from feature_generator import FeatureGenerator
 
@@ -5,7 +6,7 @@ class SurvivalProblem:
     def __init__(self, samples):
         self.samples = samples
 
-    def solve(self, feature_generator):
+    def solve(self, feature_generator, verbose=False):
         # TODO: Add theta for different mutation types
         theta = Variable(feature_generator.feature_vec_len)
         obj = 0
@@ -13,8 +14,8 @@ class SurvivalProblem:
             obj += self.calculate_per_sample_lik(feature_generator, theta, sample)
         # maximize the average log likelihood (normalization makes it easier to track EM
         # since the number of E-step samples grows)
-        problem = Problem(Maximize(1.0/len(self.samples) * obj))
-        problem.solve()
+        problem = Problem(Maximize(1.0/len(self.samples) * obj - norm(theta, 1)))
+        problem.solve(verbose=verbose)
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 

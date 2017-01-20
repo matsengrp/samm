@@ -1,3 +1,4 @@
+import time
 import numpy as np
 
 from models import *
@@ -5,21 +6,23 @@ from feature_generator import SubmotifFeatureGenerator
 # from mutation_order_sampler import MutationOrderSampler
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem import SurvivalProblem
+from sampler_collection import SamplerCollection
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, base_num_e_samples=10, burn_in=10):
+    def __init__(self, observed_data, feat_generator, sampler_cls, base_num_e_samples=10, burn_in=10, num_threads=1):
         self.observed_data = observed_data
         self.feat_generator = feat_generator
         self.base_num_e_samples = base_num_e_samples
         self.burn_in = burn_in
+        self.sampler_cls = sampler_cls
+        self.num_threads = num_threads
 
     # TODO: find a reasonable choice for upper_stop
-    def run(self, max_iters=10, alpha=.05, upper_stop=1.):
+    def run(self, max_iters=10, verbose=False, upper_stop=1.):
         # initialize theta vector
         theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
-        init_orders_for_iter = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
-
+        init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         upper_bound_is_large = True
         run = 0
         all_lik_ratios = np.zeros(max_iters+self.burn_in)
@@ -27,21 +30,35 @@ class MCMC_EM:
         while upper_bound_is_large and run < max_iters+self.burn_in:
             prev_samples = []
             lower_bound_is_negative = True
+            num_e_samples = self.base_num_e_samples
+            # do E-step
+            sampler_collection = SamplerCollection(
+                self.observed_data,
+                theta,
+                self.sampler_cls,
+                self.feat_generator,
+                self.num_threads,
+            )
+
+            sampled_orders_list = sampler_collection.get_samples(
+                init_orders,
+                num_e_samples,
+                self.burn_in,
+            )
+            # the last sampled mutation order from each list
+            # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
+            init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
             while lower_bound_is_negative:
                 prev_theta = theta
-                num_e_samples = self.base_num_e_samples
-                # do E-step, prepending previous samples
-                samples_for_obs_seq = prev_samples + [
-                    self.get_e_samples(obs_seq, theta, init_order, num_e_samples) for obs_seq, init_order in zip(self.observed_data, init_orders_for_iter)
-                ]
-                # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
-                init_orders_for_iter = [samples[-1].mutation_order for samples in samples_for_obs_seq]
-                e_step_samples = [s for s in samples for samples in samples_for_obs_seq]
+                # flatten the list of samples to get all the samples
+                e_step_samples = [o for orders in sampled_orders_list for o in orders]
+                # append previous samples
+                e_step_samples += prev_samples
 
                 # Do M-step
                 problem = SurvivalProblem(e_step_samples)
-                theta, exp_log_lik = problem.solve(self.feat_generator)
-    
+                theta, exp_log_lik = problem.solve(self.feat_generator, verbose=verbose)
+
                 # Get statistics
                 lik_ratio_mean, lik_ratio_var = problem.calculate_lik_stats(self.feat_generator, theta, prev_theta, e_step_samples)
                 all_lik_ratios[run] = lik_ratio_mean
@@ -58,11 +75,16 @@ class MCMC_EM:
                     upper_bound = lik_ratio_mean + 1.65 * np.sqrt(lik_ratio_var / neff)
                     lower_bound_is_negative = (lower_bound < 0)
                     upper_bound_is_large = (upper_bound > upper_stop)
-                    prev_samples = samples_for_obs_seq
-                    
+                    prev_samples = e_step_samples
+
                     # Take enough samples next time to get large enough neff
                     assert(autocorr > 1)
                     num_e_samples = np.ceil((autocorr - 1) * num_e_samples)
+                    sampled_orders_list = sampler_collection.get_samples(
+                        init_orders,
+                        int(num_e_samples),
+                        self.burn_in,
+                    )
                 else:
                     # If still in burn-in go to next iteration
                     lower_bound_is_negative = False
