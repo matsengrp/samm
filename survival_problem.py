@@ -1,5 +1,5 @@
 import time
-import numpy as np
+from numpy import zeros
 from cvxpy import *
 from feature_generator import FeatureGenerator
 
@@ -21,7 +21,7 @@ class SurvivalProblem:
         return theta.value, problem.value
 
     def calculate_lik_vec(self, feature_generator, theta, prev_theta, sample):
-        lik_vec = np.zeros(len(self.samples))
+        lik_vec = zeros(len(self.samples))
         for sample_id, sample in enumerate(self.samples):
             lik_vec[sample_id] = self.calculate_per_sample_lik(feature_generator, theta, sample).value - \
                     self.calculate_per_sample_lik(feature_generator, prev_theta, sample).value
