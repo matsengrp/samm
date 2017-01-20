@@ -1,4 +1,5 @@
 import time
+import numpy as np
 from cvxpy import *
 from feature_generator import FeatureGenerator
 
@@ -19,17 +20,12 @@ class SurvivalProblem:
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 
-    def calculate_lik_stats(self, feature_generator, theta, prev_theta, sample):
-        lik_mean = 0.
-        lik_var = 0.
-        n = len(self.samples)
+    def calculate_lik_vec(self, feature_generator, theta, prev_theta, sample):
+        lik_vec = np.zeros(len(self.samples))
         for sample_id, sample in enumerate(self.samples):
-            lik_value = self.calculate_per_sample_lik(feature_generator, theta, sample) - \
-                    self.calculate_per_sample_lik(feature_generator, prev_theta, sample)
-            lik_mean += lik_value / n
-            lik_var += lik_value*lik_value / n
-        lik_var -= lik_mean*lik_mean
-        return lik_mean.value, lik_var.value
+            lik_vec[sample_id] = self.calculate_per_sample_lik(feature_generator, theta, sample).value - \
+                    self.calculate_per_sample_lik(feature_generator, prev_theta, sample).value
+        return lik_vec
 
     def calculate_per_sample_lik(self, feature_generator, theta, sample):
         all_feature_vecs = feature_generator.create_for_mutation_steps(sample)

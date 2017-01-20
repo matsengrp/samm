@@ -25,9 +25,8 @@ class MCMC_EM:
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         upper_bound_is_large = True
         run = 0
-        all_lik_ratios = np.zeros(max_iters+self.burn_in)
         # TODO: use a separate burn-in value for computing ESS?
-        while upper_bound_is_large and run < max_iters+self.burn_in:
+        while upper_bound_is_large and run < max_iters:
             prev_samples = []
             lower_bound_is_negative = True
             num_e_samples = self.base_num_e_samples
@@ -60,33 +59,29 @@ class MCMC_EM:
                 theta, exp_log_lik = problem.solve(self.feat_generator, verbose=verbose)
 
                 # Get statistics
-                lik_ratio_mean, lik_ratio_var = problem.calculate_lik_stats(self.feat_generator, theta, prev_theta, e_step_samples)
-                all_lik_ratios[run] = lik_ratio_mean
+                lik_vec = problem.calculate_lik_vec(self.feat_generator, theta, prev_theta, e_step_samples)
+                lik_ratio_mean = np.mean(lik_vec)
 
-                if run > self.burn_in:
-                    # Calculate lower bound to determine if we need to rerun
-                    autocorr = self.calculate_autocorr(all_lik_ratios[:run])
-                    neff = len(e_step_samples) / autocorr
-                    ase = np.sqrt(lik_ratio_var / neff)
+                # Calculate lower bound to determine if we need to rerun
+                autocorr = self.calculate_autocorr(lik_vec)
+                neff = len(e_step_samples) / autocorr
+                ase = np.sqrt(np.var(like_vec) / neff)
 
-                    # TODO: should we just have a table of z scores?
-                    lower_bound = lik_ratio_mean - 1.65 * ase
-                    upper_bound = lik_ratio_mean + 1.65 * ase
-                    lower_bound_is_negative = (lower_bound < 0)
-                    upper_bound_is_large = (upper_bound > upper_stop)
-                    prev_samples = e_step_samples
+                # TODO: should we just have a table of z scores?
+                lower_bound = lik_ratio_mean - 1.65 * ase
+                upper_bound = lik_ratio_mean + 1.65 * ase
+                lower_bound_is_negative = (lower_bound < 0)
+                upper_bound_is_large = (upper_bound > upper_stop)
+                prev_samples = e_step_samples
 
-                    # Take enough samples next time to get large enough neff
-                    assert(autocorr > 1)
-                    num_e_samples = np.ceil((autocorr - 1) * num_e_samples)
-                    sampled_orders_list = sampler_collection.get_samples(
-                        init_orders,
-                        int(num_e_samples),
-                        self.burn_in,
-                    )
-                else:
-                    # If still in burn-in go to next iteration
-                    lower_bound_is_negative = False
+                # Take enough samples next time to get large enough neff
+                assert(autocorr > 1)
+                num_e_samples = np.ceil((autocorr - 1) * num_e_samples)
+                sampled_orders_list = sampler_collection.get_samples(
+                    init_orders,
+                    int(num_e_samples),
+                    self.burn_in,
+                )
             run += 1
         return theta
 
