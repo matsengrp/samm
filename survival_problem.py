@@ -21,7 +21,7 @@ class SurvivalProblem:
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 
-    def calculate_log_lik_vec(self, theta, prev_theta, sample):
+    def calculate_log_lik_vec(self, theta, prev_theta):
         log_lik_vec = zeros(len(self.samples))
         for sample_id, sample in enumerate(self.samples):
             log_lik_vec[sample_id] = self.calculate_per_sample_log_lik(theta, sample).value - \
