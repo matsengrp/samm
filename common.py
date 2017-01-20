@@ -26,5 +26,5 @@ def get_random_dna_seq(seq_length, nucleotide_probs=[1,1,1,1]):
     ]
     return "".join(random_nucleotides)
 
-def checkEqual(L1, L2):
+def check_unordered_equal(L1, L2):
     return len(L1) == len(L2) and sorted(L1) == sorted(L2)
