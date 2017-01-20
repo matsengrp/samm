@@ -42,6 +42,7 @@ em_algo = MCMC_EM(
     obs_data,
     feat_generator,
     MutationOrderGibbsSampler,
+    num_threads=num_threads
 )
-theta = em_algo.run()
+theta = em_algo.run(verbose=True)
 print "theta", theta
