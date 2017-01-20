@@ -19,16 +19,13 @@ class MCMC_EM:
         self.num_threads = num_threads
 
 
-    # TODO: find a reasonable choice for upper_stop
-    def run(self, lasso_param=1, max_iters=10, verbose=False, upper_stop=1.):
+    def run(self, lasso_param=1, max_iters=10, verbose=False):
         # initialize theta vector
         theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         run = 0
-        # TODO: use a separate burn-in value for computing ESS?
         while run < max_iters:
-            prev_samples = []
             lower_bound_is_negative = True
             num_e_samples = self.base_num_e_samples
             # do E-step
@@ -58,7 +55,6 @@ class MCMC_EM:
                 # Do M-step
                 problem = SurvivalProblem(e_step_samples, self.feat_generator)
                 theta, exp_log_lik = problem.solve(lasso_param, verbose=verbose)
-
 
                 # Get statistics
                 log_lik_vec = problem.calculate_log_lik_vec(theta, prev_theta)
