@@ -57,14 +57,10 @@ class MCMC_EM:
 
                 # Get statistics
                 log_lik_vec = problem.calculate_log_lik_vec(theta, prev_theta)
-                log_lik_ratio_mean = np.mean(log_lik_vec)
 
                 # Calculate lower bound to determine if we need to rerun
-                autocorr = self.calculate_autocorr(log_lik_vec)
-                ase = np.sqrt(autocorr * np.var(log_lik_vec) / len(e_step_samples))
+                ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_vec, ZSCORE)
 
-                # TODO: should we just have a table of z scores?
-                lower_bound = log_lik_ratio_mean - ZSCORE * ase
                 lower_bound_is_negative = (lower_bound < 0)
             run += 1
         return theta
@@ -80,14 +76,3 @@ class MCMC_EM:
         # TODO: we definitely want different number of samples at each E-step in the future
         sampled_orders = mut_order_sampler.sample_orders(num_samples)
         return [ImputedSequenceMutations(obs_seq, order) for order in sampled_orders]
-
-    def calculate_autocorr(self, log_lik_ratios):
-        # Definition from p. 151 of Carlin/Louis:
-        # \kappa = 1 + 2\sum_{k=1}^\infty \rho_k
-        # So we don't take the self-correlation
-        # TODO: do we worry about cutting off small values?
-        # Glynn/Whitt say we could use batch estimation with batch sizes going to
-        # infinity. Is this a viable option?
-        result = np.correlate(log_lik_ratios, log_lik_ratios, mode='full')
-        return 1 + 2*np.sum(result[1+result.size/2:])
-

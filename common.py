@@ -29,3 +29,46 @@ def get_random_dna_seq(seq_length, nucleotide_probs=[1,1,1,1]):
 
 def check_unordered_equal(L1, L2):
     return len(L1) == len(L2) and sorted(L1) == sorted(L2)
+
+def get_standard_error_ci_corrected(values, zscore):
+    """
+    @returns
+        the standard error of the values correcting for auto-correlation between the values
+        the lower bound of the mean of the values using the standard error and the given zscore
+        the upper bound of the mean of the values using the standard error and the given zscore
+    Calculate the autocorrelation, then the effective sample size, scale the standard error appropriately the effective sample size
+    """
+    mean = np.mean(values)
+    var = np.var(values)
+
+    # If the values are essentially constant, then the autocorrelation is zero.
+    # (There are numerical stability issues if we go thru the usual calculations)
+    if var < 1e-10:
+        return 0, mean, mean
+
+    # Calculate auto-correlation
+    # Definition from p. 151 of Carlin/Louis:
+    # \kappa = 1 + 2\sum_{k=1}^\infty \rho_k
+    # So we don't take the self-correlation
+    # TODO: do we worry about cutting off small values?
+    # Glynn/Whitt say we could use batch estimation with batch sizes going to
+    # infinity. Is this a viable option?
+    result = np.correlate(values - mean, values - mean, mode='full')
+    result = result[result.size/2:]
+    result /= (var * np.arange(values.size, 0, -1))
+
+    # truncate sum once the autocorrelation is negative
+    neg_indices = np.where(result < 0)
+    neg_idx = result.size
+    if len(neg_indices) > 0 and neg_indices[0].size > 1:
+        neg_idx = np.where(result < 0)[0][0]
+
+    autocorr = 1 + 2*np.sum(result[1:neg_idx])
+
+    # Effective sample size calculation
+    ess = values.size/autocorr
+
+    # Corrected standard error
+    ase = np.sqrt(var/ess)
+
+    return ase, mean - zscore * ase, mean + zscore * ase
