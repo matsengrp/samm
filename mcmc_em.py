@@ -32,7 +32,7 @@ class MCMC_EM:
             # do E-step
             sampler_collection = SamplerCollection(
                 self.observed_data,
-                theta,
+                prev_theta,
                 self.sampler_cls,
                 self.feat_generator,
                 self.num_threads,
