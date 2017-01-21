@@ -27,11 +27,12 @@ class MCMC_EM:
         run = 0
         while run < max_iters:
             lower_bound_is_negative = True
+            prev_theta = theta
             num_e_samples = self.base_num_e_samples
             # do E-step
             sampler_collection = SamplerCollection(
                 self.observed_data,
-                theta,
+                prev_theta,
                 self.sampler_cls,
                 self.feat_generator,
                 self.num_threads,
@@ -49,8 +50,6 @@ class MCMC_EM:
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
-
-                prev_theta = theta
 
                 # Do M-step
                 problem = SurvivalProblem(e_step_samples, self.feat_generator)
