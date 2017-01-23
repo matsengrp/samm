@@ -29,6 +29,7 @@ class MCMC_EM:
             lower_bound_is_negative = True
             prev_theta = theta
             num_e_samples = self.base_num_e_samples
+            burn_in = self.burn_in
             # do E-step
             sampler_collection = SamplerCollection(
                 self.observed_data,
@@ -43,8 +44,10 @@ class MCMC_EM:
                 sampled_orders_list = sampler_collection.get_samples(
                     init_orders,
                     num_e_samples,
-                    self.burn_in,
+                    burn_in,
                 )
+                burn_in = 0
+
                 # the last sampled mutation order from each list
                 # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
