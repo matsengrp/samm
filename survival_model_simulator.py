@@ -57,7 +57,9 @@ class SurvivalModelSimulator:
             # sample the target nucleotide
             nucleotide_original = intermediate_seq[mutate_pos]
             possible_target_nucleotides = NUCLEOTIDES.replace(nucleotide_original, "")
-            target_nucleotide_sample = np.random.multinomial(n=1, pvals=np.ones(3)/3)
+
+            # TODO: Right now this just randomly picks a target nucleotide. Might need to change in the future
+            target_nucleotide_sample = np.random.multinomial(n=1, pvals=np.ones(3)/3.)
             nucleotide_target = possible_target_nucleotides[np.where(target_nucleotide_sample == 1)[0][0]]
 
             mutations.append(MutationEvent(
