@@ -10,14 +10,14 @@ class SurvivalModelSimulator:
     Suppose that when a mutation occurs, it is equally likely to mutate into the
     three other nucleotides (prob=1/3).
     """
-    def __init__(self, theta, lambda0, feature_generator):
+    def __init__(self, theta, feature_generator, lambda0):
         """
         @param theta: numpy array of size (p,1)
         @param lambda0: a constant hazard rate
         """
         self.theta = theta
-        self.lambda0 = lambda0
         self.feature_generator = feature_generator
+        self.lambda0 = lambda0
 
     def simulate(self, start_seq, censoring_time):
         """

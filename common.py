@@ -15,10 +15,11 @@ def sample_multinomial(pvals):
     will renormalize pvals if needed
     """
     norm_pvals = np.array(pvals)/np.sum(pvals)
+    assert(np.sum(norm_pvals) > 1 - 1e-10)
     sample = np.random.multinomial(1, norm_pvals)
     return np.where(sample == 1)[0][0]
 
-def get_random_dna_seq(seq_length, nucleotide_probs=[1,1,1,1]):
+def get_random_dna_seq(seq_length, nucleotide_probs=[0.25, 0.25, 0.25, 0.25]):
     """
     Generate a random dna sequence
     """
@@ -72,3 +73,11 @@ def get_standard_error_ci_corrected(values, zscore):
     ase = np.sqrt(var/ess)
 
     return ase, mean - zscore * ase, mean + zscore * ase
+
+def soft_threshold(theta, thres):
+    """
+    @param theta: a numpy vector
+    @param thres: the amount to threshold theta by
+    @return theta that is soft-thresholded with constant thres
+    """
+    return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
