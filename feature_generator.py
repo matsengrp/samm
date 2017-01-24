@@ -110,3 +110,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 nuc_idx = NUCLEOTIDES.index(submotif_nuc)
                 idx += nuc_idx * np.power(4, submotif_i)
         return [idx]
+
+    @staticmethod
+    def get_motif_list():
+        motif_list = []
+        for i in NUCLEOTIDES:
+            for j in NUCLEOTIDES:
+                for k in NUCLEOTIDES:
+                    motif = "%s%s%s" % (k, j, i)
+                    motif_list.append(motif)
+        return motif_list

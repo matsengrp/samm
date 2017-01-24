@@ -4,11 +4,33 @@ from cvxpy import *
 from feature_generator import FeatureGenerator
 
 class SurvivalProblem:
+    def solve(self, *args, **kwargs):
+        """
+        Solve the problem
+        @return final fitted value of theta and objective function value
+        """
+        raise NotImplementedError()
+
+    def calculate_log_lik_ratio_vec(self, theta, prev_theta):
+        """
+        @param theta: the theta in the numerator
+        @param prev_theta: the theta in the denominator
+        @return the log likelihood ratios between theta and prev_theta for each e-step sample
+        """
+        raise NotImplementedError()
+
+
+class SurvivalProblemCVXPY(SurvivalProblem):
+    """
+    Use CVXPY to solve the survival problem
+    Warning: will be very slow for large datasets
+    Objective function: log likelihood of theta - lasso penalty on theta
+    """
     def __init__(self, samples, feature_generator):
         self.samples = samples
         self.feature_generator = feature_generator
 
-    def solve(self, lasso_param, verbose=False):
+    def solve(self, lasso_param, verbose=True):
         # TODO: Add theta for different mutation types
         theta = Variable(self.feature_generator.feature_vec_len)
         obj = 0
@@ -21,7 +43,7 @@ class SurvivalProblem:
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 
-    def calculate_log_lik_vec(self, theta, prev_theta):
+    def calculate_log_lik_ratio_vec(self, theta, prev_theta):
         log_lik_vec = zeros(len(self.samples))
         for sample_id, sample in enumerate(self.samples):
             log_lik_vec[sample_id] = self.calculate_per_sample_log_lik(theta, sample).value - \
@@ -38,4 +60,3 @@ class SurvivalProblem:
                 sum_entries(theta[f]) for f in vecs_at_mutation_step.values()
             ]))
         return obj
-
