@@ -30,11 +30,11 @@ def parse_args():
 
     parser_simulate = subparsers.add_parser('simulate')
 
-    parser_simulate.add_argument('--n_taxa',
+    parser_simulate.add_argument('--n-taxa',
         type=int,
         help='number of taxa to simulate',
         default=2)
-    parser_simulate.add_argument('--param_path',
+    parser_simulate.add_argument('--param-path',
         type=str,
         help='parameter file path',
         default=GERMLINE_PARAM_FILE)
@@ -42,23 +42,23 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser_simulate.add_argument('--output_file',
+    parser_simulate.add_argument('--output-file',
         type=str,
         help='simulated data destination file',
         default='_output/seqs.csv')
-    parser_simulate.add_argument('--output_genes',
+    parser_simulate.add_argument('--output-genes',
         type=str,
         help='germline genes used in csv file',
         default='_output/genes.csv')
-    parser_simulate.add_argument('--log_dir',
+    parser_simulate.add_argument('--log-dir',
         type=str,
         help='log directory',
         default='_output')
-    parser_simulate.add_argument('--n_germlines',
+    parser_simulate.add_argument('--n-germlines',
         type=int,
         help='number of germline genes to sample (maximum 350)',
         default=2)
-    parser_simulate.add_argument('--n_mutes',
+    parser_simulate.add_argument('--n-mutes',
         type=int,
         help='number of mutations from germline (default: -1 meaning choose at random)',
         default=-1)
