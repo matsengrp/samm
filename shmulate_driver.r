@@ -8,7 +8,7 @@ source('shmulate/R/SHMulate_Functions.R')
 # seqinr
 # shazam
 
-arg <- commandArgs(TRUE)                       
+arg <- commandArgs(TRUE)
 n.taxa <- as.numeric(arg[1])
 seq.file <- arg[2]
 germline <- arg[3]
@@ -31,4 +31,3 @@ outdat <- lapply(1:nrow(dat), function(u) dat[u,])
 
 # output file should be same as input file
 write.fasta(sequences = outdat, file.out = seq.file, names = paste(group, '-Sequence', 1:n.taxa, sep=''))
-
