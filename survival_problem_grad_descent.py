@@ -44,22 +44,22 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         return -(1.0/self.num_samples * log_lik - self.lasso_param * np.linalg.norm(theta, ord=1))
 
     def calculate_log_lik_ratio_vec(self, theta, prev_theta):
-        log_lik_vec = np.zeros(self.num_samples)
+        llr_vec = np.zeros(self.num_samples)
         for sample_id, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair):
-            log_lik_vec[sample_id] = SurvivalProblemGradientDescent.calculate_per_sample_log_lik(theta, sample, feature_vecs) - \
+            llr_vec[sample_id] = SurvivalProblemGradientDescent.calculate_per_sample_log_lik(theta, sample, feature_vecs) - \
                     SurvivalProblemGradientDescent.calculate_per_sample_log_lik(prev_theta, sample, feature_vecs)
-        return log_lik_vec
+        return llr_vec
 
     @staticmethod
     def calculate_per_sample_log_lik(theta, sample, feature_vecs):
         """
-        @param sample: class ImputedSequenceMutations
+        @param sample: instance of class ImputedSequenceMutations
         @param feature_vecs: list of sparse feature vectors for all at-risk positions at every mutation step
         @return the log likelihood of theta for the given sample
         """
         obj = 0
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
-            # vec_mutation_step are the feature vectors of the at-risk group after mutation i
+            # vecs_at_mutation_step[i] are the feature vectors of the at-risk group after mutation i
             feature_vec_mutated = vecs_at_mutation_step[mutating_pos]
             obj += np.sum(theta[feature_vec_mutated]) - sp.misc.logsumexp(
                 [np.sum(theta[f]) for f in vecs_at_mutation_step.values()]

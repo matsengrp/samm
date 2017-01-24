@@ -76,6 +76,9 @@ def get_standard_error_ci_corrected(values, zscore):
 
 def soft_threshold(theta, thres):
     """
+    The soft thresholding function S is zero in the range [-thresh, thresh],
+    theta+thresh when theta < -thresh and theta-thresh when theta > thresh.
+
     @param theta: a numpy vector
     @param thres: the amount to threshold theta by
     @return theta that is soft-thresholded with constant thres
