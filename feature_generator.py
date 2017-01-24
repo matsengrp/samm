@@ -1,6 +1,7 @@
 import numpy as np
 from common import mutate_string
 from common import NUCLEOTIDES
+import itertools
 
 class FeatureGenerator:
     """
@@ -35,7 +36,7 @@ class FeatureGenerator:
 class SubmotifFeatureGenerator(FeatureGenerator):
     def __init__(self, submotif_len=3):
         assert(submotif_len % 2 == 1)
-        self.submotif_len = 3
+        self.submotif_len = submotif_len
         self.flank_end_len = submotif_len/2
         self.feature_vec_len = np.power(4, submotif_len) + 1
 
@@ -108,15 +109,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             idx = 0
             for submotif_i, submotif_nuc in enumerate(submotif):
                 nuc_idx = NUCLEOTIDES.index(submotif_nuc)
-                idx += nuc_idx * np.power(4, submotif_i)
+                idx += nuc_idx * np.power(4, self.submotif_len - 1 - submotif_i)
         return [idx]
 
     @staticmethod
-    def get_motif_list():
-        motif_list = []
-        for i in NUCLEOTIDES:
-            for j in NUCLEOTIDES:
-                for k in NUCLEOTIDES:
-                    motif = "%s%s%s" % (k, j, i)
-                    motif_list.append(motif)
-        return motif_list
+    def get_motif_list(motif_len):
+        motif_list = itertools.product(*([NUCLEOTIDES] * motif_len))
+        return ["".join(m) for m in motif_list]

@@ -16,7 +16,7 @@ import os
 import os.path
 from Bio import SeqIO
 import csv
-
+from common import *
 
 def parse_args():
     ''' parse command line arguments '''
@@ -37,7 +37,7 @@ def parse_args():
     parser_simulate.add_argument('--param_path',
         type=str,
         help='parameter file path',
-        default='/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5')
+        default=GERMLINE_PARAM_FILE)
     parser_simulate.add_argument('--seed',
         type=int,
         help='rng seed for replicability',
@@ -74,17 +74,6 @@ def parse_args():
     args = parser.parse_args()
 
     return args
-
-
-def read_bcr_hd5(path, remove_gap=True):
-    ''' read hdf5 parameter file and process '''
-
-    sites = pd.read_hdf(path, 'sites')
-
-    if remove_gap:
-        return sites.query('base != "-"')
-    else:
-        return sites
 
 
 def run_shmulate(n_taxa, output_file, log_dir, run, germline, n_mutes, seed, verbose):
