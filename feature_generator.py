@@ -114,9 +114,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     @staticmethod
     def get_motif_list():
         motif_list = []
-        for i in range(len(NUCLEOTIDES)):
-            for j in range(len(NUCLEOTIDES)):
-                for k in range(len(NUCLEOTIDES)):
-                    motif = "%s%s%s" % (NUCLEOTIDES[k], NUCLEOTIDES[j], NUCLEOTIDES[i])
+        for i in NUCLEOTIDES:
+            for j in NUCLEOTIDES:
+                for k in NUCLEOTIDES:
+                    motif = "%s%s%s" % (k, j, i)
                     motif_list.append(motif)
         return motif_list

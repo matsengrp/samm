@@ -86,7 +86,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-            # Calculate gradient of the smooth
+            # Calculate gradient of the smooth part
             grad = self._get_gradient_log_lik(theta)
             potential_theta = theta - step_size * grad
             # Do proximal gradient step
