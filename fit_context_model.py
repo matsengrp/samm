@@ -28,35 +28,35 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--input_file',
+    parser.add_argument('--input-file',
         type=str,
         help='sequence data in csv',
         default='_output/seqs.csv')
-    parser.add_argument('--input_genes',
+    parser.add_argument('--input-genes',
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
-    parser.add_argument('--num_threads',
+    parser.add_argument('--num-threads',
         type=str,
         help='number of threads to use during E-step',
         default=4)
-    parser.add_argument('--motif_len',
+    parser.add_argument('--motif-len',
         type=str,
         help='length of motif (must be odd)',
         default=5)
-    parser.add_argument('--em_max_iters',
+    parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
         default=20)
-    parser.add_argument('--log_file',
+    parser.add_argument('--log-file',
         type=str,
         help='log file',
         default='_output/context_log.txt')
-    parser.add_argument('--out_file',
+    parser.add_argument('--out-file',
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
-    parser.add_argument("--lasso_param",
+    parser.add_argument("--lasso-param",
         type=float,
         help="lasso parameter",
         default=0.1)

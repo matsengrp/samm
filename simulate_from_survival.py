@@ -18,15 +18,15 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--random_gene_len',
+    parser.add_argument('--random-gene-len',
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=25)
-    parser.add_argument('--output_file',
+    parser.add_argument('--output-file',
         type=str,
         help='simulated data destination file',
         default='_output/seqs.csv')
-    parser.add_argument('--output_genes',
+    parser.add_argument('--output-genes',
         type=str,
         help='germline genes used in csv file',
         default='_output/genes.csv')
@@ -34,19 +34,19 @@ def parse_args():
         type=float,
         help='base hazard rate in cox proportional hazards model',
         default=0.1)
-    parser.add_argument('--n_taxa',
+    parser.add_argument('--n-taxa',
         type=int,
         help='number of taxa to simulate',
         default=2)
-    parser.add_argument('--n_germlines',
+    parser.add_argument('--n-germlines',
         type=int,
         help='number of germline genes to sample from (max 350)',
         default=2)
-    parser.add_argument('--motif_len',
+    parser.add_argument('--motif-len',
         type=str,
         help='length of motif (must be odd)',
         default=5)
-    parser.add_argument('--min_censor_time',
+    parser.add_argument('--min-censor-time',
         type=float,
         help='Minimum censoring time',
         default=0.1)
