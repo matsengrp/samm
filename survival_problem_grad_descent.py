@@ -77,7 +77,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         @param backtrack_alpha: the alpha in backtracking line descent (p464 in Boyd)
         @param diff_thres: if the difference is less than diff_thres, then stop gradient descent
         @param verbose: whether to print out the status at each iteration
-        @return final fitted value of theta and negative penalized log likelihood
+        @return final fitted value of theta and penalized log likelihood
         """
         st = time.time()
         theta = init_theta
@@ -116,7 +116,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
                     # Stop if difference in objective function is too small
                     break
         log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        return theta, current_value
+        return theta, -current_value
 
     def _get_gradient_log_lik(self, theta):
         """

@@ -16,7 +16,7 @@ import os
 import os.path
 from Bio import SeqIO
 import csv
-
+from common import *
 
 def parse_args():
     ''' parse command line arguments '''
@@ -37,7 +37,7 @@ def parse_args():
     parser_simulate.add_argument('--param_path',
         type=str,
         help='parameter file path',
-        default='/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5')
+        default=GERMLINE_PARAM_FILE)
     parser_simulate.add_argument('--seed',
         type=int,
         help='rng seed for replicability',
@@ -56,7 +56,7 @@ def parse_args():
         default='_output')
     parser_simulate.add_argument('--n_germlines',
         type=int,
-        help='number of germline genes to sample',
+        help='number of germline genes to sample (maximum 350)',
         default=2)
     parser_simulate.add_argument('--n_mutes',
         type=int,
@@ -74,17 +74,6 @@ def parse_args():
     args = parser.parse_args()
 
     return args
-
-
-def read_bcr_hd5(path, remove_gap=True):
-    ''' read hdf5 parameter file and process '''
-
-    sites = pd.read_hdf(path, 'sites')
-
-    if remove_gap:
-        return sites.query('base != "-"')
-    else:
-        return sites
 
 
 def run_shmulate(n_taxa, output_file, log_dir, run, germline, n_mutes, seed, verbose):
@@ -129,7 +118,7 @@ def simulate(args):
     np.random.seed(args.seed)
 
     if args.n_mutes < 0:
-        n_mute_vec = 2 + np.random.randint(10, size=args.n_germlines)
+        n_mute_vec = 10 + np.random.randint(20, size=args.n_germlines)
     else:
         n_mute_vec = [args.n_mutes] * args.n_germlines
 
@@ -183,4 +172,3 @@ def main(args=sys.argv[1:]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-

@@ -5,7 +5,6 @@ import logging as log
 from models import *
 from common import *
 from feature_generator import SubmotifFeatureGenerator
-# from mutation_order_sampler import MutationOrderSampler
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem import SurvivalProblem
 from sampler_collection import SamplerCollection
@@ -21,11 +20,12 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.num_threads = num_threads
 
-    def run(self, lasso_param=1, max_em_iters=10):
+    def run(self, lasso_param=1, max_em_iters=10, diff_thres=1e-6):
         # initialize theta vector
         theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
+        prev_exp_log_lik = None
         for run in range(max_em_iters):
             lower_bound_is_negative = True
             prev_theta = theta
@@ -66,7 +66,7 @@ class MCMC_EM:
                     max_iters=self.max_m_iters,
                 )
                 log.info("\n".join(["%d: %.2g" % (i, theta[i]) for i in range(theta.size) if np.abs(theta[i]) > 1e-5]))
-                log.info("penalized negative log likelihood" % exp_log_lik)
+                log.info("penalized negative log likelihood %f" % exp_log_lik)
 
                 # Get statistics
                 log_lik_vec = problem.calculate_log_lik_ratio_vec(theta, prev_theta)
@@ -76,4 +76,8 @@ class MCMC_EM:
 
                 lower_bound_is_negative = (lower_bound < 0)
                 log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
+            if prev_exp_log_lik is not None and exp_log_lik - prev_exp_log_lik < diff_thres:
+                break
+            prev_exp_log_lik = exp_log_lik
+
         return theta

@@ -27,7 +27,7 @@ AddOption('--output_name',
           nargs=1,
           help='name of output directory')
 
-env = Environment(ENV=os.environ, 
+env = Environment(ENV=os.environ,
                   NREPS = GetOption('nreps'),
                   OUTPUT_NAME = GetOption('output_name'))
 
@@ -42,7 +42,7 @@ base = {'nreps': env['NREPS'],
 nest = SConsWrap(Nest(base_dict=base), '_'+env['OUTPUT_NAME'], alias_environment=env)
 
 # Nest for simulation methods
-sim_methods = ['mutation_data']
+sim_methods = ['shmulate', 'survival']
 
 nest.add(
     'simulation_methods',
@@ -65,12 +65,19 @@ nest.add(
 
 @nest.add_target_with_env(env)
 def generate(env, outdir, c):
-    cmd = ['python simulate_from_sampled_gls.py',
-           'simulate',
-           '--seed',
-           c['seed'],
-           '--output_file ${TARGETS[0]}',
-           '--output_genes ${TARGETS[1]}']
+    if c['simulation_methods'] == "shmulate":
+        cmd = ['python simulate_from_sampled_gls.py',
+               'simulate',
+               '--seed',
+               c['seed'],
+               '--output_file ${TARGETS[0]}',
+               '--output_genes ${TARGETS[1]}']
+    elif c['simulation_methods'] == "survival":
+        cmd = ['python simulate_from_survival.py',
+               '--seed',
+               c['seed'],
+               '--output_file ${TARGETS[0]}',
+               '--output_genes ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
         [],
@@ -79,10 +86,22 @@ def generate(env, outdir, c):
 ## Future nests
 
 # Nest for model fitting
+@nest.add_target_with_env(env)
+def fit_context_model(env, outdir, c):
+    cmd = ['python fit_context_model.py',
+           '--seed',
+           c['seed'],
+           '--input_file ${SOURCES[0]}',
+           '--input_genes ${SOURCES[1]}',
+           '--log_file ${TARGETS[0]}',
+           '--out_file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
+        [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        ' '.join(map(str, cmd)))
 
 # Aggregate over different fitting methods
 
 # Aggregate over all replicates
 
 # Plot results
-

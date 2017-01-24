@@ -1,7 +1,10 @@
 import numpy as np
+import pandas as pd
 
 NUCLEOTIDES = "atcg"
+GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 ZSCORE = 1.65
+ZERO_THRES = 1e-6
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
@@ -84,3 +87,15 @@ def soft_threshold(theta, thres):
     @return theta that is soft-thresholded with constant thres
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
+
+def read_bcr_hd5(path, remove_gap=True):
+    """
+    read hdf5 parameter file and process
+    """
+
+    sites = pd.read_hdf(path, 'sites')
+
+    if remove_gap:
+        return sites.query('base != "-"')
+    else:
+        return sites

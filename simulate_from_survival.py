@@ -1,77 +1,122 @@
+import sys
+import argparse
 import numpy as np
-from common import mutate_string
-from common import NUCLEOTIDES
-from models import *
+import os
+import os.path
+import csv
 
-class SurvivalModelSimulator:
-    """
-    A simple model that will mutate sequences based on the survival model we've assumed.
-    We will suppose that the hazard is constant over time.
-    Suppose that when a mutation occurs, it is equally likely to mutate into the
-    three other nucleotides (prob=1/3).
-    """
-    def __init__(self, theta, feature_generator, lambda0):
-        """
-        @param theta: numpy array of size (p,1)
-        @param lambda0: a constant hazard rate
-        """
-        self.theta = theta
-        self.feature_generator = feature_generator
-        self.lambda0 = lambda0
+from survival_model import SurvivalModelSimulator
+from feature_generator import SubmotifFeatureGenerator
+from common import *
 
-    def simulate(self, start_seq, censoring_time):
-        """
-        @param censoring_time: how long to mutate the sequence for
-        @return ending sequence
-        """
-        mutations = []
-        intermediate_seq = start_seq
-        unmutated_pos = range(len(start_seq))
-        last_mutate_time = 0
-        while len(unmutated_pos) > 0:
-            # TODO: For speedup, we don't need to recalculate all the features.
-            feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, do_feat_vec_pos=unmutated_pos)
-            hazard_weights = np.array([
-                np.exp(np.sum(self.theta[feature_vec_dict[p]])) for p in unmutated_pos
-            ])
+def parse_args():
+    ''' parse command line arguments '''
 
-            # sample the time for the next mutation
-            # we do inverse transform sampling - sample from unif and then invert
-            unif_sample = np.random.rand(1)
-            denom = np.sum(hazard_weights)
-            mutate_time = last_mutate_time - 1/self.lambda0 * np.log(1 - unif_sample) / denom
-            if censoring_time > mutate_time:
-                last_mutate_time = mutate_time
-            else:
-                break
+    parser = argparse.ArgumentParser(description=__doc__)
 
-            # sample the position this mutation occurs in
-            # this is a multinomial
-            multinomial_sample = np.random.multinomial(
-                n=1,
-                pvals=hazard_weights/np.sum(hazard_weights),
-            )
-            sampled_idx = np.where(multinomial_sample == 1)[0][0]
-            mutate_pos = unmutated_pos.pop(sampled_idx)
+    parser.add_argument('--seed',
+        type=int,
+        help='rng seed for replicability',
+        default=1533)
+    parser.add_argument('--random-gene-len',
+        type=int,
+        help='Create random germline genes of this length. If zero, load true germline genes',
+        default=25)
+    parser.add_argument('--output-file',
+        type=str,
+        help='simulated data destination file',
+        default='_output/seqs.csv')
+    parser.add_argument('--output-genes',
+        type=str,
+        help='germline genes used in csv file',
+        default='_output/genes.csv')
+    parser.add_argument('--lambda0',
+        type=float,
+        help='base hazard rate in cox proportional hazards model',
+        default=0.1)
+    parser.add_argument('--n-taxa',
+        type=int,
+        help='number of taxa to simulate',
+        default=2)
+    parser.add_argument('--n-germlines',
+        type=int,
+        help='number of germline genes to sample from (max 350)',
+        default=2)
+    parser.add_argument('--motif-len',
+        type=str,
+        help='length of motif (must be odd)',
+        default=5)
+    parser.add_argument('--min-censor-time',
+        type=float,
+        help='Minimum censoring time',
+        default=0.1)
 
-            # sample the target nucleotide
-            nucleotide_original = intermediate_seq[mutate_pos]
-            possible_target_nucleotides = NUCLEOTIDES.replace(nucleotide_original, "")
-            target_nucleotide_sample = np.random.multinomial(n=1, pvals=np.ones(3)/3)
-            nucleotide_target = possible_target_nucleotides[np.where(target_nucleotide_sample == 1)[0][0]]
+    args = parser.parse_args()
+    return args
 
-            mutations.append(MutationEvent(
-                mutate_time,
-                mutate_pos,
-                nucleotide_target,
-            ))
+def main(args=sys.argv[1:]):
+    args = parse_args()
 
-            intermediate_seq = mutate_string(intermediate_seq, mutate_pos, nucleotide_target)
+    # Randomly generate number of mutations or use default
+    np.random.seed(args.seed)
 
-        return FullSequenceMutations(
-            ObservedSequenceMutations(
-                start_seq,
-                intermediate_seq,
-            ),
-            mutations
-        )
+    if args.random_gene_len > 0:
+        germline_genes = ["FAKE_GENE_%d" % i for i in range(args.n_germlines)]
+        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
+    else:
+        # Read germline genes from this file
+        params = read_bcr_hd5(GERMLINE_PARAM_FILE)
+
+        # Select, with replacement, args.n_germlines germline genes from our
+        # parameter file and place them into a numpy array.
+        # Here 'germline_gene' is something like IGHV1-2*01.
+        germline_genes = np.random.choice(params['gene'].unique(),
+                size=args.n_germlines)
+
+        # Put the nucleotide content of each selected germline gene into a
+        # corresponding list.
+        germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
+                for gene in germline_genes]
+
+    # True vector
+    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    true_theta = np.matrix(np.zeros(feat_generator.feature_vec_len)).T
+    ## huh what to do here...
+    true_theta[0:4] = 50
+    true_theta[20:24] = 30
+    true_theta[43] = 70
+    true_theta[59] = 20
+    true_theta[63] = 20
+
+    simulator = SurvivalModelSimulator(true_theta, feat_generator, lambda0=args.lambda0)
+
+    # Write germline genes to file with two columns: name of gene and
+    # corresponding sequence.
+    with open(args.output_genes, 'w') as outgermlines:
+        germline_file = csv.writer(outgermlines)
+        germline_file.writerow(['germline_name','germline_sequence'])
+        for gene, sequence in zip(germline_genes, germline_nucleotides):
+            germline_file.writerow([gene,sequence])
+
+    # For each germline gene, run shmulate to obtain mutated sequences.
+    # Write sequences to file with three columns: name of germline gene
+    # used, name of simulated sequence and corresponding sequence.
+    with open(args.output_file, 'w') as outseqs:
+        seq_file = csv.writer(outseqs)
+        seq_file.writerow(['germline_name','sequence_name','sequence'])
+        for run, (gene, sequence) in \
+                enumerate(zip(germline_genes, germline_nucleotides)):
+
+            full_data_samples = [
+                simulator.simulate(
+                    start_seq=sequence.lower(),
+                    censoring_time=args.min_censor_time + np.random.rand(), # censoring time at least 0.1
+                ) for i in range(args.n_taxa)
+            ]
+
+            # write to file in csv format
+            for i, sample in enumerate(full_data_samples):
+                seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.obs_seq_mutation.end_seq])
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

@@ -1,4 +1,5 @@
 import numpy as np
+import logging as log
 
 from models import ImputedSequenceMutations
 from common import *
@@ -14,7 +15,9 @@ class MutationOrderGibbsSampler(Sampler):
 
         curr_order = init_order
         samples = []
+        log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
         for i in range(burn_in + num_samples):
+            log.info("Gibbs: sweep %d of %d" % (i, burn_in + num_samples))
             curr_order = self._do_gibbs_sweep(curr_order)
             samples.append(curr_order)
 
@@ -27,7 +30,7 @@ class MutationOrderGibbsSampler(Sampler):
         """
         # sample full ordering from conditional prob for this position
         # TODO: make this go through a randomly ordered gibbs sampler
-        for position in self.mutated_positions:
+        for position in np.random.permutation(self.mutated_positions):
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
 
