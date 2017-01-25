@@ -37,11 +37,11 @@ def parse_args():
         help='genes data in csv',
         default='_output/genes.csv')
     parser.add_argument('--num-threads',
-        type=str,
+        type=int,
         help='number of threads to use during E-step',
         default=4)
     parser.add_argument('--motif-len',
-        type=str,
+        type=int,
         help='length of motif (must be odd)',
         default=5)
     parser.add_argument('--em-max-iters',
@@ -56,10 +56,10 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
-    parser.add_argument("--lasso-param",
-        type=float,
-        help="lasso parameter",
-        default=0.1)
+    parser.add_argument("--lasso-params",
+        type=str,
+        help="lasso parameters, comma separated",
+        default="0.1")
 
     args = parser.parse_args()
 
@@ -108,19 +108,28 @@ def main(args=sys.argv[1:]):
         MutationOrderGibbsSampler,
         num_threads=args.num_threads,
     )
-    theta = em_algo.run(lasso_param=args.lasso_param, max_em_iters=args.em_max_iters)
 
     motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
-    log.info("==== FINAL theta ====")
-    for i in range(theta.size):
-        if np.abs(theta[i]) > ZERO_THRES:
-            if i == theta.size - 1:
-                log.info("%d: %f (EDGES)" % (i, theta[i]))
-            else:
-                log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
+
+    # Run EM on the lasso parameters from largest to smallest
+    lasso_params = [float(l) for l in args.lasso_params.split(",")]
+    lasso_results_list = []
+    theta = None
+    for lasso_param in sorted(lasso_params, reverse=True):
+        log.info("Lasso parama %f" % lasso_param)
+        theta = em_algo.run(theta=theta, lasso_param=lasso_param, max_em_iters=args.em_max_iters)
+        lasso_results_list.append((lasso_param, theta))
+
+        log.info("==== FINAL theta, lasso %f ====" % lasso_param)
+        for i in range(theta.size):
+            if np.abs(theta[i]) > ZERO_THRES:
+                if i == theta.size - 1:
+                    log.info("%d: %f (EDGES)" % (i, theta[i]))
+                else:
+                    log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
 
     with open(args.out_file, "w") as f:
-        pickle.dump(theta, f)
+        pickle.dump(lasso_results_list, f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

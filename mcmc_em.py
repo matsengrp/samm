@@ -20,9 +20,10 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.num_threads = num_threads
 
-    def run(self, lasso_param=1, max_em_iters=10, diff_thres=1e-6):
+    def run(self, theta=None, lasso_param=1, max_em_iters=10, diff_thres=1e-6):
         # initialize theta vector
-        theta = np.random.randn(self.feat_generator.feature_vec_len)
+        if theta is None:
+            theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         prev_exp_log_lik = None
@@ -65,6 +66,7 @@ class MCMC_EM:
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                 )
+                log.info("Current Theta")
                 log.info("\n".join(["%d: %.2g" % (i, theta[i]) for i in range(theta.size) if np.abs(theta[i]) > 1e-5]))
                 log.info("penalized negative log likelihood %f" % exp_log_lik)
 
