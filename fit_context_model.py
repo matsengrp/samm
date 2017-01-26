@@ -84,6 +84,8 @@ def main(args=sys.argv[1:]):
         feat_generator,
         MutationOrderGibbsSampler,
         num_threads=args.num_threads,
+        burn_in=1,
+        base_num_e_samples=2,
     )
     theta = em_algo.run(lasso_param=args.lasso_param, max_em_iters=args.em_max_iters)
 

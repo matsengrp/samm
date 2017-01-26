@@ -21,7 +21,7 @@ def parse_args():
     parser.add_argument('--random-gene-len',
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
-        default=25)
+        default=50)
     parser.add_argument('--output-file',
         type=str,
         help='simulated data destination file',
@@ -37,11 +37,11 @@ def parse_args():
     parser.add_argument('--n-taxa',
         type=int,
         help='number of taxa to simulate',
-        default=2)
+        default=10)
     parser.add_argument('--n-germlines',
         type=int,
         help='number of germline genes to sample from (max 350)',
-        default=2)
+        default=20)
     parser.add_argument('--motif-len',
         type=str,
         help='length of motif (must be odd)',
@@ -49,7 +49,7 @@ def parse_args():
     parser.add_argument('--min-censor-time',
         type=float,
         help='Minimum censoring time',
-        default=0.1)
+        default=3.0)
 
     args = parser.parse_args()
     return args

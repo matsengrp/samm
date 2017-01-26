@@ -31,7 +31,6 @@ class MutationOrderGibbsSampler(Sampler):
         One gibbs sweep is a gibbs sampling step for all the positions
         """
         # sample full ordering from conditional prob for this position
-        # TODO: make this go through a randomly ordered gibbs sampler
         for position in np.random.permutation(self.mutated_positions):
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
