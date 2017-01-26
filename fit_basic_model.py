@@ -12,6 +12,8 @@ import csv
 import pickle
 
 import numpy as np
+from scipy.stats import spearmanr
+
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
@@ -61,7 +63,7 @@ def main(args=sys.argv[1:]):
 
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 
-    motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
+    motif_list = feat_generator.get_motif_list(args.motif_len)
     motif_list.append('EDGES')
 
     mutations = dict.fromkeys(motif_list, 0)
@@ -79,11 +81,23 @@ def main(args=sys.argv[1:]):
         for mut_pos in mutated_positions:
             for mutation in germline_motifs[mut_pos]:
                 mutations[motif_list[mutation]] += 1
+    
+    proportions = {}
+    for key in motif_list:
+        if appearances[key] > 0:
+            proportions[key] = 1. * mutations[key] / appearances[key]
+        else:
+            proportions[key] = 0.
 
     theta = pickle.load(open(args.theta_file, 'rb'))
+    prop_list = [proportions[motif_list[i]] for i in range(theta.size)]
+
     for i in range(theta.size):
         if np.abs(theta[i]) > ZERO_THRES or mutations[motif_list[i]] > 0:
-            print (i, motif_list[i], theta[i], mutations[motif_list[i]], appearances[motif_list[i]])
+            print (i, theta[i], motif_list[i], proportions[motif_list[i]])
+
+    print spearmanr(theta, prop_list)
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
