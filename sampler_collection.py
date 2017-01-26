@@ -90,7 +90,7 @@ class Sampler:
         self.feature_generator = feature_generator
         self.obs_seq_mutation = obs_seq_mutation
 
-    def run(self, init_order, burn_in, num_samples):
+    def run(self, init_order, num_samples, burn_in):
         """
         @param init_order: a mutation order to initialize the sampler (list of integers)
         @param burn_in: number of iterations for burn in

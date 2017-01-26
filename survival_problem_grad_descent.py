@@ -67,7 +67,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             )
         return obj
 
-    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
+    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, prox_diff_thres=0.1, diff_thres=1e-6, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
 
@@ -108,7 +108,10 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
                 # Do backtracking line search
                 expected_decrease = backtrack_alpha * np.power(np.linalg.norm(grad), 2)
                 while potential_value >= current_value - step_size * expected_decrease:
-                    if step_size * expected_decrease < diff_thres:
+                    if not do_batch_gd and step_size * expected_decrease < prox_diff_thres:
+                        # If proximal gradient descent is no longer decreasing a lot, go to full batch size
+                        break
+                    elif step_size * expected_decrease < diff_thres:
                         # Stop if difference in objective function is too small
                         break
                     step_size *= step_size_shrink
@@ -118,8 +121,8 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
                     potential_value = self.get_value(potential_theta)
 
                 if potential_value > current_value:
-                    # Stop if value is increasing
                     if do_batch_gd:
+                        # Stop if value is increasing
                         finish_gd = True
                     do_batch_gd = True
                     break

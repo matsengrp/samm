@@ -9,7 +9,7 @@ from common import *
 from sampler_collection import Sampler
 
 class MutationOrderGibbsSampler(Sampler):
-    def run(self, init_order, burn_in, num_samples):
+    def run(self, init_order, num_samples, burn_in):
         self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
 
@@ -19,7 +19,6 @@ class MutationOrderGibbsSampler(Sampler):
         samples = []
         log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
         for i in range(burn_in + num_samples):
-            log.info("Gibbs: sweep %d of %d" % (i, burn_in + num_samples))
             curr_order = self._do_gibbs_sweep(curr_order)
             samples.append(curr_order)
 
