@@ -1,7 +1,6 @@
 import time
 from numpy import zeros
 from cvxpy import *
-from feature_generator import FeatureGenerator, SubmotifFeatureGenerator
 from common import get_idx_differ_by_one_character
 from survival_problem import SurvivalProblem
 
@@ -64,8 +63,6 @@ class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
         @param init_theta: ignored
         @param max_iters: ignored
         """
-        assert
-
         motif_list = self.feature_generator.get_motif_list()
 
         theta = Variable(self.feature_generator.feature_vec_len)
