@@ -1,4 +1,6 @@
+import time
 import numpy as np
+import scipy as sp
 import logging as log
 
 from models import ImputedSequenceMutations
@@ -43,7 +45,7 @@ class MutationOrderGibbsSampler(Sampler):
 
             # first consider the full ordering with position under consideration mutating last
             full_order_last = partial_order + [position]
-            feat_vec_dicts = self.feature_generator.create_for_mutation_steps(
+            feat_vec_dicts, intermediate_seqs = self.feature_generator.create_for_mutation_steps(
                 ImputedSequenceMutations(
                     self.obs_seq_mutation,
                     full_order_last,
@@ -58,13 +60,23 @@ class MutationOrderGibbsSampler(Sampler):
 
             # iterate through the rest of the possible full mutation orders consistent with this partial order
             for i in reversed(range(self.num_mutations - 1)):
+                if i == self.num_mutations - 2:
+                    # If the last mutation, only need to update one feature vec
+                    update_steps = [i]
+                else:
+                    # If not the last mutation, update two feature vecs
+                    update_steps = [i, i+1]
                 possible_full_order = partial_order[:i] + [position] + partial_order[i:]
-                feat_vec_dicts = self.feature_generator.create_for_mutation_steps(
+                feat_vec_dicts, intermediate_seqs = self.feature_generator.update_for_mutation_steps(
                     ImputedSequenceMutations(
                         self.obs_seq_mutation,
                         possible_full_order
-                    )
+                    ),
+                    update_steps=update_steps,
+                    base_feat_vec_dicts = feat_vec_dicts,
+                    base_intermediate_seqs = intermediate_seqs,
                 )
+
                 # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
                 # the position that mutates right after it), rest are the same
                 multinomial_sequence[i] = self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
@@ -86,10 +98,8 @@ class MutationOrderGibbsSampler(Sampler):
         """
         a single term in {eq:full_ordering}
         """
-        # guard against blowups when calculating exp - use a renormalization term
-        theta_sums = [np.sum(self.theta[feat_vec]) for feat_vec in feat_vec_dict.values()]
-        renorm_factor = np.max(theta_sums)
-
-        numerator = np.exp(np.sum(self.theta[feat_vec_dict[numerator_pos]]) - renorm_factor)
-        denominator = np.sum([np.exp(t - renorm_factor) for t in theta_sums])
-        return numerator / denominator
+        theta_sums = [self.theta[feat_vec].sum() for feat_vec in feat_vec_dict.values()]
+        multinomial_prob = np.exp(
+            self.theta[feat_vec_dict[numerator_pos]].sum() - sp.misc.logsumexp(theta_sums)
+        )
+        return multinomial_prob

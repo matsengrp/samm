@@ -27,7 +27,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         self.feature_vec_sample_pair = [
             (
                 sample,
-                self.feature_generator.create_for_mutation_steps(sample),
+                self.feature_generator.create_for_mutation_steps(sample)[0],
             )
             for sample in samples
         ]

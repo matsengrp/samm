@@ -1,5 +1,8 @@
+import csv
 import numpy as np
 import pandas as pd
+
+from models import ObservedSequenceMutations
 
 NUCLEOTIDES = "atcg"
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
@@ -99,3 +102,26 @@ def read_bcr_hd5(path, remove_gap=True):
         return sites.query('base != "-"')
     else:
         return sites
+
+def read_gene_seq_csv_data(gene_file_name, seq_file_name):
+    gene_dict = {}
+    with open(gene_file_name, "r") as gene_csv:
+        gene_reader = csv.reader(gene_csv, delimiter=',')
+        gene_reader.next()
+        for row in gene_reader:
+            gene_dict[row[0]] = row[1]
+
+    obs_data = []
+    with open(seq_file_name, "r") as seq_csv:
+        seq_reader = csv.reader(seq_csv, delimiter=",")
+        seq_reader.next()
+        for row in seq_reader:
+            start_seq = gene_dict[row[0]].lower()
+            end_seq = row[2]
+            obs_data.append(
+                ObservedSequenceMutations(
+                    start_seq=start_seq[:len(end_seq)],
+                    end_seq=end_seq,
+                )
+            )
+    return gene_dict, obs_data
