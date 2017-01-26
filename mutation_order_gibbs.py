@@ -1,5 +1,6 @@
 import time
 import numpy as np
+import scipy as sp
 import logging as log
 
 from models import ImputedSequenceMutations
@@ -97,10 +98,8 @@ class MutationOrderGibbsSampler(Sampler):
         """
         a single term in {eq:full_ordering}
         """
-        # guard against blowups when calculating exp - use a renormalization term
-        theta_sums = [np.sum(self.theta[feat_vec]) for feat_vec in feat_vec_dict.values()]
-        renorm_factor = np.max(theta_sums)
-
-        numerator = np.exp(np.sum(self.theta[feat_vec_dict[numerator_pos]]) - renorm_factor)
-        denominator = np.sum([np.exp(t - renorm_factor) for t in theta_sums])
-        return numerator / denominator
+        theta_sums = [self.theta[feat_vec].sum() for feat_vec in feat_vec_dict.values()]
+        multinomial_prob = np.exp(
+            self.theta[feat_vec_dict[numerator_pos]].sum() - sp.misc.logsumexp(theta_sums)
+        )
+        return multinomial_prob
