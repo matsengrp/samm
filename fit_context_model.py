@@ -17,6 +17,9 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
+from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
+from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
+from survival_problem_grad_descent import SurvivalProblemGradientDescent
 from common import *
 
 def parse_args():
@@ -40,6 +43,11 @@ def parse_args():
         type=int,
         help='number of threads to use during E-step',
         default=4)
+    parser.add_argument('--solver',
+        type=str,
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso',
+        choices=["CL", "CFL", "L"],
+        default="L")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -56,12 +64,18 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
-    parser.add_argument("--lasso-params",
+    parser.add_argument("--penalty-params",
         type=str,
-        help="lasso parameters, comma separated",
+        help="penalty parameters, comma separated",
         default="0.1")
 
     args = parser.parse_args()
+
+    args.problem_solver_cls = SurvivalProblemGradientDescent
+    if args.solver == "CL":
+        args.problem_solver_cls = SurvivalProblemLassoCVXPY
+    elif args.solver == "CFL":
+        args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
@@ -79,25 +93,27 @@ def main(args=sys.argv[1:]):
     log.info("Settings %s" % args)
 
     log.info("Running EM")
+
     em_algo = MCMC_EM(
         obs_data,
         feat_generator,
         MutationOrderGibbsSampler,
+        args.problem_solver_cls,
         num_threads=args.num_threads,
     )
 
-    motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
+    motif_list = feat_generator.get_motif_list()
 
     # Run EM on the lasso parameters from largest to smallest
-    lasso_params = [float(l) for l in args.lasso_params.split(",")]
-    lasso_results_list = []
+    penalty_params = [float(l) for l in args.penalty_params.split(",")]
+    results_list = []
     theta = None
-    for lasso_param in sorted(lasso_params, reverse=True):
-        log.info("Lasso parama %f" % lasso_param)
-        theta = em_algo.run(theta=theta, lasso_param=lasso_param, max_em_iters=args.em_max_iters)
-        lasso_results_list.append((lasso_param, theta))
+    for penalty_param in sorted(penalty_params, reverse=True):
+        log.info("Penalty parameter %f" % penalty_param)
+        theta = em_algo.run(theta=theta, penalty_param=penalty_param, max_em_iters=args.em_max_iters)
+        results_list.append((penalty_param, theta))
 
-        log.info("==== FINAL theta, lasso %f ====" % lasso_param)
+        log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
         for i in range(theta.size):
             if np.abs(theta[i]) > ZERO_THRES:
                 if i == theta.size - 1:
@@ -106,7 +122,7 @@ def main(args=sys.argv[1:]):
                     log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
 
     with open(args.out_file, "w") as f:
-        pickle.dump(lasso_results_list, f)
+        pickle.dump(results_list, f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

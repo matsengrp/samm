@@ -125,3 +125,18 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name):
                 )
             )
     return gene_dict, obs_data
+
+def get_idx_differ_by_one_character(s1, s2):
+    """
+    Return the index at strings s1 and s2 which differ by one character. If the strings
+    are the same or differ by more than one character, return None
+    """
+    count_diffs = 0
+    idx_differ = None
+    for i, (a, b) in enumerate(zip(s1, s2)):
+        if a != b:
+            if count_diffs:
+                return None
+            count_diffs += 1
+            idx_differ = i
+    return idx_differ

@@ -115,7 +115,7 @@ def fit_context_model(env, outdir, c):
            c['seed'],
            '--motif-len',
            3,
-           '--lasso-params',
+           '--penalty-params',
            "0.05,0.01,0.002",
            '--num-threads',
            10,

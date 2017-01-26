@@ -1,6 +1,6 @@
 import time
 import numpy as np
-import scipy as sp
+import scipy.misc
 import logging as log
 
 from models import ImputedSequenceMutations
@@ -99,6 +99,6 @@ class MutationOrderGibbsSampler(Sampler):
         """
         theta_sums = [self.theta[feat_vec].sum() for feat_vec in feat_vec_dict.values()]
         multinomial_prob = np.exp(
-            self.theta[feat_vec_dict[numerator_pos]].sum() - sp.misc.logsumexp(theta_sums)
+            self.theta[feat_vec_dict[numerator_pos]].sum() - scipy.misc.logsumexp(theta_sums)
         )
         return multinomial_prob
