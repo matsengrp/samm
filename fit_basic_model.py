@@ -43,6 +43,10 @@ def parse_args():
         type=str,
         help='length of motif (must be odd)',
         default=5)
+    parser.add_argument('--theta-file',
+        type=str,
+        help='file with pickled context model',
+        default='_output/context_model.pkl')
 
     args = parser.parse_args()
 
@@ -60,7 +64,7 @@ def main(args=sys.argv[1:]):
     motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
     motif_list.append('EDGES')
 
-    mutations = {}
+    mutations = dict.fromkeys(motif_list, 0)
 
     # TODO: this doesn't do anything clever with overlapping mutations. Should we
     # double count them?
@@ -69,13 +73,13 @@ def main(args=sys.argv[1:]):
         germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
         for mut_pos in mutated_positions:
             for mutation in germline_motifs[mut_pos]:
-                if motif_list[mutation] in mutations:
-                    mutations[motif_list[mutation]] += 1
-                else:
-                    mutations[motif_list[mutation]] = 1
+                mutations[motif_list[mutation]] += 1
 
-    with open(args.out_file, "w") as f:
-        pickle.dump(mutations, f)
+    theta = pickle.load(open(args.theta_file, 'rb'))
+    for i in range(theta.size):
+        if np.abs(theta[i]) > ZERO_THRES or mutations[motif_list[i]] > 0:
+            print (i, theta[i], motif_list[i], mutations[motif_list[i]])
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
