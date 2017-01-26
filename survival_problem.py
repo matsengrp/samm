@@ -51,7 +51,7 @@ class SurvivalProblemCVXPY(SurvivalProblem):
         return log_lik_vec
 
     def calculate_per_sample_log_lik(self, theta, sample):
-        all_feature_vecs = self.feature_generator.create_for_mutation_steps(sample)
+        all_feature_vecs, _ = self.feature_generator.create_for_mutation_steps(sample)
         obj = 0
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, all_feature_vecs):
             # vec_mutation_step are the feature vectors of the at-risk group after mutation i

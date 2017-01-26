@@ -50,9 +50,7 @@ class FeatureGenerator:
         can just be copied.
 
         @param seq_mut_order: a ImputedSequenceMutations
-        @param update_steps: the mutation steps such that the intermediate sequence was different
-                            after these steps were different from the mutation steps used to create
-                                `base_feat_vec_dicts` and `base_intermediate_seqs`
+        @param update_steps: the indices of the mutation steps where the intermediate sequence is different
         @param base_feat_vec_dicts: a list of sparse feature vectors for all mutation steps
         @param base_intermediate_seqs: a list of all the intermediate sequences for all mutation steps
         @return: a tuple with:

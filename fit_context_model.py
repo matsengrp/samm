@@ -17,7 +17,7 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
-from common import ZERO_THRES
+from common import *
 
 def parse_args():
     ''' parse command line arguments '''
@@ -67,29 +67,6 @@ def parse_args():
 
     return args
 
-def read_data(gene_file_name, seq_file_name):
-    gene_dict = {}
-    with open(gene_file_name, "r") as gene_csv:
-        gene_reader = csv.reader(gene_csv, delimiter=',')
-        gene_reader.next()
-        for row in gene_reader:
-            gene_dict[row[0]] = row[1]
-
-    obs_data = []
-    with open(seq_file_name, "r") as seq_csv:
-        seq_reader = csv.reader(seq_csv, delimiter=",")
-        seq_reader.next()
-        for row in seq_reader:
-            start_seq = gene_dict[row[0]].lower()
-            end_seq = row[2]
-            obs_data.append(
-                ObservedSequenceMutations(
-                    start_seq=start_seq[:len(end_seq)],
-                    end_seq=end_seq,
-                )
-            )
-    return gene_dict, obs_data
-
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
@@ -97,7 +74,7 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
 
     log.info("Reading data")
-    gene_dict, obs_data = read_data(args.input_genes, args.input_file)
+    gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
     log.info("Number of sequences %d" % len(obs_data))
     log.info("Settings %s" % args)
 
