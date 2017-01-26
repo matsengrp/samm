@@ -22,6 +22,10 @@ def parse_args():
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=25)
+    parser.add_argument('--output-true-theta',
+        type=str,
+        help='true theta file',
+        default='_output/true_theta.txt')
     parser.add_argument('--output-file',
         type=str,
         help='simulated data destination file',
@@ -43,12 +47,16 @@ def parse_args():
         help='number of germline genes to sample from (max 350)',
         default=2)
     parser.add_argument('--motif-len',
-        type=str,
+        type=int,
         help='length of motif (must be odd)',
         default=5)
     parser.add_argument('--min-censor-time',
         type=float,
         help='Minimum censoring time',
+        default=0.1)
+    parser.add_argument('--ratio-nonzero',
+        type=float,
+        help='Proportion of motifs that are nonzero',
         default=0.1)
 
     args = parser.parse_args()
@@ -60,9 +68,28 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
+    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
+    # True vector
+    true_theta = np.matrix(np.zeros(feat_generator.feature_vec_len)).T
+
+    # Hard code simulation to have edge motifs with higher mutation rates
+    true_theta[feat_generator.feature_vec_len - 1] = 0.1
+
+    num_nonzero_motifs = int(true_theta.size * args.ratio_nonzero)
+    # Remove edge motifs from random choices
+    nonzero_motifs = np.random.choice(true_theta.size - 1, num_nonzero_motifs)
+    for idx in nonzero_motifs:
+        # randomly set nonzero indices between [-2, 2]
+        true_theta[idx] = (np.random.rand() - 0.5) * 4
+
     if args.random_gene_len > 0:
         germline_genes = ["FAKE_GENE_%d" % i for i in range(args.n_germlines)]
-        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
+        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines - num_nonzero_motifs)]
+        # Let's make sure that our nonzero motifs show up in a germline sequence at least once
+        for motif_idx in nonzero_motifs:
+            new_str = get_random_dna_seq(args.random_gene_len/2) + motif_list[motif_idx] + get_random_dna_seq(args.random_gene_len/2)
+            germline_nucleotides.append(new_str)
     else:
         # Read germline genes from this file
         params = read_bcr_hd5(GERMLINE_PARAM_FILE)
@@ -78,17 +105,16 @@ def main(args=sys.argv[1:]):
         germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
                 for gene in germline_genes]
 
-    # True vector
-    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
-    true_theta = np.matrix(np.zeros(feat_generator.feature_vec_len)).T
-    ## huh what to do here...
-    true_theta[0:4] = 50
-    true_theta[20:24] = 30
-    true_theta[43] = 70
-    true_theta[59] = 20
-    true_theta[63] = 20
-
     simulator = SurvivalModelSimulator(true_theta, feat_generator, lambda0=args.lambda0)
+
+    with open(args.output_true_theta, 'w') as f:
+        f.write("True Theta\n")
+        for i in range(true_theta.size):
+            if np.abs(true_theta[i]) > ZERO_THRES:
+                if i == true_theta.size - 1:
+                    f.write("%d: %f (EDGES)\n" % (i, true_theta[i]))
+                else:
+                    f.write("%d: %f (%s)\n" % (i, true_theta[i], motif_list[i]))
 
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.

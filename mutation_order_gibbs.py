@@ -19,7 +19,6 @@ class MutationOrderGibbsSampler(Sampler):
         samples = []
         log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
         for i in range(burn_in + num_samples):
-            log.info("Gibbs: sweep %d of %d" % (i, burn_in + num_samples))
             curr_order = self._do_gibbs_sweep(curr_order)
             samples.append(curr_order)
 
