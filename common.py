@@ -128,7 +128,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name):
 
 def get_idx_differ_by_one_character(s1, s2):
     """
-    Return the index at strings s1 and s2 differ by one character. If the strings
+    Return the index at strings s1 and s2 which differ by one character. If the strings
     are the same or differ by more than one character, return None
     """
     count_diffs = 0

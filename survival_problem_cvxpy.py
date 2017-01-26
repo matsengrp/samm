@@ -31,9 +31,10 @@ class SurvivalProblemCVXPY(SurvivalProblem):
 
 class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
     """
-    Shared theta value for motifs that mutate into different nucleotides
-
     Objective function: log likelihood of theta - lasso penalty on theta
+    * Lasso penalty over all of theta
+
+    Note: motifs that mutate to different target nucleotides share the same theta value
     """
     def solve(self, init_theta=None, max_iters=None):
         """
@@ -53,10 +54,11 @@ class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
 
 class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
     """
-    Creates fused lasso penalties between motifs that differ by only a single nucleotide
-    Shared theta value for motifs that mutate into different nucleotides
-
     Objective function: log likelihood of theta - penalty_param * (fused lasso penalty + lasso penalty)
+    * Creates fused lasso penalties between motifs that differ by only a single nucleotide
+    * Lasso penalty over all of theta
+
+    Note: motifs that mutate to different target nucleotides share the same theta value
     """
     def solve(self, init_theta=None, max_iters=None):
         """

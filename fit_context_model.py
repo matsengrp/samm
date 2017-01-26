@@ -106,14 +106,14 @@ def main(args=sys.argv[1:]):
 
     # Run EM on the lasso parameters from largest to smallest
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
-    lasso_results_list = []
+    results_list = []
     theta = None
     for penalty_param in sorted(penalty_params, reverse=True):
-        log.info("Lasso parama %f" % penalty_param)
+        log.info("Penalty parameter %f" % penalty_param)
         theta = em_algo.run(theta=theta, penalty_param=penalty_param, max_em_iters=args.em_max_iters)
-        lasso_results_list.append((penalty_param, theta))
+        results_list.append((penalty_param, theta))
 
-        log.info("==== FINAL theta, lasso %f ====" % penalty_param)
+        log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
         for i in range(theta.size):
             if np.abs(theta[i]) > ZERO_THRES:
                 if i == theta.size - 1:
@@ -122,7 +122,7 @@ def main(args=sys.argv[1:]):
                     log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
 
     with open(args.out_file, "w") as f:
-        pickle.dump(lasso_results_list, f)
+        pickle.dump(results_list, f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

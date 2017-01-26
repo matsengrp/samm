@@ -3,8 +3,8 @@ class SurvivalProblem:
         """
         @param samples: the observations for this problem
         @param feature_generator: FeatureGenerator
-        @param penalty_param: the coefficient on the penalty function(s). This assumes there is
-                                only penalty parameter shared across all penalties for now.
+        @param penalty_param: the coefficient on the penalty function(s). This assumes a single
+                                shared penalty parameter across all penalties for now.
         """
         assert(penalty_param >= 0)
 
