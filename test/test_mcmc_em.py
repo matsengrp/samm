@@ -4,6 +4,7 @@ import csv
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
+from survival_problem_grad_descent import SurvivalProblemGradientDescent
 from common import read_gene_seq_csv_data
 from constants import *
 
@@ -18,6 +19,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
             obs_data,
             feat_generator,
             MutationOrderGibbsSampler,
+            SurvivalProblemGradientDescent,
             num_threads=1,
         )
         em_algo.run(max_em_iters=1)

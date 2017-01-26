@@ -72,7 +72,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         self.flank_end_len = submotif_len/2
         self.feature_vec_len = np.power(4, submotif_len) + 1
 
-        motif_list = self.get_motif_list(submotif_len)
+        motif_list = self.get_motif_list()
         self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
@@ -187,7 +187,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             idx = self.motif_dict[submotif]
         return [idx]
 
-    @staticmethod
-    def get_motif_list(motif_len):
-        motif_list = itertools.product(*([NUCLEOTIDES] * motif_len))
+    def get_motif_list(self):
+        motif_list = itertools.product(*([NUCLEOTIDES] * self.submotif_len))
         return ["".join(m) for m in motif_list]

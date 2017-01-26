@@ -17,6 +17,7 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
+from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from common import *
 
 def parse_args():
@@ -83,10 +84,11 @@ def main(args=sys.argv[1:]):
         obs_data,
         feat_generator,
         MutationOrderGibbsSampler,
+        SurvivalProblemFusedLassoCVXPY,
         num_threads=args.num_threads,
     )
 
-    motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
+    motif_list = feat_generator.get_motif_list()
 
     # Run EM on the lasso parameters from largest to smallest
     lasso_params = [float(l) for l in args.lasso_params.split(",")]

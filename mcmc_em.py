@@ -4,23 +4,37 @@ import logging as log
 
 from models import *
 from common import *
-from feature_generator import SubmotifFeatureGenerator
-from mutation_order_gibbs import MutationOrderGibbsSampler
-from survival_problem import SurvivalProblem
 from sampler_collection import SamplerCollection
 from survival_problem_grad_descent import SurvivalProblemGradientDescent
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1):
+    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1):
+        """
+        @param observed_data: list of observed data (start and end sequences)
+        @param feat_generator: an instance of a FeatureGenerator
+        @param sampler_cls: a Sampler class
+        @param problem_solver_cls: SurvivalProblem class
+        @param base_num_e_samples: number of E-step samples to draw initially
+        @param burn_in: number of gibbs sweeps to do for burn in
+        @param max_m_iters: maximum number of iterations for the M-step
+        @param num_threads: number of threads to use
+        """
         self.observed_data = observed_data
         self.feat_generator = feat_generator
         self.base_num_e_samples = base_num_e_samples
         self.max_m_iters = max_m_iters
         self.burn_in = burn_in
         self.sampler_cls = sampler_cls
+        self.problem_solver_cls = problem_solver_cls
         self.num_threads = num_threads
 
-    def run(self, theta=None, lasso_param=1, max_em_iters=10, diff_thres=1e-6):
+    def run(self, theta=None, penalty_param=1, max_em_iters=10, diff_thres=1e-6):
+        """
+        @param theta: initial value for theta in MCMC-EM
+        @param penalty_param: the coefficient for the penalty function
+        @param max_em_iters: the maximum number of iterations of MCMC-EM
+        @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
+        """
         # initialize theta vector
         if theta is None:
             theta = np.random.randn(self.feat_generator.feature_vec_len)
@@ -61,7 +75,7 @@ class MCMC_EM:
                 # Do M-step
                 log.info("M STEP, iter %d" % run)
 
-                problem = SurvivalProblemGradientDescent(self.feat_generator, e_step_samples, lasso_param)
+                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param)
                 theta, exp_log_lik = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,

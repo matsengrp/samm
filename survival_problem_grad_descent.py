@@ -13,13 +13,13 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, lasso_param):
+    def __init__(self, feat_generator, samples, penalty_param):
         """
         @param feat_generator: feature generator
         @param init_theta: where to initialize the gradient descent procedure from
-        @param lasso_param: the lasso parameter. should be non-negative
+        @param penalty_param: the lasso parameter. should be non-negative
         """
-        assert(lasso_param >= 0)
+        assert(penalty_param >= 0)
 
         self.feature_generator = feat_generator
         self.samples = samples
@@ -31,7 +31,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             )
             for sample in samples
         ]
-        self.lasso_param = lasso_param
+        self.penalty_param = penalty_param
 
     def get_value(self, theta):
         """
@@ -41,7 +41,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             SurvivalProblemGradientDescent.calculate_per_sample_log_lik(theta, sample, feature_vecs)
             for sample, feature_vecs in self.feature_vec_sample_pair
         ])
-        return -(1.0/self.num_samples * log_lik - self.lasso_param * np.linalg.norm(theta, ord=1))
+        return -(1.0/self.num_samples * log_lik - self.penalty_param * np.linalg.norm(theta, ord=1))
 
     def calculate_log_lik_ratio_vec(self, theta, prev_theta):
         llr_vec = np.zeros(self.num_samples)
@@ -90,7 +90,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             grad = self._get_gradient_log_lik(theta)
             potential_theta = theta - step_size * grad
             # Do proximal gradient step
-            potential_theta = soft_threshold(potential_theta, step_size * self.lasso_param)
+            potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
             potential_value = self.get_value(potential_theta)
 
             # Do backtracking line search
@@ -102,7 +102,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
                 step_size *= step_size_shrink
                 potential_theta = theta - step_size * grad
                 # Do proximal gradient step
-                potential_theta = soft_threshold(potential_theta, step_size * self.lasso_param)
+                potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
                 potential_value = self.get_value(potential_theta)
 
             if potential_value > current_value:
