@@ -5,7 +5,7 @@ import os
 import os.path
 import csv
 
-from survival_model import SurvivalModelSimulator
+from survival_model_simulator import SurvivalModelSimulator
 from feature_generator import SubmotifFeatureGenerator
 from common import *
 
