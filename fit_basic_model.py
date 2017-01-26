@@ -65,20 +65,20 @@ def main(args=sys.argv[1:]):
     motif_list.append('EDGES')
 
     mutations = dict.fromkeys(motif_list, 0)
+    appearances = dict.fromkeys(motif_list, 0)
 
     # TODO: this doesn't do anything clever with overlapping mutations. Should we
     # double count them?
     for obs_seq in obs_data:
         mutated_positions = obs_seq.mutation_pos_dict.keys()
         germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
+
+        for idx in germline_motifs:
+            appearances[motif_list[idx]] += 1
+
         for mut_pos in mutated_positions:
             for mutation in germline_motifs[mut_pos]:
                 mutations[motif_list[mutation]] += 1
-
-    theta = pickle.load(open(args.theta_file, 'rb'))
-    for i in range(theta.size):
-        if np.abs(theta[i]) > ZERO_THRES or mutations[motif_list[i]] > 0:
-            print (i, theta[i], motif_list[i], mutations[motif_list[i]])
 
 
 if __name__ == "__main__":
