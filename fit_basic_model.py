@@ -48,7 +48,7 @@ def parse_args():
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled context model',
-        default='_output/context_model.pkl')
+        default='_output/true_theta.pkl')
     parser.add_argument('--prop-file',
         type=str,
         help='file to output fitted proportions',

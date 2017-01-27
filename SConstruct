@@ -113,6 +113,29 @@ def generate(env, outdir, c):
             [join(outdir, 'true_theta'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
             [],
             ' '.join(map(str, cmd)))
+    elif c['simulation_methods'] == "survival_big":
+        cmd = ['python simulate_from_survival.py',
+               '--seed',
+               c['seed'],
+               '--n-taxa',
+               10,
+               '--n-germlines',
+               50,
+               '--motif-len',
+               5,
+               '--random-gene-len',
+               200,
+               '--min-censor-time',
+               2.0,
+               '--ratio-nonzero',
+               0.1,
+               '--output-true-theta ${TARGETS[0]}',
+               '--output-file ${TARGETS[1]}',
+               '--output-genes ${TARGETS[2]}']
+        return env.Command(
+            [join(outdir, 'true_theta'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [],
+            ' '.join(map(str, cmd)))
     else:
         raise NotImplementedError()
 
@@ -152,7 +175,7 @@ def fit_context_model(env, outdir, c):
                motif_len,
                '--input-file ${SOURCES[0]}',
                '--input-genes ${SOURCES[1]}',
-               '--theta-file ${SOURCES[2]}'
+               '--theta-file ${SOURCES[2]}',
                '--prop-file ${TARGETS[0]}']
         return env.Command(
             [join(outdir, 'proportions.pkl')],

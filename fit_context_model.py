@@ -13,6 +13,8 @@ import pickle
 import logging as log
 
 import numpy as np
+from scipy.stats import spearmanr
+
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
@@ -68,6 +70,10 @@ def parse_args():
         type=str,
         help="penalty parameters, comma separated",
         default="0.1")
+    parser.add_argument('--theta-file',
+        type=str,
+        help='file with pickled true context model',
+        default='_output/true_theta.pkl')
 
     args = parser.parse_args()
 
@@ -86,6 +92,9 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+
+    # Load true theta for comparison
+    true_theta = pickle.load(open(args.theta_file, 'rb'))
 
     log.info("Reading data")
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
@@ -120,6 +129,8 @@ def main(args=sys.argv[1:]):
                     log.info("%d: %f (EDGES)" % (i, theta[i]))
                 else:
                     log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
+
+        log.info(spearmanr(theta, true_theta))
 
     with open(args.out_file, "w") as f:
         pickle.dump(results_list, f)
