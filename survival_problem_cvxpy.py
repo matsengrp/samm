@@ -36,10 +36,11 @@ class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
 
     Note: motifs that mutate to different target nucleotides share the same theta value
     """
-    def solve(self, init_theta=None, max_iters=None):
+    def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """
         @param init_theta: ignored
         @param max_iters: ignored
+        @param num_threads: ignored
         """
         theta = Variable(self.feature_generator.feature_vec_len)
         obj = 0
@@ -60,10 +61,11 @@ class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
 
     Note: motifs that mutate to different target nucleotides share the same theta value
     """
-    def solve(self, init_theta=None, max_iters=None):
+    def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """
         @param init_theta: ignored
         @param max_iters: ignored
+        @param num_threads: ignored
         """
         motif_list = self.feature_generator.get_motif_list()
 

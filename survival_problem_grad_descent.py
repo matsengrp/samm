@@ -1,11 +1,11 @@
 import time
-import traceback
 from multiprocessing import Pool
 import numpy as np
 import scipy as sp
 import logging as log
 from survival_problem import SurvivalProblem
 from common import soft_threshold
+from parallel_worker import *
 
 class SurvivalProblemGradientDescent(SurvivalProblem):
     """
@@ -93,7 +93,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             potential_theta = theta - step_size * grad
             # Do proximal gradient step
             potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
-            potential_value = self.get_value_parallel(potential_theta)
+            potential_value = self._get_value_parallel(potential_theta)
 
             # Do backtracking line search
             expected_decrease = backtrack_alpha * np.power(np.linalg.norm(grad), 2)
@@ -105,7 +105,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
                 potential_theta = theta - step_size * grad
                 # Do proximal gradient step
                 potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
-                potential_value = self.get_value_parallel(potential_theta)
+                potential_value = self._get_value_parallel(potential_theta)
 
             if potential_value > current_value:
                 # Stop if value is increasing
@@ -121,13 +121,13 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
         return theta, -current_value
 
-    def get_value_parallel(self, theta):
+    def _get_value_parallel(self, theta):
         """
         @return negative penalized log likelihood
         """
         ll = self.pool.map(
-            _run_value_worker,
-            [Worker(theta, sample, feature_vecs) for sample, feature_vecs in self.feature_vec_sample_pair]
+            run_parallel_worker,
+            [ObjectiveValueWorker(theta, sample, feature_vecs) for sample, feature_vecs in self.feature_vec_sample_pair]
         )
         return -(1.0/self.num_samples * np.sum(ll) - self.penalty_param * np.linalg.norm(theta, ord=1))
 
@@ -139,44 +139,15 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         @return the gradient of the total log likelihood wrt theta
         """
         l = self.pool.map(
-            _run_worker,
-            [Worker(theta, sample, feature_vecs) for sample, feature_vecs in self.feature_vec_sample_pair]
+            run_parallel_worker,
+            [GradientWorker(theta, sample, feature_vecs) for sample, feature_vecs in self.feature_vec_sample_pair]
         )
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
 
-def _run_worker(worker):
+class GradientWorker(ParallelWorker):
     """
-    @param worker: Worker
-    Function called by each worker process in the multiprocessing pool
-    Note: this must be a global function
-    """
-    result = None
-    try:
-        result = worker.run()
-    except Exception as e:
-        print "Exception caught: %s" % e
-        traceback.print_exc()
-    return result
-
-def _run_value_worker(worker):
-    """
-    @param worker: Worker
-    Function called by each worker process in the multiprocessing pool
-    Note: this must be a global function
-    """
-    result = None
-    try:
-        result = worker.run_value()
-    except Exception as e:
-        print "Exception caught: %s" % e
-        traceback.print_exc()
-    return result
-
-
-class Worker:
-    """
-    Stores the information for running a sampler
+    Stores the information for calculating gradient
     """
     def __init__(self, theta, sample, feature_vecs):
         """
@@ -209,6 +180,23 @@ class Worker:
             grad -= grad_log_sum_exp/denom
         return grad
 
-    def run_value(self):
+class ObjectiveValueWorker(ParallelWorker):
+    """
+    Stores the information for calculating objective function value
+    """
+    def __init__(self, theta, sample, feature_vecs):
+        """
+        @param theta: where to take the gradient of the total log likelihood
+        @param sample: class ImputedSequenceMutations
+        @param feature_vecs: list of sparse feature vectors for all at-risk positions at every mutation step
+        """
+        self.theta = theta
+        self.sample = sample
+        self.feature_vecs = feature_vecs
+
+    def run(self):
+        """
+        @return the log likelihood for this sample
+        """
         return SurvivalProblemGradientDescent.calculate_per_sample_log_lik(
             self.theta, self.sample, self.feature_vecs)
