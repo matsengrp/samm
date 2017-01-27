@@ -2,6 +2,7 @@ import sys
 import traceback
 from multiprocessing import Pool
 from models import ImputedSequenceMutations
+from parallel_worker import *
 
 class SamplerCollection:
     """
@@ -36,7 +37,7 @@ class SamplerCollection:
         """
         pool = Pool(self.num_threads)
         sampled_orders_list = pool.map(
-            _run_sampler,
+            run_parallel_worker,
             [
                 SamplerPoolWorker(sampler, init_order, num_samples, burn_in_sweeps)
                 for sampler, init_order in zip(self.samplers, init_orders_for_iter)
@@ -51,21 +52,7 @@ class SamplerCollection:
 
         return sampled_orders_list
 
-def _run_sampler(sampler_worker):
-    """
-    @param sampler_worker: SamplerPoolWorker
-    Function called by each worker process in the multiprocessing pool
-    Note: this must be a global function
-    """
-    result = None
-    try:
-        result = sampler_worker.run()
-    except Exception as e:
-        print "Exception caught: %s" % e
-        traceback.print_exc()
-    return result
-
-class SamplerPoolWorker:
+class SamplerPoolWorker(ParallelWorker):
     """
     Stores the information for running a sampler
     """
