@@ -131,7 +131,6 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         )
         return -(1.0/self.num_samples * np.sum(ll) - self.penalty_param * np.linalg.norm(theta, ord=1))
 
-
     def _get_gradient_log_lik(self, theta):
         """
         @param theta: where to take the gradient of the total log likelihood
@@ -144,6 +143,21 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         )
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
+
+    @staticmethod
+    def get_gradient_log_lik_per_sample(theta, sample, feature_vecs):
+        grad = np.zeros(theta.size)
+        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
+            grad[vecs_at_mutation_step[mutating_pos]] += 1
+            denom = 0
+            grad_log_sum_exp = np.zeros(theta.size)
+            denom = np.exp([theta[one_feats].sum() for one_feats in vecs_at_mutation_step.values()]).sum()
+            for one_feats in vecs_at_mutation_step.values():
+                val = np.exp(theta[one_feats].sum())
+                for f in one_feats:
+                    grad_log_sum_exp[f] += val
+            grad -= grad_log_sum_exp/denom
+        return grad
 
 class GradientWorker(ParallelWorker):
     """
@@ -163,22 +177,7 @@ class GradientWorker(ParallelWorker):
         """
         @return the gradient of the log likelihood for this sample
         """
-        theta = self.theta
-        sample = self.sample
-        feature_vecs = self.feature_vecs
-
-        grad = np.zeros(theta.size)
-        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
-            grad[vecs_at_mutation_step[mutating_pos]] += 1
-            denom = 0
-            grad_log_sum_exp = np.zeros(theta.size)
-            denom = np.exp([theta[one_feats].sum() for one_feats in vecs_at_mutation_step.values()]).sum()
-            for one_feats in vecs_at_mutation_step.values():
-                val = np.exp(theta[one_feats].sum())
-                for f in one_feats:
-                    grad_log_sum_exp[f] += val
-            grad -= grad_log_sum_exp/denom
-        return grad
+        return SurvivalProblemGradientDescent.get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs)
 
 class ObjectiveValueWorker(ParallelWorker):
     """
@@ -198,5 +197,4 @@ class ObjectiveValueWorker(ParallelWorker):
         """
         @return the log likelihood for this sample
         """
-        return SurvivalProblemGradientDescent.calculate_per_sample_log_lik(
-            self.theta, self.sample, self.feature_vecs)
+        return SurvivalProblemGradientDescent.calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs)
