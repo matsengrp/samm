@@ -13,7 +13,7 @@ import pickle
 import logging as log
 
 import numpy as np
-from scipy.stats import spearmanr
+import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
@@ -130,10 +130,13 @@ def main(args=sys.argv[1:]):
                 else:
                     log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
 
-        log.info(spearmanr(theta, true_theta))
+        log.info(scipy.stats.spearmanr(theta, true_theta))
+        log.info(scipy.stats.kendalltau(theta, true_theta))
+        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(theta, true_theta))
+        log.info("L2 error %f" % np.linalg.norm(theta - true_theta))
 
-    with open(args.out_file, "w") as f:
-        pickle.dump(results_list, f)
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

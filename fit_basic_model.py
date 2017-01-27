@@ -12,7 +12,7 @@ import csv
 import pickle
 
 import numpy as np
-from scipy.stats import spearmanr
+import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
@@ -94,14 +94,23 @@ def main(args=sys.argv[1:]):
     theta = pickle.load(open(args.theta_file, 'rb'))
     prop_list = [proportions[motif_list[i]] for i in range(theta.size)]
 
-    # Print the motifs that are acting out of the ordinary
+    # Print the motifs with the highest and lowest proportions
+    threshold_prop_list = [0] * len(prop_list)
     mean_prop = np.mean(prop_list)
     sd_prop = np.sqrt(np.var(prop_list))
     for i in range(theta.size):
-        if np.abs(proportions[motif_list[i]] - mean_prop) > 1.5 * sd_prop:
+        if np.abs(proportions[motif_list[i]] - mean_prop) > 0.5 * sd_prop:
             print (i, theta[i], motif_list[i], proportions[motif_list[i]])
+            threshold_prop_list[i] = proportions[motif_list[i]]
 
-    print spearmanr(theta, prop_list)
+    print "THETA"
+    print scipy.stats.spearmanr(theta, prop_list)
+    print scipy.stats.kendalltau(theta, prop_list)
+
+    print "THRESHOLDED THETA"
+    print scipy.stats.spearmanr(theta, threshold_prop_list)
+    print scipy.stats.kendalltau(theta, threshold_prop_list)
+
     pickle.dump(np.array(prop_list), open(args.prop_file, 'w'))
 
 if __name__ == "__main__":

@@ -72,7 +72,7 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
     # True vector
-    true_theta = np.matrix(np.zeros(feat_generator.feature_vec_len)).T
+    true_theta = np.zeros(feat_generator.feature_vec_len)
 
     # Hard code simulation to have edge motifs with higher mutation rates
     true_theta[feat_generator.feature_vec_len - 1] = 0.1
