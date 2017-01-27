@@ -38,10 +38,13 @@ class FullSequenceMutations:
     def __init__(self, obs_seq_mutation, mutations):
         """
         @param obs_seq_mutation: ObservedSequenceMutations
-        @param mutations: a list of MutationPosTime
+        @param mutations: an ordered list of MutationPosTime
         """
         self.obs_seq_mutation = obs_seq_mutation
         self.mutations = mutations
+
+    def get_mutation_order(self):
+        return [m.pos for m in self.mutations]
 
     def __str__(self):
         return "%s => %s" % (
@@ -59,4 +62,4 @@ class MutationEvent:
         self.target_nucleotide = target_nucleotide
 
     def __str__(self):
-        return "%d=%s" % (self.pos, self.target_nucleotide)
+        return "%d=%s (%.2g)" % (self.pos, self.target_nucleotide, self.time)
