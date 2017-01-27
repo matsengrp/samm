@@ -10,6 +10,7 @@ import os
 import os.path
 import csv
 import pickle
+import logging as log
 
 import numpy as np
 import scipy.stats
@@ -53,6 +54,10 @@ def parse_args():
         type=str,
         help='file to output fitted proportions',
         default='_output/prop_file.pkl')
+    parser.add_argument('--log-file',
+        type=str,
+        help='file to output logs',
+        default='_output/basic_log.txt')
 
     args = parser.parse_args()
 
@@ -62,6 +67,9 @@ def parse_args():
 
 def main(args=sys.argv[1:]):
     args = parse_args()
+
+    log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
+
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
 
@@ -100,16 +108,16 @@ def main(args=sys.argv[1:]):
     sd_prop = np.sqrt(np.var(prop_list))
     for i in range(theta.size):
         if np.abs(proportions[motif_list[i]] - mean_prop) > 0.5 * sd_prop:
-            print (i, theta[i], motif_list[i], proportions[motif_list[i]])
+            log.info("%d: %f, %s, %f" % (i, theta[i], motif_list[i], proportions[motif_list[i]]))
             threshold_prop_list[i] = proportions[motif_list[i]]
 
-    print "THETA"
-    print scipy.stats.spearmanr(theta, prop_list)
-    print scipy.stats.kendalltau(theta, prop_list)
+    log.info("THETA")
+    log.info(scipy.stats.spearmanr(theta, prop_list))
+    log.info(scipy.stats.kendalltau(theta, prop_list))
 
-    print "THRESHOLDED THETA"
-    print scipy.stats.spearmanr(theta, threshold_prop_list)
-    print scipy.stats.kendalltau(theta, threshold_prop_list)
+    log.info("THRESHOLDED THETA")
+    log.info(scipy.stats.spearmanr(theta, threshold_prop_list))
+    log.info(scipy.stats.kendalltau(theta, threshold_prop_list))
 
     pickle.dump(np.array(prop_list), open(args.prop_file, 'w'))
 

@@ -43,9 +43,9 @@ nest = SConsWrap(Nest(base_dict=base), '_'+env['OUTPUT_NAME'], alias_environment
 
 # Nest for simulation methods
 sim_methods = [
-    'survival_big',
-    # 'survival_mini', # In the future, we should make a survival_big
-    # 'shmulate',
+    #'survival_big', #This is still too big to run our data on.
+    'survival_mini',
+    'shmulate',
 ]
 
 nest.add(
@@ -126,7 +126,7 @@ def generate(env, outdir, c):
                '--random-gene-len',
                200,
                '--min-censor-time',
-               2.0,
+               1.0,
                '--ratio-nonzero',
                0.1,
                '--output-true-theta ${TARGETS[0]}',
@@ -144,7 +144,7 @@ def generate(env, outdir, c):
 # Nest for model fitting
 @nest.add_target_with_env(env)
 def fit_context_model(env, outdir, c):
-    if c["simulation_methods"] in ["survival_mini"]:
+    if c["simulation_methods"] == "survival_mini":
         motif_len = 3
     else:
         motif_len = 5
@@ -158,14 +158,15 @@ def fit_context_model(env, outdir, c):
                '--penalty-params',
                "0.05",
                '--num-threads',
-               12,
+               10,
                '--input-file ${SOURCES[0]}',
                '--input-genes ${SOURCES[1]}',
+               '--theta-file ${SOURCES[2]}',
                '--log-file ${TARGETS[0]}',
                '--out-file ${TARGETS[1]}']
         return env.Command(
             [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
-            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv'), join(outdir, 'true_theta.pkl')],
             ' '.join(map(str, cmd)))
     else:
         cmd = ['python fit_basic_model.py',
@@ -176,9 +177,10 @@ def fit_context_model(env, outdir, c):
                '--input-file ${SOURCES[0]}',
                '--input-genes ${SOURCES[1]}',
                '--theta-file ${SOURCES[2]}',
-               '--prop-file ${TARGETS[0]}']
+               '--prop-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
         return env.Command(
-            [join(outdir, 'proportions.pkl')],
+            [join(outdir, 'proportions.pkl'), join(outdir, 'log.txt')],
             [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv'), join(outdir, 'true_theta.pkl')],
             ' '.join(map(str, cmd)))
 
