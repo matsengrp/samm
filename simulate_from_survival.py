@@ -69,7 +69,7 @@ def main(args=sys.argv[1:]):
     np.random.seed(args.seed)
 
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
-    motif_list = SubmotifFeatureGenerator.get_motif_list(args.motif_len)
+    motif_list = feat_generator.get_motif_list()
     # True vector
     true_theta = np.matrix(np.zeros(feat_generator.feature_vec_len)).T
 
