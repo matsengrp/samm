@@ -79,6 +79,7 @@ class MCMC_EM:
                 theta, exp_log_lik = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
+                    num_threads=self.num_threads,
                 )
                 log.info("Current Theta")
                 log.info("\n".join(["%d: %.2g" % (i, theta[i]) for i in range(theta.size) if np.abs(theta[i]) > 1e-5]))

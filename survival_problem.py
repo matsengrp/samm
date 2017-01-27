@@ -12,13 +12,14 @@ class SurvivalProblem:
         self.feature_generator = feature_generator
         self.penalty_param = penalty_param
 
-    def solve(self, init_theta=None, max_iters=None):
+    def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """
         Solve the problem
         @param init_theta: if this param is used, then the problem solver will initialize the theta
                             at this value
         @param max_iters: if this param is used, then this is the maximum number of iterations for
                             the problem solver
+        @param num_threads: if this param is used, number of threads to use to calculate the gradient
 
         @return final fitted value of theta and objective function value
         """
