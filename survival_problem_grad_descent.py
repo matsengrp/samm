@@ -7,10 +7,9 @@ from survival_problem import SurvivalProblem
 from common import soft_threshold
 from parallel_worker import *
 
-class SurvivalProblemGradientDescent(SurvivalProblem):
+class SurvivalProblemCustom(SurvivalProblem):
     """
-    Our own implementation of proximal gradient descent to solve the survival problem
-    Objective function: - log likelihood of theta + lasso penalty on theta
+    Our own implementation to solve the survival problem
     """
     print_iter = 10 # print status every `print_iter` iterations
 
@@ -34,21 +33,26 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
         ]
         self.penalty_param = penalty_param
 
-    def get_value(self, theta):
+        self.post_init()
+
+    def post_init(self):
+        return
+
+    def get_log_lik(self, theta):
         """
         @return negative penalized log likelihood
         """
         log_lik = np.sum([
-            SurvivalProblemGradientDescent.calculate_per_sample_log_lik(theta, sample, feature_vecs)
+            SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_vecs)
             for sample, feature_vecs in self.feature_vec_sample_pair
         ])
-        return -(1.0/self.num_samples * log_lik - self.penalty_param * np.linalg.norm(theta, ord=1))
+        return 1.0/self.num_samples * log_lik
 
     def calculate_log_lik_ratio_vec(self, theta, prev_theta):
         llr_vec = np.zeros(self.num_samples)
         for sample_id, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair):
-            llr_vec[sample_id] = SurvivalProblemGradientDescent.calculate_per_sample_log_lik(theta, sample, feature_vecs) - \
-                    SurvivalProblemGradientDescent.calculate_per_sample_log_lik(prev_theta, sample, feature_vecs)
+            llr_vec[sample_id] = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_vecs) - \
+                    SurvivalProblemCustom.calculate_per_sample_log_lik(prev_theta, sample, feature_vecs)
         return llr_vec
 
     @staticmethod
@@ -67,61 +71,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             )
         return obj
 
-    def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
-        """
-        Runs proximal gradient descent to minimize the negative penalized log likelihood
-
-        @param init_theta: where to initialize the gradient descent
-        @param max_iters: maximum number of iterations of gradient descent
-        @param init_step_size: how big to initialize the step size factor
-        @param step_size_shrink: how much to shrink the step size during backtracking line descent
-        @param backtrack_alpha: the alpha in backtracking line descent (p464 in Boyd)
-        @param diff_thres: if the difference is less than diff_thres, then stop gradient descent
-        @param verbose: whether to print out the status at each iteration
-        @return final fitted value of theta and penalized log likelihood
-        """
-        st = time.time()
-        self.pool = Pool(num_threads)
-        theta = init_theta
-        step_size = init_step_size
-        current_value = self.get_value(theta)
-        for i in range(max_iters):
-            if i % self.print_iter == 0:
-                log.info("GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-            # Calculate gradient of the smooth part
-            grad = self._get_gradient_log_lik(theta)
-            potential_theta = theta - step_size * grad
-            # Do proximal gradient step
-            potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
-            potential_value = self._get_value_parallel(potential_theta)
-
-            # Do backtracking line search
-            expected_decrease = backtrack_alpha * np.power(np.linalg.norm(grad), 2)
-            while potential_value >= current_value - step_size * expected_decrease:
-                if step_size * expected_decrease < diff_thres:
-                    # Stop if difference in objective function is too small
-                    break
-                step_size *= step_size_shrink
-                potential_theta = theta - step_size * grad
-                # Do proximal gradient step
-                potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
-                potential_value = self._get_value_parallel(potential_theta)
-
-            if potential_value > current_value:
-                # Stop if value is increasing
-                break
-            else:
-                theta = potential_theta
-                diff = current_value - potential_value
-                current_value = potential_value
-                if diff < diff_thres:
-                    # Stop if difference in objective function is too small
-                    break
-        self.pool.close()
-        log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        return theta, -current_value
-
-    def _get_value_parallel(self, theta):
+    def _get_log_lik_parallel(self, theta):
         """
         @return negative penalized log likelihood
         """
@@ -129,7 +79,7 @@ class SurvivalProblemGradientDescent(SurvivalProblem):
             run_parallel_worker,
             [ObjectiveValueWorker(theta, sample, feature_vecs) for sample, feature_vecs in self.feature_vec_sample_pair]
         )
-        return -(1.0/self.num_samples * np.sum(ll) - self.penalty_param * np.linalg.norm(theta, ord=1))
+        return 1.0/self.num_samples * np.sum(ll)
 
     def _get_gradient_log_lik(self, theta):
         """
@@ -177,7 +127,7 @@ class GradientWorker(ParallelWorker):
         """
         @return the gradient of the log likelihood for this sample
         """
-        return SurvivalProblemGradientDescent.get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs)
+        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs)
 
 class ObjectiveValueWorker(ParallelWorker):
     """
@@ -197,4 +147,4 @@ class ObjectiveValueWorker(ParallelWorker):
         """
         @return the log likelihood for this sample
         """
-        return SurvivalProblemGradientDescent.calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs)
+        return SurvivalProblemCustom.calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs)
