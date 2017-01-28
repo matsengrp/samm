@@ -153,7 +153,7 @@ class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
         """
         return self.rho/2. * np.power(np.linalg.norm(self.beta - self.D * theta + self.u, ord=2), 2) + self.penalty_param * np.linalg.norm(theta, ord=1)
 
-    def get_grad(self, theta):
+    def get_gradient_smooth(self, theta):
         grad_ll = np.matrix(self._get_gradient_log_lik(theta)).T
         grad_norm2 = - self.rho * self.D.T * (self.beta - self.get_fused_lasso_theta(theta) + self.u)
         return grad_ll + grad_norm2

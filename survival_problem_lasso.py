@@ -12,6 +12,8 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
     Our own implementation of proximal gradient descent to solve the survival problem
     Objective function: - log likelihood of theta + lasso penalty on theta
     """
+    min_diff_thres = 1e-8
+
     def get_value(self, theta):
         """
         @return negative penalized log likelihood
@@ -34,6 +36,9 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         theta, current_value, step_size = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
         return theta, -current_value
 
+    def get_gradient_smooth(self, theta):
+        return self._get_gradient_log_lik(theta)
+
     def _solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
@@ -50,7 +55,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
                 log.info("GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
 
             # Calculate gradient of the smooth part
-            grad = self._get_gradient_log_lik(theta)
+            grad = self.get_gradient_smooth(theta)
             potential_theta = theta - step_size * grad
             # Do proximal gradient step
             potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
@@ -62,7 +67,10 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
                 if step_size * expected_decrease < diff_thres and i > 0:
                     # Stop if difference in objective function is too small
                     break
+                elif step_size * expected_decrease < self.min_diff_thres:
+                    break
                 step_size *= step_size_shrink
+                log.info("GD step size shrink %f" % step_size)
                 potential_theta = theta - step_size * grad
                 # Do proximal gradient step
                 potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
