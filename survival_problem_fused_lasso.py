@@ -1,18 +1,16 @@
 import time
 import numpy as np
 import scipy as sp
-from multiprocessing import Pool
 import sklearn.linear_model
 import logging as log
 
 from survival_problem_grad_descent import SurvivalProblemCustom
 from survival_problem_lasso import SurvivalProblemLasso
-from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from common import *
 
 class SurvivalProblemFusedLasso(SurvivalProblemCustom):
     """
-    Let's do ADMM?
+    Let's do ADMM to solve the sparse fused lasso problem
     """
     print_iter = 1
 
@@ -32,11 +30,12 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=int)
         self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=int)
 
+        # Creates the difference matrix. Won't work with too many motifs
+        # TODO: Make more memory efficient in the future
         self.D = np.matrix(np.zeros((self.fused_lasso_idx1.size, self.feature_generator.feature_vec_len)))
         for i, (i1, i2) in enumerate(zip(self.fused_lasso_idx1.tolist(), self.fused_lasso_idx2.tolist())):
             self.D[i, i1] = 1
             self.D[i, i2] = -1
-        self.DD = self.D.T * self.D
 
         self.penalty_param_fused = self.penalty_param
         # TODO: This is a hack for now since we assume only one penalty param
@@ -111,10 +110,6 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
                 break
         log.info("final ADMM iter %d, val %f, time %d" % (i, current_value, time.time() - st))
         return np.array(theta.T)[0], -current_value
-
-    def solve_theta(self):
-        # do something
-        return 0
 
 class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
     """

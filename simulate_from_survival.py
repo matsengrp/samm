@@ -79,12 +79,14 @@ def main(args=sys.argv[1:]):
     some_num_nonzero_motifs = int(true_theta.size * args.ratio_nonzero/2.0)
     # Remove edge motifs from random choices
     some_nonzero_motifs = np.random.choice(true_theta.size - 1, some_num_nonzero_motifs)
+    # Also make some neighbor motifs nonzero
     nonzero_motifs = np.unique(np.vstack((some_nonzero_motifs, some_nonzero_motifs + 1)))
     num_nonzero_motifs = nonzero_motifs.size
     for idx in some_nonzero_motifs:
         # randomly set nonzero indices between [-2, 2]
         true_theta[idx] = (np.random.rand() - 0.5) * 4
-        # neighboring values also have same value
+        # neighboring values also have same value (may get overridden if that motif was originally
+        # set to be nonzero too)
         true_theta[idx + 1] = true_theta[idx]
 
     if args.random_gene_len > 0:
