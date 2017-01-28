@@ -10,7 +10,8 @@ from common import *
 
 class SurvivalProblemFusedLasso(SurvivalProblemCustom):
     """
-    Let's do ADMM to solve the sparse fused lasso problem
+    Let's do ADMM to solve the sparse fused lasso problem.
+    In this case we "fuse" over motifs that differ in only one base.
     """
     print_iter = 1
 
@@ -18,6 +19,8 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         # Calculate the fused lasso indices
         motif_list = self.feature_generator.get_motif_list()
         fused_lasso_pen = 0
+        # We implement the fused penalty in terms of differences of pairs that are stored in these
+        # index lists: the first entry of the first list minus the first entry in the second list, etc.
         motifs_fused_lasso1 = []
         motifs_fused_lasso2 = []
         for i1, m1 in enumerate(motif_list):
@@ -52,6 +55,9 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         return -(self.get_log_lik(theta) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
 
     def get_fused_lasso_theta(self, theta):
+        """
+        @return the components of the fused lasso penalty (before applying l1 to it)
+        """
         return theta[self.fused_lasso_idx1, 0] - theta[self.fused_lasso_idx2, 0]
 
     def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1.0, step_size_shrink=0.5, diff_thres=1e-3, verbose=False):
