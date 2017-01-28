@@ -78,7 +78,8 @@ def main(args=sys.argv[1:]):
 
     some_num_nonzero_motifs = int(true_theta.size * args.ratio_nonzero/2.0)
     # Remove edge motifs from random choices
-    some_nonzero_motifs = np.random.choice(true_theta.size - 1, some_num_nonzero_motifs)
+    # Also cannot pick the last motif
+    some_nonzero_motifs = np.random.choice(true_theta.size - 2, some_num_nonzero_motifs)
     # Also make some neighbor motifs nonzero
     nonzero_motifs = np.unique(np.vstack((some_nonzero_motifs, some_nonzero_motifs + 1)))
     num_nonzero_motifs = nonzero_motifs.size

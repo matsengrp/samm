@@ -59,7 +59,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
             # Do backtracking line search
             expected_decrease = backtrack_alpha * np.power(np.linalg.norm(grad), 2)
             while potential_value >= current_value - step_size * expected_decrease:
-                if step_size * expected_decrease < diff_thres:
+                if step_size * expected_decrease < diff_thres and i > 0:
                     # Stop if difference in objective function is too small
                     break
                 step_size *= step_size_shrink
