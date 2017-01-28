@@ -53,10 +53,13 @@ class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 
-class SurvivalProblemIshLassoCVXPY(SurvivalProblemCVXPY):
+class SurvivalProblemLassoCVXPY_ADMM(SurvivalProblemCVXPY):
     """
-    Objective function: log likelihood of theta - lasso penalty on theta
+    Objective function: log likelihood of theta - lasso penalty on theta - augmented penalty on theta from ADMM
     * Lasso penalty over all of theta
+    * || difference in thetas - residuals ||^2 from ADMM
+
+    Internal solver for ADMM for comparison to our grad descent implementation
 
     Note: motifs that mutate to different target nucleotides share the same theta value
     """

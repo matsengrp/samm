@@ -6,7 +6,8 @@ import sklearn.linear_model
 import logging as log
 
 from survival_problem_grad_descent import SurvivalProblemCustom
-from survival_problem_cvxpy import SurvivalProblemIshLassoCVXPY, SurvivalProblemFusedLassoCVXPY
+from survival_problem_lasso import SurvivalProblemLasso
+from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from common import *
 
 class SurvivalProblemFusedLasso(SurvivalProblemCustom):
@@ -16,9 +17,6 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
     print_iter = 1
 
     def post_init(self):
-        self.penalty_param_fused = self.penalty_param
-        self.penalty_param_lasso = self.penalty_param
-
         # Calculate the fused lasso indices
         motif_list = self.feature_generator.get_motif_list()
         fused_lasso_pen = 0
@@ -40,6 +38,12 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
             self.D[i, i2] = -1
         self.DD = self.D.T * self.D
 
+        self.penalty_param_fused = self.penalty_param
+        # TODO: This is a hack for now since we assume only one penalty param
+        # We upweight lasso since we don't want to over-penalize.
+        self.penalty_param_lasso = 2 * self.penalty_param
+
+
     def get_value(self, theta):
         """
         @return negative penalized log likelihood
@@ -51,10 +55,9 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
     def get_fused_lasso_theta(self, theta):
         return theta[self.fused_lasso_idx1, 0] - theta[self.fused_lasso_idx2, 0]
 
-    def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1.0, step_size_shrink=0.5, diff_thres=1e-6, verbose=False):
+    def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1.0, step_size_shrink=0.5, diff_thres=1e-3, verbose=False):
         st = time.time()
         theta = np.matrix(init_theta).T
-        print "theta", theta
         beta = self.get_fused_lasso_theta(theta)
         u = np.matrix(np.zeros(beta.size)).T # scaled dual variable
         beta_size = beta.size
@@ -64,7 +67,10 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         current_value = self.get_value(theta)
         prev_value = current_value
 
-        gd_diff_thres = 0.01
+        # Slowly increase the accuracy of the update to theta since it is an iterative algo
+        gd_diff_thres = 0.3
+        max_gd_iters = 2
+        gd_step_size = 1
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("ADMM Iter %d, val %f, time %d" % (i, current_value, time.time() - st))
@@ -78,10 +84,7 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
             beta = new_beta[0, :, :]
 
             # UPDATE THETA
-            # pr = SurvivalProblemIshLassoCVXPY(self.feature_generator, self.samples, self.penalty_param_lasso)
-            # theta, cvx_val = pr.solve(beta, u, self.D)
-
-            inner_problem = SurvivalProblemIshLassoInner(
+            inner_problem = SurvivalProblemLassoInnerADMM(
                 self.feature_vec_sample_pair,
                 self.samples,
                 self.penalty_param_lasso,
@@ -92,7 +95,11 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
                 u,
                 step_size,
             )
-            theta, _ = inner_problem.solve(theta, diff_thres=gd_diff_thres)
+            # initialize with previous step size
+            theta, _, gd_step_size = inner_problem.solve(theta, num_threads=num_threads, init_step_size=gd_step_size, max_iters=max_gd_iters, diff_thres=gd_diff_thres)
+            if i % 5 == 0:
+                max_gd_iters += 1
+                gd_diff_thres *= 0.95
 
             # UPDATE DUAL
             u = u + beta - self.get_fused_lasso_theta(theta)
@@ -101,10 +108,7 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
             diff = prev_value - current_value
             prev_value = current_value
             if diff < diff_thres:
-                gd_diff_thres = 0.001
                 break
-            print "admm", current_value
-
         log.info("final ADMM iter %d, val %f, time %d" % (i, current_value, time.time() - st))
         return np.array(theta.T)[0], -current_value
 
@@ -112,12 +116,12 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         # do something
         return 0
 
-class SurvivalProblemIshLassoInner(SurvivalProblemCustom):
+class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
     """
     Our own implementation of proximal gradient descent to solve the survival problem
-    Objective function: - log likelihood of theta + lasso penalty on theta
+    Objective function: - log likelihood of theta + lasso penalty on theta + augmented penalty on theta from ADMM
     """
-    print_iter = 1
+    print_iter = 10
     def __init__(self, feature_vec_sample_pair, samples, penalty_param, fused_lasso_idx1, fused_lasso_idx2, D, beta, u, rho):
         """
         @param feat_generator: feature generator
@@ -149,9 +153,17 @@ class SurvivalProblemIshLassoInner(SurvivalProblemCustom):
         return -1 * self.get_log_lik(theta) + self.get_value_addon(theta)
 
     def get_value_addon(self, theta):
+        """
+        Additional penalty from lasso and ADMM
+        """
         return self.rho/2. * np.power(np.linalg.norm(self.beta - self.D * theta + self.u, ord=2), 2) + self.penalty_param * np.linalg.norm(theta, ord=1)
 
-    def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=0.001, verbose=False):
+    def get_grad(self, theta):
+        grad_ll = np.matrix(self._get_gradient_log_lik(theta)).T
+        grad_norm2 = - self.rho * self.D.T * (self.beta - self.get_fused_lasso_theta(theta) + self.u)
+        return grad_ll + grad_norm2
+
+    def solve(self, init_theta, max_iters=100, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=0.001, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
 
@@ -164,58 +176,9 @@ class SurvivalProblemIshLassoInner(SurvivalProblemCustom):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        self.pool = Pool(num_threads)
 
-        st = time.time()
-        theta = init_theta
-        step_size = init_step_size
-        current_value = self.get_value(theta)
-        for i in range(max_iters):
-            if i % self.print_iter == 0:
-                log.info("GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-
-            # Calculate gradient of the smooth part
-            st = time.time()
-            grad_ll = np.matrix(self._get_gradient_log_lik(theta)).T
-            print time.time() - st
-            st = time.time()
-            grad_norm2 = - self.rho * self.D.T * (self.beta - self.get_fused_lasso_theta(theta) + self.u)
-            print time.time() - st
-            grad = grad_ll + grad_norm2
-            potential_theta = theta - step_size * grad
-
-            # Do proximal gradient step
-            potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
-            potential_value = self._get_value_parallel(potential_theta)
-
-            # Do backtracking line search
-            expected_decrease = backtrack_alpha * np.power(np.linalg.norm(grad), 2)
-
-            while potential_value >= current_value - step_size * expected_decrease:
-                if step_size * expected_decrease < diff_thres:
-                    # Stop if difference in objective function is too small
-                    break
-                step_size *= step_size_shrink
-                potential_theta = theta - step_size * grad
-                # Do proximal gradient step
-                potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
-                potential_value = self._get_value_parallel(potential_theta)
-
-            if potential_value > current_value:
-                # Stop if value is increasing
-                break
-            else:
-                theta = potential_theta
-                diff = current_value - potential_value
-                current_value = potential_value
-                # print "current_value", current_value
-                if diff < diff_thres:
-                    # Stop if difference in objective function is too small
-                    break
-        self.pool.close()
-        log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-
-        return theta, -current_value
+        theta, current_value, step_size = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, step_size
 
     def _get_value_parallel(self, theta):
         """

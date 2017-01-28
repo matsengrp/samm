@@ -2,6 +2,8 @@ import time
 import numpy as np
 import scipy as sp
 import logging as log
+from multiprocessing import Pool
+
 from survival_problem_grad_descent import SurvivalProblemCustom
 from common import soft_threshold
 
@@ -28,6 +30,14 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         @param diff_thres: if the difference is less than diff_thres, then stop gradient descent
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
+        """
+        theta, current_value, step_size = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value
+
+    def _solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
+        """
+        Runs proximal gradient descent to minimize the negative penalized log likelihood
+        @return final fitted value of theta and penalized negative log likelihood and step size
         """
         self.pool = Pool(num_threads)
 
@@ -70,7 +80,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
                     break
         self.pool.close()
         log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        return theta, -current_value
+        return theta, current_value, step_size
 
     def _get_value_parallel(self, theta):
         """

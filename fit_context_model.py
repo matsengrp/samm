@@ -43,16 +43,16 @@ def parse_args():
     parser.add_argument('--num-threads',
         type=int,
         help='number of threads to use during E-step',
-        default=1)
+        default=4)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso',
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso',
         choices=["CL", "CFL", "L", "FL"],
-        default="FL")
+        default="L")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
-        default=3)
+        default=5)
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
