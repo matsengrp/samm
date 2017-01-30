@@ -84,10 +84,11 @@ def generate(env, outdir, c):
                'simulate',
                '--seed',
                c['seed'],
-               '--output-file ${TARGETS[0]}',
-               '--output-genes ${TARGETS[1]}']
+               '--output-true-theta ${TARGETS[0]}',
+               '--output-file ${TARGETS[1]}',
+               '--output-genes ${TARGETS[2]}']
         return env.Command(
-            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
             [],
             ' '.join(map(str, cmd)))
     elif c['simulation_methods'] == "survival_mini":
@@ -110,7 +111,7 @@ def generate(env, outdir, c):
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
         return env.Command(
-            [join(outdir, 'true_theta'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
             [],
             ' '.join(map(str, cmd)))
     elif c['simulation_methods'] == "survival_big":
@@ -133,7 +134,7 @@ def generate(env, outdir, c):
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
         return env.Command(
-            [join(outdir, 'true_theta'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
             [],
             ' '.join(map(str, cmd)))
     else:

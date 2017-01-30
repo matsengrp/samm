@@ -16,6 +16,8 @@ import os
 import os.path
 from Bio import SeqIO
 import csv
+import pickle
+
 from common import *
 
 def parse_args():
@@ -50,6 +52,10 @@ def parse_args():
         type=str,
         help='germline genes used in csv file',
         default='_output/genes.csv')
+    parser_simulate.add_argument('--output-true-theta',
+        type=str,
+        help='true theta pickle file',
+        default='_output/true_theta.pkl')
     parser_simulate.add_argument('--log-dir',
         type=str,
         help='log directory',
@@ -58,6 +64,10 @@ def parse_args():
         type=int,
         help='number of germline genes to sample (maximum 350)',
         default=2)
+    parser.add_argument('--motif-len',
+        type=int,
+        help='length of motif (must be odd)',
+        default=5)
     parser_simulate.add_argument('--n-mutes',
         type=int,
         help='number of mutations from germline (default: -1 meaning choose at random)',
@@ -161,6 +171,11 @@ def simulate(args):
                 seq_file.writerow([gene, str(seq.id), str(seq.seq)])
 
             os.remove(args.output_file+'_'+str(run))
+
+    # Dump a dummy file of theta
+    # We'll input some function of mutability here, but leave it dummy-length for now
+    true_theta = np.zeros(1+4**args.motif_len)
+    pickle.dump(true_theta, open(args.output_true_theta, 'w'))
 
 
 def main(args=sys.argv[1:]):
