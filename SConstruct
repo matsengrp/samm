@@ -43,13 +43,24 @@ nest = SConsWrap(Nest(base_dict=base), '_'+env['OUTPUT_NAME'], alias_environment
 
 # Nest for simulation methods
 sim_methods = [
-    'survival_mini', # In the future, we should make a survival_big
+    #'survival_big', #This is still too big to run our data on.
+    'survival_mini',
     'shmulate',
 ]
 
 nest.add(
     'simulation_methods',
     sim_methods)
+
+# Nest for fitting models
+model_options = [
+    'survival',
+    'basic',
+]
+
+nest.add(
+    'model_options',
+    model_options)
 
 # Nest for replicates
 
@@ -99,7 +110,30 @@ def generate(env, outdir, c):
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
         return env.Command(
-            [join(outdir, 'true_theta.txt'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [join(outdir, 'true_theta'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+            [],
+            ' '.join(map(str, cmd)))
+    elif c['simulation_methods'] == "survival_big":
+        cmd = ['python simulate_from_survival.py',
+               '--seed',
+               c['seed'],
+               '--n-taxa',
+               10,
+               '--n-germlines',
+               50,
+               '--motif-len',
+               5,
+               '--random-gene-len',
+               200,
+               '--min-censor-time',
+               1.0,
+               '--ratio-nonzero',
+               0.1,
+               '--output-true-theta ${TARGETS[0]}',
+               '--output-file ${TARGETS[1]}',
+               '--output-genes ${TARGETS[2]}']
+        return env.Command(
+            [join(outdir, 'true_theta'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
             [],
             ' '.join(map(str, cmd)))
     else:
@@ -110,23 +144,46 @@ def generate(env, outdir, c):
 # Nest for model fitting
 @nest.add_target_with_env(env)
 def fit_context_model(env, outdir, c):
-    cmd = ['python fit_context_model.py',
-           '--seed',
-           c['seed'],
-           '--motif-len',
-           3,
-           '--penalty-params',
-           "0.05,0.01,0.002",
-           '--num-threads',
-           10,
-           '--input-file ${SOURCES[0]}',
-           '--input-genes ${SOURCES[1]}',
-           '--log-file ${TARGETS[0]}',
-           '--out-file ${TARGETS[1]}']
-    return env.Command(
-        [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
-        [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
-        ' '.join(map(str, cmd)))
+    if c["simulation_methods"] == "survival_mini":
+        motif_len = 3
+    else:
+        motif_len = 5
+
+    if c["model_options"] == "survival":
+        cmd = ['python fit_context_model.py',
+               '--seed',
+               c['seed'],
+               '--motif-len',
+               motif_len,
+               '--penalty-params',
+               "0.05",
+               '--num-threads',
+               10,
+               '--input-file ${SOURCES[0]}',
+               '--input-genes ${SOURCES[1]}',
+               '--theta-file ${SOURCES[2]}',
+               '--log-file ${TARGETS[0]}',
+               '--out-file ${TARGETS[1]}']
+        return env.Command(
+            [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
+            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv'), join(outdir, 'true_theta.pkl')],
+            ' '.join(map(str, cmd)))
+    else:
+        cmd = ['python fit_basic_model.py',
+               '--seed',
+               c['seed'],
+               '--motif-len',
+               motif_len,
+               '--input-file ${SOURCES[0]}',
+               '--input-genes ${SOURCES[1]}',
+               '--theta-file ${SOURCES[2]}',
+               '--prop-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+        return env.Command(
+            [join(outdir, 'proportions.pkl'), join(outdir, 'log.txt')],
+            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv'), join(outdir, 'true_theta.pkl')],
+            ' '.join(map(str, cmd)))
+
 
 # Aggregate over different fitting methods
 

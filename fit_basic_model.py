@@ -10,9 +10,10 @@ import os
 import os.path
 import csv
 import pickle
+import logging as log
 
 import numpy as np
-from scipy.stats import spearmanr
+import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
@@ -42,13 +43,21 @@ def parse_args():
         help='number of threads to use during E-step',
         default=4)
     parser.add_argument('--motif-len',
-        type=str,
+        type=int,
         help='length of motif (must be odd)',
         default=5)
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled context model',
-        default='_output/context_model.pkl')
+        default='_output/true_theta.pkl')
+    parser.add_argument('--prop-file',
+        type=str,
+        help='file to output fitted proportions',
+        default='_output/prop_file.pkl')
+    parser.add_argument('--log-file',
+        type=str,
+        help='file to output logs',
+        default='_output/basic_log.txt')
 
     args = parser.parse_args()
 
@@ -58,12 +67,15 @@ def parse_args():
 
 def main(args=sys.argv[1:]):
     args = parse_args()
+
+    log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
+
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
 
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 
-    motif_list = feat_generator.get_motif_list(args.motif_len)
+    motif_list = feat_generator.get_motif_list()
     motif_list.append('EDGES')
 
     mutations = dict.fromkeys(motif_list, 0)
@@ -79,7 +91,7 @@ def main(args=sys.argv[1:]):
         for mut_pos in mutated_positions:
             for mutation in germline_motifs[mut_pos]:
                 mutations[motif_list[mutation]] += 1
-    
+
     proportions = {}
     for key in motif_list:
         if appearances[key] > 0:
@@ -90,12 +102,24 @@ def main(args=sys.argv[1:]):
     theta = pickle.load(open(args.theta_file, 'rb'))
     prop_list = [proportions[motif_list[i]] for i in range(theta.size)]
 
+    # Print the motifs with the highest and lowest proportions
+    threshold_prop_list = [0] * len(prop_list)
+    mean_prop = np.mean(prop_list)
+    sd_prop = np.sqrt(np.var(prop_list))
     for i in range(theta.size):
-        if np.abs(theta[i]) > ZERO_THRES or mutations[motif_list[i]] > 0:
-            print (i, theta[i], motif_list[i], proportions[motif_list[i]])
+        if np.abs(proportions[motif_list[i]] - mean_prop) > 0.5 * sd_prop:
+            log.info("%d: %f, %s, %f" % (i, theta[i], motif_list[i], proportions[motif_list[i]]))
+            threshold_prop_list[i] = proportions[motif_list[i]]
 
-    print spearmanr(theta, prop_list)
+    log.info("THETA")
+    log.info(scipy.stats.spearmanr(theta, prop_list))
+    log.info(scipy.stats.kendalltau(theta, prop_list))
 
+    log.info("THRESHOLDED THETA")
+    log.info(scipy.stats.spearmanr(theta, threshold_prop_list))
+    log.info(scipy.stats.kendalltau(theta, threshold_prop_list))
+
+    pickle.dump(np.array(prop_list), open(args.prop_file, 'w'))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

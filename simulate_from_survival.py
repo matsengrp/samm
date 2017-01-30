@@ -1,3 +1,4 @@
+import pickle
 import sys
 import argparse
 import numpy as np
@@ -24,8 +25,8 @@ def parse_args():
         default=25)
     parser.add_argument('--output-true-theta',
         type=str,
-        help='true theta file',
-        default='_output/true_theta.txt')
+        help='true theta file prefix',
+        default='_output/true_theta')
     parser.add_argument('--output-file',
         type=str,
         help='simulated data destination file',
@@ -71,7 +72,7 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
     # True vector
-    true_theta = np.matrix(np.zeros(feat_generator.feature_vec_len)).T
+    true_theta = np.zeros(feat_generator.feature_vec_len)
 
     # Hard code simulation to have edge motifs with higher mutation rates
     true_theta[feat_generator.feature_vec_len - 1] = 0.1
@@ -107,7 +108,11 @@ def main(args=sys.argv[1:]):
 
     simulator = SurvivalModelSimulator(true_theta, feat_generator, lambda0=args.lambda0)
 
-    with open(args.output_true_theta, 'w') as f:
+    # Dump a pickle file of theta
+    pickle.dump(true_theta, open("%s.pkl" % args.output_true_theta, 'w'))
+
+    # Dump a text file of theta
+    with open("%s.txt" % args.output_true_theta, 'w') as f:
         f.write("True Theta\n")
         for i in range(true_theta.size):
             if np.abs(true_theta[i]) > ZERO_THRES:
