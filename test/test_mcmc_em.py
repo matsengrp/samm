@@ -6,7 +6,8 @@ from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
-from survival_problem_grad_descent import SurvivalProblemGradientDescent
+from survival_problem_lasso import SurvivalProblemLasso
+from survival_problem_fused_lasso import SurvivalProblemFusedLasso
 from common import read_gene_seq_csv_data
 from constants import *
 
@@ -18,12 +19,22 @@ class MCMC_EM_TestCase(unittest.TestCase):
         feat_generator = SubmotifFeatureGenerator(submotif_len=3)
         gene_dict, obs_data = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS)
 
-        # check SurvivalProblemGradientDescent
+        # check SurvivalProblemLasso
         em_algo = MCMC_EM(
             obs_data,
             feat_generator,
             MutationOrderGibbsSampler,
-            SurvivalProblemGradientDescent,
+            SurvivalProblemLasso,
+            num_threads=1,
+        )
+        em_algo.run(max_em_iters=1)
+
+        # check SurvivalProblemFusedLasso
+        em_algo = MCMC_EM(
+            obs_data,
+            feat_generator,
+            MutationOrderGibbsSampler,
+            SurvivalProblemFusedLasso,
             num_threads=1,
         )
         em_algo.run(max_em_iters=1)

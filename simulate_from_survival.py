@@ -77,12 +77,19 @@ def main(args=sys.argv[1:]):
     # Hard code simulation to have edge motifs with higher mutation rates
     true_theta[feat_generator.feature_vec_len - 1] = 0.1
 
-    num_nonzero_motifs = int(true_theta.size * args.ratio_nonzero)
+    some_num_nonzero_motifs = int(true_theta.size * args.ratio_nonzero/2.0)
     # Remove edge motifs from random choices
-    nonzero_motifs = np.random.choice(true_theta.size - 1, num_nonzero_motifs)
-    for idx in nonzero_motifs:
+    # Also cannot pick the last motif
+    some_nonzero_motifs = np.random.choice(true_theta.size - 2, some_num_nonzero_motifs)
+    # Also make some neighbor motifs nonzero
+    nonzero_motifs = np.unique(np.vstack((some_nonzero_motifs, some_nonzero_motifs + 1)))
+    num_nonzero_motifs = nonzero_motifs.size
+    for idx in some_nonzero_motifs:
         # randomly set nonzero indices between [-2, 2]
         true_theta[idx] = (np.random.rand() - 0.5) * 4
+        # neighboring values also have same value (may get overridden if that motif was originally
+        # set to be nonzero too)
+        true_theta[idx + 1] = true_theta[idx]
 
     if args.random_gene_len > 0:
         germline_genes = ["FAKE_GENE_%d" % i for i in range(args.n_germlines)]

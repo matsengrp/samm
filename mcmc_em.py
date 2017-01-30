@@ -5,7 +5,6 @@ import logging as log
 from models import *
 from common import *
 from sampler_collection import SamplerCollection
-from survival_problem_grad_descent import SurvivalProblemGradientDescent
 
 class MCMC_EM:
     def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1):
@@ -35,6 +34,7 @@ class MCMC_EM:
         @param max_em_iters: the maximum number of iterations of MCMC-EM
         @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
         """
+        st = time.time()
         # initialize theta vector
         if theta is None:
             theta = np.random.randn(self.feat_generator.feature_vec_len)
@@ -58,7 +58,7 @@ class MCMC_EM:
             e_step_samples = []
             while lower_bound_is_negative:
                 # do E-step
-                log.info("E STEP, iter %d, num samples %d" % (run, len(e_step_samples) + num_e_samples))
+                log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples) + num_e_samples, time.time() - st))
                 sampled_orders_list = sampler_collection.get_samples(
                     init_orders,
                     num_e_samples,
@@ -73,7 +73,7 @@ class MCMC_EM:
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
 
                 # Do M-step
-                log.info("M STEP, iter %d" % run)
+                log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
                 problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param)
                 theta, exp_log_lik = problem.solve(

@@ -53,6 +53,37 @@ class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 
+class SurvivalProblemLassoCVXPY_ADMM(SurvivalProblemCVXPY):
+    """
+    Objective function: log likelihood of theta - lasso penalty on theta - augmented penalty on theta from ADMM
+    * Lasso penalty over all of theta
+    * || difference in thetas - residuals ||^2 from ADMM
+
+    Internal solver for ADMM for comparison to our grad descent implementation
+
+    Note: motifs that mutate to different target nucleotides share the same theta value
+    """
+    def solve(self, beta,u, D, init_theta=None, max_iters=None, num_threads=1):
+        """
+        @param init_theta: ignored
+        @param max_iters: ignored
+        @param num_threads: ignored
+        """
+        theta = Variable(self.feature_generator.feature_vec_len, 1)
+        obj = 0
+        for sample in self.samples:
+            obj += self.calculate_per_sample_log_lik(theta, sample)
+        # maximize the average log likelihood (normalization makes it easier to track EM
+        # since the number of E-step samples grows)
+        problem = Problem(Minimize(
+            - 1.0/len(self.samples) * obj
+            + self.penalty_param * norm(theta, 1)
+            + 0.5 * pow(norm(beta - D * theta + u, 2), 2)
+        ))
+        problem.solve(verbose=True)
+        assert(problem.status == OPTIMAL)
+        return theta.value, problem.value
+
 class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
     """
     Objective function: log likelihood of theta - penalty_param * (fused lasso penalty + lasso penalty)

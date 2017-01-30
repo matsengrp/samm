@@ -21,7 +21,8 @@ from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
-from survival_problem_grad_descent import SurvivalProblemGradientDescent
+from survival_problem_lasso import SurvivalProblemLasso
+from survival_problem_fused_lasso import SurvivalProblemFusedLasso
 from common import *
 
 def parse_args():
@@ -47,8 +48,8 @@ def parse_args():
         default=4)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso',
-        choices=["CL", "CFL", "L"],
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso',
+        choices=["CL", "CFL", "L", "FL"],
         default="L")
     parser.add_argument('--motif-len',
         type=int,
@@ -77,11 +78,13 @@ def parse_args():
 
     args = parser.parse_args()
 
-    args.problem_solver_cls = SurvivalProblemGradientDescent
+    args.problem_solver_cls = SurvivalProblemLasso
     if args.solver == "CL":
         args.problem_solver_cls = SurvivalProblemLassoCVXPY
     elif args.solver == "CFL":
         args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
+    elif args.solver == "FL":
+        args.problem_solver_cls = SurvivalProblemFusedLasso
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
