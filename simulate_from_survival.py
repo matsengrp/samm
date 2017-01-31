@@ -5,6 +5,7 @@ import numpy as np
 import os
 import os.path
 import csv
+import re
 
 from survival_model_simulator import SurvivalModelSimulator
 from feature_generator import SubmotifFeatureGenerator
@@ -25,8 +26,8 @@ def parse_args():
         default=25)
     parser.add_argument('--output-true-theta',
         type=str,
-        help='true theta file prefix',
-        default='_output/true_theta')
+        help='true theta pickle file',
+        default='_output/true_theta.pkl')
     parser.add_argument('--output-file',
         type=str,
         help='simulated data destination file',
@@ -116,10 +117,10 @@ def main(args=sys.argv[1:]):
     simulator = SurvivalModelSimulator(true_theta, feat_generator, lambda0=args.lambda0)
 
     # Dump a pickle file of theta
-    pickle.dump(true_theta, open("%s.pkl" % args.output_true_theta, 'w'))
+    pickle.dump(true_theta, open(args.output_true_theta, 'w'))
 
     # Dump a text file of theta
-    with open("%s.txt" % args.output_true_theta, 'w') as f:
+    with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
         for i in range(true_theta.size):
             if np.abs(true_theta[i]) > ZERO_THRES:
