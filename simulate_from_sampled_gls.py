@@ -16,6 +16,8 @@ import os
 import os.path
 from Bio import SeqIO
 import csv
+import pickle
+
 from common import *
 
 sys.path.append('gctree/bin')
@@ -53,6 +55,10 @@ def parse_args():
         type=str,
         help='germline genes used in csv file',
         default='_output/genes.csv')
+    parser_simulate.add_argument('--output-true-theta',
+        type=str,
+        help='true theta pickle file',
+        default='_output/true_theta.pkl')
     parser_simulate.add_argument('--log-dir',
         type=str,
         help='log directory',
@@ -61,6 +67,10 @@ def parse_args():
         type=int,
         help='number of germline genes to sample (maximum 350)',
         default=2)
+    parser.add_argument('--motif-len',
+        type=int,
+        help='length of motif (must be odd)',
+        default=5)
     parser_simulate.add_argument('--verbose',
         action='store_true',
         help='output R log')
@@ -185,6 +195,11 @@ def simulate(args):
                 if leaf.frequency != 0:
                     i += 1
                     seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence)])
+
+    # Dump a dummy file of theta
+    # We'll input some function of mutability here, but leave it dummy-length for now
+    true_theta = np.zeros(1+4**args.motif_len)
+    pickle.dump(true_theta, open(args.output_true_theta, 'w'))
 
 
 def main(args=sys.argv[1:]):
