@@ -52,16 +52,6 @@ nest.add(
     'simulation_methods',
     sim_methods)
 
-# Nest for fitting models
-model_options = [
-    'survival',
-    'basic',
-]
-
-nest.add(
-    'model_options',
-    model_options)
-
 # Nest for replicates
 
 nest.add(
@@ -142,6 +132,16 @@ def generate(env, outdir, c):
 
 ## Future nests
 
+# Nest for fitting models
+model_options = [
+    'survival',
+    'basic',
+]
+
+nest.add(
+    'model_options',
+    model_options)
+
 # Nest for model fitting
 @nest.add_target_with_env(env)
 def fit_context_model(env, outdir, c):
@@ -160,14 +160,14 @@ def fit_context_model(env, outdir, c):
                "0.05",
                '--num-threads',
                10,
-               '--input-file ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--theta-file ${SOURCES[2]}',
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
                '--log-file ${TARGETS[0]}',
                '--out-file ${TARGETS[1]}']
         return env.Command(
             [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
-            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv'), join(outdir, 'true_theta.pkl')],
+            c['generate'],
             ' '.join(map(str, cmd)))
     else:
         cmd = ['python fit_basic_model.py',
@@ -175,14 +175,14 @@ def fit_context_model(env, outdir, c):
                c['seed'],
                '--motif-len',
                motif_len,
-               '--input-file ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--theta-file ${SOURCES[2]}',
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
                '--prop-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
         return env.Command(
             [join(outdir, 'proportions.pkl'), join(outdir, 'log.txt')],
-            [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv'), join(outdir, 'true_theta.pkl')],
+            c['generate'],
             ' '.join(map(str, cmd)))
 
 
