@@ -19,7 +19,7 @@ import csv
 from common import *
 
 sys.path.append('gctree/bin')
-from gctree import *
+from gctree import MutationModel, CollapsedTree
 
 def parse_args():
     ''' parse command line arguments '''
@@ -191,7 +191,7 @@ def simulate(args):
             tree = run_gctree(args, sequence)
             i = 0
             for leaf in tree.iter_leaves():
-                if leaf.frequency != 0:# and '*' not in Seq(leaf.sequence, generic_dna).translate():
+                if leaf.frequency != 0:
                     i += 1
                     seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence)])
 
