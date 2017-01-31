@@ -61,10 +61,6 @@ def parse_args():
         type=int,
         help='number of germline genes to sample (maximum 350)',
         default=2)
-    parser_simulate.add_argument('--n-mutes',
-        type=int,
-        help='number of mutations from germline (default: -1 meaning choose at random)',
-        default=-1)
     parser_simulate.add_argument('--verbose',
         action='store_true',
         help='output R log')
@@ -122,7 +118,7 @@ def run_gctree(args, germline_seq):
     while size < args.n_taxa:
         # this loop makes us resimulate if we got backmutations
         trial = 1
-        while trial < 10:
+        while trial < MAX_TRIALS:
             try:
                 tree = mutation_model.simulate(germline_seq, p=args.p, lambda0=args.lambda0, r=args.r, frame=args.frame, T=args.T)
                 collapsed_tree = CollapsedTree(tree=tree, frame=args.frame) # <-- this will fail if backmutations
@@ -132,7 +128,7 @@ def run_gctree(args, germline_seq):
                 continue
             else:
                 raise
-        if trial == 10:
+        if trial == MAX_TRIALS:
             raise RuntimeError('repeated sequences in collapsed tree on {} attempts'.format(trial))
         size = sum(node.frequency for node in tree)
 
@@ -152,11 +148,6 @@ def simulate(args):
 
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
-
-    if args.n_mutes < 0:
-        n_mute_vec = 10 + np.random.randint(20, size=args.n_germlines)
-    else:
-        n_mute_vec = [args.n_mutes] * args.n_germlines
 
     # Select, with replacement, args.n_germlines germline genes from our
     # parameter file and place them into a numpy array.
@@ -183,7 +174,7 @@ def simulate(args):
     with open(args.output_file, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
-        for run, (gene, sequence, n_mutes) in \
+        for run, (gene, sequence) in \
                 enumerate(zip(germline_genes, germline_nucleotides, n_mute_vec)):
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same

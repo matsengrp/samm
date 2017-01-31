@@ -8,6 +8,7 @@ NUCLEOTIDES = "atcg"
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
+MAX_TRIALS = 10
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
