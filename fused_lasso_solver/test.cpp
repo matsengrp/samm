@@ -9,6 +9,7 @@
 using namespace std;
 
 struct MotifThetaVals {
+  // Container for motif and its corresponding node value
   string motif;
   double value;
 
@@ -29,6 +30,7 @@ struct ProblemSetting{
 };
 
 bool differ_by_one_char(string s1, string s2){
+  // Determine if strings are off by one character
   int num_diff = 0;
   for (int k = 0; k < min(s1.length(), s2.length()); k++) {
     // printf("?? %s %s\n", s1[k], s2[k]);
