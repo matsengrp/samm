@@ -1,3 +1,4 @@
+import time
 import csv
 import numpy as np
 import pandas as pd
@@ -145,3 +146,11 @@ def get_idx_differ_by_one_character(s1, s2):
             count_diffs += 1
             idx_differ = i
     return idx_differ
+
+def measure_time(func):
+    def func_wrapper(*args, **kwargs):
+        st = time.time()
+        res = func(*args, **kwargs)
+        print "time %s: %f" % (func.__name__, time.time() - st)
+        return res
+    return func_wrapper

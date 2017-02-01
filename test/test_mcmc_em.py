@@ -16,7 +16,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         Check if MCMC EM will run to completion
         """
-        feat_generator = SubmotifFeatureGenerator(submotif_len=3)
+        feat_generator = SubmotifFeatureGenerator(motif_len=3)
         gene_dict, obs_data = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS)
 
         # check SurvivalProblemLasso
