@@ -30,7 +30,7 @@ class SurvivalModelSimulator:
         last_mutate_time = 0
         while len(unmutated_pos) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
-            feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, do_feat_vec_pos=unmutated_pos)
+            feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, do_feat_vec_pos=set(unmutated_pos))
             hazard_weights = np.array([
                 np.exp(np.sum(self.theta[feature_vec_dict[p]])) for p in unmutated_pos
             ])
