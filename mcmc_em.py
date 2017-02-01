@@ -27,7 +27,7 @@ class MCMC_EM:
         self.problem_solver_cls = problem_solver_cls
         self.num_threads = num_threads
 
-    def run(self, theta=None, penalty_param=1, max_em_iters=10, diff_thres=1e-6):
+    def run(self, theta=None, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
         """
         @param theta: initial value for theta in MCMC-EM
         @param penalty_param: the coefficient for the penalty function
@@ -40,7 +40,7 @@ class MCMC_EM:
             theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
-        prev_exp_log_lik = None
+        prev_pen_exp_log_lik = None
         for run in range(max_em_iters):
             lower_bound_is_negative = True
             prev_theta = theta
@@ -56,7 +56,9 @@ class MCMC_EM:
             )
 
             e_step_samples = []
-            while lower_bound_is_negative:
+            while lower_bound_is_negative and len(e_step_samples) < max_e_samples:
+                ## Keep grabbing samples until it is highly likely we have increased the penalized log likelihood
+
                 # do E-step
                 log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples) + num_e_samples, time.time() - st))
                 sampled_orders_list = sampler_collection.get_samples(
@@ -76,25 +78,36 @@ class MCMC_EM:
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
                 problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param)
-                theta, exp_log_lik = problem.solve(
+                theta, pen_exp_log_lik = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                     num_threads=self.num_threads,
                 )
                 log.info("Current Theta")
                 log.info("\n".join(["%d: %.2g" % (i, theta[i]) for i in range(theta.size) if np.abs(theta[i]) > 1e-5]))
-                log.info("penalized negative log likelihood %f" % exp_log_lik)
+                log.info("penalized log likelihood %f" % pen_exp_log_lik)
 
-                # Get statistics
-                log_lik_vec = problem.calculate_log_lik_ratio_vec(theta, prev_theta)
+                if prev_pen_exp_log_lik is not None:
+                    # Get statistics
+                    log_lik_vec = problem.calculate_log_lik_ratio_vec(theta, prev_theta)
 
-                # Calculate lower bound to determine if we need to rerun
-                ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_vec, ZSCORE)
+                    # Calculate lower bound to determine if we need to rerun
+                    # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
+                    ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_vec, ZSCORE, pen_exp_log_lik - prev_pen_exp_log_lik)
 
-                lower_bound_is_negative = (lower_bound < 0)
-                log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
-            if prev_exp_log_lik is not None and exp_log_lik - prev_exp_log_lik < diff_thres:
+                    lower_bound_is_negative = (lower_bound < 0)
+                    log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
+                else:
+                    lower_bound_is_negative = False
+
+            if lower_bound_is_negative:
+                # if penalized log likelihood is decreasing
                 break
-            prev_exp_log_lik = exp_log_lik
+            elif prev_pen_exp_log_lik is not None and pen_exp_log_lik - prev_pen_exp_log_lik < diff_thres:
+                # if penalized log likelihood is increasing but not by very much
+                break
+
+            prev_pen_exp_log_lik = pen_exp_log_lik
+            log.info("official pen_exp_log_lik %f" % pen_exp_log_lik)
 
         return theta

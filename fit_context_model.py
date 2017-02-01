@@ -23,6 +23,7 @@ from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso import SurvivalProblemFusedLasso
+from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import *
 
 def parse_args():
@@ -48,9 +49,9 @@ def parse_args():
         default=4)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso',
-        choices=["CL", "CFL", "L", "FL"],
-        default="L")
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
+        choices=["CL", "CFL", "L", "FL", "PFL"],
+        default="FL")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -70,7 +71,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.1")
+        default="0.01")
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled true context model',
@@ -85,6 +86,8 @@ def parse_args():
         args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "FL":
         args.problem_solver_cls = SurvivalProblemFusedLasso
+    elif args.solver == "PFL":
+        args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
@@ -98,6 +101,7 @@ def main(args=sys.argv[1:]):
 
     # Load true theta for comparison
     true_theta = pickle.load(open(args.theta_file, 'rb'))
+    assert(true_theta.size == feat_generator.feature_vec_len)
 
     log.info("Reading data")
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
