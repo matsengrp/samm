@@ -21,7 +21,6 @@ class MutationOrderGibbsSampler(Sampler):
             curr_order = init_order
             samples = []
             log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
-            #print "Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len)
             feat_vec_dicts, intermediate_seqs = self.feature_generator.create_for_mutation_steps(
                 ImputedSequenceMutations(
                     self.obs_seq_mutation,
@@ -65,13 +64,11 @@ class MutationOrderGibbsSampler(Sampler):
                     full_order_last,
                 )
             )
-            # !! this is only justified if probabilities don't change much each iteration... which they
-            # don't really...
+
+            # This is only justified if probabilities don't change much each iteration... which they
+            # don't really... but I'll have to test it...
             multinomial_sequence = [initial_probabilities[init_order.index(item)] for item in full_order_last]
-            #print multinomial_sequence, [
-            #    self._get_multinomial_prob(feat_vec_dict_step, curr_mutate_pos)
-            #    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(full_order_last, feat_vec_dicts))
-            #]
+            # Previous code:
             #multinomial_sequence = [
             #    self._get_multinomial_prob(feat_vec_dict_step, curr_mutate_pos)
             #    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(full_order_last, feat_vec_dicts))
@@ -101,12 +98,14 @@ class MutationOrderGibbsSampler(Sampler):
 
                 # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
                 # the position that mutates right after it), rest are the same
-                # !! this is just 
-                #multinomial_sequence[i] = self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
                 multinomial_sequence[i] += \
                     self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
                     self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
-                #print multinomial_sequence[i], self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
+                # Previous code:
+                #multinomial_sequence[i] = self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
+
+                # We could do something similar below, since only a few elements of theta change, but we'd have
+                # to do some extra legwork and it probably wouldn't be worth it
                 multinomial_sequence[i + 1] = self._get_multinomial_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
 
                 full_orderings[idx+1] = possible_full_order
