@@ -52,8 +52,7 @@ void read_graph_vals(std::string file_name, double * graph_node_vals) {
   }
 }
 
-int solve_fused_lasso()
-{
+int solve_fused_lasso() {
   std::string file_name = "test.txt";
   int NUM_MOTIFS = 64;
 
