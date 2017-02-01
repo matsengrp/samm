@@ -9,9 +9,9 @@ Compile the Cython code:
 ```
 python setup.py build_ext --inplace
 ```
-Compile the TVDyadic code (in linux) in the TVDyadic folder:
+Compile the TVDyadic code (on stoat) in the TVDyadic folder:
 ```
-cc -O -c *.cpp
+cc -O -fPIC -c *.cpp
 ar rus libTVH.a *.o
 ```
 

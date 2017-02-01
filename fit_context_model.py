@@ -71,7 +71,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.1")
+        default="0.01")
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled true context model',

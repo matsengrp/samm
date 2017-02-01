@@ -94,7 +94,6 @@ class MCMC_EM:
                     # Calculate lower bound to determine if we need to rerun
                     # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
                     ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_vec, ZSCORE, pen_exp_log_lik - prev_pen_exp_log_lik)
-                    print "lower_bound", lower_bound
 
                     lower_bound_is_negative = (lower_bound < 0)
                     log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
