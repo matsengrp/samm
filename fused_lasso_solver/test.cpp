@@ -1,12 +1,38 @@
 #include <stdio.h>
 #include <vector>
-#include <string>
 #include <iostream>
 #include <fstream>
 #include "graph.h"
 #include "test.h"
 
-using namespace std;
+
+class MotifThetaVals {
+  string motif;
+  double value;
+
+  public:
+    MotifThetaVals(string s, double v) {
+      motif = s;
+      value = v;
+    }
+    string get_motif() {return motif;}
+    double get_value() {return value;}
+};
+
+class ProblemSetting{
+  double lambda;
+  vector<MotifThetaVals> all_motif_vals;
+
+  public:
+    ProblemSetting(double l, vector<MotifThetaVals> a) {
+      lambda = l;
+      all_motif_vals = a;
+    }
+    double get_lambda() {return lambda;}
+    vector<MotifThetaVals> get_motif_vals() {return all_motif_vals;}
+};
+
+
 
 bool differ_by_one_char(std::string s1, std::string s2){
   int num_diff = 0;
@@ -22,57 +48,41 @@ bool differ_by_one_char(std::string s1, std::string s2){
   return num_diff == 1;
 }
 
-vector<string> get_motif_list(){
-  int NUM_MOTIFS = 64;
-  std::vector<std::string> motif_list(NUM_MOTIFS);
+ProblemSetting read_graph_vals(const char *file_name) {
+  vector<MotifThetaVals> graph_motifs;
 
-  char NUCLEOTIDES[] = "ATCG";
-  int n = 0;
-  for (int i=0; i < 4; i++) {
-    for (int j=0; j < 4; j++) {
-      for (int k=0; k < 4; k++) {
-        motif_list[n] = std::string() + NUCLEOTIDES[i] + NUCLEOTIDES[j] + NUCLEOTIDES[k];
-        printf("%s\n", motif_list[n].c_str());
-        n++;
-      }
-    }
-  }
-
-  return motif_list;
-}
-
-void read_graph_vals(std::string file_name, double * graph_node_vals) {
   std::ifstream graph_file(file_name);
-  std::string a;
-  int i;
-  double b;
-  while (graph_file >> a >> i >> b) {
+
+  double lambda;
+  graph_file >> lambda;
+
+  std::string feature_name; //most of this is going to be the motif
+  int feature_idx; //not used right now, but nice for sanity checks
+  double graph_val; //theta value from proximal gradient descent
+  while (graph_file >> feature_name >> feature_idx >> graph_val) {
     // printf("%s %d %f\n", a.c_str(), i, b);
-    graph_node_vals[i] = b;
+    graph_motifs.push_back(MotifThetaVals(feature_name, graph_val));
   }
+  return ProblemSetting(lambda, graph_motifs);
 }
 
-int solve_fused_lasso() {
-  std::string file_name = "test.txt";
-  int NUM_MOTIFS = 64;
+int solve_fused_lasso(double lmin, double lmax, int numdeep, const char *infile_name, const char *outfile_name) {
+  // This is going to find the minimizer of
+  // 0.5 * || theta - g ||^2_2 + lambda * fused lasso penalty
 
-  double graph_node_vals[NUM_MOTIFS];
-  read_graph_vals(file_name, graph_node_vals);
-
-  double lambda = 0.001;
-
-  double delta = 0.1;
-  int numdeep = 14;
-  int numlevel = (1 << numdeep) -1;
+  int numlevel = (1 << numdeep) - 1;
   printf("numlevel %d\n", numlevel);
 
-  double lmin = 0.0;
-  double lmax = 1.0;
+  ProblemSetting prob = read_graph_vals(infile_name);
+  double lambda = prob.get_lambda();
+  vector<MotifThetaVals> graph_motifs = prob.get_motif_vals();
 
-  double * lev0 = (double *) malloc((numlevel+1)*sizeof(double));
-  double * lev = (double *) malloc((numlevel+1)*sizeof(double));
+  int vector_size = graph_motifs.size();
 
-  // construct these crazy level things.
+  // construct levels for the dyadic TV solver
+  double *lev0 = (double *) malloc((numlevel+1)*sizeof(double));
+  double *lev = (double *) malloc((numlevel+1)*sizeof(double));
+
   double dl=(lmax-lmin)/(double)numlevel;
   lev[0]=lev0[0]=lmin; //lev[0] never used
   for (int l=1;l<=numlevel;l++) {
@@ -81,28 +91,30 @@ int solve_fused_lasso() {
   }
   int idl = (1+numlevel) >> 1;
 
-  vector<std::string>motif_list = get_motif_list();
-
-  Graph::node_id * nodes = (Graph::node_id *) malloc((NUM_MOTIFS + 1)*sizeof(Graph::node_id));
+  // Now construct the graph
+  Graph::node_id * nodes = (Graph::node_id *) malloc(vector_size * sizeof(Graph::node_id));
   Graph *BKG = new Graph();
 
-  // add nodes for each motif PLUS the last edge motif
-  for (int i=0; i < NUM_MOTIFS + 1; i++) {
+  for (int i=0; i < vector_size; i++) {
     nodes[i] = BKG->add_node();
-    BKG->set_tweights(nodes[i], graph_node_vals[i], lev[idl]);
+    BKG->set_tweights(
+      nodes[i],
+      graph_motifs[i].get_value(),
+      lev[idl] // start the dyadic TV solver at the middle level (lev[idl])
+    );
   }
 
   // add edges between motifs that differ by one character
-  for (int i=0; i < NUM_MOTIFS; i++) {
-    for (int j=0; j < NUM_MOTIFS; j++) {
+  for (int i=0; i < vector_size; i++) {
+    for (int j=0; j < vector_size; j++) {
       if (i == j) {
         continue;
       }
-      bool is_diff = differ_by_one_char(motif_list.at(i), motif_list.at(j));
+      bool is_diff = differ_by_one_char(graph_motifs[i].get_motif(), graph_motifs[j].get_motif());
       // printf("%s, %s: %d\n", motif_list[i].c_str(), motif_list[j].c_str(), is_diff);
       if (is_diff) {
         // add edge
-        BKG->add_edge(nodes[i],nodes[j],lambda,lambda);
+        BKG->add_edge(nodes[i], nodes[j], lambda, lambda);
       }
     }
   }
@@ -111,9 +123,18 @@ int solve_fused_lasso() {
   BKG->dyadicparametricTV(numdeep, idl*dl/2);
   //if (BKG->error()) { fprintf(stderr,"error in maxflow\n"); exit(0); }
 
-  for (int k=0; k < NUM_MOTIFS + 1; k++)
+  // OUTPUT the fitted values
+  std::ofstream out_file(outfile_name);
+  for (int k=0; k < vector_size; k++) {
+    out_file << k << " " << lev0[BKG->what_label(nodes[k])] << "\n" ;
     printf("%f\n", lev0[BKG->what_label(nodes[k])]);
+  }
+  out_file.close();
 
   delete BKG;
   return 1;
+}
+
+int main() {
+  solve_fused_lasso();
 }

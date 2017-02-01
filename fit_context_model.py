@@ -23,6 +23,7 @@ from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso import SurvivalProblemFusedLasso
+from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import *
 
 def parse_args():
@@ -84,7 +85,7 @@ def parse_args():
     elif args.solver == "CFL":
         args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "FL":
-        args.problem_solver_cls = SurvivalProblemFusedLasso
+        args.problem_solver_cls = SurvivalProblemFusedLassoProximal#SurvivalProblemFusedLasso
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
