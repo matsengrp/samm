@@ -1,13 +1,9 @@
 import time
-import os
 import numpy as np
-import scipy as sp
-import sklearn.linear_model
 import logging as log
 from multiprocessing import Pool
 
 from survival_problem_grad_descent import SurvivalProblemCustom
-from survival_problem_lasso import SurvivalProblemLasso
 from common import *
 from solver_wrappers import solve_fused_lasso
 

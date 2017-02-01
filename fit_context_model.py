@@ -49,9 +49,9 @@ def parse_args():
         default=4)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso',
-        choices=["CL", "CFL", "L", "FL"],
-        default="L")
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
+        choices=["CL", "CFL", "L", "FL", "PFL"],
+        default="FL")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -85,7 +85,9 @@ def parse_args():
     elif args.solver == "CFL":
         args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "FL":
-        args.problem_solver_cls = SurvivalProblemFusedLassoProximal#SurvivalProblemFusedLasso
+        args.problem_solver_cls = SurvivalProblemFusedLasso
+    elif args.solver == "PFL":
+        args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
