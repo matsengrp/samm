@@ -185,7 +185,7 @@ def simulate(args):
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
         for run, (gene, sequence) in \
-                enumerate(zip(germline_genes, germline_nucleotides, n_mute_vec)):
+                enumerate(zip(germline_genes, germline_nucleotides)):
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
@@ -194,7 +194,7 @@ def simulate(args):
             for leaf in tree.iter_leaves():
                 if leaf.frequency != 0:
                     i += 1
-                    seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence)])
+                    seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence).lower()])
 
     # Dump a dummy file of theta
     # We'll input some function of mutability here, but leave it dummy-length for now
