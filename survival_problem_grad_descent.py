@@ -6,7 +6,6 @@ import logging as log
 from survival_problem import SurvivalProblem
 from common import soft_threshold
 from parallel_worker import *
-from common import measure_time
 
 class SurvivalProblemCustom(SurvivalProblem):
     """
@@ -59,37 +58,49 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     @staticmethod
     def calculate_per_sample_log_lik(theta, sample, feature_vecs, motif_len):
-        obj = 0
-        denom_terms = np.exp([theta[one_feats].sum() for one_feats in feature_vecs[0].values()])
-        denom_sum = denom_terms.sum()
-
+        """
+        Calculate the log likelihood of this sample - tries to minimize recalculations as much as possible
+        """
+        log_lik = 0
         num_pos = len(feature_vecs[0]) - 1
+
+        # Store the exp terms so we don't need to recalculate things
+        # Gets updated when a position changes
+        exp_terms = np.exp([theta[one_feats].sum() for one_feats in feature_vecs[0].values()])
+        # The sum of the exp terms. Update the sum accordingly to minimize recalculation
+        exp_sum = exp_terms.sum()
 
         prev_mutating_pos = None
         prev_vecs_at_mutation_step = None
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
             if prev_mutating_pos is not None:
+                # Find the positions near the position that just mutated
+                # TODO: Assumes that the motif lengths are odd!
                 change_pos_min = max(prev_mutating_pos - motif_len/2, 0)
                 change_pos_max = min(prev_mutating_pos + motif_len/2, num_pos)
                 change_pos = np.arange(change_pos_min, change_pos_max)
 
-                denom_sum -= denom_terms[change_pos].sum()
-                # change position values
+                # Remove old exp terms from the exp sum
+                exp_sum -= exp_terms[change_pos].sum()
+                # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
-                    if denom_terms[p] != 0:
-                        denom_terms[p] = np.exp(theta[vecs_at_mutation_step[p]].sum())
+                    if p == prev_mutating_pos:
+                        # if it is previously mutated position, should be removed from risk group
+                        # therefore exp term should be set to zero
+                        exp_terms[prev_mutating_pos] = 0
+                    elif exp_terms[p] != 0:
+                        # position hasn't mutated yet.
+                        # need to update its exp value
+                        exp_terms[p] = np.exp(theta[vecs_at_mutation_step[p]].sum())
+                # Add in the new exp terms from the exp sum
+                exp_sum += exp_terms[change_pos].sum()
 
-                denom_sum += denom_terms[change_pos].sum()
-
-            obj += theta[vecs_at_mutation_step[mutating_pos]].sum()
-            obj -= np.log(denom_sum)
-
-            denom_sum -= denom_terms[mutating_pos]
-            denom_terms[mutating_pos] = 0
+            # Add to the log likelihood the log likelihood at this step: theta * psi - log(sum(exp terms))
+            log_lik += theta[vecs_at_mutation_step[mutating_pos]].sum() - np.log(exp_sum)
 
             prev_mutating_pos = mutating_pos
             prev_vecs_at_mutation_step = vecs_at_mutation_step
-        return obj
+        return log_lik
 
     def _get_log_lik_parallel(self, theta):
         """
@@ -122,39 +133,51 @@ class SurvivalProblemCustom(SurvivalProblem):
         grad = np.zeros(theta.size)
         num_pos = len(feature_vecs[0]) - 1
 
-        denom_terms = np.exp([theta[one_feats].sum() for one_feats in feature_vecs[0].values()])
-        denom_sum = denom_terms.sum()
+        # Store the exp terms so we don't need to recalculate things
+        # Gets updated when a position changes
+        exp_terms = np.exp([theta[one_feats].sum() for one_feats in feature_vecs[0].values()])
+        # The sum of the exp terms. Update the sum accordingly to minimize recalculation
+        exp_sum = exp_terms.sum()
 
+        # Store the gradient vector (not normalized) so we don't need to recalculate things
         grad_log_sum_exp = np.zeros(theta.size)
         for pos, feat_vec in feature_vecs[0].iteritems():
-            grad_log_sum_exp[feat_vec] += denom_terms[pos]
+            grad_log_sum_exp[feat_vec] += exp_terms[pos]
 
         prev_mutating_pos = None
         prev_vecs_at_mutation_step = None
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
             if prev_mutating_pos is not None:
+                # Find the positions near the position that just mutated
+                # TODO: Assumes that the motif lengths are odd!
                 change_pos_min = max(prev_mutating_pos - motif_len/2, 0)
                 change_pos_max = min(prev_mutating_pos + motif_len/2, num_pos)
                 change_pos = np.arange(change_pos_min, change_pos_max)
 
-                denom_sum -= denom_terms[change_pos].sum()
-                # change position values
+                # Remove old exp terms from the exp sum
+                exp_sum -= exp_terms[change_pos].sum()
+                # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
-                    if denom_terms[p] != 0:
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p]] -= denom_terms[p]
-                        denom_terms[p] = np.exp(theta[vecs_at_mutation_step[p]].sum())
-                        grad_log_sum_exp[vecs_at_mutation_step[p]] += denom_terms[p]
+                    if p == prev_mutating_pos:
+                        # if it is previously mutated position, should be removed from risk group
+                        # therefore exp term should be set to zero
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p]] -= exp_terms[p]
+                        exp_terms[p] = 0
+                    elif exp_terms[p] != 0:
+                        # position hasn't mutated yet.
+                        # need to update its exp value and the corresponding gradient vector
 
-                denom_sum += denom_terms[change_pos].sum()
+                        # remove old exp term from gradient
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p]] -= exp_terms[p]
+                        exp_terms[p] = np.exp(theta[vecs_at_mutation_step[p]].sum())
+                        # add new exp term to gradient
+                        grad_log_sum_exp[vecs_at_mutation_step[p]] += exp_terms[p]
+                # Add in the new exp terms from the exp sum
+                exp_sum += exp_terms[change_pos].sum()
 
+            # Add to the gradient the gradient at this step
             grad[vecs_at_mutation_step[mutating_pos]] += 1
-
-            grad -= grad_log_sum_exp/denom_sum
-
-            # change current position
-            denom_sum -= denom_terms[mutating_pos]
-            grad_log_sum_exp[vecs_at_mutation_step[mutating_pos]] -= denom_terms[mutating_pos]
-            denom_terms[mutating_pos] = 0
+            grad -= grad_log_sum_exp/exp_sum
 
             prev_mutating_pos = mutating_pos
             prev_vecs_at_mutation_step = vecs_at_mutation_step
