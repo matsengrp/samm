@@ -99,6 +99,7 @@ def main(args=sys.argv[1:]):
 
     # Load true theta for comparison
     true_theta = pickle.load(open(args.theta_file, 'rb'))
+    assert(true_theta.size == feat_generator.feature_vec_len)
 
     log.info("Reading data")
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)

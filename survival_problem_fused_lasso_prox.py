@@ -9,6 +9,7 @@ from multiprocessing import Pool
 from survival_problem_grad_descent import SurvivalProblemCustom
 from survival_problem_lasso import SurvivalProblemLasso
 from common import *
+from solver_wrappers import solve_fused_lasso
 
 class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
     """
@@ -33,21 +34,13 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
                 if get_idx_differ_by_one_character(m1, m2) is not None:
                     motifs_fused_lasso1.append(i1)
                     motifs_fused_lasso2.append(i2)
-        self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=int)
-        self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=int)
-
-        # Creates the difference matrix. Won't work with too many motifs
-        # TODO: Make more memory efficient in the future
-        # self.D = np.matrix(np.zeros((self.fused_lasso_idx1.size, self.feature_generator.feature_vec_len)))
-        # for i, (i1, i2) in enumerate(zip(self.fused_lasso_idx1.tolist(), self.fused_lasso_idx2.tolist())):
-        #     self.D[i, i1] = 1
-        #     self.D[i, i2] = -1
+        self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)
+        self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=np.intc)
 
         self.penalty_param_fused = self.penalty_param
         # TODO: This is a hack for now since we assume only one penalty param
         # We upweight lasso since we don't want to over-penalize.
         self.penalty_param_lasso = 2 * self.penalty_param
-
 
     def get_value(self, theta):
         """
@@ -67,38 +60,19 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
         self.pool = Pool(num_threads)
         st = time.time()
         theta = init_theta
-        beta = self.get_fused_lasso_theta(theta)
-        u = np.matrix(np.zeros(beta.size)).T # scaled dual variable
-        beta_size = beta.size
-        eye_matrix = np.eye(beta_size)
 
         step_size = init_step_size
         current_value = self.get_value(theta)
-        prev_value = current_value
-
         # Slowly increase the accuracy of the update to theta since it is an iterative algo
-        gd_diff_thres = 0.3
-        max_gd_iters = 2
-        gd_step_size = 1
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("PROX Iter %d, val %f, time %d" % (i, current_value, time.time() - st))
 
             # Calculate gradient of the smooth part
             grad = self.get_gradient_smooth(theta)
-            print "theta", theta
-            print "grad", grad
             potential_theta = theta - step_size * grad
-
             # Do proximal gradient step
-            # prox step 1: solve fused lasso
-            potential_theta = self.solve_fused_lasso_prox(
-                potential_theta,
-                step_size * self.penalty_param_fused
-            )
-            print "potential_theta HAPPY", potential_theta
-            # prox step 2: soft threshold to get sparse fused lasso
-            potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
+            potential_theta = self.solve_prox(potential_theta, step_size)
 
             potential_value = self._get_value_parallel(potential_theta)
 
@@ -114,12 +88,8 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
                 log.info("GD step size shrink %f" % step_size)
 
                 potential_theta = theta - step_size * grad
-
                 # Do proximal gradient step
-                # prox step 1: solve fused lasso
-                potential_theta = self.solve_fused_lasso_prox(potential_theta, step_size * self.penalty_param_fused)
-                # prox step 2: soft threshold to get sparse fused lasso
-                potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
+                potential_theta = self.solve_prox(potential_theta, step_size)
 
                 potential_value = self._get_value_parallel(potential_theta)
 
@@ -135,26 +105,32 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
                     break
         self.pool.close()
         log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        return theta, current_value, step_size
+        return theta, -current_value
+
+    def solve_prox(self, theta, step_size):
+        """
+        Do proximal gradient step
+        """
+
+        # prox step 1: solve fused lasso
+        fused_lasso_theta = self.solve_fused_lasso_prox(theta, step_size * self.penalty_param_fused)
+        # prox step 2: soft threshold to get sparse fused lasso
+        sparse_fused_lasso_theta = soft_threshold(fused_lasso_theta, step_size * self.penalty_param_lasso)
+        return sparse_fused_lasso_theta
 
     def solve_fused_lasso_prox(self, potential_theta, factor):
         """
         Minimize 0.5 * || theta - potential_theta ||^2_2 + factor * || fused lasso penalty on theta ||_1
         """
-        print "factor", factor
-        feat_list = self.motif_list + ["EDGES"]
-        with open("fused_lasso_solver/in.txt", "w") as f:
-            f.write("%f\n" % factor)
-            for j, (motif, theta) in enumerate(zip(feat_list, potential_theta.tolist())):
-                f.write("%s %d %f\n" % (motif, j, theta))
-
-        st = time.time()
-        os.system("./fused_lasso_solver/a.out")
-        print " prox time",  time.time() - st
-
-        with open("fused_lasso_solver/out.txt", "r") as f:
-            lines = f.readlines()
-        return np.array([float(l.split(" ")[1]) for l in lines])
+        fused_lasso_soln = np.zeros(potential_theta.size)
+        solve_fused_lasso(
+            fused_lasso_soln,
+            np.array(potential_theta, dtype=np.float64),
+            self.fused_lasso_idx1,
+            self.fused_lasso_idx2,
+            factor,
+        )
+        return fused_lasso_soln
 
     def get_gradient_smooth(self, theta):
         return self._get_gradient_log_lik(theta)
