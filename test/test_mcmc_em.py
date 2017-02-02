@@ -7,7 +7,7 @@ from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
-from survival_problem_fused_lasso import SurvivalProblemFusedLasso
+from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import read_gene_seq_csv_data
 from constants import *
 
@@ -34,7 +34,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
             obs_data,
             feat_generator,
             MutationOrderGibbsSampler,
-            SurvivalProblemFusedLasso,
+            SurvivalProblemFusedLassoProximal,
             num_threads=1,
         )
         em_algo.run(max_em_iters=1)
