@@ -6,7 +6,7 @@
 		An Experimental Comparison of Min-Cut/Max-Flow Algorithms
 		for Energy Minimization in Vision.
 		Yuri Boykov and Vladimir Kolmogorov.
-		In IEEE Transactions on Pattern Analysis and Machine Intelligence (PAMI),
+		In IEEE Transactions on Pattern Analysis and Machine Intelligence (PAMI), 
 		September 2004
 
 	This algorithm was developed by Yuri Boykov and Vladimir Kolmogorov
@@ -16,8 +16,8 @@
 	If you use this software for research purposes, you should cite
 	the aforementioned paper in any resulting publication.
 */
-
-/*
+	
+/*	
 	Copyright 2001 Vladimir Kolmogorov (vnk@cs.cornell.edu), Yuri Boykov (yuri@csd.uwo.ca).
 
     This program is free software; you can redistribute it and/or modify
@@ -61,11 +61,14 @@
    captype and flowtype have been set to 'double'
    a new variable 'unsigned short label;' has been added together with
    the function for retrieveing the value
-   'int what_label(node_id i);'
-   a new function, computing a TV-minimization by D. Hochbaum's
+   'double what_value(node_id i);'
+   a new function, computing a TV-minimization by D. Hochbaum's 
    dyadic-parametric approach is added
-   'void dyadicparametricTV(int, captype);'
+   'void dyadicparametricTV(float);' where float is the error
    see graphtv.cpp for the corresponding code
+ */
+/* compilation :
+   cc -L. -O -o tvle TVlambda-exact.c images.c -lm -lnetpbm -lTVE -lstdc++
  */
 
 #ifndef __GRAPH_H__
@@ -131,19 +134,23 @@ public:
 	/* After the maxflow is computed, this function returns to which
 	   segment the node 'i' belongs (Graph::SOURCE or Graph::SINK) */
 	termtype what_segment(node_id i);
-	int what_label(node_id i);
+	double what_value(node_id i);
 
 	/* Computes the maxflow/minimizes TV.
 	   One and only one of the following can be called (only once). */
 	flowtype maxflow();
-	void dyadicparametricTV(int, captype);
+	void dyadicparametricTV(float);
 
 /***********************************************************************/
 /***********************************************************************/
 /***********************************************************************/
-
+	
 private:
 	/* internal variables and functions */
+
+	captype *values;
+	unsigned int maxlabel; // the size of the array "values
+	// when allocated
 
 	struct arc_st;
 
@@ -157,11 +164,10 @@ private:
 									   (or to itself if it is the last node in the list) */
 		int				TS;			/* timestamp showing when DIST was computed */
 		int				DIST;		/* distance to the terminal */
-		short			is_sink;	/* flag showing whether the node is in the source or in the sink tree */
-	  unsigned short label; // for Hochbaum's parametric TV
-
-		captype			tr_cap;		/* if tr_cap > 0 then tr_cap is residual capacity of the arc SOURCE->node
-									   otherwise         -tr_cap is residual capacity of the arc node->SINK */
+	  unsigned char	is_sink;	/* flag showing whether the node is in the source or in the sink tree */
+	  unsigned char alive;
+	  unsigned int label ; // to identify connected cpnts / for Hochbaum's parametric TV 
+	  captype tr_cap;		/* if tr_cap > 0 then tr_cap is residual capacity of the arc SOURCE->node otherwise -tr_cap is residual capacity of the arc node->SINK */
 	} node;
 
 	/* arc structure */

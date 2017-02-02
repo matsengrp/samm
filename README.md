@@ -5,7 +5,7 @@ We need to compile the Cython component:
 ```
 pip install --user cython
 ```
-Compile the TVDyadic code (on stoat) in the TVDyadic folder:
+Compile the TVexact code (on stoat) in the TVexact folder:
 ```
 cc -O -fPIC -c *.cpp
 ar rus libTVH.a *.o

@@ -12,9 +12,9 @@ from Cython.Distutils import build_ext
 exts = cythonize([Extension(
         "solver_wrappers",
         sources=["solver_wrappers.pyx", "c/fused_lasso_solver.cpp"],
-        include_dirs=["c/TVdyadic", np.get_include()],
+        include_dirs=["c/TVexact", np.get_include()],
         libraries=["TVH", "stdc++"],
-        library_dirs=["c/TVdyadic"]
+        library_dirs=["c/TVexact"]
     )],
     language="c++"
 )

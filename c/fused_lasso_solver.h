@@ -13,9 +13,7 @@ void solve_fused_lasso(
   int *features_to_fuse2, // fused lasso penalty: second index of theta
   int num_features_to_fuse, // size of features_to_fuse1 and features_to_fuse2 (sould be the same)
   double penalty_param, // penalty parameter
-  double lmin, // the minimum value of the solution
-  double lmax, // the maximum value of the solution
-  int numdeep = 16 // the degree of precision to use
+  double err //tolarated error
 );
 
 #endif

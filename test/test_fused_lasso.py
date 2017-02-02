@@ -57,8 +57,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
 
         st = time.time()
         problem = Problem(Minimize(0.5 * obj + penalty_param * fused_lasso_pen))
-        problem.solve(verbose=False)
-        self.assertTrue(problem.status == OPTIMAL)
+        problem.solve(verbose=False, solver=SCS, eps=1e-16, max_iters=100000)
         cvx_soln = np.array(theta_var.value.flat)
         print "cvxtime", time.time() - st
 
@@ -73,7 +72,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
             penalty_param,
         )
         print "c time", time.time() - st
-        self.assertTrue(np.allclose(c_soln, cvx_soln, rtol=1e-04, atol=1e-05))
+        self.assertTrue(np.allclose(c_soln, cvx_soln, rtol=1e-10, atol=1e-14))
 
     def test_sparse_fused_lasso(self):
         """
@@ -94,8 +93,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
         problem = Problem(Minimize(
             0.5 * obj + fuse_penalty_param * fused_lasso_pen + lasso_penalty_param * norm(theta_var, 1)
         ))
-        problem.solve(verbose=False)
-        self.assertTrue(problem.status == OPTIMAL)
+        problem.solve(verbose=False, solver=SCS, eps=1e-16, max_iters=100000)
         cvx_soln = np.array(theta_var.value.flat)
         print "cvxtime", time.time() - st
 
@@ -119,4 +117,4 @@ class Fused_LassoC_TestCase(unittest.TestCase):
             )
         )
         print "c time", time.time() - st
-        self.assertTrue(np.allclose(sparse_fuse_c_soln, cvx_soln, rtol=1e-04, atol=1e-05))
+        self.assertTrue(np.allclose(sparse_fuse_c_soln, cvx_soln, rtol=1e-10, atol=1e-14))

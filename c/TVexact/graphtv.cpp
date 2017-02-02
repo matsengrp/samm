@@ -52,22 +52,58 @@
 */
 
 
-#include <stdio.h>
+//#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "maxflow.cpp"
 
 /***********************************************************************/
 
-void Graph::dyadicparametricTV(int numlevel,captype delta)
+void Graph::dyadicparametricTV(float erreur)
+  // ajouter précision/min/max?
   // paramétrique (Hochbaum)
 {
-	node *i, *j, *current_node = NULL;
-	arc *a;
-	nodeptr *np, *np_next;
-	int l, deltalabel;
 
-      for (l=numlevel-1;l>=0;l--) {
+#define Alloc_Size 1024
+
+  node *i, *j, *current_node = NULL;
+  arc *a;
+  nodeptr *np, *np_next;
+  unsigned int l,*nextlabel,nlab,oldnlab,*nums;
+  unsigned char flagstop, *inactivelabel;
+  captype *averages;
+
+  maxlabel=Alloc_Size;
+  nextlabel= (unsigned int *) malloc(sizeof(unsigned int)*maxlabel);
+  inactivelabel= (unsigned char *) malloc(sizeof(unsigned char)*maxlabel);
+  nums = (unsigned int *) malloc(sizeof(unsigned int)*maxlabel);
+  averages = (captype *) malloc(sizeof(captype)*maxlabel);
+  values = (captype *) malloc(sizeof(captype)*maxlabel);
+
+  double moy;
+  int num;
+
+  nlab=1;
+  nextlabel[0]=0;
+  memset(inactivelabel,0,sizeof(unsigned char)*maxlabel);
+  // initialisation
+  moy=0.; num=0;
+  for (i=node_block->ScanFirst(); i; i=node_block->ScanNext()) {
+    moy += i->tr_cap;
+    i->alive=1;
+    num++;
+  }
+  moy /= (double) num;
+  values[0]=moy;
+  for (i=node_block->ScanFirst(); i; i=node_block->ScanNext()) {
+    i->tr_cap -= moy;
+    i->label=0;
+  }
+
+
+	// for (l=numlevel-1;l>=0;l--) {
+      do {
 	maxflow_init();
-	deltalabel=1<<l;
 
 	nodeptr_block = new DBlock<nodeptr>(NODEPTR_BLOCK_SIZE, error_function);
 	while ( 1 )
@@ -171,25 +207,89 @@ void Graph::dyadicparametricTV(int numlevel,captype delta)
 	}
 
 	delete nodeptr_block;
-	if (l)
-	  for (i=node_block->ScanFirst(); i; i=node_block->ScanNext()) {
-	    if (what_segment(i)==SOURCE) {
-	      i->label += deltalabel;
-	      i->tr_cap -= delta;
-	      // contracter les arcs: [HOW?]
-	    } else {
-	      i->tr_cap += delta;
-	      for (a=i->first; a; a=a->next)
-	      	if (what_segment(a->head)==SOURCE) { a->r_cap=0;}
-	    }
-	  }
-	else
-	  for (i=node_block->ScanFirst(); i; i=node_block->ScanNext())
-	    if (what_segment(i)==SOURCE) i->label += deltalabel;
-	delta /= 2;
-      }
-}
 
+	memset(averages,0,nlab*sizeof(captype));
+	memset(nums,0,nlab*sizeof(int));
+	memset(nextlabel,0,nlab*sizeof(int));
+	oldnlab=nlab;
+	  for (i=node_block->ScanFirst(); i; i=node_block->ScanNext()) 
+	    if (i->alive) {
+	      if (what_segment(i)==SOURCE) {
+		l=nextlabel[i->label];
+		if (l==0) {
+		  l=(nextlabel[i->label]=nlab);
+		  inactivelabel[l]=0;
+		  nlab++;
+		  averages[l]=0.; nums[l]=0;
+		  nextlabel[l]=0;
+		  values[l]=values[i->label];
+		  if (nlab==maxlabel) {
+		    maxlabel+=Alloc_Size;
+		    inactivelabel= (unsigned char *) realloc(inactivelabel,sizeof(unsigned char)*maxlabel);
+		    nextlabel= (unsigned int *) realloc(nextlabel,sizeof(unsigned int)*maxlabel);
+		    nums = (unsigned int *) realloc(nums,sizeof(unsigned int)*maxlabel);
+		    averages = (captype *) realloc(averages,sizeof(captype)*maxlabel);
+		    values = (captype *) realloc(values,sizeof(captype)*maxlabel);
+		  }
+		}
+		i->label = l;
+		averages[l] += i->tr_cap;
+		nums[l]++;
+		// i->tr_cap -= delta;
+		// contracter les arcs: [HOW?]
+	      } else {
+		l=i->label;
+		averages[l] += i->tr_cap;
+		nums[l]++;
+		//	      i->tr_cap += delta;
+		for (a=i->first; a; a=a->next)
+		  if (what_segment(a->head)==SOURCE) { a->r_cap=0;}
+	      }
+	    }
+
+	  // tentative d'arret a precision zero
+	  // detection d'un label qui n'a pas ete coupe
+	  for (l=0;l<oldnlab;l++) if (!inactivelabel[l]) {
+	      if (nextlabel[l]==0) { averages[l]=0.; inactivelabel[l]=1;}
+	      else if (nums[l]==0) {
+		inactivelabel[l]=inactivelabel[nextlabel[l]]=1;
+		averages[nextlabel[l]]=0.;
+	      } else {
+		averages[l] /= (double) nums[l];
+		values[l] += averages[l];
+	      }
+	    } else averages[l]=0.;
+	  for (; l<nlab; l++) {
+	    averages[l] /= (double) nums[l];
+	    values[l]   += averages[l];
+	  }
+	  // remplace :
+	  /*	  for (l=0;l<nlab;l++) if (nums[l]) {
+	      averages[l] /= (double) nums[l];
+	      values[l] += averages[l];
+	      } */
+
+	  flagstop=0;
+	  for (i=node_block->ScanFirst(); i; i=node_block->ScanNext())
+	    if (i->alive) {
+	      l = i->label;
+	      if (inactivelabel[l] ||
+		  (averages[l]<=erreur && averages[l]>=-erreur)) {
+		i->tr_cap = 0;
+		i->alive = 0; // noeud déconnecté à l'avenir
+		inactivelabel[l]=1;
+	      } else {
+		flagstop=1; // on continue
+		i->tr_cap -= averages[l];
+	      }
+	    }
+      } while (flagstop);
+      free(nextlabel);
+      free(inactivelabel);
+      free(nums); free(averages);
+}
 /***********************************************************************/
 
-int Graph::what_label(node_id i) { return (int) (((node*) i)->label) ; }
+//int Graph::what_label(node_id i) { return (int) (((node*) i)->label) ; }
+double Graph::what_value(node_id i)
+{ return (double) values[(((node*) i)->label)] ; }

@@ -20,6 +20,7 @@
 
 #include <stdio.h>
 #include "graph.h"
+#include <stdlib.h>
 
 Graph::Graph(void (*err_function)(char *))
 {
@@ -27,12 +28,15 @@ Graph::Graph(void (*err_function)(char *))
 	node_block = new Block<node>(NODE_BLOCK_SIZE, error_function);
 	arc_block  = new Block<arc>(NODE_BLOCK_SIZE, error_function);
 	flow = 0;
+	values = NULL;
+	maxlabel=0;
 }
 
 Graph::~Graph()
 {
 	delete node_block;
 	delete arc_block;
+	if (values) free(values);
 }
 
 Graph::node_id Graph::add_node()
