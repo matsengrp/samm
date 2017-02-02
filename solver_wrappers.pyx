@@ -17,7 +17,7 @@ def solve_fused_lasso(
     np.ndarray[int, ndim=1, mode="c"] features_to_fuse1 not None,
     np.ndarray[int, ndim=1, mode="c"] features_to_fuse2 not None,
     double penalty_param,
-    double err = 1e-20,
+    double err = 0,
   ):
     fused_lasso_fun.solve_fused_lasso(
       &input[0],
