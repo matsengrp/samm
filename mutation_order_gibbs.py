@@ -15,8 +15,8 @@ class MutationOrderGibbsSampler(Sampler):
 
         assert(check_unordered_equal(init_order, self.mutated_positions))
 
-        if self.mutated_positions < 2:
-            sampled_orders = [init_order] * num_samples
+        if self.num_mutations < 2:
+            samples = [init_order] * (burn_in + num_samples)
         else:
             curr_order = init_order
             samples = []
@@ -35,7 +35,7 @@ class MutationOrderGibbsSampler(Sampler):
                 curr_order = self._do_gibbs_sweep(curr_order, initial_probabilities, init_order)
                 samples.append(curr_order)
 
-            sampled_orders = samples[-num_samples:]
+        sampled_orders = samples[-num_samples:]
 
         return [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in sampled_orders]
 
@@ -95,23 +95,26 @@ class MutationOrderGibbsSampler(Sampler):
                     base_feat_vec_dicts = feat_vec_dicts,
                     base_intermediate_seqs = intermediate_seqs,
                 )
-
                 # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
                 # the position that mutates right after it), rest are the same
-                multinomial_sequence[i] += \
-                    self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
-                    self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
+
+                # Another horrible assumption is that the change in theta won't really change the i+1 element
+                # of our multinomial. Let's make it. That will leave the following:
+                #multinomial_sequence[i + 1] = multinomial_sequence[i]
+                #multinomial_sequence[i] += \
+                #    self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
+                #    self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
                 # Previous code:
                 #multinomial_sequence[i] = self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
-
-                # We could do something similar below, since only a few elements of theta change, but we'd have
-                # to do some extra legwork and it probably wouldn't be worth it
-                multinomial_sequence[i + 1] = self._get_multinomial_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
+                #multinomial_sequence[i + 1] = self._get_multinomial_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
 
                 full_orderings[idx+1] = possible_full_order
                 # multiply the sequence of multinomials to get the probability of the full ordering
                 # the product in {eq:full_ordering}
-                full_ordering_probs[idx+1] = np.sum(multinomial_sequence)
+                #full_ordering_probs[idx+1] = np.sum(multinomial_sequence)
+                full_ordering_probs[idx+1] = full_ordering_probs[idx] + \
+                    self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
+                    self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
 
             # now perform a draw from the multinomial distribution of full orderings
             # the multinomial folows the distribution in {eq:order_conditional_prob}
@@ -127,3 +130,4 @@ class MutationOrderGibbsSampler(Sampler):
         theta_sums = [self.theta[feat_vec].sum() for feat_vec in feat_vec_dict.values()]
         multinomial_prob = self.theta[feat_vec_dict[numerator_pos]].sum() - scipy.misc.logsumexp(theta_sums)
         return multinomial_prob
+
