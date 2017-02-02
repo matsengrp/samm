@@ -27,11 +27,19 @@ class MutationOrderGibbsSampler(Sampler):
                     curr_order,
                 )
             )
-            initial_probabilities = [
-                self._get_multinomial_prob(feat_vec_dict_step, curr_mutate_pos)
-                for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(curr_order, feat_vec_dicts))
-            ]
+            if self.approx == 'fastest':
+                initial_probabilities = [
+                    self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
+                    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(curr_order, feat_vec_dicts))
+                ]
+            else:
+                initial_probabilities = []
             for i in range(burn_in + num_samples):
+                if self.approx == 'faster':
+                    initial_probabilities = [
+                        self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
+                        for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(curr_order, feat_vec_dicts))
+                    ]
                 curr_order = self._do_gibbs_sweep(curr_order, initial_probabilities, init_order)
                 samples.append(curr_order)
 
@@ -50,7 +58,7 @@ class MutationOrderGibbsSampler(Sampler):
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
 
             # the probabilities of each full ordering
-            full_ordering_probs = [0.] * self.num_mutations
+            full_ordering_log_probs = [0.] * self.num_mutations
             # the orderings under consideration
             # TODO: we can get rid of this variable and just recompute the order
             # It's here right now cause it makes life easy
@@ -66,17 +74,18 @@ class MutationOrderGibbsSampler(Sampler):
             )
 
             # Previous code:
-            #multinomial_sequence = [
-            #    self._get_multinomial_prob(feat_vec_dict_step, curr_mutate_pos)
-            #    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(full_order_last, feat_vec_dicts))
-            #]
-
-            # Stupid speed up #1: This is only justified if probabilities don't change much each iteration... which they
-            # don't really...
-            multinomial_sequence = [initial_probabilities[init_order.index(item)] for item in full_order_last]
+            if self.approx == 'none':
+                multinomial_sequence = [
+                    self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
+                    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(full_order_last, feat_vec_dicts))
+                ]
+            else:
+                # Stupid speed up #1: This is only justified if probabilities don't change much each iteration... which they
+                # don't really...
+                multinomial_sequence = [initial_probabilities[init_order.index(item)] for item in full_order_last]
 
             full_orderings[0] = full_order_last
-            full_ordering_probs[0] = np.sum(multinomial_sequence)
+            full_ordering_log_probs[0] = np.sum(multinomial_sequence)
 
             # iterate through the rest of the possible full mutation orders consistent with this partial order
             for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
@@ -100,35 +109,33 @@ class MutationOrderGibbsSampler(Sampler):
                 # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
                 # the position that mutates right after it), rest are the same
 
-                # Previous code:
-                #multinomial_sequence[i] = self._get_multinomial_prob(feat_vec_dicts[i], possible_full_order[i])
-                #multinomial_sequence[i + 1] = self._get_multinomial_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
-                #full_ordering_probs[idx+1] = np.sum(multinomial_sequence)
-
-                # Stupid speed up #2:
-                # A horrible assumption is that the change in theta won't really change the i+1 element
-                # of our multinomial. And it doesn't really. So let's make it:
-                #multinomial_sequence[i + 1] = multinomial_sequence[i]
-                #multinomial_sequence[i] += \
-                #    self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
-                #    self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
-
                 full_orderings[idx+1] = possible_full_order
+
                 # multiply the sequence of multinomials to get the probability of the full ordering
                 # the product in {eq:full_ordering}
-                full_ordering_probs[idx+1] = full_ordering_probs[idx] + \
-                    self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
-                    self.theta[feat_vec_dicts[i][full_order_last[i]]].sum() + \
-                    multinomial_sequence[i] - multinomial_sequence[i + 1]
+                if self.approx == 'fastest':
+                    # Stupid speed up #2:
+                    # A horrible assumption is that the change in theta won't really change the i+1 element
+                    # of our multinomial. And it doesn't really. So let's make it:
+                    full_ordering_log_probs[idx+1] = full_ordering_log_probs[idx] + \
+                        self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
+                        self.theta[feat_vec_dicts[i][full_order_last[i]]].sum() + \
+                        multinomial_sequence[i] - multinomial_sequence[i + 1]
+                else:
+                    multinomial_sequence[i] += \
+                        self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
+                        self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
+                    multinomial_sequence[i + 1] = self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
+                    full_ordering_log_probs[idx+1] = np.sum(multinomial_sequence)
 
             # now perform a draw from the multinomial distribution of full orderings
             # the multinomial folows the distribution in {eq:order_conditional_prob}
-            sampled_order_idx = sample_multinomial(np.exp(full_ordering_probs))
+            sampled_order_idx = sample_multinomial(np.exp(full_ordering_log_probs))
             # update the ordering
             curr_order = full_orderings[sampled_order_idx]
         return curr_order
 
-    def _get_multinomial_prob(self, feat_vec_dict, numerator_pos):
+    def _get_multinomial_log_prob(self, feat_vec_dict, numerator_pos):
         """
         a single term in {eq:full_ordering}
         """
