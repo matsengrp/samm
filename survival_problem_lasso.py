@@ -52,7 +52,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         current_value = self.get_value(theta)
         for i in range(max_iters):
             if i % self.print_iter == 0:
-                log.info("GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
+                log.info("GD iter %d, val %f, time %f" % (i, current_value, time.time() - st))
 
             # Calculate gradient of the smooth part
             grad = self.get_gradient_smooth(theta)
@@ -86,6 +86,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
                 if diff < diff_thres:
                     # Stop if difference in objective function is too small
                     break
+
         self.pool.close()
         log.info("final GD iter %d, val %f, time %d" % (i, current_value, time.time() - st))
         return theta, current_value, step_size

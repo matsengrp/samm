@@ -71,7 +71,7 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 

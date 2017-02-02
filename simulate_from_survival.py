@@ -70,7 +70,7 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
     # True vector
     true_theta = np.zeros(feat_generator.feature_vec_len)

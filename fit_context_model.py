@@ -97,7 +97,7 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
     true_theta = pickle.load(open(args.theta_file, 'rb'))
