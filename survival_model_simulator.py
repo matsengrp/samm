@@ -1,6 +1,7 @@
 import numpy as np
 from common import mutate_string
 from common import NUCLEOTIDES
+from common import sample_multinomial
 from models import *
 
 class SurvivalModelSimulator:
@@ -19,20 +20,26 @@ class SurvivalModelSimulator:
         self.feature_generator = feature_generator
         self.lambda0 = lambda0
 
-    def simulate(self, start_seq, censoring_time):
+    def simulate(self, start_seq, censoring_time, with_replacement=True):
         """
+        @param start_seq: string for the original sequence
         @param censoring_time: how long to mutate the sequence for
-        @return ending sequence
+        @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
+
+        @return FullSequenceMutations, ending sequence and entire history of mutations
         """
         mutations = []
         intermediate_seq = start_seq
-        unmutated_pos = range(len(start_seq))
+        pos_to_mutate = range(len(start_seq))
         last_mutate_time = 0
-        while len(unmutated_pos) > 0:
+        while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
-            feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, do_feat_vec_pos=unmutated_pos)
+            if with_replacement:
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq)
+            else:
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, do_feat_vec_pos=pos_to_mutate)
             hazard_weights = np.array([
-                np.exp(np.sum(self.theta[feature_vec_dict[p]])) for p in unmutated_pos
+                np.exp(np.sum(self.theta[feature_vec_dict[p]])) for p in pos_to_mutate
             ])
 
             # sample the time for the next mutation
@@ -47,20 +54,19 @@ class SurvivalModelSimulator:
 
             # sample the position this mutation occurs in
             # this is a multinomial
-            multinomial_sample = np.random.multinomial(
-                n=1,
-                pvals=hazard_weights/np.sum(hazard_weights),
-            )
-            sampled_idx = np.where(multinomial_sample == 1)[0][0]
-            mutate_pos = unmutated_pos.pop(sampled_idx)
+            sampled_idx = sample_multinomial(hazard_weights)
+            if not with_replacement:
+                mutate_pos = pos_to_mutate.pop(sampled_idx)
+            else:
+                mutate_pos = pos_to_mutate[sampled_idx]
 
             # sample the target nucleotide
             nucleotide_original = intermediate_seq[mutate_pos]
             possible_target_nucleotides = NUCLEOTIDES.replace(nucleotide_original, "")
 
             # TODO: Right now this just randomly picks a target nucleotide. Might need to change in the future
-            target_nucleotide_sample = np.random.multinomial(n=1, pvals=np.ones(3)/3.)
-            nucleotide_target = possible_target_nucleotides[np.where(target_nucleotide_sample == 1)[0][0]]
+            target_nucleotide_idx = sample_multinomial(np.ones(3))
+            nucleotide_target = possible_target_nucleotides[target_nucleotide_idx]
 
             mutations.append(MutationEvent(
                 mutate_time,
@@ -69,7 +75,6 @@ class SurvivalModelSimulator:
             ))
 
             intermediate_seq = mutate_string(intermediate_seq, mutate_pos, nucleotide_target)
-
         return FullSequenceMutations(
             ObservedSequenceMutations(
                 start_seq,
