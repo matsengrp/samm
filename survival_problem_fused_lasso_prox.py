@@ -1,3 +1,4 @@
+from cvxpy import *
 import time
 import numpy as np
 import logging as log
@@ -107,15 +108,32 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
         """
         Do proximal gradient step
         """
-
         # prox step 1: solve fused lasso
         fused_lasso_theta = self.solve_fused_lasso_prox(theta, step_size * self.penalty_param_fused)
         # prox step 2: soft threshold to get sparse fused lasso
         sparse_fused_lasso_theta = soft_threshold(fused_lasso_theta, step_size * self.penalty_param_lasso)
         return sparse_fused_lasso_theta
 
+    def solve_fused_lasso_prox_cvxpy(self, potential_theta, factor):
+        """
+        solve the fused lasso proximal problem using cvxpy
+        Minimize 0.5 * || theta - potential_theta ||^2_2 + factor * || fused lasso penalty on theta ||_1
+        """
+        theta_var = Variable(potential_theta.size)
+        obj = sum_squares(theta_var - potential_theta)
+
+        fused_lasso_pen = 0
+        for i1, i2 in zip(self.fused_lasso_idx1, self.fused_lasso_idx2):
+            fused_lasso_pen += abs(theta_var[i1] - theta_var[i2])
+
+        st = time.time()
+        problem = Problem(Minimize(0.5 * obj + factor * fused_lasso_pen))
+        problem.solve(verbose=True)
+        return np.array(theta_var.value.flat)
+
     def solve_fused_lasso_prox(self, potential_theta, factor):
         """
+        Solve the fused lasso proximal problem using the C library
         Minimize 0.5 * || theta - potential_theta ||^2_2 + factor * || fused lasso penalty on theta ||_1
         """
         fused_lasso_soln = np.zeros(potential_theta.size)

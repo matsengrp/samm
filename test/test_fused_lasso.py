@@ -73,7 +73,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
             penalty_param,
         )
         print "c time", time.time() - st
-        self.assertTrue(np.allclose(c_soln, cvx_soln, rtol=1e-04, atol=1e-05))
+        self.assertTrue(np.allclose(c_soln, cvx_soln, rtol=1e-5, atol=1e-6))
 
     def test_sparse_fused_lasso(self):
         """
@@ -119,4 +119,4 @@ class Fused_LassoC_TestCase(unittest.TestCase):
             )
         )
         print "c time", time.time() - st
-        self.assertTrue(np.allclose(sparse_fuse_c_soln, cvx_soln, rtol=1e-04, atol=1e-05))
+        self.assertTrue(np.allclose(sparse_fuse_c_soln, cvx_soln, rtol=1e-4, atol=1e-5))
