@@ -1,7 +1,7 @@
 import time
 from numpy import zeros
 from cvxpy import *
-from common import get_idx_differ_by_one_character
+from common import *
 from survival_problem import SurvivalProblem
 
 class SurvivalProblemCVXPY(SurvivalProblem):

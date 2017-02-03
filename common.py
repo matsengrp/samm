@@ -3,12 +3,37 @@ import numpy as np
 import pandas as pd
 
 from models import ObservedSequenceMutations
-
+NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "atcg"
+NUCLEOTIDE_DICT = {
+    "a": 0,
+    "t": 1,
+    "c": 2,
+    "g": 3,
+}
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
+
+def get_nonzero_theta_print_lines(theta, motif_list):
+    lines = []
+    for i in range(theta.shape[0]):
+        for j in range(NUM_NUCLEOTIDES):
+            if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
+                if i == theta.shape[0] - 1:
+                    lines.append("%d: %s (EDGES)" % (i, theta[i, :]))
+                else:
+                    lines.append("%d: %s (%s)" % (i, theta[i, :], motif_list[i]))
+                break
+    return "\n".join(lines)
+
+def get_possible_motifs_to_targets(motif_list, mask_shape, motif_len):
+    theta_mask = np.ones(mask_shape, dtype=bool)
+    for i in range(len(motif_list)):
+        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][motif_len/2]]
+        theta_mask[i, center_nucleotide_idx] = False
+    return theta_mask
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """

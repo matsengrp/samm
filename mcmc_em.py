@@ -7,7 +7,7 @@ from common import *
 from sampler_collection import SamplerCollection
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1):
+    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=1, burn_in=1, max_m_iters=500, num_threads=1):
         """
         @param observed_data: list of observed data (start and end sequences)
         @param feat_generator: an instance of a FeatureGenerator
@@ -20,14 +20,16 @@ class MCMC_EM:
         """
         self.observed_data = observed_data
         self.feat_generator = feat_generator
+        self.motif_list = self.feat_generator.get_motif_list()
         self.base_num_e_samples = base_num_e_samples
         self.max_m_iters = max_m_iters
         self.burn_in = burn_in
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
         self.num_threads = num_threads
+        self.theta_mask = theta_mask
 
-    def run(self, theta=None, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
+    def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
         """
         @param theta: initial value for theta in MCMC-EM
         @param penalty_param: the coefficient for the penalty function
@@ -35,9 +37,6 @@ class MCMC_EM:
         @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
         """
         st = time.time()
-        # initialize theta vector
-        if theta is None:
-            theta = np.random.randn(self.feat_generator.feature_vec_len)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         prev_pen_exp_log_lik = None
@@ -77,14 +76,17 @@ class MCMC_EM:
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
-                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param)
+                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask)
                 theta, pen_exp_log_lik = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                     num_threads=self.num_threads,
                 )
+                print "pen_exp_log_lik", pen_exp_log_lik
                 log.info("Current Theta")
-                log.info("\n".join(["%d: %.2g" % (i, theta[i]) for i in range(theta.size) if np.abs(theta[i]) > 1e-5]))
+                log.info(
+                    get_nonzero_theta_print_lines(theta, self.motif_list)
+                )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
 
                 if prev_pen_exp_log_lik is not None:

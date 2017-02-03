@@ -19,9 +19,12 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
+from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
+from survival_problem_cvxpy_multi import SurvivalProblemLassoMultiCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
+from survival_problem_lasso_multi import SurvivalProblemLassoMulti
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import *
 
@@ -78,9 +81,9 @@ def parse_args():
 
     args = parser.parse_args()
 
-    args.problem_solver_cls = SurvivalProblemLasso
+    args.problem_solver_cls = SurvivalProblemLassoMulti #SurvivalProblemLasso
     if args.solver == "CL":
-        args.problem_solver_cls = SurvivalProblemLassoCVXPY
+        args.problem_solver_cls = SurvivalProblemLassoMultiCVXPY #SurvivalProblemLassoCVXPY
     elif args.solver == "CFL":
         args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "FL":
@@ -110,40 +113,40 @@ def main(args=sys.argv[1:]):
 
     log.info("Running EM")
 
-    em_algo = MCMC_EM(
-        obs_data,
-        feat_generator,
-        MutationOrderGibbsSampler,
-        args.problem_solver_cls,
-        num_threads=args.num_threads,
-    )
-
     motif_list = feat_generator.get_motif_list()
 
     # Run EM on the lasso parameters from largest to smallest
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
     results_list = []
-    theta = None
+
+    # special case when theta is 4 vectors actually
+    theta = np.random.randn(feat_generator.feature_vec_len, NUM_NUCLEOTIDES)
+    # Set the impossible thetas to -inf
+    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape, args.motif_len)
+    theta[~theta_mask] = -np.inf
+
+    em_algo = MCMC_EM(
+        obs_data,
+        feat_generator,
+        # MutationOrderGibbsSampler,
+        MutationOrderGibbsSamplerMultiTarget,
+        args.problem_solver_cls,
+        theta_mask = theta_mask,
+        num_threads=args.num_threads,
+    )
+
     for penalty_param in sorted(penalty_params, reverse=True):
         log.info("Penalty parameter %f" % penalty_param)
         theta = em_algo.run(theta=theta, penalty_param=penalty_param, max_em_iters=args.em_max_iters)
         results_list.append((penalty_param, theta))
 
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
-        for i in range(theta.size):
-            if np.abs(theta[i]) > ZERO_THRES:
-                if i == theta.size - 1:
-                    log.info("%d: %f (EDGES)" % (i, theta[i]))
-                else:
-                    log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
+        log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        # TODO: Right now true_thetas is a 4 column matrix, a value for each target nucleotide
-        # We have assumed that all the columns have the same value. Therefore we can compare fitted
-        # theta values like this. In the future we will need some other comparison method.
-        log.info(scipy.stats.spearmanr(theta, true_thetas[:,0]))
-        log.info(scipy.stats.kendalltau(theta, true_thetas[:,0]))
-        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(theta, true_thetas[:,0]))
-        log.info("L2 error %f" % np.linalg.norm(theta - true_thetas[:,0]))
+        log.info(scipy.stats.spearmanr(theta[theta_mask].flatten(), true_thetas[theta_mask].flatten()))
+        log.info(scipy.stats.kendalltau(theta[theta_mask].flatten(), true_thetas[theta_mask].flatten()))
+        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(theta[theta_mask].flatten(), true_thetas[theta_mask].flatten()))
+        log.info("L2 error %f" % np.linalg.norm(theta[theta_mask].flatten() - true_thetas[theta_mask].flatten()))
 
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)

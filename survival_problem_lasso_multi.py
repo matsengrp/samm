@@ -8,7 +8,7 @@ from survival_problem_grad_descent import SurvivalProblemCustom
 from survival_problem_grad_descent_multi import SurvivalProblemCustomMulti
 from common import soft_threshold
 
-class SurvivalProblemLasso(SurvivalProblemCustom):
+class SurvivalProblemLassoMulti(SurvivalProblemCustomMulti):
     """
     Our own implementation of proximal gradient descent to solve the survival problem
     Objective function: - log likelihood of theta + lasso penalty on theta
@@ -19,7 +19,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         """
         @return negative penalized log likelihood
         """
-        return -(self.get_log_lik(theta) - self.penalty_param * np.linalg.norm(theta, ord=1))
+        return -(self.get_log_lik(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask], ord=1))
 
     def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
         """
@@ -50,7 +50,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         st = time.time()
         theta = init_theta
         step_size = init_step_size
-        current_value = self.get_value(theta)
+        current_value = self._get_value_parallel(theta)
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("GD iter %d, val %f, time %f" % (i, current_value, time.time() - st))
@@ -58,6 +58,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
             # Calculate gradient of the smooth part
             grad = self.get_gradient_smooth(theta)
             potential_theta = theta - step_size * grad
+
             # Do proximal gradient step
             potential_theta = soft_threshold(potential_theta, step_size * self.penalty_param)
             potential_value = self._get_value_parallel(potential_theta)
@@ -96,4 +97,4 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         """
         @return negative penalized log likelihood
         """
-        return - (self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta, ord=1))
+        return - (self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask], ord=1))

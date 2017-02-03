@@ -33,7 +33,7 @@ class SamplerCollection:
         @param init_orders_for_iter: what order to initialize each gibbs sampler
         @param num_samples: number of samples to retrieve from each gibbs sampler
         @param burn_in_sweeps: number of samplers to run initially for burn in
-        @returns List of samples from each sampler
+        @returns List of samples from each sampler (ImputedSequenceMutations)
         """
         pool = Pool(self.num_threads)
         sampled_orders_list = pool.map(

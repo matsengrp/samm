@@ -1,16 +1,18 @@
 class SurvivalProblem:
-    def __init__(self, feature_generator, samples, penalty_param):
+    def __init__(self, feature_generator, samples, penalty_param, theta_mask):
         """
-        @param samples: the observations for this problem
+        @param samples: the observations for this problem, list of ImputedSequenceMutations
         @param feature_generator: FeatureGenerator
         @param penalty_param: the coefficient on the penalty function(s). This assumes a single
                                 shared penalty parameter across all penalties for now.
+        @param theta_mask: a mask indicating which theta values to estimate
         """
         assert(penalty_param >= 0)
 
         self.samples = samples
         self.feature_generator = feature_generator
         self.penalty_param = penalty_param
+        self.theta_mask = theta_mask
 
     def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """

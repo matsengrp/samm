@@ -8,7 +8,7 @@ from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_grad_descent import SurvivalProblemCustom
 
-class Survival_Problm_Gradient_Descent_TestCase(unittest.TestCase):
+class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
     def test_grad_calculation(self):
         """
         Check that the gradient calculation speed up is the same as the old basic gradient calculation
