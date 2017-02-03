@@ -5,6 +5,7 @@ import numpy as np
 from scipy.stats import spearmanr
 from collections import Counter
 
+from common import NUM_NUCLEOTIDES
 from models import ObservedSequenceMutations
 from survival_model_simulator import SurvivalModelSimulator
 from feature_generator import SubmotifFeatureGenerator
@@ -19,15 +20,15 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         np.random.seed(10)
 
-        START_SEQ = "ttcgat" # MUST BE LESS THAN TEN
-        NUM_OBS_SAMPLES = 3000
+        START_SEQ = "ttcg" # MUST BE LESS THAN TEN
+        NUM_OBS_SAMPLES = 5000
         BURN_IN = 15
-        CENSORING_TIME = 4.0
+        CENSORING_TIME = 2.0
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
 
         feat_generator = SubmotifFeatureGenerator(motif_len=3)
-        theta = np.random.rand(feat_generator.feature_vec_len)
+        theta = np.random.rand(feat_generator.feature_vec_len, NUM_NUCLEOTIDES)
         surv_simulator = SurvivalModelSimulator(theta, feat_generator, lambda0=LAMBDA0)
 
         # Simulate some data from the same starting sequence
@@ -63,5 +64,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.4)
+        self.assertTrue(rho > 0.8)
         self.assertTrue(pval < 1e-5)
