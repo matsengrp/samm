@@ -158,7 +158,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Calculate feature vectors for positions that are close to the mutation
             do_feat_vec_pos = range(
                 max(mutation_pos - self.flank_end_len, 0),
-                min(mutation_pos + self.flank_end_len, seq_mut_order.obs_seq_mutation.seq_len),
+                min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
             )
             feat_vec_dict_update = self.create_for_sequence(
                 intermediate_seqs[i + 1],
