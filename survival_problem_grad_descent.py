@@ -62,7 +62,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         Calculate the log likelihood of this sample - tries to minimize recalculations as much as possible
         """
         log_lik = 0
-        num_pos = len(feature_vecs[0]) - 1
+        max_pos = len(feature_vecs[0]) - 1
 
         # Store the exp terms so we don't need to recalculate things
         # Gets updated when a position changes
@@ -77,8 +77,8 @@ class SurvivalProblemCustom(SurvivalProblem):
                 # Find the positions near the position that just mutated
                 # TODO: Assumes that the motif lengths are odd!
                 change_pos_min = max(prev_mutating_pos - motif_len/2, 0)
-                change_pos_max = min(prev_mutating_pos + motif_len/2, num_pos)
-                change_pos = np.arange(change_pos_min, change_pos_max)
+                change_pos_max = min(prev_mutating_pos + motif_len/2, max_pos)
+                change_pos = np.arange(change_pos_min, change_pos_max + 1)
 
                 # Remove old exp terms from the exp sum
                 exp_sum -= exp_terms[change_pos].sum()
@@ -131,7 +131,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     @staticmethod
     def get_gradient_log_lik_per_sample(theta, sample, feature_vecs, motif_len):
         grad = np.zeros(theta.size)
-        num_pos = len(feature_vecs[0]) - 1
+        max_pos = len(feature_vecs[0]) - 1
 
         # Store the exp terms so we don't need to recalculate things
         # Gets updated when a position changes
@@ -151,8 +151,8 @@ class SurvivalProblemCustom(SurvivalProblem):
                 # Find the positions near the position that just mutated
                 # TODO: Assumes that the motif lengths are odd!
                 change_pos_min = max(prev_mutating_pos - motif_len/2, 0)
-                change_pos_max = min(prev_mutating_pos + motif_len/2, num_pos)
-                change_pos = np.arange(change_pos_min, change_pos_max)
+                change_pos_max = min(prev_mutating_pos + motif_len/2, max_pos)
+                change_pos = np.arange(change_pos_min, change_pos_max + 1)
 
                 # Remove old exp terms from the exp sum
                 exp_sum -= exp_terms[change_pos].sum()
