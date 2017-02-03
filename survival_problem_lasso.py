@@ -18,7 +18,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         """
         @return negative penalized log likelihood
         """
-        return -(self.get_log_lik(theta) - self.penalty_param * np.linalg.norm(theta, ord=1))
+        return -(self.get_log_lik(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask], ord=1))
 
     def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
         """
@@ -49,7 +49,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         st = time.time()
         theta = init_theta
         step_size = init_step_size
-        current_value = self.get_value(theta)
+        current_value = self._get_value_parallel(theta)
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("GD iter %d, val %f, time %f" % (i, current_value, time.time() - st))
@@ -95,4 +95,4 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         """
         @return negative penalized log likelihood
         """
-        return - (self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta, ord=1))
+        return - (self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask], ord=1))

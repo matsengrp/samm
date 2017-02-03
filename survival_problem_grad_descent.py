@@ -35,6 +35,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             for sample in samples
         ]
         self.penalty_param = penalty_param
+        self.pool = None
 
         self.post_init()
 
@@ -121,6 +122,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         @return negative penalized log likelihood
         """
+        if self.pool is None:
+            raise ValueError("Pool has not been initialized")
+
         ll = self.pool.map(
             run_parallel_worker,
             [ObjectiveValueWorker(theta, sample, feature_vecs, self.motif_len) for sample, feature_vecs in self.feature_vec_sample_pair]
@@ -133,6 +137,9 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         @return the gradient of the total log likelihood wrt theta
         """
+        if self.pool is None:
+            raise ValueError("Pool has not been initialized")
+
         l = self.pool.map(
             run_parallel_worker,
             [

@@ -23,11 +23,25 @@ class SurvivalProblemCVXPY(SurvivalProblem):
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, all_feature_vecs):
             # vec_mutation_step are the feature vectors of the at-risk group after mutation i
             feature_vec_mutated = vecs_at_mutation_step[mutating_pos]
-            obj += sum_entries(theta[feature_vec_mutated]) - log_sum_exp(vstack(*[
-                sum_entries(theta[f]) for f in vecs_at_mutation_step.values()
+            col_idx = 0
+            if self.per_target_model:
+                col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
+
+            obj += sum_entries(theta[feature_vec_mutated, col_idx]) - log_sum_exp(vstack(*[
+                sum_entries(theta[f, i])
+                for f in vecs_at_mutation_step.values()
+                for i in range(self.theta_num_col)
+                if self.theta_mask[f,i]
             ]))
         return obj
 
+    def get_log_likelihood(self, theta):
+        obj = 0
+        for sample in self.samples:
+            obj += self.calculate_per_sample_log_lik(theta, sample)
+        # maximize the average log likelihood (normalization makes it easier to track EM
+        # since the number of E-step samples grows)
+        return 1.0/len(self.samples) * obj
 
 class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
     """
@@ -36,20 +50,22 @@ class SurvivalProblemLassoCVXPY(SurvivalProblemCVXPY):
 
     Note: motifs that mutate to different target nucleotides share the same theta value
     """
+    def get_value(self, theta):
+        ll = self.get_log_likelihood(theta)
+        return ll - self.penalty_param * norm(theta[self.theta_mask], 1)
+
     def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """
-        @param init_theta: ignored
+        @param init_theta: only used to determine shape of theta
         @param max_iters: ignored
         @param num_threads: ignored
         """
-        theta = Variable(self.feature_generator.feature_vec_len)
-        obj = 0
-        for sample in self.samples:
-            obj += self.calculate_per_sample_log_lik(theta, sample)
+        theta = Variable(init_theta.shape[0], init_theta.shape[1])
+
         # maximize the average log likelihood (normalization makes it easier to track EM
         # since the number of E-step samples grows)
-        problem = Problem(Maximize(1.0/len(self.samples) * obj - self.penalty_param * norm(theta, 1)))
-        problem.solve(verbose=True)
+        problem = Problem(Maximize(self.get_value(theta)))
+        problem.solve(solver=SCS, verbose=True)
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value
 

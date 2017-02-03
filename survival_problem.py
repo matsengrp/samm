@@ -1,3 +1,5 @@
+from common import NUM_NUCLEOTIDES
+
 class SurvivalProblem:
     def __init__(self, feature_generator, samples, penalty_param, theta_mask):
         """
@@ -13,6 +15,8 @@ class SurvivalProblem:
         self.feature_generator = feature_generator
         self.penalty_param = penalty_param
         self.theta_mask = theta_mask
+        self.theta_num_col = self.theta_mask.shape[1]
+        self.per_target_model = self.theta_num_col == NUM_NUCLEOTIDES
 
     def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """

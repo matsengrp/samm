@@ -22,9 +22,7 @@ from mutation_order_gibbs import MutationOrderGibbsSampler
 from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
-from survival_problem_cvxpy_multi import SurvivalProblemLassoMultiCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
-from survival_problem_lasso_multi import SurvivalProblemLassoMulti
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import *
 
@@ -87,20 +85,14 @@ def parse_args():
     # Determine problem solver
     args.problem_solver_cls = SurvivalProblemLasso
     if args.solver == "CL":
-        if args.per_target_model:
-            args.problem_solver_cls = SurvivalProblemLassoMultiCVXPY
-        else:
-            args.problem_solver_cls = SurvivalProblemLassoCVXPY
+        args.problem_solver_cls = SurvivalProblemLassoCVXPY
     elif args.solver == "CFL":
         if args.per_target_model:
             raise NotImplementedError()
         else:
             args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "L":
-        if args.per_target_model:
-            args.problem_solver_cls = SurvivalProblemLassoMulti
-        else:
-            args.problem_solver_cls = SurvivalProblemLasso
+        args.problem_solver_cls = SurvivalProblemLasso
     elif args.solver == "FL":
         if args.per_target_model:
             raise NotImplementedError()
