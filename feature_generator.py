@@ -77,14 +77,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
         feature_vec_dict = dict()
-        if do_feat_vec_pos is None:
-            do_feat_vec_pos = set(range(len(sequence)))
-
-        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
-        for pos in do_feat_vec_pos-no_feat_vec_pos:
-            feature_vec_dict[pos] = self._create_feature_vec_for_pos(pos, sequence)
-
-        return feature_vec_dict
+        return self.update_for_sequence(feature_vec_dict, sequence, no_feat_vec_pos, do_feat_vec_pos)
 
     def update_for_sequence(self, feature_vec_dict, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
         if do_feat_vec_pos is None:
