@@ -13,13 +13,15 @@ class Survival_Problm_Gradient_Descent_TestCase(unittest.TestCase):
         """
         Check that the gradient calculation speed up is the same as the old basic gradient calculation
         """
+        np.random.seed(10)
         motif_len = 3
 
         feat_gen = SubmotifFeatureGenerator(motif_len)
 
         theta = np.random.rand(feat_gen.feature_vec_len)
-        obs = ObservedSequenceMutations("aaaatg", "ggaagt")
-        sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
+        theta[feat_gen.feature_vec_len - 1] = -1
+        obs = ObservedSequenceMutations("ggtgggtta", "ggagagtta")
+        sample = ImputedSequenceMutations(obs, [4,2])
         feature_vecs = feat_gen.create_for_mutation_steps(sample)[0]
 
         # Basic gradient calculation
@@ -32,6 +34,7 @@ class Survival_Problm_Gradient_Descent_TestCase(unittest.TestCase):
         """
         Check that the log likelihood calculation speed up is the same as the old basic log likelihood calculation
         """
+        np.random.seed(10)
         motif_len = 3
 
         feat_gen = SubmotifFeatureGenerator(motif_len)
