@@ -20,7 +20,7 @@ class Survival_Problem_Multi_TestCase(unittest.TestCase):
         feat_gen = SubmotifFeatureGenerator(motif_len)
         motif_list = feat_gen.get_motif_list()
         theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
-        theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape, motif_len)
+        theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
         theta[~theta_mask] = -np.inf
 
         obs = ObservedSequenceMutations("ggtgggtta", "ggagagtta")

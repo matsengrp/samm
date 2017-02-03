@@ -17,9 +17,12 @@ ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
 def get_nonzero_theta_print_lines(theta, motif_list):
+    """
+    @return a string that summarizes the theta vector/matrix
+    """
     lines = []
     for i in range(theta.shape[0]):
-        for j in range(NUM_NUCLEOTIDES):
+        for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 if i == theta.shape[0] - 1:
                     lines.append("%d: %s (EDGES)" % (i, theta[i, :]))
@@ -28,10 +31,23 @@ def get_nonzero_theta_print_lines(theta, motif_list):
                 break
     return "\n".join(lines)
 
-def get_possible_motifs_to_targets(motif_list, mask_shape, motif_len):
+def get_possible_motifs_to_targets(motif_list, mask_shape):
+    """
+    @param motif_list: list of motifs - assumes that the first few theta rows correspond to these motifs
+    @param mask_shape: shape of the theta matrix
+
+    @return a boolean matrix with possible mutations as True, impossible mutations as False
+    """
     theta_mask = np.ones(mask_shape, dtype=bool)
+    if mask_shape[1] == 1:
+        # Estimating a single theta vector - then we should estimate all theta values
+        return theta_mask
+
+    # Estimating a different theta vector for different target nucleotides
+    # We cannot have a motif mutate to the same center nucleotide
+    center_motif_idx = len(motif_list[0])/2
     for i in range(len(motif_list)):
-        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][motif_len/2]]
+        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
         theta_mask[i, center_nucleotide_idx] = False
     return theta_mask
 

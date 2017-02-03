@@ -78,20 +78,59 @@ def parse_args():
         type=str,
         help='file with pickled true context model',
         default='_output/true_theta.pkl')
+    parser.add_argument('--per-target-model',
+        action='store_true')
 
+    parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
 
-    args.problem_solver_cls = SurvivalProblemLassoMulti #SurvivalProblemLasso
+    # Determine problem solver
+    args.problem_solver_cls = SurvivalProblemLasso
     if args.solver == "CL":
-        args.problem_solver_cls = SurvivalProblemLassoMultiCVXPY #SurvivalProblemLassoCVXPY
+        if args.per_target_model:
+            args.problem_solver_cls = SurvivalProblemLassoMultiCVXPY
+        else:
+            args.problem_solver_cls = SurvivalProblemLassoCVXPY
     elif args.solver == "CFL":
-        args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
+        if args.per_target_model:
+            raise NotImplementedError()
+        else:
+            args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
+    elif args.solver == "L":
+        if args.per_target_model:
+            args.problem_solver_cls = SurvivalProblemLassoMulti
+        else:
+            args.problem_solver_cls = SurvivalProblemLasso
     elif args.solver == "FL":
-        args.problem_solver_cls = SurvivalProblemFusedLassoProximal
+        if args.per_target_model:
+            raise NotImplementedError()
+        else:
+            args.problem_solver_cls = SurvivalProblemFusedLassoProximal
+
+    # Determine sampler
+    if args.per_target_model:
+        args.sampler_cls = MutationOrderGibbsSamplerMultiTarget
+        args.theta_num_col = NUM_NUCLEOTIDES
+    else:
+        args.sampler_cls = MutationOrderGibbsSampler
+        args.theta_num_col = 1
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
     return args
+
+def load_true_theta(theta_file, per_target_model):
+    """
+    @param theta_file: file name
+    @param per_target_model: if True, we return the entire theta. If False, we return a collapsed theta vector
+
+    @return the true theta vector/matrix
+    """
+    true_theta = pickle.load(open(theta_file, 'rb'))
+    if per_target_model:
+        return true_theta
+    else:
+        return np.matrix(np.max(true_theta, axis=1)).T
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -100,11 +139,8 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
-    # TODO: Right now this is a 4 column matrix, a value for each target nucleotide
-    # However we only fit a 1 column theta matrix for now (so assumes equal theta values for all target nucleotides)
-    # For now, this true theta matrix should have same values across all columns.
-    true_thetas = pickle.load(open(args.theta_file, 'rb'))
-    assert(true_thetas.shape[0] == feat_generator.feature_vec_len)
+    true_theta = load_true_theta(args.theta_file, args.per_target_model)
+    assert(true_theta.shape[0] == feat_generator.feature_vec_len)
 
     log.info("Reading data")
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
@@ -119,17 +155,15 @@ def main(args=sys.argv[1:]):
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
     results_list = []
 
-    # special case when theta is 4 vectors actually
-    theta = np.random.randn(feat_generator.feature_vec_len, NUM_NUCLEOTIDES)
+    theta = np.random.randn(feat_generator.feature_vec_len, args.theta_num_col)
     # Set the impossible thetas to -inf
-    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape, args.motif_len)
+    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
 
     em_algo = MCMC_EM(
         obs_data,
         feat_generator,
-        # MutationOrderGibbsSampler,
-        MutationOrderGibbsSamplerMultiTarget,
+        args.sampler_cls,
         args.problem_solver_cls,
         theta_mask = theta_mask,
         num_threads=args.num_threads,
@@ -143,10 +177,13 @@ def main(args=sys.argv[1:]):
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        log.info(scipy.stats.spearmanr(theta[theta_mask].flatten(), true_thetas[theta_mask].flatten()))
-        log.info(scipy.stats.kendalltau(theta[theta_mask].flatten(), true_thetas[theta_mask].flatten()))
-        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(theta[theta_mask].flatten(), true_thetas[theta_mask].flatten()))
-        log.info("L2 error %f" % np.linalg.norm(theta[theta_mask].flatten() - true_thetas[theta_mask].flatten()))
+        theta_shape = (theta_mask.sum(), 1)
+        flat_theta = theta[theta_mask].reshape(theta_shape)
+        flat_true_theta = true_theta[theta_mask].reshape(theta_shape)
+        log.info(scipy.stats.spearmanr(flat_theta, flat_true_theta))
+        log.info(scipy.stats.kendalltau(flat_theta, flat_true_theta))
+        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
+        log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
 
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)

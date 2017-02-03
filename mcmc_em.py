@@ -7,7 +7,7 @@ from common import *
 from sampler_collection import SamplerCollection
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=1, burn_in=1, max_m_iters=500, num_threads=1):
+    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1):
         """
         @param observed_data: list of observed data (start and end sequences)
         @param feat_generator: an instance of a FeatureGenerator
