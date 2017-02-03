@@ -9,7 +9,7 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_threads):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_threads, approx):
         """
         @param observed_data: list of ObservedSequenceMutations objects
         @param theta: numpy vector
@@ -24,6 +24,7 @@ class SamplerCollection:
                 theta,
                 feat_generator,
                 obs_seq,
+                approx,
             )
             for obs_seq in observed_data
         ]
@@ -67,7 +68,7 @@ class SamplerPoolWorker(ParallelWorker):
         return samples
 
 class Sampler:
-    def __init__(self, theta, feature_generator, obs_seq_mutation):
+    def __init__(self, theta, feature_generator, obs_seq_mutation, approx):
         """
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
@@ -76,6 +77,7 @@ class Sampler:
         self.theta = theta
         self.feature_generator = feature_generator
         self.obs_seq_mutation = obs_seq_mutation
+        self.approx = approx
 
     def run(self, init_order, burn_in, num_samples):
         """
