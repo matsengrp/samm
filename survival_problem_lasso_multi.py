@@ -5,10 +5,9 @@ import logging as log
 from multiprocessing import Pool
 
 from survival_problem_grad_descent import SurvivalProblemCustom
-from survival_problem_grad_descent_multi import SurvivalProblemCustomMulti
 from common import soft_threshold
 
-class SurvivalProblemLassoMulti(SurvivalProblemCustomMulti):
+class SurvivalProblemLassoMulti(SurvivalProblemCustom):
     """
     Our own implementation of proximal gradient descent to solve the survival problem
     Objective function: - log likelihood of theta + lasso penalty on theta

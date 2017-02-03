@@ -5,7 +5,6 @@ import logging as log
 from multiprocessing import Pool
 
 from survival_problem_grad_descent import SurvivalProblemCustom
-from survival_problem_grad_descent_multi import SurvivalProblemCustomMulti
 from common import soft_threshold
 
 class SurvivalProblemLasso(SurvivalProblemCustom):

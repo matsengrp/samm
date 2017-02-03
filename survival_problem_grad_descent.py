@@ -4,8 +4,8 @@ import numpy as np
 import scipy as sp
 import logging as log
 from survival_problem import SurvivalProblem
-from common import soft_threshold
 from parallel_worker import *
+from common import NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
 
 class SurvivalProblemCustom(SurvivalProblem):
     """
@@ -18,13 +18,14 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param feat_generator: feature generator
         @param init_theta: where to initialize the gradient descent procedure from
         @param penalty_param: the lasso parameter. should be non-negative
-        @param theta_mask: ignored
+        @param theta_mask: which elements in theta to estimate
         """
         assert(penalty_param >= 0)
 
         self.feature_generator = feat_generator
         self.motif_len = feat_generator.motif_len
         self.samples = samples
+        self.theta_mask = theta_mask
         self.num_samples = len(self.samples)
         self.feature_vec_sample_pair = [
             (
@@ -67,10 +68,16 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         # Store the exp terms so we don't need to recalculate things
         # Gets updated when a position changes
-        exp_terms = np.exp([theta[one_feats].sum() for one_feats in feature_vecs[0].values()])
+        exp_terms = np.exp(
+            [
+                [theta[one_feats, i].sum() for i in range(theta.shape[1])]
+                for one_feats in feature_vecs[0].values()
+            ]
+        )
         # The sum of the exp terms. Update the sum accordingly to minimize recalculation
         exp_sum = exp_terms.sum()
 
+        prev_pos_changed = [] # track positions that have mutated already
         prev_mutating_pos = None
         prev_vecs_at_mutation_step = None
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
@@ -82,25 +89,32 @@ class SurvivalProblemCustom(SurvivalProblem):
                 change_pos = np.arange(change_pos_min, change_pos_max + 1)
 
                 # Remove old exp terms from the exp sum
-                exp_sum -= exp_terms[change_pos].sum()
+                exp_sum -= exp_terms[change_pos, :].sum()
                 # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
-                        exp_terms[prev_mutating_pos] = 0
-                    elif exp_terms[p] != 0:
+                        exp_terms[prev_mutating_pos, :] = 0
+                    elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value
-                        exp_terms[p] = np.exp(theta[vecs_at_mutation_step[p]].sum())
+                        exp_terms[p, :] = np.exp([theta[vecs_at_mutation_step[p], i].sum() for i in range(theta.shape[1])])
                 # Add in the new exp terms from the exp sum
                 exp_sum += exp_terms[change_pos].sum()
 
+            # Determine the theta column
+            col_idx = 0
+            if theta.shape[1] == NUM_NUCLEOTIDES:
+                # Get the column for this target nucleotide
+                col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
+
             # Add to the log likelihood the log likelihood at this step: theta * psi - log(sum(exp terms))
-            log_lik += theta[vecs_at_mutation_step[mutating_pos]].sum() - np.log(exp_sum)
+            log_lik += theta[vecs_at_mutation_step[mutating_pos], col_idx].sum() - np.log(exp_sum)
 
             prev_mutating_pos = mutating_pos
             prev_vecs_at_mutation_step = vecs_at_mutation_step
+            prev_pos_changed.append(mutating_pos)
         return log_lik
 
     def _get_log_lik_parallel(self, theta):
@@ -131,20 +145,26 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     @staticmethod
     def get_gradient_log_lik_per_sample(theta, sample, feature_vecs, motif_len):
-        grad = np.zeros(theta.size)
+        grad = np.zeros(theta.shape)
         max_pos = len(feature_vecs[0]) - 1
 
         # Store the exp terms so we don't need to recalculate things
         # Gets updated when a position changes
-        exp_terms = np.exp([theta[one_feats].sum() for one_feats in feature_vecs[0].values()])
+        exp_terms = np.exp(
+            [
+                [theta[one_feats, i].sum() for i in range(theta.shape[1])]
+                for one_feats in feature_vecs[0].values()
+            ]
+        )
         # The sum of the exp terms. Update the sum accordingly to minimize recalculation
         exp_sum = exp_terms.sum()
 
         # Store the gradient vector (not normalized) so we don't need to recalculate things
-        grad_log_sum_exp = np.zeros(theta.size)
+        grad_log_sum_exp = np.zeros(theta.shape)
         for pos, feat_vec in feature_vecs[0].iteritems():
-            grad_log_sum_exp[feat_vec] += exp_terms[pos]
+            grad_log_sum_exp[feat_vec, :] += exp_terms[pos, :]
 
+        prev_pos_changed = [] # track positions that have mutated already
         prev_mutating_pos = None
         prev_vecs_at_mutation_step = None
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
@@ -156,32 +176,39 @@ class SurvivalProblemCustom(SurvivalProblem):
                 change_pos = np.arange(change_pos_min, change_pos_max + 1)
 
                 # Remove old exp terms from the exp sum
-                exp_sum -= exp_terms[change_pos].sum()
+                exp_sum -= exp_terms[change_pos, :].sum()
                 # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
                         grad_log_sum_exp[prev_vecs_at_mutation_step[p]] -= exp_terms[p]
-                        exp_terms[p] = 0
-                    elif exp_terms[p] != 0:
+                        exp_terms[p, :] = 0
+                    elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value and the corresponding gradient vector
 
                         # remove old exp term from gradient
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p]] -= exp_terms[p]
-                        exp_terms[p] = np.exp(theta[vecs_at_mutation_step[p]].sum())
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= exp_terms[p, :]
+                        exp_terms[p,:] = np.exp(
+                            [theta[vecs_at_mutation_step[p], i].sum() for i in range(theta.shape[1])]
+                        )
                         # add new exp term to gradient
-                        grad_log_sum_exp[vecs_at_mutation_step[p]] += exp_terms[p]
+                        grad_log_sum_exp[vecs_at_mutation_step[p], :] += exp_terms[p, :]
                 # Add in the new exp terms from the exp sum
-                exp_sum += exp_terms[change_pos].sum()
+                exp_sum += exp_terms[change_pos, :].sum()
 
             # Add to the gradient the gradient at this step
-            grad[vecs_at_mutation_step[mutating_pos]] += 1
+            col_idx = 0
+            if theta.shape[1] == NUM_NUCLEOTIDES:
+                col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
+
+            grad[vecs_at_mutation_step[mutating_pos], col_idx] += 1
             grad -= grad_log_sum_exp/exp_sum
 
             prev_mutating_pos = mutating_pos
             prev_vecs_at_mutation_step = vecs_at_mutation_step
+            prev_pos_changed.append(mutating_pos)
         return grad
 
 class GradientWorker(ParallelWorker):
