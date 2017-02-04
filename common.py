@@ -38,12 +38,16 @@ def get_random_dna_seq(seq_length, nucleotide_probs=[0.25, 0.25, 0.25, 0.25]):
 def check_unordered_equal(L1, L2):
     return len(L1) == len(L2) and sorted(L1) == sorted(L2)
 
-def get_standard_error_ci_corrected(values, zscore):
+def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     """
+    @param values: the values that are correlated
+    @param zscore: the zscore to form the confidence interval
+    @param pen_val_diff: the total penalized value (so it should be the average of the values plus some penalty)
+
     @returns
         the standard error of the values correcting for auto-correlation between the values
-        the lower bound of the mean of the values using the standard error and the given zscore
-        the upper bound of the mean of the values using the standard error and the given zscore
+        the lower bound of the mean of the total penalized value using the standard error and the given zscore
+        the upper bound of the mean of the total penalized value using the standard error and the given zscore
     Calculate the autocorrelation, then the effective sample size, scale the standard error appropriately the effective sample size
     """
     mean = np.mean(values)
@@ -79,7 +83,7 @@ def get_standard_error_ci_corrected(values, zscore):
     # Corrected standard error
     ase = np.sqrt(var/ess)
 
-    return ase, mean - zscore * ase, mean + zscore * ase
+    return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
 
 def soft_threshold(theta, thres):
     """

@@ -117,6 +117,6 @@ class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
                     fused_lasso_pen += abs(theta[i1] - theta[i2])
 
         problem = Problem(Maximize(1.0/len(self.samples) * obj - self.penalty_param * fused_lasso_pen - self.penalty_param * norm(theta,1)))
-        problem.solve(verbose=True)
+        problem.solve(solver=SCS, verbose=True)
         assert(problem.status == OPTIMAL)
         return theta.value, problem.value

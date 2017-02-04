@@ -70,27 +70,35 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
     # True vector
-    true_theta = np.zeros(feat_generator.feature_vec_len)
+    true_thetas = np.zeros((feat_generator.feature_vec_len, 4))
 
     # Hard code simulation to have edge motifs with higher mutation rates
-    true_theta[feat_generator.feature_vec_len - 1] = 0.1
+    true_thetas[feat_generator.feature_vec_len - 1, :] = 0.1
 
-    some_num_nonzero_motifs = int(true_theta.size * args.ratio_nonzero/2.0)
+    some_num_nonzero_motifs = int(true_thetas.shape[0] * args.ratio_nonzero/2.0)
     # Remove edge motifs from random choices
     # Also cannot pick the last motif
-    some_nonzero_motifs = np.random.choice(true_theta.size - 2, some_num_nonzero_motifs)
+    some_nonzero_motifs = np.random.choice(true_thetas.shape[0] - 2, some_num_nonzero_motifs)
     # Also make some neighbor motifs nonzero
     nonzero_motifs = np.unique(np.vstack((some_nonzero_motifs, some_nonzero_motifs + 1)))
     num_nonzero_motifs = nonzero_motifs.size
     for idx in some_nonzero_motifs:
         # randomly set nonzero indices between [-2, 2]
-        true_theta[idx] = (np.random.rand() - 0.5) * 4
+        rand_theta_val = (np.random.rand() - 0.5) * 4
+        # Currently set all theta for the same motif to same value
+        true_thetas[idx, :] = rand_theta_val
+
+        # Cannot mutate motif to a target nucleotide with the same center nucleotide.
+        center_nucleotide_idx = NUCLEOTIDES.index(motif_list[idx][args.motif_len/2])
+        assert(center_nucleotide_idx >= 0)
+        true_thetas[idx, center_nucleotide_idx] = -np.inf
+
         # neighboring values also have same value (may get overridden if that motif was originally
         # set to be nonzero too)
-        true_theta[idx + 1] = true_theta[idx]
+        true_thetas[idx + 1, :] = rand_theta_val
 
     if args.random_gene_len > 0:
         germline_genes = ["FAKE_GENE_%d" % i for i in range(args.n_germlines)]
@@ -114,20 +122,20 @@ def main(args=sys.argv[1:]):
         germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
                 for gene in germline_genes]
 
-    simulator = SurvivalModelSimulator(true_theta, feat_generator, lambda0=args.lambda0)
+    simulator = SurvivalModelSimulator(true_thetas, feat_generator, lambda0=args.lambda0)
 
     # Dump a pickle file of theta
-    pickle.dump(true_theta, open(args.output_true_theta, 'w'))
+    pickle.dump(true_thetas, open(args.output_true_theta, 'w'))
 
     # Dump a text file of theta
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
-        for i in range(true_theta.size):
-            if np.abs(true_theta[i]) > ZERO_THRES:
-                if i == true_theta.size - 1:
-                    f.write("%d: %f (EDGES)\n" % (i, true_theta[i]))
+        for i in range(true_thetas.shape[0]):
+            if np.abs(true_thetas[i, 0]) > ZERO_THRES:
+                if i == true_thetas.shape[0] - 1:
+                    f.write("%d: %f (EDGES)\n" % (i, true_thetas[i, 0]))
                 else:
-                    f.write("%d: %f (%s)\n" % (i, true_theta[i], motif_list[i]))
+                    f.write("%d: %f (%s)\n" % (i, true_thetas[i, 0], motif_list[i]))
 
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.

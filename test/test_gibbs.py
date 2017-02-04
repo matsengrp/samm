@@ -26,7 +26,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
 
-        feat_generator = SubmotifFeatureGenerator(submotif_len=3)
+        feat_generator = SubmotifFeatureGenerator(motif_len=3)
         theta = np.random.rand(feat_generator.feature_vec_len)
         surv_simulator = SurvivalModelSimulator(theta, feat_generator, lambda0=LAMBDA0)
 

@@ -1,3 +1,4 @@
 *.pyc
 _output/
 .sconsign.dblite
+.fus*

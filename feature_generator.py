@@ -66,11 +66,11 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     just use an indicator to denote the position is on the edge.
     TODO: Do something else for edge positions?
     """
-    def __init__(self, submotif_len=3):
-        assert(submotif_len % 2 == 1)
-        self.submotif_len = submotif_len
-        self.flank_end_len = submotif_len/2
-        self.feature_vec_len = np.power(4, submotif_len) + 1
+    def __init__(self, motif_len=3):
+        assert(motif_len % 2 == 1)
+        self.motif_len = motif_len
+        self.flank_end_len = motif_len/2
+        self.feature_vec_len = np.power(4, motif_len) + 1
 
         motif_list = self.get_motif_list()
         self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
@@ -113,7 +113,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Calculate feature vectors for positions that are close to the mutation
             do_feat_vec_pos = set(range(
                 max(mutation_pos - self.flank_end_len, 0),
-                min(mutation_pos + self.flank_end_len, seq_mut_order.obs_seq_mutation.seq_len),
+                min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
             ))
             feat_vec_dict_update = feature_vec_dicts[i].copy()
             feat_vec_dict_update.pop(seq_mut_order.mutation_order[i], None)
@@ -157,7 +157,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Calculate feature vectors for positions that are close to the mutation
             do_feat_vec_pos = set(range(
                 max(mutation_pos - self.flank_end_len, 0),
-                min(mutation_pos + self.flank_end_len, seq_mut_order.obs_seq_mutation.seq_len),
+                min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
             ))
             feat_vec_dict_update = feature_vec_dicts[i].copy()
             feat_vec_dict_update.pop(seq_mut_order.mutation_order[i], None)
@@ -185,5 +185,5 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return [idx]
 
     def get_motif_list(self):
-        motif_list = itertools.product(*([NUCLEOTIDES] * self.submotif_len))
+        motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
         return ["".join(m) for m in motif_list]

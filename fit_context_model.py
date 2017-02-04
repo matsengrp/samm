@@ -22,7 +22,7 @@ from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
-from survival_problem_fused_lasso import SurvivalProblemFusedLasso
+from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import *
 
 def parse_args():
@@ -48,9 +48,9 @@ def parse_args():
         default=4)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso',
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
         choices=["CL", "CFL", "L", "FL"],
-        default="L")
+        default="FL")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -70,7 +70,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.1")
+        default="0.01")
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled true context model',
@@ -84,7 +84,7 @@ def parse_args():
     elif args.solver == "CFL":
         args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "FL":
-        args.problem_solver_cls = SurvivalProblemFusedLasso
+        args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
@@ -94,10 +94,14 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(submotif_len=args.motif_len)
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
-    true_theta = pickle.load(open(args.theta_file, 'rb'))
+    # TODO: Right now this is a 4 column matrix, a value for each target nucleotide
+    # However we only fit a 1 column theta matrix for now (so assumes equal theta values for all target nucleotides)
+    # For now, this true theta matrix should have same values across all columns.
+    true_thetas = pickle.load(open(args.theta_file, 'rb'))
+    assert(true_thetas.shape[0] == feat_generator.feature_vec_len)
 
     log.info("Reading data")
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
@@ -133,10 +137,13 @@ def main(args=sys.argv[1:]):
                 else:
                     log.info("%d: %f (%s)" % (i, theta[i], motif_list[i]))
 
-        log.info(scipy.stats.spearmanr(theta, true_theta))
-        log.info(scipy.stats.kendalltau(theta, true_theta))
-        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(theta, true_theta))
-        log.info("L2 error %f" % np.linalg.norm(theta - true_theta))
+        # TODO: Right now true_thetas is a 4 column matrix, a value for each target nucleotide
+        # We have assumed that all the columns have the same value. Therefore we can compare fitted
+        # theta values like this. In the future we will need some other comparison method.
+        log.info(scipy.stats.spearmanr(theta, true_thetas[:,0]))
+        log.info(scipy.stats.kendalltau(theta, true_thetas[:,0]))
+        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(theta, true_thetas[:,0]))
+        log.info("L2 error %f" % np.linalg.norm(theta - true_thetas[:,0]))
 
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
