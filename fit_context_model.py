@@ -116,6 +116,7 @@ def main(args=sys.argv[1:]):
         MutationOrderGibbsSampler,
         args.problem_solver_cls,
         num_threads=args.num_threads,
+        approx='none',
     )
 
     motif_list = feat_generator.get_motif_list()
