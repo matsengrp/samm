@@ -82,7 +82,6 @@ class MCMC_EM:
                     max_iters=self.max_m_iters,
                     num_threads=self.num_threads,
                 )
-                print "pen_exp_log_lik", pen_exp_log_lik
                 log.info("Current Theta")
                 log.info(
                     get_nonzero_theta_print_lines(theta, self.motif_list)
