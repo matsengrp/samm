@@ -25,27 +25,13 @@ class MutationOrderGibbsSampler(Sampler):
             samples = [init_order] * (burn_in + num_samples)
             traces = []
         else:
-            curr_order = init_order
             samples = []
             traces = []
             log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
-            init_dicts, init_seqs = self.feature_generator.create_for_mutation_steps(
-                ImputedSequenceMutations(
-                    self.obs_seq_mutation,
-                    init_order,
-                )
-            )
-            if self.approx == 'fastest':
-                # Precompute probabilities for speeding up computation. For
-                # a more statistically sound approach, use 'faster' to
-                # precompute them at the beginning of a Gibbs sweep.
-                init_log_probs = [
-                    self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
-                    for curr_mutate_pos, feat_vec_dict_step in zip(init_order, init_dicts)
-                ]
-            else:
-                init_log_probs = []
 
+            init_dicts, init_seqs, init_log_probs = self._compute_log_probs(init_order)
+
+            curr_order = init_order
             for i in range(burn_in + num_samples):
                 curr_order, trace = self._do_gibbs_sweep(curr_order, init_log_probs, init_order, init_dicts, init_seqs)
                 samples.append(curr_order)
@@ -77,25 +63,18 @@ class MutationOrderGibbsSampler(Sampler):
         fastest: uses precalculated probabilities (also stored in init_log_probs) from the beginning of
             the entire sampling step
         """
+
         if self.approx == 'faster':
-            # Calculate probability vector just at the beginning of the sweep
-            feat_vec_dicts, intermediate_seqs = self.feature_generator.update_for_mutation_steps(
-                ImputedSequenceMutations(
-                    self.obs_seq_mutation,
-                    curr_order,
-                ),
-                update_steps=range(self.num_mutations-1),
-                base_feat_vec_dicts = init_dicts,
-                base_intermediate_seqs = init_seqs,
-            )
-            init_log_probs = [
-                self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
-                for curr_mutate_pos, feat_vec_dict_step in zip(curr_order, feat_vec_dicts)
-            ]
+            # Compute log probs at beginning of sweep
             init_order = curr_order
-        trace = []
+            _, _, init_log_probs = self._compute_log_probs(init_order, init_dicts, init_seqs)
+        elif self.approx == 'none':
+            # Compute log probs each iteration
+            init_order = None
+            init_log_probs = None
 
         # sample full ordering from conditional prob for this position
+        trace = []
         for position in np.random.permutation(self.mutated_positions):
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
@@ -110,26 +89,7 @@ class MutationOrderGibbsSampler(Sampler):
             # first consider the full ordering with position under consideration mutating last
             full_order_last = partial_order + [position]
 
-            # Updating is like 40% faster than creating from scratch
-            feat_vec_dicts, intermediate_seqs = self.feature_generator.update_for_mutation_steps(
-                ImputedSequenceMutations(
-                    self.obs_seq_mutation,
-                    full_order_last,
-                ),
-                update_steps=range(self.num_mutations-1),
-                base_feat_vec_dicts = init_dicts,
-                base_intermediate_seqs = init_seqs,
-            )
-
-            if self.approx == 'none':
-                multinomial_sequence = [
-                    self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
-                    for curr_mutate_pos, feat_vec_dict_step in zip(full_order_last, feat_vec_dicts)
-                ]
-            else:
-                # Stupid speed up #1: This is only justified if probabilities don't change much each iteration... which they
-                # don't really...
-                multinomial_sequence = [init_log_probs[init_order.index(item)] for item in full_order_last]
+            feat_vec_dicts, intermediate_seqs, multinomial_sequence = self._compute_log_probs(full_order_last, init_dicts, init_seqs, init_order, init_log_probs)
 
             full_orderings[0] = full_order_last
             full_ordering_log_probs[0] = np.sum(multinomial_sequence)
@@ -192,3 +152,41 @@ class MutationOrderGibbsSampler(Sampler):
         multinomial_prob = self.theta[feat_vec_dict[numerator_pos]].sum() - scipy.misc.logsumexp(theta_sums)
         return multinomial_prob
 
+    def _compute_log_probs(self, curr_order, init_dicts=None, init_seqs=None, init_order=None, init_log_probs=None):
+        """
+        Driver to compute probabilities with some precompute if statements
+        for speeding up computation.
+
+        @params same as in _do_gibbs_sweep
+        """
+        if init_dicts is None and init_seqs is None:
+            # Compute dictionaries if we haven't yet
+            feat_vec_dicts, intermediate_seqs = self.feature_generator.create_for_mutation_steps(
+                ImputedSequenceMutations(
+                    self.obs_seq_mutation,
+                    curr_order,
+                )
+            )
+        else:
+            # Update dictionaries if they've been computed already
+            feat_vec_dicts, intermediate_seqs = self.feature_generator.update_for_mutation_steps(
+                ImputedSequenceMutations(
+                    self.obs_seq_mutation,
+                    curr_order,
+                ),
+                update_steps=range(self.num_mutations-1),
+                base_feat_vec_dicts = init_dicts,
+                base_intermediate_seqs = init_seqs,
+            )
+
+        if init_order is None and init_log_probs is None:
+            # Compute probabilities if they haven't been already
+            log_probs = [
+                self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
+                for curr_mutate_pos, feat_vec_dict_step in zip(curr_order, feat_vec_dicts)
+            ]
+        else:
+            # Otherwise just reorder precomputed probabilities
+            log_probs = [init_log_probs[init_order.index(item)] for item in curr_order]
+
+        return feat_vec_dicts, intermediate_seqs, log_probs
