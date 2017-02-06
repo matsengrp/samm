@@ -74,7 +74,6 @@ def main(args=sys.argv[1:]):
     motif_list = feat_generator.get_motif_list()
     # True vector
     true_thetas = np.zeros((feat_generator.feature_vec_len, 4))
-
     # Hard code simulation to have edge motifs with higher mutation rates
     true_thetas[feat_generator.feature_vec_len - 1, :] = 0.1
 
@@ -92,13 +91,18 @@ def main(args=sys.argv[1:]):
         true_thetas[idx, :] = rand_theta_val
 
         # Cannot mutate motif to a target nucleotide with the same center nucleotide.
-        center_nucleotide_idx = NUCLEOTIDES.index(motif_list[idx][args.motif_len/2])
+        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[idx][args.motif_len/2]]
         assert(center_nucleotide_idx >= 0)
         true_thetas[idx, center_nucleotide_idx] = -np.inf
 
         # neighboring values also have same value (may get overridden if that motif was originally
         # set to be nonzero too)
         true_thetas[idx + 1, :] = rand_theta_val
+
+    # Set the impossible thetas to -inf
+    for i in range(len(motif_list)):
+        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][args.motif_len/2]]
+        true_thetas[i, center_nucleotide_idx] = -np.inf
 
     if args.random_gene_len > 0:
         germline_genes = ["FAKE_GENE_%d" % i for i in range(args.n_germlines)]

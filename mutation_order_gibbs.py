@@ -102,3 +102,26 @@ class MutationOrderGibbsSampler(Sampler):
             self.theta[feat_vec_dict[numerator_pos]].sum() - scipy.misc.logsumexp(theta_sums)
         )
         return multinomial_prob
+
+class MutationOrderGibbsSamplerMultiTarget(MutationOrderGibbsSampler):
+    """
+    Deals with different theta vector for each target nucleotide
+    """
+    def _get_multinomial_prob(self, feat_vec_dict, numerator_pos):
+        """
+        a single term in {eq:full_ordering}
+        """
+        # Calculate the components in the risk group (risk group is all positions
+        # that have not mutated yet)
+        theta_sums = [
+            self.theta[feat_vec, i].sum() for pos, feat_vec in feat_vec_dict.iteritems() for i in range(NUM_NUCLEOTIDES)
+        ]
+
+        numerator_target_nucleotide = self.obs_seq_mutation.mutation_pos_dict[numerator_pos]
+        multinomial_prob = np.exp(
+            self.theta[
+                feat_vec_dict[numerator_pos], # motif idx
+                NUCLEOTIDE_DICT[numerator_target_nucleotide] # target nucleotide
+            ].sum() - scipy.misc.logsumexp(theta_sums)
+        )
+        return multinomial_prob
