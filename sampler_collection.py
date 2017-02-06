@@ -16,6 +16,7 @@ class SamplerCollection:
         @param sampler_cls: class that inherits from Sampler class
         @param feat_generator: FeatureGenerator
         @param num_threads: number of processes to create when performing gibbs sampling
+        @param approx: level of approximation to use to speed up Gibbs sampling
         """
         self.num_threads = num_threads
 
@@ -34,7 +35,7 @@ class SamplerCollection:
         @param init_orders_for_iter: what order to initialize each gibbs sampler
         @param num_samples: number of samples to retrieve from each gibbs sampler
         @param burn_in_sweeps: number of samplers to run initially for burn in
-        @returns List of samples from each sampler
+        @returns List of samples from each sampler and log probabilities for tracing
         """
         pool = Pool(self.num_threads)
         sampled_orders_list = pool.map(
@@ -73,6 +74,7 @@ class Sampler:
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
         @param obs_seq_mutation: a ObservedSequenceMutations to know the starting and ending sequence
+        @param approx: level of approximation to use to speed up Gibbs sampling
         """
         self.theta = theta
         self.feature_generator = feature_generator
