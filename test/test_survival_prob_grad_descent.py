@@ -60,6 +60,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
 
     def calculate_grad_slow(self, theta, sample, feature_vecs):
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
+
         grad = np.zeros(theta.shape)
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
             col_idx = 0
@@ -83,11 +84,17 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         return grad
 
     def calculate_log_likelihood_slow(self, theta, sample, feature_vecs):
+        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
+
         obj = 0
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
             # vecs_at_mutation_step[i] are the feature vectors of the at-risk group after mutation i
             feature_vec_mutated = vecs_at_mutation_step[mutating_pos]
-            obj += theta[feature_vec_mutated].sum() - sp.misc.logsumexp(
-                [theta[f].sum() for f in vecs_at_mutation_step.values()]
+            col_idx = 0
+            if per_target_model:
+                col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
+
+            obj += theta[feature_vec_mutated, col_idx].sum() - sp.misc.logsumexp(
+                [theta[f,i].sum() for f in vecs_at_mutation_step.values() for i in range(theta.shape[1])]
             )
         return obj
