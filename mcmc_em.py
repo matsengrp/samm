@@ -69,6 +69,7 @@ class MCMC_EM:
                     num_e_samples,
                     burn_in,
                 )
+                # Don't use burn-in if we are repeating the sampling due to a negative lower bound
                 burn_in = 0
                 all_traces.append([sampled_dict['trace'] for sampled_dict in sampled_orders_dict])
                 sampled_orders_list = [sampled_dict['sampled_orders'] for sampled_dict in sampled_orders_dict]
