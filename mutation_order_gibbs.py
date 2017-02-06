@@ -9,6 +9,10 @@ from common import *
 from sampler_collection import Sampler
 
 class MutationOrderGibbsSampler(Sampler):
+    """
+    A class that will do the heavy lifting of Gibbs sampling.
+    Returns an order and log probability vector (for tracing)
+    """
     def run(self, init_order, burn_in, num_samples):
         self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
@@ -32,12 +36,16 @@ class MutationOrderGibbsSampler(Sampler):
                 )
             )
             if self.approx == 'fastest':
+                # Precompute probabilities for speeding up computation. For
+                # a more statistically sound approach, use 'faster' to
+                # precompute them at the beginning of a Gibbs sweep.
                 initial_probabilities = [
                     self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
-                    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(curr_order, feat_vec_dicts))
+                    for curr_mutate_pos, feat_vec_dict_step in zip(curr_order, feat_vec_dicts)
                 ]
             else:
                 initial_probabilities = []
+
             for i in range(burn_in + num_samples):
                 curr_order, trace = self._do_gibbs_sweep(curr_order, initial_probabilities, init_order, feat_vec_dicts, intermediate_seqs)
                 samples.append(curr_order)
@@ -54,9 +62,22 @@ class MutationOrderGibbsSampler(Sampler):
     def _do_gibbs_sweep(self, curr_order, initial_probabilities, init_order, init_dicts, init_seqs):
         """
         One gibbs sweep is a gibbs sampling step for all the positions
+        Returns an order and trace
+
+        @param curr_order: current order in sampling step
+        @param initial_probabilities: precalculated probabilities for speeding up computation
+        @param init_order: order corresponding to above precalculated probabilities
+        @param init_dicts: initial dictionary to pass in instead of initializing on every step
+        @param init_seqs: sequences corresponding to above dictionary
+
+        There are three different values self.approx can take here:
+        none: no approximations
+        faster: uses precalculated probabilities (stored in initial_probabilities) from the beginning of
+            each Gibbs sweep
+        fastest: uses precalculated probabilities (also stored in initial_probabilities) from the beginning of
+            the entire sampling step
         """
         # sample full ordering from conditional prob for this position
-        # TODO: make this go through a randomly ordered gibbs sampler
         if self.approx == 'faster':
             # Calculate probability vector just at the beginning of the sweep
             feat_vec_dicts, intermediate_seqs = self.feature_generator.update_for_mutation_steps(
@@ -70,7 +91,7 @@ class MutationOrderGibbsSampler(Sampler):
             )
             initial_probabilities = [
                 self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
-                for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(curr_order, feat_vec_dicts))
+                for curr_mutate_pos, feat_vec_dict_step in zip(curr_order, feat_vec_dicts)
             ]
             init_order = curr_order
         for position in np.random.permutation(self.mutated_positions):
@@ -101,7 +122,7 @@ class MutationOrderGibbsSampler(Sampler):
             if self.approx == 'none':
                 multinomial_sequence = [
                     self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
-                    for idx, (curr_mutate_pos, feat_vec_dict_step) in enumerate(zip(full_order_last, feat_vec_dicts))
+                    for curr_mutate_pos, feat_vec_dict_step in zip(full_order_last, feat_vec_dicts)
                 ]
             else:
                 # Stupid speed up #1: This is only justified if probabilities don't change much each iteration... which they
