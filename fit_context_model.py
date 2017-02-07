@@ -164,7 +164,7 @@ def main(args=sys.argv[1:]):
 
     for penalty_param in sorted(penalty_params, reverse=True):
         log.info("Penalty parameter %f" % penalty_param)
-        theta = em_algo.run(theta=theta, penalty_param=penalty_param, max_em_iters=args.em_max_iters)
+        theta, _ = em_algo.run(theta=theta, penalty_param=penalty_param, max_em_iters=args.em_max_iters)
         results_list.append((penalty_param, theta))
 
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
