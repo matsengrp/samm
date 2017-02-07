@@ -103,4 +103,4 @@ class MCMC_EM_TestCase(unittest.TestCase):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
         self.assertTrue(rho > 0.93)
-        self.assertTrue(pval < 1e-25)
+        self.assertTrue(pval < 1e-23)
