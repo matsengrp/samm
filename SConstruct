@@ -86,7 +86,7 @@ def generate(env, outdir, c):
                '--n-germlines',
                50,
                '--motif-len',
-               3,
+               5,
                '--random-gene-len',
                30,
                '--min-censor-time',
