@@ -194,7 +194,7 @@ def simulate(args):
             for leaf in tree.iter_leaves():
                 if leaf.frequency != 0:
                     i += 1
-                    seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence)])
+                    seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence).lower()])
 
     # Dump a dummy file of theta
     # We'll input some function of mutability here, but leave it dummy-length for now

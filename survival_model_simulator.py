@@ -31,7 +31,7 @@ class SurvivalModelSimulator:
         """
         mutations = []
         intermediate_seq = start_seq
-        pos_to_mutate = range(len(start_seq))
+        pos_to_mutate = set(range(len(start_seq)))
         last_mutate_time = 0
         while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.

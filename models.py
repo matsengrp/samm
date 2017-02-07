@@ -5,7 +5,7 @@ class ObservedSequenceMutations:
         self.start_seq = start_seq
         self.end_seq = end_seq
 
-        # Make mutation position dictionary
+        # A dictionary with key as position and value as target nucleotide
         self.mutation_pos_dict = dict()
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
