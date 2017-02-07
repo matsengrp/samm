@@ -1,11 +1,9 @@
-import time
 import numpy as np
 import scipy.misc
 import logging as log
 
 from models import ImputedSequenceMutations
 from common import *
-from decorators import measure_time
 
 from sampler_collection import Sampler
 from sampler_collection import SamplerResult
@@ -37,7 +35,7 @@ class FullMutationOrderGibbsStepOptions:
         self.order_list.append(order)
         self.feat_vec_dicts_list.append(feat_vec_dicts)
         self.intermediate_seqs_list.append(intermediate_seqs)
-        self.log_probs_list.append(np.copy(log_probs))
+        self.log_probs_list.append(log_probs)
         self.full_ordering_log_probs.append(full_ordering_log_prob)
 
     def sample(self):
@@ -62,9 +60,6 @@ class MutationOrderGibbsSampler(Sampler):
     Returns an order and log probability vector (for tracing)
     """
     def run(self, init_order, burn_in, num_samples):
-        self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
-        self.num_mutations = len(self.mutated_positions)
-
         assert(check_unordered_equal(init_order, self.mutated_positions))
 
         traces = []
@@ -131,6 +126,7 @@ class MutationOrderGibbsSampler(Sampler):
             # iterate through the rest of the possible full mutation orders consistent with this partial order
             prev_full_order = full_order_last
             for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
+                prev_feat_dicts = feat_vec_dicts
                 if i == self.num_mutations - 2:
                     # If the last mutation, only need to update one feature vec
                     update_steps = [i]
@@ -151,25 +147,7 @@ class MutationOrderGibbsSampler(Sampler):
                 # multiply the sequence of multinomials to get the probability of the full ordering
                 # the product in {eq:full_ordering}
                 if self.approx == 'none':
-                    # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
-                    # the position that mutates right after it), rest are the same
-                    mutate_earlier_theta = self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum()
-                    mutate_later_theta = self.theta[feat_vec_dicts[i][prev_full_order[i]]].sum()
-                    log_probs[i] += mutate_earlier_theta - mutate_later_theta
-
-                    a = self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
-                    st = time.time()
-                    print "possible_full_order: i", possible_full_order[i]
-                    print "possible_full_order i + 1", possible_full_order[i + 1]
-                    mutate_earlier_theta = self.theta[feat_vec_dicts[i + 1][possible_full_order[i]]].sum()
-                    mutate_later_theta = self.theta[feat_vec_dicts[i + 1][prev_full_order[i]]].sum()
-                    log_probs[i + 1] = mutate_later_theta - np.log(np.exp(mutate_earlier_theta - log_probs[i + 1]) + np.exp(mutate_later_theta) - np.exp(mutate_earlier_theta))
-                    print "timmm", time.time() - st
-                    print "log_probs[i + 1]", a
-                    print "log_probs[i + 1] - fast", log_probs[i + 1]
-                    1/0
-
-                    self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
+                    log_probs = self._update_log_prob_from_shuffle(i, log_probs, possible_full_order, prev_full_order, feat_vec_dicts, prev_feat_dicts)
                     full_ordering_log_prob = log_probs.sum()
                 else:
                     # Stupid speed up #2:
@@ -199,7 +177,46 @@ class MutationOrderGibbsSampler(Sampler):
 
         return gibbs_step_info, trace
 
-    @measure_time
+    def _update_log_prob_from_shuffle(self, i, old_log_probs, order, prev_order, feat_dicts, prev_feat_dicts):
+        """
+        Calculate multinomial probs - only need to update 2 values (the one where this position mutates and
+        the position that mutates right after it), rest are the same
+        @param i: the index of the positions in the `order` and `prev_order` that are being shuffled in the mutation order
+        @param old_log_probs: the previous log probabilities - most of these are correct. only corrections need to occur in i and i + 1
+        @param order: the order after the shuffle
+        @param prev_order: the order before the shuffle
+        @param feat_dicts: the features after all mutation steps for the mutation order specified in `order`
+        @param prev_feat_dicts: the features after all mutation steps for the mutation order specified in `prev_order`
+        """
+        log_probs = np.copy(old_log_probs)
+        pos_mutate_earlier = order[i]
+        pos_mutate_later = prev_order[i]
+
+        # Term at `i` is easy to update: just change out the numerator from the multinomial (but log it)
+        log_probs[i] += self.theta[feat_dicts[i][pos_mutate_earlier]].sum() - self.theta[feat_dicts[i][pos_mutate_later]].sum()
+
+        # Term at `i + 1` is complicated: we need to change out the numerator and some terms in the denominator
+        # Remember that the denominator is the sum of exp thetas - some of the thetas are have the wrong value if the mutation order is shuffled
+        # We only chose the theta value that are potentially wrong.
+        # We are making the assumption that the features only change for positions close to the positions that got shuffled.
+        changed_feature_positions = set(
+            range(max(pos_mutate_earlier - self.motif_len/2, 0), min(pos_mutate_earlier + self.motif_len/2 + 1, self.seq_len))
+            + range(max(pos_mutate_later - self.motif_len/2, 0), min(pos_mutate_later + self.motif_len/2 + 1, self.seq_len))
+        ) - set(order[:i])
+        old_sumexp = np.exp(self.theta[prev_feat_dicts[i + 1][pos_mutate_earlier]].sum() - log_probs[i + 1])
+        old_sumexp_terms = sum([
+            np.exp(self.theta[prev_feat_dicts[i + 1][p]].sum())
+            for p in changed_feature_positions if p != pos_mutate_later
+        ])
+        new_sumexp_terms = sum([
+            np.exp(self.theta[feat_dicts[i + 1][p]].sum())
+            for p in changed_feature_positions if p != pos_mutate_earlier
+        ])
+        log_probs[i + 1] = self.theta[feat_dicts[i + 1][pos_mutate_later]].sum() - np.log(
+            old_sumexp + new_sumexp_terms - old_sumexp_terms
+        )
+        return log_probs
+
     def _get_multinomial_log_prob(self, feat_vec_dict, numerator_pos):
         """
         a single term in {eq:full_ordering}
