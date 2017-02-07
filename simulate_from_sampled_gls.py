@@ -185,7 +185,7 @@ def simulate(args):
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
         for run, (gene, sequence) in \
-                enumerate(zip(germline_genes, germline_nucleotides, n_mute_vec)):
+                enumerate(zip(germline_genes, germline_nucleotides)):
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run

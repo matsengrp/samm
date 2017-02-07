@@ -101,7 +101,7 @@ def main(args=sys.argv[1:]):
         true_thetas[idx + 1, :] = rand_theta_val
 
     if args.random_gene_len > 0:
-        germline_genes = ["FAKE_GENE_%d" % i for i in range(args.n_germlines)]
+        germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
         germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines - num_nonzero_motifs)]
         # Let's make sure that our nonzero motifs show up in a germline sequence at least once
         for motif_idx in nonzero_motifs:
