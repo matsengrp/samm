@@ -221,19 +221,19 @@ class MutationOrderGibbsSampler(Sampler):
 
         if gibbs_step_base is None:
             # Compute probabilities if they haven't been already
-            log_probs = [
+            log_probs = np.array([
                 self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos)
                 for curr_mutate_pos, feat_vec_dict_step in zip(curr_order, feat_vec_dicts)
-            ]
+            ])
         elif self.approx == "none":
-            log_probs = list(gibbs_step_base.log_probs)
+            log_probs = np.copy(gibbs_step_base.log_probs)
             for i in update_positions:
                 log_probs[i] = self._get_multinomial_log_prob(feat_vec_dicts[i], curr_order[i])
         else:
             # Otherwise just reorder precomputed probabilities
-            log_probs = [gibbs_step_base.log_probs[gibbs_step_base.order.index(item)] for item in curr_order]
+            log_probs = np.array([gibbs_step_base.log_probs[gibbs_step_base.order.index(item)] for item in curr_order])
 
-        return feat_vec_dicts, intermediate_seqs, np.array(log_probs)
+        return feat_vec_dicts, intermediate_seqs, log_probs
 
 class MutationOrderGibbsSamplerMultiTarget(MutationOrderGibbsSampler):
     """
