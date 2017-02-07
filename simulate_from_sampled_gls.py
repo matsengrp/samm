@@ -203,8 +203,8 @@ def simulate(args):
     context_model = MutationModel(args.mutability, args.substitution).context_model
     true_theta = np.zeros((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
     for motif_idx, motif in enumerate(motif_list):
+        mutability = context_model[motif.upper()][0]
         for nuc in NUCLEOTIDES:
-            mutability = context_model[motif.upper()][0]
             substitution = context_model[motif.upper()][1][nuc.upper()]
             true_theta[motif_idx, NUCLEOTIDE_DICT[nuc]] = mutability * substitution
     pickle.dump(true_theta, open(args.output_true_theta, 'w'))
