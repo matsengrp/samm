@@ -30,7 +30,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         )
         self.assertEqual(intermediate_seqs, intermediate_seqs_slow)
         self.assertEqual(feat_vec_dicts, feat_vec_dicts_slow)
-        self.assertEqual(multinomial_sequence, multinomial_sequence_slow)
+        self.assertTrue(np.allclose(multinomial_sequence, multinomial_sequence_slow))
 
     def test_joint_distribution(self):
         """
@@ -66,7 +66,6 @@ class MCMC_EM_TestCase(unittest.TestCase):
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
             order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
-
             # We make the mutation orders strings so easy to process
             gibbs_order.append("".join(order_sample))
 

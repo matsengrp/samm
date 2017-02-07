@@ -30,17 +30,15 @@ class FullMutationOrderGibbsStepOptions:
         self.feat_vec_dicts_list = []
         self.intermediate_seqs_list = []
 
-    def append(self, order, feat_vec_dicts, intermediate_seqs, log_probs):
+    def append(self, order, feat_vec_dicts, intermediate_seqs, log_probs, full_ordering_log_prob):
         """
         Add this new full ordering and its info to the list
         """
         self.order_list.append(order)
         self.feat_vec_dicts_list.append(feat_vec_dicts)
         self.intermediate_seqs_list.append(intermediate_seqs)
-        self.log_probs_list.append(list(log_probs))
-        self.full_ordering_log_probs.append(
-            np.sum(log_probs)
-        )
+        self.log_probs_list.append(np.copy(log_probs))
+        self.full_ordering_log_probs.append(full_ordering_log_prob)
 
     def sample(self):
         """
@@ -128,9 +126,11 @@ class MutationOrderGibbsSampler(Sampler):
                 feat_vec_dicts,
                 intermediate_seqs,
                 log_probs,
+                log_probs.sum(),
             )
 
             # iterate through the rest of the possible full mutation orders consistent with this partial order
+            prev_full_order = full_order_last
             for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
                 if i == self.num_mutations - 2:
                     # If the last mutation, only need to update one feature vec
@@ -154,24 +154,25 @@ class MutationOrderGibbsSampler(Sampler):
                 if self.approx == 'none':
                     # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
                     # the position that mutates right after it), rest are the same
-                    log_probs[i] += \
-                        self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
-                        self.theta[feat_vec_dicts[i][full_order_last[i]]].sum()
+                    log_probs[i] += self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - self.theta[feat_vec_dicts[i][prev_full_order[i]]].sum()
                     log_probs[i + 1] = self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
+                    full_ordering_log_prob = log_probs.sum()
                 else:
                     # Stupid speed up #2:
                     # The change in theta doesn't really change the i+1 element
                     # of our multinomial vector from the previous ith element:
-                    full_ordering_log_probs[idx+1] = full_ordering_log_probs[idx] + \
+                    full_ordering_log_prob = gibbs_step_options.full_ordering_log_probs[-1] + \
                         self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - \
                         self.theta[feat_vec_dicts[i][full_order_last[i]]].sum() + \
                         log_probs[i] - log_probs[i + 1]
 
+                prev_full_order = possible_full_order
                 gibbs_step_options.append(
                     possible_full_order,
                     feat_vec_dicts,
                     intermediate_seqs,
                     log_probs,
+                    full_ordering_log_prob,
                 )
 
             # now perform a draw from the multinomial distribution of full orderings
@@ -232,7 +233,7 @@ class MutationOrderGibbsSampler(Sampler):
             # Otherwise just reorder precomputed probabilities
             log_probs = [gibbs_step_base.log_probs[gibbs_step_base.order.index(item)] for item in curr_order]
 
-        return feat_vec_dicts, intermediate_seqs, log_probs
+        return feat_vec_dicts, intermediate_seqs, np.array(log_probs)
 
 class MutationOrderGibbsSamplerMultiTarget(MutationOrderGibbsSampler):
     """
