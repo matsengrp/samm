@@ -14,11 +14,12 @@ import pandas as pd
 import numpy as np
 import os
 import os.path
-from Bio import SeqIO
 import csv
 import pickle
 
 from common import *
+from Bio import SeqIO
+from feature_generator import SubmotifFeatureGenerator
 
 sys.path.append('gctree/bin')
 from gctree import MutationModel, CollapsedTree
@@ -196,9 +197,16 @@ def simulate(args):
                     i += 1
                     seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence).lower()])
 
-    # Dump a dummy file of theta
-    # We'll input some function of mutability here, but leave it dummy-length for now
-    true_theta = np.zeros((1+4**args.motif_len, 1))
+    # Dump the true "thetas," which are mutability * substitution
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    motif_list = feat_generator.get_motif_list()
+    context_model = MutationModel(args.mutability, args.substitution).context_model
+    true_theta = np.zeros((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
+    for motif_idx, motif in enumerate(motif_list):
+        for nuc in NUCLEOTIDES:
+            mutability = context_model[motif.upper()][0]
+            substitution = context_model[motif.upper()][1][nuc.upper()]
+            true_theta[motif_idx, NUCLEOTIDE_DICT[nuc]] = mutability * substitution
     pickle.dump(true_theta, open(args.output_true_theta, 'w'))
 
 
