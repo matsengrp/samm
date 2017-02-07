@@ -66,16 +66,27 @@ class SamplerPoolWorker(ParallelWorker):
         self.init_order = init_order
 
     def run(self):
-        samples = self.sampler.run(self.init_order, self.num_samples, self.burn_in_sweeps)
-        return samples
+        sampler_res = self.sampler.run(self.init_order, self.num_samples, self.burn_in_sweeps)
+        return sampler_res
+
+class SamplerResult:
+    def __init__(self, samples, trace):
+        """
+        class returned by Sampler after a run
+
+        @param samples: list of ImputedSequenceMutations
+        @param trace: list of things to plot for trace diagnostics
+        """
+        self.samples = samples
+        self.trace = trace
 
 class Sampler:
-    def __init__(self, theta, feature_generator, obs_seq_mutation, approx):
+    def __init__(self, theta, feature_generator, obs_seq_mutation, approx="none"):
         """
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
         @param obs_seq_mutation: a ObservedSequenceMutations to know the starting and ending sequence
-        @param approx: level of approximation to use to speed up Gibbs sampling
+        @param approx: level of approximation to use to speed up Gibbs sampling (none, faster)
         """
         self.theta = theta
         self.feature_generator = feature_generator
@@ -87,6 +98,6 @@ class Sampler:
         @param init_order: a mutation order to initialize the sampler (list of integers)
         @param burn_in: number of iterations for burn in
         @param num_samples: number of samples needed
-        @return list of ImputedSequenceMutations
+        @return SamplerResult
         """
         raise NotImplementedError

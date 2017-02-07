@@ -63,15 +63,15 @@ class MCMC_EM:
 
                 # do E-step
                 log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples) + num_e_samples, time.time() - st))
-                sampled_orders_dict = sampler_collection.get_samples(
+                sampler_results = sampler_collection.get_samples(
                     init_orders,
                     num_e_samples,
                     burn_in,
                 )
                 # Don't use burn-in if we are repeating the sampling due to a negative lower bound
                 burn_in = 0
-                all_traces.append([sampled_dict['trace'] for sampled_dict in sampled_orders_dict])
-                sampled_orders_list = [sampled_dict['sampled_orders'] for sampled_dict in sampled_orders_dict]
+                all_traces.append([res.trace for res in sampler_results])
+                sampled_orders_list = [res.samples for res in sampled_results]
 
                 # the last sampled mutation order from each list
                 # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle

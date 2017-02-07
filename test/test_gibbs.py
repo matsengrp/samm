@@ -9,9 +9,29 @@ from common import NUM_NUCLEOTIDES
 from models import ObservedSequenceMutations
 from survival_model_simulator import SurvivalModelSimulator
 from feature_generator import SubmotifFeatureGenerator
-from mutation_order_gibbs import MutationOrderGibbsSampler
+from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
 class MCMC_EM_TestCase(unittest.TestCase):
+    def test_speedup(self):
+        feat_generator = SubmotifFeatureGenerator(motif_len=3)
+        theta = np.random.rand(feat_generator.feature_vec_len, NUM_NUCLEOTIDES)
+        obs_seq_m = ObservedSequenceMutations("ttcgta", "tgggtt")
+        gibbs_sampler = MutationOrderGibbsSampler(theta, feat_generator, obs_seq_m)
+
+        curr_order = obs_seq_m.mutation_pos_dict.keys()
+        curr_dicts, curr_seqs, curr_log_probs = gibbs_sampler._compute_log_probs(curr_order)
+
+        new_order = [curr_order[0], curr_order[-1]] + curr_order[1:-1]
+        feat_vec_dicts_slow, intermediate_seqs_slow, multinomial_sequence_slow = gibbs_sampler._compute_log_probs(new_order)
+        feat_vec_dicts, intermediate_seqs, multinomial_sequence = gibbs_sampler._compute_log_probs(
+            new_order,
+            GibbsStepInfo(curr_order, curr_dicts, curr_seqs, curr_log_probs),
+            update_positions=range(1, len(new_order)),
+        )
+        self.assertEqual(intermediate_seqs, intermediate_seqs_slow)
+        self.assertEqual(feat_vec_dicts, feat_vec_dicts_slow)
+        self.assertTrue(np.allclose(multinomial_sequence, multinomial_sequence_slow))
+
     def test_joint_distribution(self):
         """
         Check that the distribution of mutation orders is similar when we generate mutation orders directly
@@ -42,11 +62,10 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(theta, feat_generator, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(np.max(theta, axis=1), feat_generator, obs_seq_m)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
-            order_sample = gibbs_samples[0].mutation_order
+            order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
-
             # We make the mutation orders strings so easy to process
             gibbs_order.append("".join(order_sample))
 
@@ -64,5 +83,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.8)
-        self.assertTrue(pval < 1e-5)
+        self.assertTrue(rho > 0.94)
+        self.assertTrue(pval < 1e-31)
