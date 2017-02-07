@@ -1,4 +1,4 @@
-import copy
+import time
 import numpy as np
 import scipy.misc
 import logging as log
@@ -61,7 +61,6 @@ class MutationOrderGibbsSampler(Sampler):
     A class that will do the heavy lifting of Gibbs sampling.
     Returns an order and log probability vector (for tracing)
     """
-    @measure_time
     def run(self, init_order, burn_in, num_samples):
         self.mutated_positions = self.obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
@@ -77,11 +76,12 @@ class MutationOrderGibbsSampler(Sampler):
             samples = []
             log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
 
-            init_dicts, init_seqs, init_log_probs = self._compute_log_probs(init_order)
-            curr_gibbs_step_info = GibbsStepInfo(init_order, init_dicts, init_seqs, init_log_probs)
+            curr_gibbs_step_info = None
+            curr_order = init_order
             for i in range(burn_in + num_samples):
-                curr_gibbs_step_info, trace = self._do_gibbs_sweep(curr_gibbs_step_info)
-                samples.append(curr_gibbs_step_info.order)
+                curr_gibbs_step_info, trace = self._do_gibbs_sweep(curr_order, curr_gibbs_step_info)
+                curr_order = curr_gibbs_step_info.order
+                samples.append(curr_order)
                 traces += trace
 
         sampled_orders = samples[-num_samples:]
@@ -90,8 +90,7 @@ class MutationOrderGibbsSampler(Sampler):
             traces
         )
 
-    @measure_time
-    def _do_gibbs_sweep(self, gibbs_step_info):
+    def _do_gibbs_sweep(self, curr_order, gibbs_step_info=None):
         """
         One gibbs sweep is a gibbs sampling step for all the positions
         Returns an order and trace
@@ -108,8 +107,8 @@ class MutationOrderGibbsSampler(Sampler):
         trace = []
         for position in np.random.permutation(self.mutated_positions):
             # Take out the position we are going to sample order for and get the partial ordering under consideration
-            pos_order_idx = gibbs_step_info.order.index(position)
-            partial_order = gibbs_step_info.order[0:pos_order_idx] + gibbs_step_info.order[pos_order_idx + 1:]
+            pos_order_idx = curr_order.index(position)
+            partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
 
             # Compute probabilities for the orderings under consideration
             # First consider the full ordering with position under consideration mutating last
@@ -178,6 +177,7 @@ class MutationOrderGibbsSampler(Sampler):
             # now perform a draw from the multinomial distribution of full orderings
             # the multinomial follows the distribution in {eq:order_conditional_prob}
             gibbs_step_info, curr_order_probs = gibbs_step_options.sample()
+            curr_order = gibbs_step_info.order
 
             # Output all log probabilities for trace
             trace.append(curr_order_probs)

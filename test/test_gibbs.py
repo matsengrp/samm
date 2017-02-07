@@ -62,7 +62,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(theta, feat_generator, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(np.max(theta, axis=1), feat_generator, obs_seq_m)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
             order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
@@ -83,5 +83,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.85)
-        self.assertTrue(pval < 1e-5)
+        self.assertTrue(rho > 0.94)
+        self.assertTrue(pval < 1e-31)
