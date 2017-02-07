@@ -74,6 +74,10 @@ def generate(env, outdir, c):
                'simulate',
                '--seed',
                c['seed'],
+               '--n-taxa',
+               5,
+               '--n-germlines',
+               5,
                '--output-true-theta ${TARGETS[0]}',
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
