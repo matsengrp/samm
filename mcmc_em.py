@@ -71,7 +71,7 @@ class MCMC_EM:
                 # Don't use burn-in if we are repeating the sampling due to a negative lower bound
                 burn_in = 0
                 all_traces.append([res.trace for res in sampler_results])
-                sampled_orders_list = [res.samples for res in sampled_results]
+                sampled_orders_list = [res.samples for res in sampler_results]
 
                 # the last sampled mutation order from each list
                 # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
