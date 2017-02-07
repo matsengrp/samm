@@ -137,13 +137,17 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     ):
         """
         Returns a feature vec Given a list of steps that need to be updated
+        Note: This makes a copy of the lists given so it won't modify `base_feat_vec_dicts, base_intermediate_seqs` in place.
 
         @param seq_mut_order: ImputedSequenceMutations
         @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
         """
+        num_steps = len(base_intermediate_seqs)
         intermediate_seqs = list(base_intermediate_seqs)
         feature_vec_dicts = list(base_feat_vec_dicts)
         for i in update_steps:
+            if i >= num_steps - 1:
+                break
             mutation_pos = seq_mut_order.mutation_order[i]
             # update to get the new sequence after the i-th mutation
             intermediate_seqs[i+1] = mutate_string(
