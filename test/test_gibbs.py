@@ -12,7 +12,7 @@ from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 
 class MCMC_EM_TestCase(unittest.TestCase):
-    def test_joint_distribution(self):
+    def test_joint_distribution(self, approx='none'):
         """
         Check that the distribution of mutation orders is similar when we generate mutation orders directly
         from the survival model vs. when we generate mutation orders given the mutation positions from the
@@ -42,9 +42,9 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(theta, feat_generator, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(theta, feat_generator, obs_seq_m, approx)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
-            order_sample = gibbs_samples[0].mutation_order
+            order_sample = gibbs_samples['sampled_orders'][0].mutation_order
             order_sample = map(str, order_sample)
 
             # We make the mutation orders strings so easy to process
