@@ -159,6 +159,7 @@ def main(args=sys.argv[1:]):
         args.problem_solver_cls,
         theta_mask = theta_mask,
         num_threads=args.num_threads,
+        approx='none',
     )
 
     for penalty_param in sorted(penalty_params, reverse=True):

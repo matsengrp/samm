@@ -77,10 +77,6 @@ def generate(env, outdir, c):
                '--output-true-theta ${TARGETS[0]}',
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
-        return env.Command(
-            [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
-            [],
-            ' '.join(map(str, cmd)))
     elif c['simulation_methods'] == "survival_mini":
         cmd = ['python simulate_from_survival.py',
                '--seed',
@@ -100,10 +96,6 @@ def generate(env, outdir, c):
                '--output-true-theta ${TARGETS[0]}',
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
-        return env.Command(
-            [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
-            [],
-            ' '.join(map(str, cmd)))
     elif c['simulation_methods'] == "survival_big":
         cmd = ['python simulate_from_survival.py',
                '--seed',
@@ -123,12 +115,10 @@ def generate(env, outdir, c):
                '--output-true-theta ${TARGETS[0]}',
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
-        return env.Command(
-            [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
-            [],
-            ' '.join(map(str, cmd)))
-    else:
-        raise NotImplementedError()
+    return env.Command(
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        [],
+        ' '.join(map(str, cmd)))
 
 ## Future nests
 

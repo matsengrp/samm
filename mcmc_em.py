@@ -7,7 +7,7 @@ from common import *
 from sampler_collection import SamplerCollection
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1):
+    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1, approx='none'):
         """
         @param observed_data: list of observed data (start and end sequences)
         @param feat_generator: an instance of a FeatureGenerator
@@ -28,6 +28,7 @@ class MCMC_EM:
         self.problem_solver_cls = problem_solver_cls
         self.num_threads = num_threads
         self.theta_mask = theta_mask
+        self.approx = approx
 
     def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
         """
@@ -40,6 +41,7 @@ class MCMC_EM:
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         prev_pen_exp_log_lik = None
+        all_traces = []
         for run in range(max_em_iters):
             lower_bound_is_negative = True
             prev_theta = theta
@@ -52,6 +54,7 @@ class MCMC_EM:
                 self.sampler_cls,
                 self.feat_generator,
                 self.num_threads,
+                self.approx,
             )
 
             e_step_samples = []
@@ -60,12 +63,15 @@ class MCMC_EM:
 
                 # do E-step
                 log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples) + num_e_samples, time.time() - st))
-                sampled_orders_list = sampler_collection.get_samples(
+                sampled_orders_dict = sampler_collection.get_samples(
                     init_orders,
                     num_e_samples,
                     burn_in,
                 )
+                # Don't use burn-in if we are repeating the sampling due to a negative lower bound
                 burn_in = 0
+                all_traces.append([sampled_dict['trace'] for sampled_dict in sampled_orders_dict])
+                sampled_orders_list = [sampled_dict['sampled_orders'] for sampled_dict in sampled_orders_dict]
 
                 # the last sampled mutation order from each list
                 # use this iteration's sampled mutation orders as initialization for the gibbs samplers next cycle
@@ -111,4 +117,4 @@ class MCMC_EM:
             prev_pen_exp_log_lik = pen_exp_log_lik
             log.info("official pen_exp_log_lik %f" % pen_exp_log_lik)
 
-        return theta
+        return theta, all_traces

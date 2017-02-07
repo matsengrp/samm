@@ -75,15 +75,16 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         motif_list = self.get_motif_list()
         self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
 
-    def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
+    def create_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
         feature_vec_dict = dict()
-        if do_feat_vec_pos is None:
-            do_feat_vec_pos = range(len(sequence))
+        return self.update_for_sequence(feature_vec_dict, sequence, no_feat_vec_pos, do_feat_vec_pos)
 
-        for pos in do_feat_vec_pos:
-            if pos in no_feat_vec_pos:
-                # don't generate any feature vector for this position since it is not in the risk group
-                continue
+    def update_for_sequence(self, feature_vec_dict, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
+        if do_feat_vec_pos is None:
+            do_feat_vec_pos = set(range(len(sequence)))
+
+        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        for pos in do_feat_vec_pos-no_feat_vec_pos:
             feature_vec_dict[pos] = self._create_feature_vec_for_pos(pos, sequence)
 
         return feature_vec_dict
@@ -108,22 +109,20 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             )
             # Get the feature vectors for the positions that might be affected by the latest mutation
             # Don't calculate feature vectors for positions that have mutated already
-            no_feat_vec_pos = seq_mut_order.mutation_order[:i + 1]
+            no_feat_vec_pos = set(seq_mut_order.mutation_order[:i + 1])
             # Calculate feature vectors for positions that are close to the mutation
-            do_feat_vec_pos = range(
+            do_feat_vec_pos = set(range(
                 max(mutation_pos - self.flank_end_len, 0),
                 min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
-            )
-            feat_vec_dict_update = self.create_for_sequence(
+            ))
+            feat_vec_dict_update = feature_vec_dicts[i].copy()
+            feat_vec_dict_update.pop(seq_mut_order.mutation_order[i], None)
+            feat_vec_dict_update = self.update_for_sequence(
+                feat_vec_dict_update,
                 intermediate_seq,
                 no_feat_vec_pos=no_feat_vec_pos,
                 do_feat_vec_pos=do_feat_vec_pos,
             )
-            # Populate rest of dict with the previously calculated feature vectors
-            # TODO: maybe we can copy the dict faster
-            for p in range(seq_mut_order.obs_seq_mutation.seq_len):
-                if p not in no_feat_vec_pos and p not in do_feat_vec_pos:
-                    feat_vec_dict_update[p] = feature_vec_dicts[i][p]
 
             feature_vec_dicts[i + 1] = feat_vec_dict_update
             intermediate_seqs[i + 1] = intermediate_seq
@@ -154,22 +153,20 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             )
             # Get the feature vectors for the positions that might be affected by the latest mutation
             # Don't calculate feature vectors for positions that have mutated already
-            no_feat_vec_pos = seq_mut_order.mutation_order[:i + 1]
+            no_feat_vec_pos = set(seq_mut_order.mutation_order[:i + 1])
             # Calculate feature vectors for positions that are close to the mutation
-            do_feat_vec_pos = range(
+            do_feat_vec_pos = set(range(
                 max(mutation_pos - self.flank_end_len, 0),
                 min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
-            )
-            feat_vec_dict_update = self.create_for_sequence(
+            ))
+            feat_vec_dict_update = feature_vec_dicts[i].copy()
+            feat_vec_dict_update.pop(seq_mut_order.mutation_order[i], None)
+            feat_vec_dict_update = self.update_for_sequence(
+                feat_vec_dict_update,
                 intermediate_seqs[i + 1],
                 no_feat_vec_pos=no_feat_vec_pos,
                 do_feat_vec_pos=do_feat_vec_pos,
             )
-            # Populate rest of dict with the previously calculated feature vectors
-            # TODO: maybe we can copy the dict faster
-            for p in range(seq_mut_order.obs_seq_mutation.seq_len):
-                if p not in no_feat_vec_pos and p not in do_feat_vec_pos:
-                    feat_vec_dict_update[p] = feature_vec_dicts[i][p]
 
             feature_vec_dicts[i + 1] = feat_vec_dict_update
         return feature_vec_dicts, intermediate_seqs

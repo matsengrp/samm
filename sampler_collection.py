@@ -9,13 +9,14 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_threads):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_threads, approx):
         """
         @param observed_data: list of ObservedSequenceMutations objects
         @param theta: numpy vector
         @param sampler_cls: class that inherits from Sampler class
         @param feat_generator: FeatureGenerator
         @param num_threads: number of processes to create when performing gibbs sampling
+        @param approx: level of approximation to use to speed up Gibbs sampling
         """
         self.num_threads = num_threads
 
@@ -24,6 +25,7 @@ class SamplerCollection:
                 theta,
                 feat_generator,
                 obs_seq,
+                approx,
             )
             for obs_seq in observed_data
         ]
@@ -33,7 +35,8 @@ class SamplerCollection:
         @param init_orders_for_iter: what order to initialize each gibbs sampler
         @param num_samples: number of samples to retrieve from each gibbs sampler
         @param burn_in_sweeps: number of samplers to run initially for burn in
-        @returns List of samples from each sampler (ImputedSequenceMutations)
+        @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
+
         """
         pool = Pool(self.num_threads)
         sampled_orders_list = pool.map(
@@ -67,15 +70,17 @@ class SamplerPoolWorker(ParallelWorker):
         return samples
 
 class Sampler:
-    def __init__(self, theta, feature_generator, obs_seq_mutation):
+    def __init__(self, theta, feature_generator, obs_seq_mutation, approx):
         """
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
         @param obs_seq_mutation: a ObservedSequenceMutations to know the starting and ending sequence
+        @param approx: level of approximation to use to speed up Gibbs sampling
         """
         self.theta = theta
         self.feature_generator = feature_generator
         self.obs_seq_mutation = obs_seq_mutation
+        self.approx = approx
 
     def run(self, init_order, burn_in, num_samples):
         """
