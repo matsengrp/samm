@@ -136,17 +136,12 @@ nest.add(
 # Nest for model fitting
 @nest.add_target_with_env(env)
 def fit_context_model(env, outdir, c):
-    if c["simulation_methods"] == "survival_mini":
-        motif_len = 3
-    else:
-        motif_len = 5
-
     if c["model_options"] == "survival":
         cmd = ['python fit_context_model.py',
                '--seed',
                c['seed'],
                '--motif-len',
-               motif_len,
+               5,
                '--penalty-params',
                "0.05",
                '--num-threads',
@@ -176,7 +171,7 @@ def fit_context_model(env, outdir, c):
                '--seed',
                c['seed'],
                '--motif-len',
-               motif_len,
+               5,
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
