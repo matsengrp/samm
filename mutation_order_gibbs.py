@@ -153,8 +153,23 @@ class MutationOrderGibbsSampler(Sampler):
                 if self.approx == 'none':
                     # calculate multinomial probs - only need to update 2 values (the one where this position mutates and
                     # the position that mutates right after it), rest are the same
-                    log_probs[i] += self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum() - self.theta[feat_vec_dicts[i][prev_full_order[i]]].sum()
-                    log_probs[i + 1] = self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
+                    mutate_earlier_theta = self.theta[feat_vec_dicts[i][possible_full_order[i]]].sum()
+                    mutate_later_theta = self.theta[feat_vec_dicts[i][prev_full_order[i]]].sum()
+                    log_probs[i] += mutate_earlier_theta - mutate_later_theta
+
+                    a = self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
+                    st = time.time()
+                    print "possible_full_order: i", possible_full_order[i]
+                    print "possible_full_order i + 1", possible_full_order[i + 1]
+                    mutate_earlier_theta = self.theta[feat_vec_dicts[i + 1][possible_full_order[i]]].sum()
+                    mutate_later_theta = self.theta[feat_vec_dicts[i + 1][prev_full_order[i]]].sum()
+                    log_probs[i + 1] = mutate_later_theta - np.log(np.exp(mutate_earlier_theta - log_probs[i + 1]) + np.exp(mutate_later_theta) - np.exp(mutate_earlier_theta))
+                    print "timmm", time.time() - st
+                    print "log_probs[i + 1]", a
+                    print "log_probs[i + 1] - fast", log_probs[i + 1]
+                    1/0
+
+                    self._get_multinomial_log_prob(feat_vec_dicts[i + 1], possible_full_order[i + 1])
                     full_ordering_log_prob = log_probs.sum()
                 else:
                     # Stupid speed up #2:
@@ -184,6 +199,7 @@ class MutationOrderGibbsSampler(Sampler):
 
         return gibbs_step_info, trace
 
+    @measure_time
     def _get_multinomial_log_prob(self, feat_vec_dict, numerator_pos):
         """
         a single term in {eq:full_ordering}
