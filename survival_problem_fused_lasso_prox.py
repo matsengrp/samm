@@ -109,10 +109,10 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemCustom):
         Do proximal gradient step
         """
         # prox step 1: solve fused lasso
-        fused_lasso_theta = self.solve_fused_lasso_prox(theta, step_size * self.penalty_param_fused)
+        fused_lasso_theta = self.solve_fused_lasso_prox(theta.reshape((theta.size,)), step_size * self.penalty_param_fused)
         # prox step 2: soft threshold to get sparse fused lasso
         sparse_fused_lasso_theta = soft_threshold(fused_lasso_theta, step_size * self.penalty_param_lasso)
-        return sparse_fused_lasso_theta
+        return sparse_fused_lasso_theta.reshape((sparse_fused_lasso_theta.size,1))
 
     def solve_fused_lasso_prox_cvxpy(self, potential_theta, factor):
         """
