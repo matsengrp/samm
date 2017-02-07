@@ -198,7 +198,7 @@ def simulate(args):
 
     # Dump a dummy file of theta
     # We'll input some function of mutability here, but leave it dummy-length for now
-    true_theta = np.zeros(1+4**args.motif_len)
+    true_theta = np.zeros((1+4**args.motif_len, 1))
     pickle.dump(true_theta, open(args.output_true_theta, 'w'))
 
 
