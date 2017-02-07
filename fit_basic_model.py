@@ -100,24 +100,25 @@ def main(args=sys.argv[1:]):
             proportions[key] = 0.
 
     theta = pickle.load(open(args.theta_file, 'rb'))
-    prop_list = [proportions[motif_list[i]] for i in range(theta.size)]
+    prop_list = [proportions[motif_list[i]] for i in range(theta.shape[0])]
 
     # Print the motifs with the highest and lowest proportions
     threshold_prop_list = [0] * len(prop_list)
     mean_prop = np.mean(prop_list)
     sd_prop = np.sqrt(np.var(prop_list))
-    for i in range(theta.size):
+    for i in range(theta.shape[0]):
         if np.abs(proportions[motif_list[i]] - mean_prop) > 0.5 * sd_prop:
-            log.info("%d: %f, %s, %f" % (i, theta[i], motif_list[i], proportions[motif_list[i]]))
+            log.info("%d: %f, %s, %f" % (i, np.max(theta[i,]), motif_list[i], proportions[motif_list[i]]))
             threshold_prop_list[i] = proportions[motif_list[i]]
 
+    theta_flat = np.max(theta, axis=1)
     log.info("THETA")
-    log.info(scipy.stats.spearmanr(theta, prop_list))
-    log.info(scipy.stats.kendalltau(theta, prop_list))
+    log.info(scipy.stats.spearmanr(theta_flat, prop_list))
+    log.info(scipy.stats.kendalltau(theta_flat, prop_list))
 
     log.info("THRESHOLDED THETA")
-    log.info(scipy.stats.spearmanr(theta, threshold_prop_list))
-    log.info(scipy.stats.kendalltau(theta, threshold_prop_list))
+    log.info(scipy.stats.spearmanr(theta_flat, threshold_prop_list))
+    log.info(scipy.stats.kendalltau(theta_flat, threshold_prop_list))
 
     pickle.dump(np.array(prop_list), open(args.prop_file, 'w'))
 

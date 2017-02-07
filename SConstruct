@@ -86,7 +86,7 @@ def generate(env, outdir, c):
                '--n-germlines',
                50,
                '--motif-len',
-               3,
+               5,
                '--random-gene-len',
                30,
                '--min-censor-time',
@@ -126,6 +126,7 @@ def generate(env, outdir, c):
 model_options = [
     'survival',
     'basic',
+    'shmulate'
 ]
 
 nest.add(
@@ -135,17 +136,12 @@ nest.add(
 # Nest for model fitting
 @nest.add_target_with_env(env)
 def fit_context_model(env, outdir, c):
-    if c["simulation_methods"] == "survival_mini":
-        motif_len = 3
-    else:
-        motif_len = 5
-
     if c["model_options"] == "survival":
         cmd = ['python fit_context_model.py',
                '--seed',
                c['seed'],
                '--motif-len',
-               motif_len,
+               5,
                '--penalty-params',
                "0.05",
                '--num-threads',
@@ -159,12 +155,23 @@ def fit_context_model(env, outdir, c):
             [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
             c['generate'],
             ' '.join(map(str, cmd)))
+    elif c["model_options"] == "shmulate":
+        cmd = ['python fit_shmulate_model.py',
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
+               '--model-csv ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+        return env.Command(
+            [join(outdir, 'proportions.csv'), join(outdir, 'log.txt')],
+            c['generate'],
+            ' '.join(map(str, cmd)))
     else:
         cmd = ['python fit_basic_model.py',
                '--seed',
                c['seed'],
                '--motif-len',
-               motif_len,
+               5,
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
