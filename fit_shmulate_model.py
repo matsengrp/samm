@@ -62,19 +62,15 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
-    # Define command and arguments
+    # Call Rscript
     command = 'Rscript'
     script_file = 'R/fit_shmulate_model.R'
 
-    # Build subprocess command
     cmd = [command, script_file, args.input_file, args.input_genes, args.model_csv]
+    print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
-    print "Calling:", " ".join(cmd)
-
-    # check_output will run the command and store to result
-    res = subprocess.check_output(cmd, universal_newlines=True)
-
+    # Read in the results from the shmulate model-fitter
     feat_gen = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
     motif_list = feat_gen.get_motif_list()
     motif_dict = dict()
@@ -103,6 +99,7 @@ def main(args=sys.argv[1:]):
             model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = val
     pickle.dump(model_array, open(args.model_csv.replace(".csv", ".pkl"), 'w'))
 
+    # Let's compare the true vs. fitted models
     true_theta = pickle.load(open(args.theta_file, 'rb'))
     theta_mask = get_possible_motifs_to_targets(motif_list, true_theta.shape)
 
