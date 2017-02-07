@@ -90,7 +90,11 @@ class Sampler:
         """
         self.theta = theta
         self.feature_generator = feature_generator
+        self.motif_len = self.feature_generator.motif_len
         self.obs_seq_mutation = obs_seq_mutation
+        self.seq_len = obs_seq_mutation.seq_len
+        self.mutated_positions = obs_seq_mutation.mutation_pos_dict.keys()
+        self.num_mutations = len(self.mutated_positions)
         self.approx = approx
 
     def run(self, init_order, burn_in, num_samples):

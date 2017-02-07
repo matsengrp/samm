@@ -134,12 +134,8 @@ def main(args=sys.argv[1:]):
     # Dump a text file of theta
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
-        for i in range(true_thetas.shape[0]):
-            if np.abs(true_thetas[i, 0]) > ZERO_THRES:
-                if i == true_thetas.shape[0] - 1:
-                    f.write("%d: %f (EDGES)\n" % (i, true_thetas[i, 0]))
-                else:
-                    f.write("%d: %f (%s)\n" % (i, true_thetas[i, 0], motif_list[i]))
+        lines = get_nonzero_theta_print_lines(true_theta, motif_list)
+        f.write(lines)
 
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.

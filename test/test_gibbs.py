@@ -5,25 +5,48 @@ import numpy as np
 from scipy.stats import spearmanr
 from collections import Counter
 
-from common import NUM_NUCLEOTIDES
+from common import *
 from models import ObservedSequenceMutations
 from survival_model_simulator import SurvivalModelSimulator
 from feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
 class MCMC_EM_TestCase(unittest.TestCase):
-    def test_speedup(self):
-        feat_generator = SubmotifFeatureGenerator(motif_len=3)
-        theta = np.random.rand(feat_generator.feature_vec_len, NUM_NUCLEOTIDES)
-        obs_seq_m = ObservedSequenceMutations("ttcgta", "tgggtt")
-        gibbs_sampler = MutationOrderGibbsSampler(theta, feat_generator, obs_seq_m)
+    @classmethod
+    def setUpClass(cls):
+        np.random.seed(10)
+        cls.motif_len = 3
+        cls.BURN_IN = 10
+        cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
+        motif_list = cls.feat_gen.get_motif_list()
+        motif_list_len = len(motif_list)
+        # NOTE: THIS IS A SMALL THETA
+        cls.big_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
+        cls.big_theta[:motif_list_len,] = cls.big_theta[:motif_list_len,] - np.log(3)
+        cls.big_theta[motif_list_len,] = cls.big_theta[motif_list_len,] - np.log(4)
+        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.big_theta.shape)
+        cls.big_theta[~theta_mask] = -np.inf
+        cls.theta = np.max(cls.big_theta, axis=1)
+        cls.obs_seq_m = ObservedSequenceMutations("ttcgtata", "taagttat")
+        cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
-        curr_order = obs_seq_m.mutation_pos_dict.keys()
-        curr_dicts, curr_seqs, curr_log_probs = gibbs_sampler._compute_log_probs(curr_order)
+    def test_update_log_prob_for_shuffle(self):
+        prev_order = self.obs_seq_m.mutation_pos_dict.keys()
+        curr_order = prev_order[:2] + [prev_order[3], prev_order[2]] + prev_order[4:]
+
+        prev_feat_dicts, prev_intermediate_seqs, prev_log_probs = self.gibbs_sampler._compute_log_probs(prev_order)
+        feat_dicts, intermediate_seqs, slow_log_probs = self.gibbs_sampler._compute_log_probs(curr_order)
+        fast_log_probs = self.gibbs_sampler._update_log_prob_from_shuffle(2, prev_log_probs, curr_order, prev_order, feat_dicts, prev_feat_dicts)
+
+        self.assertTrue(np.allclose(slow_log_probs, fast_log_probs))
+
+    def test_update_log_prob_for_positions(self):
+        curr_order = self.obs_seq_m.mutation_pos_dict.keys()
+        curr_dicts, curr_seqs, curr_log_probs = self.gibbs_sampler._compute_log_probs(curr_order)
 
         new_order = [curr_order[0], curr_order[-1]] + curr_order[1:-1]
-        feat_vec_dicts_slow, intermediate_seqs_slow, multinomial_sequence_slow = gibbs_sampler._compute_log_probs(new_order)
-        feat_vec_dicts, intermediate_seqs, multinomial_sequence = gibbs_sampler._compute_log_probs(
+        feat_vec_dicts_slow, intermediate_seqs_slow, multinomial_sequence_slow = self.gibbs_sampler._compute_log_probs(new_order)
+        feat_vec_dicts, intermediate_seqs, multinomial_sequence = self.gibbs_sampler._compute_log_probs(
             new_order,
             GibbsStepInfo(curr_order, curr_dicts, curr_seqs, curr_log_probs),
             update_positions=range(1, len(new_order)),
@@ -38,8 +61,6 @@ class MCMC_EM_TestCase(unittest.TestCase):
         from the survival model vs. when we generate mutation orders given the mutation positions from the
         gibbs sampler
         """
-        np.random.seed(10)
-
         START_SEQ = "ttcg" # MUST BE LESS THAN TEN
         NUM_OBS_SAMPLES = 5000
         BURN_IN = 15
@@ -47,9 +68,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
 
-        feat_generator = SubmotifFeatureGenerator(motif_len=3)
-        theta = np.random.rand(feat_generator.feature_vec_len, NUM_NUCLEOTIDES)
-        surv_simulator = SurvivalModelSimulator(theta, feat_generator, lambda0=LAMBDA0)
+        surv_simulator = SurvivalModelSimulator(self.big_theta, self.feat_gen, lambda0=LAMBDA0)
 
         # Simulate some data from the same starting sequence
         # Get the distribution of mutation orders from our survival model
@@ -62,7 +81,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(np.max(theta, axis=1), feat_generator, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(self.theta, self.feat_gen, obs_seq_m)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
             order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
@@ -83,5 +102,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.94)
-        self.assertTrue(pval < 1e-31)
+        self.assertTrue(rho > 0.93)
+        self.assertTrue(pval < 1e-23)
