@@ -18,8 +18,12 @@ class MCMC_EM_TestCase(unittest.TestCase):
         cls.motif_len = 3
         cls.BURN_IN = 10
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
+        motif_list = cls.feat_gen.get_motif_list()
+        motif_list_len = len(motif_list)
         # NOTE: THIS IS A SMALL THETA
         cls.big_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
+        cls.big_theta[:motif_list_len,] = cls.big_theta[:motif_list_len,] - np.log(3)
+        cls.big_theta[motif_list_len,] = cls.big_theta[motif_list_len,] - np.log(4)
         theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.big_theta.shape)
         cls.big_theta[~theta_mask] = -np.inf
         cls.theta = np.max(cls.big_theta, axis=1)
@@ -98,5 +102,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.94)
-        self.assertTrue(pval < 1e-31)
+        self.assertTrue(rho > 0.93)
+        self.assertTrue(pval < 1e-25)
