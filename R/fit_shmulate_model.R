@@ -22,17 +22,27 @@ shm_model_type <- "RS"
 # Create model using only silent mutations
 # shm_model_type <- "S"
 
-sub <- createSubstitutionMatrix(
+sub_model <- createSubstitutionMatrix(
     seq_genes,
     model=shm_model_type,
     sequenceColumn="sequence",
     germlineColumn="germline_sequence",
     vCallColumn="germline_name",
-    multipleMutation=c("independent"),
-    returnModel=c("5mer"),
 )
+
+mut_model <- createMutabilityMatrix(
+    seq_genes,
+    sub_model,
+    model=shm_model_type,
+    sequenceColumn="sequence",
+    germlineColumn="germline_sequence",
+    vCallColumn="germline_name",
+)
+
+target_model <- createTargetingMatrix(sub_model, mut_model)
+
 write.csv(
-    t(sub),
+    t(target_model),
     file=output.file,
     quote=FALSE
 )

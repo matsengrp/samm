@@ -126,6 +126,7 @@ def generate(env, outdir, c):
 model_options = [
     'survival',
     'basic',
+    'shmulate'
 ]
 
 nest.add(
@@ -157,6 +158,17 @@ def fit_context_model(env, outdir, c):
                '--out-file ${TARGETS[1]}']
         return env.Command(
             [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
+            c['generate'],
+            ' '.join(map(str, cmd)))
+    elif c["model_options"] == "shmulate":
+        cmd = ['python fit_shmulate_model.py',
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
+               '--model-csv ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+        return env.Command(
+            [join(outdir, 'proportions.csv'), join(outdir, 'log.txt')],
             c['generate'],
             ' '.join(map(str, cmd)))
     else:
