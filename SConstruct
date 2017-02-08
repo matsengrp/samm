@@ -161,6 +161,7 @@ nest.add(
 # Nest for model fitting
 @nest.add_target_with_env(env)
 def fit_context_model(env, outdir, c):
+    cmd = []
     if c["model_options"] == "survival":
         cmd = ['python fit_context_model.py',
                '--seed',
