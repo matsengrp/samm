@@ -153,23 +153,15 @@ def fit_context_model(env, outdir, c):
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
-               '--log-file ${TARGETS[0]}',
-               '--out-file ${TARGETS[1]}']
-        return env.Command(
-            [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
-            c['generate'],
-            ' '.join(map(str, cmd)))
+               '--out-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
     elif c["model_options"] == "shmulate":
         cmd = ['python fit_shmulate_model.py',
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
-               '--model-csv ${TARGETS[0]}',
+               '--model-pkl ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
-        return env.Command(
-            [join(outdir, 'proportions.csv'), join(outdir, 'log.txt')],
-            c['generate'],
-            ' '.join(map(str, cmd)))
     else:
         cmd = ['python fit_basic_model.py',
                '--seed',
@@ -181,10 +173,10 @@ def fit_context_model(env, outdir, c):
                '--input-genes ${SOURCES[2]}',
                '--prop-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
-        return env.Command(
-            [join(outdir, 'proportions.pkl'), join(outdir, 'log.txt')],
-            c['generate'],
-            ' '.join(map(str, cmd)))
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
 
 
 # Aggregate over different fitting methods

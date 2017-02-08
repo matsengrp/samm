@@ -43,10 +43,10 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/true_theta.pkl')
-    parser.add_argument('--model-csv',
+    parser.add_argument('--model-pkl',
         type=str,
-        help='file to output fitted proportions',
-        default='_output/theta_shmulate.csv')
+        help='file to output fitted proportions (will also output csv)',
+        default='_output/theta_shmulate.pkl')
     parser.add_argument('--log-file',
         type=str,
         help='file to output logs',
@@ -66,7 +66,7 @@ def main(args=sys.argv[1:]):
     command = 'Rscript'
     script_file = 'R/fit_shmulate_model.R'
 
-    cmd = [command, script_file, args.input_file, args.input_genes, args.model_csv]
+    cmd = [command, script_file, args.input_file, args.input_genes, args.model_pkl.replace(".pkl", ".csv")]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
@@ -74,7 +74,7 @@ def main(args=sys.argv[1:]):
     feat_gen = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
     motif_list = feat_gen.get_motif_list()
     motif_dict = dict()
-    with open(args.model_csv, "r") as model_file:
+    with open(args.model_pkl.replace(".pkl", ".csv"), "r") as model_file:
         csv_reader = csv.reader(model_file)
         # Assume header is ACGT
         header = csv_reader.next()
@@ -97,7 +97,7 @@ def main(args=sys.argv[1:]):
             if val == "NA":
                 val = -np.inf
             model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = val
-    pickle.dump(model_array, open(args.model_csv.replace(".csv", ".pkl"), 'w'))
+    pickle.dump(model_array, open(args.model_pkl, 'w'))
 
     # Let's compare the true vs. fitted models
     true_theta = pickle.load(open(args.theta_file, 'rb'))
