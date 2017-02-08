@@ -14,11 +14,12 @@ import pandas as pd
 import numpy as np
 import os
 import os.path
-from Bio import SeqIO
 import csv
 import pickle
 
 from common import *
+from Bio import SeqIO
+from feature_generator import SubmotifFeatureGenerator
 
 sys.path.append('gctree/bin')
 from gctree import MutationModel, CollapsedTree
@@ -82,10 +83,6 @@ def parse_args():
         type=str,
         default='gctree/S5F/Substitution.csv',
         help='path to substitution model file')
-    parser_simulate.add_argument('--p',
-        type=float,
-        default=.49,
-        help='branching probability')
     parser_simulate.add_argument('--lambda0',
         type=float,
         default=None,
@@ -94,10 +91,6 @@ def parse_args():
         type=float,
         default=1.,
         help='sampling probability')
-    parser_simulate.add_argument('--n',
-        type=int,
-        default=1,
-        help='minimum simulation size')
     parser_simulate.add_argument('--T',
         type=int,
         default=None,
@@ -124,23 +117,21 @@ def run_gctree(args, germline_seq):
     if args.lambda0 is None:
         args.lambda0 = max([1, int(.01*len(germline_seq))])
     mutation_model = MutationModel(args.mutability, args.substitution)
-    size = 0
-    while size < args.n_taxa:
-        # this loop makes us resimulate if we got backmutations
-        trial = 1
-        while trial < MAX_TRIALS:
-            try:
-                tree = mutation_model.simulate(germline_seq, p=args.p, lambda0=args.lambda0, r=args.r, frame=args.frame, T=args.T)
-                collapsed_tree = CollapsedTree(tree=tree, frame=args.frame) # <-- this will fail if backmutations
-                break
-            except RuntimeError:
-                trial += 1
-                continue
-            else:
-                raise
-        if trial == MAX_TRIALS:
-            raise RuntimeError('repeated sequences in collapsed tree on {} attempts'.format(trial))
-        size = sum(node.frequency for node in tree)
+    trials = 1000
+    # this loop makes us resimulate if size too small, or backmutation
+    for trial in range(trials):
+        try:
+            tree = mutation_model.simulate(germline_seq,
+                                           lambda0=args.lambda0,
+                                           r=args.r,
+                                           N=args.n_taxa,
+                                           T=args.T)
+            collapsed_tree = CollapsedTree(tree=tree, frame=args.frame) # <-- this will fail if backmutations
+            break
+        except RuntimeError as e:
+            print('{}, trying again'.format(e))
+        else:
+            raise
 
     return tree
 
@@ -196,9 +187,18 @@ def simulate(args):
                     i += 1
                     seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence).lower()])
 
-    # Dump a dummy file of theta
-    # We'll input some function of mutability here, but leave it dummy-length for now
-    true_theta = np.zeros((1+4**args.motif_len, 1))
+    # Dump the true "thetas," which are mutability * substitution
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    motif_list = feat_generator.get_motif_list()
+    context_model = MutationModel(args.mutability, args.substitution).context_model
+    true_theta = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
+    true_theta.fill(-np.inf)
+    for motif_idx, motif in enumerate(motif_list):
+        mutability = args.lambda0 * context_model[motif.upper()][0]
+        for nuc in NUCLEOTIDES:
+            substitution = context_model[motif.upper()][1][nuc.upper()]
+            if mutability > 0 and substitution > 0:
+                true_theta[motif_idx, NUCLEOTIDE_DICT[nuc]] = np.log(mutability) + np.log(substitution)
     pickle.dump(true_theta, open(args.output_true_theta, 'w'))
 
 
