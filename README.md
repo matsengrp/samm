@@ -21,6 +21,12 @@ To fit the models, we're using CVXPY for now (until it barfs). Install this:
 pip install --user cvxpy
 ```
 
+## R package installation
+To get `shmulate` to fit an S5F model, install packages in `R` using:
+```
+R --vanilla --slave -e 'install.packages(c("igraph", "seqinr", "R.utils", "chron", "plyr", "shazam"), repos="http://cran.rstudio.com/")'
+```
+
 ## Run tests
 Run all tests:
 ```
