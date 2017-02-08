@@ -60,6 +60,14 @@ def parse_args():
         type=int,
         help='number of EM iterations',
         default=20)
+    parser.add_argument('--burn-in',
+        type=int,
+        help='number of burn-in iterations for E-step',
+        default=10)
+    parser.add_argument('--num-e-samples',
+        type=int,
+        help='number of base samples to draw during E-step',
+        default=10)
     parser.add_argument('--log-file',
         type=str,
         help='log file',
@@ -158,13 +166,19 @@ def main(args=sys.argv[1:]):
         args.sampler_cls,
         args.problem_solver_cls,
         theta_mask = theta_mask,
+        base_num_e_samples=args.num_e_samples,
+        burn_in=args.burn_in,
         num_threads=args.num_threads,
         approx='none',
     )
 
     for penalty_param in sorted(penalty_params, reverse=True):
         log.info("Penalty parameter %f" % penalty_param)
-        theta, _ = em_algo.run(theta=theta, penalty_param=penalty_param, max_em_iters=args.em_max_iters)
+        theta, _ = em_algo.run(
+            theta=theta,
+            penalty_param=penalty_param,
+            max_em_iters=args.em_max_iters,
+        )
         results_list.append((penalty_param, theta))
 
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
@@ -173,8 +187,8 @@ def main(args=sys.argv[1:]):
         theta_shape = (theta_mask.sum(), 1)
         flat_theta = theta[theta_mask].reshape(theta_shape)
         flat_true_theta = true_theta[theta_mask].reshape(theta_shape)
-        log.info(scipy.stats.spearmanr(flat_theta, flat_true_theta))
-        log.info(scipy.stats.kendalltau(flat_theta, flat_true_theta))
+        log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
+        log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
         log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
         log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
 

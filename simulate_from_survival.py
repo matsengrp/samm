@@ -60,6 +60,9 @@ def parse_args():
         type=float,
         help='Proportion of motifs that are nonzero',
         default=0.1)
+    parser.add_argument('--with-replacement',
+        action="store_true",
+        help='Allow same position to mutate multiple times')
 
     args = parser.parse_args()
     return args
@@ -134,7 +137,7 @@ def main(args=sys.argv[1:]):
     # Dump a text file of theta
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
-        lines = get_nonzero_theta_print_lines(true_theta, motif_list)
+        lines = get_nonzero_theta_print_lines(true_thetas, motif_list)
         f.write(lines)
 
     # Write germline genes to file with two columns: name of gene and
@@ -158,6 +161,7 @@ def main(args=sys.argv[1:]):
                 simulator.simulate(
                     start_seq=sequence.lower(),
                     censoring_time=args.min_censor_time + np.random.rand(), # censoring time at least 0.1
+                    with_replacement=args.with_replacement,
                 ) for i in range(args.n_taxa)
             ]
 

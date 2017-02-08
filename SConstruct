@@ -45,6 +45,7 @@ nest = SConsWrap(Nest(base_dict=base), '_'+env['OUTPUT_NAME'], alias_environment
 sim_methods = [
     #'survival_big', #This is still too big to run our data on.
     'survival_mini',
+    'survival_ctmc', # Allows multiple mutations in the same position
     'shmulate',
 ]
 
@@ -92,11 +93,31 @@ def generate(env, outdir, c):
                '--motif-len',
                5,
                '--random-gene-len',
-               30,
+               50,
                '--min-censor-time',
-               3.0,
+               0.2,
                '--ratio-nonzero',
                0.2,
+               '--output-true-theta ${TARGETS[0]}',
+               '--output-file ${TARGETS[1]}',
+               '--output-genes ${TARGETS[2]}']
+    elif c['simulation_methods'] == "survival_ctmc":
+        cmd = ['python simulate_from_survival.py',
+               '--seed',
+               c['seed'],
+               '--n-taxa',
+               10,
+               '--n-germlines',
+               50,
+               '--motif-len',
+               5,
+               '--random-gene-len',
+               200,
+               '--min-censor-time',
+               0.1,
+               '--ratio-nonzero',
+               0.1,
+               '--with-replacement',
                '--output-true-theta ${TARGETS[0]}',
                '--output-file ${TARGETS[1]}',
                '--output-genes ${TARGETS[2]}']
@@ -113,7 +134,7 @@ def generate(env, outdir, c):
                '--random-gene-len',
                200,
                '--min-censor-time',
-               1.0,
+               0.1,
                '--ratio-nonzero',
                0.1,
                '--output-true-theta ${TARGETS[0]}',
@@ -147,9 +168,13 @@ def fit_context_model(env, outdir, c):
                '--motif-len',
                5,
                '--penalty-params',
-               "0.05",
+               "0.01,0.001,0.0001",
                '--num-threads',
                10,
+               '--burn-in',
+               2,
+               '--num-e-samples',
+               4,
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
@@ -159,7 +184,7 @@ def fit_context_model(env, outdir, c):
             [join(outdir, 'context_log.txt'), join(outdir, 'context_log.pkl')],
             c['generate'],
             ' '.join(map(str, cmd)))
-    elif c["model_options"] == "shmulate":
+    elif c["model_options"] == "shmulate" and c["simulation_methods"] != "survival_ctmc":
         cmd = ['python fit_shmulate_model.py',
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
@@ -170,7 +195,7 @@ def fit_context_model(env, outdir, c):
             [join(outdir, 'proportions.csv'), join(outdir, 'log.txt')],
             c['generate'],
             ' '.join(map(str, cmd)))
-    else:
+    elif c["model_options"] == "basic" and c["simulation_methods"] != "survival_ctmc":
         cmd = ['python fit_basic_model.py',
                '--seed',
                c['seed'],
