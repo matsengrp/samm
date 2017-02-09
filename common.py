@@ -1,6 +1,12 @@
 import csv
 import numpy as np
 import pandas as pd
+import sys
+
+PARTIS_PATH = './partis'
+sys.path.insert(1, PARTIS_PATH + '/python')
+import utils
+import glutils
 
 from models import ObservedSequenceMutations
 NUM_NUCLEOTIDES = 4
@@ -12,6 +18,7 @@ NUCLEOTIDE_DICT = {
     "g": 3,
 }
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
+SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
@@ -148,6 +155,54 @@ def read_bcr_hd5(path, remove_gap=True):
         return sites.query('base != "-"')
     else:
         return sites
+
+def read_partis_annotations(annotations_file_name, chain='h', use_v=True, species='human'):
+    """
+    Function to read partis annotations csv
+
+    @param annotations_file_name: path to annotations file
+    @param chain: h for heavy, k or l for kappa or lambda light chain
+    @param use_v: use just the V gene or use the whole sequence?
+    @param species: 'human' or 'mouse'
+
+    TODO: do we want to output intermediate genes.csv/seqs.csv files?
+
+    TODO: do we want support for including multiple annotations files?
+    is this something people do, or is this done at the partis level?
+
+    @return gene_dict, obs_data
+    """
+
+    # read default germline info
+    glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
+    
+    gene_dict = {}
+    obs_data = []
+
+    if use_v:
+        seqs_col = 'v_qr_seqs'
+        gene_col = 'v_gl_seq'
+    else:
+        seqs_col = 'seqs'
+        gene_col = 'naive_seq'
+
+    with open(annotations_file_name, "r") as csvfile:
+        reader = csv.DictReader(csvfile)
+        for idx, line in enumerate(reader):
+            utils.process_input_line(line)
+            utils.add_implicit_info(glfo, line)
+            # for now just use V gene for ID
+            key = 'clone{}-{}'.format(*[idx, line['v_gene']])
+            gene_dict[key] = line[gene_col]
+            start_seq = line[gene_col].lower()
+            for end_seq in line[seqs_col]:
+                obs_data.append(
+                    ObservedSequenceMutations(
+                        start_seq=start_seq[:len(end_seq)],
+                        end_seq=end_seq.lower(),
+                    )
+                )
+    return gene_dict, obs_data
 
 def read_gene_seq_csv_data(gene_file_name, seq_file_name):
     gene_dict = {}
