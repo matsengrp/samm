@@ -1,3 +1,6 @@
+# Shmulate is finicky with the simulation parameters that get input.
+# This will march through a few different parameter combinations to determine which of them yield usable output.
+
 import numpy as np
 import pickle
 import csv
@@ -16,10 +19,9 @@ base = {}
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-# Targets for shmulate
-
 nest.add_aggregate('all_params', list)
 
+# Targets for shmulate: germline size, number of taxa, mutation rate (lambda0 in gctree)
 nest.add(
     'germline_size',
     np.arange(10, 50, 10))
@@ -32,6 +34,7 @@ nest.add(
     'mutation_rate',
     np.exp2(np.arange(0, 2, 1)))
 
+# Simulate data from gctree using S5F mutability/substitution parameters from literature
 @nest.add_target_with_env(localenv)
 def generate_shmulate(env, outdir, c):
     cmd = ['python',
@@ -53,8 +56,7 @@ def generate_shmulate(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
-# Model fitting
-
+# Fit model using shmulate
 @nest.add_target_with_env(localenv)
 def fit_shmulate(env, outdir, c):
     cmd = ['python',
@@ -70,7 +72,9 @@ def fit_shmulate(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 
-# See which parameters yield estimates
+# See which parameters yield usable estimates.
+# A "bad" parameter set is one that has too few mutations and returns all zeros for a substitution profile within a particular motif.
+# The shmulate fitting code returns zeros as -inf due to log-taking, so if there are any rows that have no finite elements these parameters are "bad."
 @nest.add_target_with_env(localenv)
 def test_output(env, outdir, c):
     def write_bad_rows(target, source, env):
@@ -84,6 +88,7 @@ def test_output(env, outdir, c):
                 c['taxa_size'],
                 c['mutation_rate'],
                 'bad_params' if any([all([not np.isfinite(entry) for entry in row]) for row in estimated]) else 'good_params'])
+                # last line is checking to see if enough data/mutations went into these estimates
 
     c['all_params'].append(env.Command(
         join(outdir, 'test.csv'),
@@ -91,8 +96,10 @@ def test_output(env, outdir, c):
         write_bad_rows,
         control=c))
 
+# Aggregate over all parameter choices
 nest.pop('germline_size')
 
+# And concatenate into one file with parameter values and what type of data we obtained.
 @nest.add_target_with_env(localenv)
 def summarize(env, outdir, c):
     def cat_files(target, source, env):
