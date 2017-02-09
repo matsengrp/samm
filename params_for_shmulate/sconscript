@@ -26,11 +26,11 @@ nest.add(
 
 nest.add(
     'taxa_size',
-    np.arange(5, 25, 5))
+    np.arange(5, 15, 5))
 
 nest.add(
     'mutation_rate',
-    np.exp2(np.arange(-2, 3, 1)))
+    np.exp2(np.arange(0, 2, 1)))
 
 @nest.add_target_with_env(localenv)
 def generate_shmulate(env, outdir, c):
