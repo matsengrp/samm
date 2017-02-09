@@ -94,8 +94,20 @@ nest.pop('germline_size')
 
 @nest.add_target_with_env(localenv)
 def summarize(env, outdir, c):
+    def cat_files(target, source, env):
+        with open(str(target[0]), 'w') as catted_files:
+            with open(str(source[0])) as first_file:
+                # keep header from first file
+                for line in first_file:
+                    catted_files.write(line)
+        
+            for fname in source[1:]:
+                with open(str(fname)) as next_file:
+                    for line in next_file:
+                        if not line.startswith('germline_size'):
+                            catted_files.write(line)
     return env.Command(
         join(outdir, 'results.csv'),
         c['all_params'],
-        'cat $SOURCES > $TARGET')
+        cat_files)
 
