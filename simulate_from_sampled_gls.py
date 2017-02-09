@@ -148,7 +148,8 @@ def simulate(args):
     params = read_bcr_hd5(args.param_path)
 
     # Find genes with "N" and remove them so gctree is happy
-    genes_to_sample = params['gene'][[base in 'ACGT' for base in params['base']]].unique()
+    genes_to_not_sample = params['gene'][[base not in 'ACGT' for base in params['base']]].unique()
+    genes_to_sample = [gene for gene in params['gene'].unique() if gene not in genes_to_not_sample]
 
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
