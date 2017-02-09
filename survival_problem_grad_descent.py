@@ -126,7 +126,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             raise ValueError("Pool has not been initialized")
 
         ll = self.pool.map(
-            run_parallel_worker,
+            run_multiprocessing_worker,
             [ObjectiveValueWorker(theta, sample, feature_vecs, self.motif_len) for sample, feature_vecs in self.feature_vec_sample_pair]
         )
         return 1.0/self.num_samples * np.sum(ll)
@@ -141,7 +141,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             raise ValueError("Pool has not been initialized")
 
         l = self.pool.map(
-            run_parallel_worker,
+            run_multiprocessing_worker,
             [
                 GradientWorker(theta, sample, feature_vecs, self.motif_len)
                 for sample, feature_vecs in self.feature_vec_sample_pair

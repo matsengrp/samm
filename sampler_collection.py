@@ -2,7 +2,8 @@ import sys
 import traceback
 from multiprocessing import Pool
 from models import ImputedSequenceMutations
-from parallel_worker import *
+from parallel_worker import ParallelWorker, BatchSubmissionManager
+import utils
 
 class SamplerCollection:
     """
@@ -38,20 +39,13 @@ class SamplerCollection:
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
 
         """
-        pool = Pool(self.num_threads)
-        sampled_orders_list = pool.map(
-            run_parallel_worker,
-            [
-                SamplerPoolWorker(sampler, init_order, num_samples, burn_in_sweeps)
-                for sampler, init_order in zip(self.samplers, init_orders_for_iter)
-            ],
-        )
-        pool.close()
-
-        # If one of the gibbs samplers fails, we should... fail the whole thing for now.
-        # We'll deal with this when this becomes a real issue. Maybe we need to try to
-        # rerun that particular sampler.
-        assert(None not in sampled_orders_list)
+        worker_list = [
+            SamplerPoolWorker(sampler, init_order, num_samples, burn_in_sweeps)
+            for sampler, init_order in zip(self.samplers, init_orders_for_iter)
+        ]
+        batch_manager = BatchSubmissionManager(worker_list, self.num_threads, "results/gibbs_workers")
+        # TODO: what to do if fails?
+        sampled_orders_list = batch_manager.run()
 
         return sampled_orders_list
 
