@@ -1,5 +1,12 @@
 ## Test model fits against one another
 
+import os
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+
 Import('env')
 localenv = env.Clone()
 
