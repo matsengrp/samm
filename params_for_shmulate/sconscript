@@ -1,0 +1,121 @@
+# Shmulate is finicky with the simulation parameters that get input.
+# This will march through a few different parameter combinations to determine which of them yield usable output.
+
+import numpy as np
+import pickle
+import csv
+
+from random import randint
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+nest.add_aggregate('all_params', list)
+
+# Targets for shmulate: germline size, number of taxa, mutation rate (lambda0 in gctree)
+nest.add(
+    'germline_size',
+    np.arange(10, 50, 10))
+
+nest.add(
+    'taxa_size',
+    np.arange(5, 15, 5))
+
+nest.add(
+    'mutation_rate',
+    np.exp2(np.arange(0, 2, 1)))
+
+# Simulate data from gctree using S5F mutability/substitution parameters from literature
+@nest.add_target_with_env(localenv)
+def generate_shmulate(env, outdir, c):
+    cmd = ['python',
+           'simulate_from_sampled_gls.py',
+           'simulate',
+           '--seed',
+           randint(1000, 9999),
+           '--n-taxa',
+           c['taxa_size'],
+           '--n-germlines',
+           c['germline_size'],
+           '--lambda0',
+           c['mutation_rate'],
+           '--output-true-theta ${TARGETS[0]}',
+           '--output-file ${TARGETS[1]}',
+           '--output-genes ${TARGETS[2]}']
+    return env.Command(
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# Fit model using shmulate
+@nest.add_target_with_env(localenv)
+def fit_shmulate(env, outdir, c):
+    cmd = ['python',
+           'fit_shmulate_model.py',
+           '--theta-file ${SOURCES[0]}',
+           '--input-file ${SOURCES[1]}',
+           '--input-genes ${SOURCES[2]}',
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['generate_shmulate'],
+        ' '.join(map(str, cmd)))
+
+
+# See which parameters yield usable estimates.
+# A "bad" parameter set is one that has too few mutations and returns all zeros for a substitution profile within a particular motif.
+# The shmulate fitting code returns zeros as -inf due to log-taking, so if there are any rows that have no finite elements these parameters are "bad."
+@nest.add_target_with_env(localenv)
+def test_output(env, outdir, c):
+    def write_bad_rows(target, source, env):
+        c = env['control']
+        with open(str(source[0]), 'r') as pickle_file:
+            estimated = pickle.load(pickle_file)
+        with open(str(target[0]), 'w') as row_file:
+            row_writer = csv.writer(row_file, delimiter=',')
+            row_writer.writerow('germline_size taxa_size mutation_rate params'.split())
+            row_writer.writerow([c['germline_size'],
+                c['taxa_size'],
+                c['mutation_rate'],
+                'bad_params' if any([all([not np.isfinite(entry) for entry in row]) for row in estimated]) else 'good_params'])
+                # last line is checking to see if enough data/mutations went into these estimates
+
+    c['all_params'].append(env.Command(
+        join(outdir, 'test.csv'),
+        c['fit_shmulate'],
+        write_bad_rows,
+        control=c))
+
+# Aggregate over all parameter choices
+nest.pop('germline_size')
+
+# And concatenate into one file with parameter values and what type of data we obtained.
+@nest.add_target_with_env(localenv)
+def summarize(env, outdir, c):
+    def cat_files(target, source, env):
+        with open(str(target[0]), 'w') as catted_files:
+            with open(str(source[0])) as first_file:
+                # keep header from first file
+                for line in first_file:
+                    catted_files.write(line)
+        
+            for fname in source[1:]:
+                with open(str(fname)) as next_file:
+                    for line in next_file:
+                        if not line.startswith('germline_size'):
+                            catted_files.write(line)
+    return env.Command(
+        join(outdir, 'results.csv'),
+        c['all_params'],
+        cat_files)
+
