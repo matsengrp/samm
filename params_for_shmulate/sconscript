@@ -79,6 +79,7 @@ def test_output(env, outdir, c):
             estimated = pickle.load(pickle_file)
         with open(str(target[0]), 'w') as row_file:
             row_writer = csv.writer(row_file, delimiter=',')
+            row_writer.writerow('germline_size taxa_size mutation_rate params'.split())
             row_writer.writerow([c['germline_size'],
                 c['taxa_size'],
                 c['mutation_rate'],
