@@ -43,10 +43,14 @@ def parse_args():
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
-    parser.add_argument('--num-threads',
+    parser.add_argument('--num-cpu-threads',
         type=int,
-        help='number of threads to use during E-step',
+        help='number of threads to use during M-step',
         default=4)
+    parser.add_argument('--num-jobs',
+        type=int,
+        help='number of jobs to submit during E-step',
+        default=2)
     parser.add_argument('--solver',
         type=str,
         help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
@@ -168,7 +172,8 @@ def main(args=sys.argv[1:]):
         theta_mask = theta_mask,
         base_num_e_samples=args.num_e_samples,
         burn_in=args.burn_in,
-        num_threads=args.num_threads,
+        num_jobs=args.num_jobs,
+        num_threads=args.num_cpu_threads,
         approx='none',
     )
 

@@ -10,16 +10,16 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_threads, approx):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs, approx):
         """
         @param observed_data: list of ObservedSequenceMutations objects
         @param theta: numpy vector
         @param sampler_cls: class that inherits from Sampler class
         @param feat_generator: FeatureGenerator
-        @param num_threads: number of processes to create when performing gibbs sampling
+        @param num_jobs: number of jobs to submit when performing gibbs sampling
         @param approx: level of approximation to use to speed up Gibbs sampling
         """
-        self.num_threads = num_threads
+        self.num_jobs = num_jobs
 
         self.samplers = [
             sampler_cls(
@@ -43,7 +43,7 @@ class SamplerCollection:
             SamplerPoolWorker(sampler, init_order, num_samples, burn_in_sweeps)
             for sampler, init_order in zip(self.samplers, init_orders_for_iter)
         ]
-        batch_manager = BatchSubmissionManager(worker_list, self.num_threads, "results/gibbs_workers")
+        batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "results/gibbs_workers")
         # TODO: what to do if fails?
         sampled_orders_list = batch_manager.run()
 

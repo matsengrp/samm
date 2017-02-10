@@ -29,6 +29,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
             MutationOrderGibbsSampler,
             SurvivalProblemLasso,
             theta_mask,
+            num_jobs=1,
             num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
@@ -40,6 +41,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
             MutationOrderGibbsSampler,
             SurvivalProblemFusedLassoProximal,
             theta_mask,
+            num_jobs=1,
             num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
@@ -51,6 +53,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
             MutationOrderGibbsSampler,
             SurvivalProblemLassoCVXPY,
             theta_mask,
+            num_jobs=1,
             num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
@@ -62,6 +65,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
             MutationOrderGibbsSampler,
             SurvivalProblemFusedLassoCVXPY,
             theta_mask,
+            num_jobs=1,
             num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
