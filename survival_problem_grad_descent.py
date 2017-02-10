@@ -13,7 +13,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_param, theta_mask):
+    def __init__(self, feat_generator, samples, penalty_param, theta_mask, num_threads):
         """
         @param feat_generator: feature generator
         @param init_theta: where to initialize the gradient descent procedure from
@@ -36,6 +36,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         ]
         self.penalty_param = penalty_param
         self.pool = None
+        self.num_threads = num_threads
 
         self.post_init()
 
@@ -126,13 +127,14 @@ class SurvivalProblemCustom(SurvivalProblem):
             raise ValueError("Pool has not been initialized")
 
         rand_seed = get_randint()
-        ll = self.pool.map(
-            run_multiprocessing_worker,
-            [
-                ObjectiveValueWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
-                for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
-            ]
-        )
+        worker_list = [
+            ObjectiveValueWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+            for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
+        ]
+        if self.num_threads > 1:
+            ll = self.pool.map(run_multiprocessing_worker, worker_list)
+        else:
+            ll = map(run_multiprocessing_worker, worker_list)
         return 1.0/self.num_samples * np.sum(ll)
 
     def _get_gradient_log_lik(self, theta):

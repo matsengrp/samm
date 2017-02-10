@@ -3,7 +3,7 @@ import numpy as np
 import traceback
 from multiprocessing import Pool
 from models import ImputedSequenceMutations
-from parallel_worker import ParallelWorker, BatchSubmissionManager
+from parallel_worker import ParallelWorker, BatchSubmissionManager, run_multiprocessing_worker
 from common import get_randint
 import utils
 
@@ -46,9 +46,12 @@ class SamplerCollection:
             SamplerPoolWorker(rand_seed + i, sampler, init_order, num_samples, burn_in_sweeps)
             for i, (sampler, init_order) in enumerate(zip(self.samplers, init_orders_for_iter))
         ]
-        batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "_output/gibbs_workers")
-        # TODO: what to do if fails?
-        sampled_orders_list = batch_manager.run()
+        if self.num_jobs > 1:
+            batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "_output/gibbs_workers")
+            # TODO: what to do if fails?
+            sampled_orders_list = batch_manager.run()
+        else:
+            sampled_orders_list = map(run_multiprocessing_worker, worker_list)
 
         return sampled_orders_list
 
