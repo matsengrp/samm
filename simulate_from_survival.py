@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument('--min-censor-time',
         type=float,
         help='Minimum censoring time',
-        default=0.1)
+        default=0.01)
     parser.add_argument('--ratio-nonzero',
         type=float,
         help='Proportion of motifs that are nonzero',

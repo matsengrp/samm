@@ -7,7 +7,7 @@ from common import *
 from sampler_collection import SamplerCollection
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_threads=1, approx='none'):
+    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_jobs=1, num_threads=1, approx='none'):
         """
         @param observed_data: list of observed data (start and end sequences)
         @param feat_generator: an instance of a FeatureGenerator
@@ -16,7 +16,8 @@ class MCMC_EM:
         @param base_num_e_samples: number of E-step samples to draw initially
         @param burn_in: number of gibbs sweeps to do for burn in
         @param max_m_iters: maximum number of iterations for the M-step
-        @param num_threads: number of threads to use
+        @param num_jobs: number of jobs to submit for E-step
+        @param num_threads: number of threads to use for M-step
         """
         self.observed_data = observed_data
         self.feat_generator = feat_generator
@@ -26,6 +27,7 @@ class MCMC_EM:
         self.burn_in = burn_in
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
+        self.num_jobs = num_jobs
         self.num_threads = num_threads
         self.theta_mask = theta_mask
         self.approx = approx
@@ -53,7 +55,7 @@ class MCMC_EM:
                 prev_theta,
                 self.sampler_cls,
                 self.feat_generator,
-                self.num_threads,
+                self.num_jobs,
                 self.approx,
             )
 

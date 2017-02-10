@@ -5,7 +5,7 @@ import scipy as sp
 import logging as log
 from survival_problem import SurvivalProblem
 from parallel_worker import *
-from common import NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
+from common import *
 
 class SurvivalProblemCustom(SurvivalProblem):
     """
@@ -125,9 +125,13 @@ class SurvivalProblemCustom(SurvivalProblem):
         if self.pool is None:
             raise ValueError("Pool has not been initialized")
 
+        rand_seed = get_randint()
         ll = self.pool.map(
-            run_parallel_worker,
-            [ObjectiveValueWorker(theta, sample, feature_vecs, self.motif_len) for sample, feature_vecs in self.feature_vec_sample_pair]
+            run_multiprocessing_worker,
+            [
+                ObjectiveValueWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+                for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
+            ]
         )
         return 1.0/self.num_samples * np.sum(ll)
 
@@ -140,11 +144,12 @@ class SurvivalProblemCustom(SurvivalProblem):
         if self.pool is None:
             raise ValueError("Pool has not been initialized")
 
+        rand_seed = get_randint()
         l = self.pool.map(
-            run_parallel_worker,
+            run_multiprocessing_worker,
             [
-                GradientWorker(theta, sample, feature_vecs, self.motif_len)
-                for sample, feature_vecs in self.feature_vec_sample_pair
+                GradientWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+                for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
             ]
         )
         grad_ll_dtheta = np.sum(l, axis=0)
@@ -222,12 +227,13 @@ class GradientWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, theta, sample, feature_vecs, motif_len):
+    def __init__(self, seed, theta, sample, feature_vecs, motif_len):
         """
         @param theta: where to take the gradient of the total log likelihood
         @param sample: class ImputedSequenceMutations
         @param feature_vecs: list of sparse feature vectors for all at-risk positions at every mutation step
         """
+        self.seed = seed
         self.theta = theta
         self.sample = sample
         self.feature_vecs = feature_vecs
@@ -243,12 +249,13 @@ class ObjectiveValueWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
     """
-    def __init__(self, theta, sample, feature_vecs, motif_len):
+    def __init__(self, seed, theta, sample, feature_vecs, motif_len):
         """
         @param theta: where to take the gradient of the total log likelihood
         @param sample: class ImputedSequenceMutations
         @param feature_vecs: list of sparse feature vectors for all at-risk positions at every mutation step
         """
+        self.seed = seed
         self.theta = theta
         self.sample = sample
         self.feature_vecs = feature_vecs
