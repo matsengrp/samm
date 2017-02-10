@@ -84,11 +84,10 @@ class MCMC_EM:
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
-                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask)
+                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask, self.num_threads)
                 theta, pen_exp_log_lik = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
-                    num_threads=self.num_threads,
                 )
                 log.info("Current Theta")
                 log.info(

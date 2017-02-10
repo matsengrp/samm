@@ -1,7 +1,7 @@
 from common import NUM_NUCLEOTIDES
 
 class SurvivalProblem:
-    def __init__(self, feature_generator, samples, penalty_param, theta_mask):
+    def __init__(self, feature_generator, samples, penalty_param, theta_mask, num_threads):
         """
         @param samples: the observations for this problem, list of ImputedSequenceMutations
         @param feature_generator: FeatureGenerator
@@ -17,6 +17,7 @@ class SurvivalProblem:
         self.theta_mask = theta_mask
         self.theta_num_col = self.theta_mask.shape[1]
         self.per_target_model = self.theta_num_col == NUM_NUCLEOTIDES
+        self.num_threads = num_threads
 
     def solve(self, init_theta=None, max_iters=None, num_threads=1):
         """

@@ -20,7 +20,7 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         """
         return -(self.get_log_lik(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask], ord=1))
 
-    def solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
+    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
 
@@ -33,18 +33,18 @@ class SurvivalProblemLasso(SurvivalProblemCustom):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, step_size = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        theta, current_value, step_size = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
         return theta, -current_value
 
     def get_gradient_smooth(self, theta):
         return self._get_gradient_log_lik(theta)
 
-    def _solve(self, init_theta, max_iters=1000, num_threads=1, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
+    def _solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
         @return final fitted value of theta and penalized negative log likelihood and step size
         """
-        self.pool = Pool(num_threads)
+        self.pool = Pool(self.num_threads)
 
         st = time.time()
         theta = init_theta
