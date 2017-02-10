@@ -46,7 +46,7 @@ class SamplerCollection:
             SamplerPoolWorker(rand_seed + i, sampler, init_order, num_samples, burn_in_sweeps)
             for i, (sampler, init_order) in enumerate(zip(self.samplers, init_orders_for_iter))
         ]
-        batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "results/gibbs_workers")
+        batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "_output/gibbs_workers")
         # TODO: what to do if fails?
         sampled_orders_list = batch_manager.run()
 
