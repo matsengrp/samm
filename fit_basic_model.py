@@ -38,6 +38,13 @@ def parse_args():
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
+    parser.add_argument('--input-partis',
+        type=str,
+        help='partis annotations file',
+        default=SAMPLE_PARTIS_ANNOTATIONS)
+    parser.add_argument('--use-partis',
+        action='store_true',
+        help='use partis annotations file')
     parser.add_argument('--num-threads',
         type=str,
         help='number of threads to use during E-step',
@@ -73,7 +80,10 @@ def main(args=sys.argv[1:]):
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
-    gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+    if args.use_partis:
+        gene_dict, obs_data = read_partis_annotations(args.input_partis)
+    else:
+        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 
     motif_list = feat_generator.get_motif_list()
     motif_list.append('EDGES')
