@@ -93,7 +93,11 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     def create_for_mutation_steps(self, seq_mut_order, theta=None):
         """
         @param seq_mut_order: ImputedSequenceMutations
-        @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
+        @param theta: if a theta vector is given, it will also calculate the theta sum (theta * feature vector) for each position
+
+        @return: 1. list of sparse feature vectors for positions in the risk group after the i-th mutation,
+                2. list of intermediate sequences formed at each mutation step
+                3. If theta is given, list of theta sums for positions in the risk group at each mutation step. Otherwise None
         """
         num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
         intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq
@@ -151,11 +155,19 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         theta=None
     ):
         """
-        Returns a feature vec Given a list of steps that need to be updated
+        Returns a feature vec given a list of steps that need to be updated
         Note: This makes a copy of the lists given so it won't modify `base_feat_vec_dicts, base_intermediate_seqs` in place.
 
         @param seq_mut_order: ImputedSequenceMutations
-        @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
+        @param update_steps: which steps in the mutation sequence are different and need to be updated
+        @param base_feat_vec_dicts: list of feature vectors for positions from a similar mutation sequence
+        @param base_intermediate_seqs: list of sequences from a similar mutation sequence
+        @param base_feature_vec_theta_sums: list of theta sums from a similar mutation sequence
+        @param theta: if a theta vector is given, function will also calculate the theta sum (theta * feature vector) for each position
+
+        @return: 1. list of sparse feature vectors for positions in the risk group after the i-th mutation,
+                2. list of intermediate sequences formed at each mutation step
+                3. If theta and base_feature_vec_theta_sums given, list of theta sums for positions in the risk group at each mutation step. Otherwise None
         """
         num_steps = len(base_intermediate_seqs)
         intermediate_seqs = list(base_intermediate_seqs)
