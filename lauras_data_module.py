@@ -9,13 +9,22 @@ from itertools import product
 
 LAURA_DATA_PATH = '/fh/fast/matsen_e/processed-data/partis/laura-mb-2016-12-22/v8'
 
-def combine_lauras_data(pth, chain='h', ig_class='G'):
+def get_annotation_paths_from_lauras_data(pth, chain='h', ig_class='G'):
     """
-    Data has directories of the form
+    @param pth: prefix path to partis-processed data
+    @param chain: 'h', 'k' or 'l'
+    @param ig_class: 'G' or 'M' for heavy chain, o/w computed as chain.upper()
+
+    @returns: two lists, one of paths to annotations files and one of corresponding paths
+    to inferred germlines
+
+    Notes:
+    Data is in directories of the form
     
     BF520.{0}-ig{1}/Hs-LN-{2}-5RACE-Ig{3}/
 
     where
+
     {0}: seed_id from 1--10 if chain is 'h' o/w in {3,10} if chain is 'l' o/w in 1--10 \ {3,10}
     {1}: chain in {'h', 'k', 'l'}
     {2}: run_id in {'C', 'D'}
@@ -34,11 +43,11 @@ def combine_lauras_data(pth, chain='h', ig_class='G'):
     file_path = pth + '/seeds/BF520.{0}-ig{1}/Hs-LN-{2}-5RACE-Ig{3}/partition-cluster-annotations.csv'
     gl_path = pth + '/Hs-LN-{0}-5RACE-Ig{1}/hmm/germline-sets'
 
-    annotations = []
-    germlines = []
+    annotations_paths = []
+    germline_paths = []
     for seed, run in product(seeds, runs):
-        annotations.append(file_path.format(seed, chain, run, ig_class))
-        germlines.append(gl_path.format(run, ig_class, chain))
+        annotations_paths.append(file_path.format(seed, chain, run, ig_class))
+        germline_paths.append(gl_path.format(run, ig_class, chain))
 
-    return annotations, germlines
+    return annotations_paths, germline_paths
 
