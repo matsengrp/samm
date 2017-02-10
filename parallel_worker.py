@@ -29,7 +29,15 @@ class ParallelWorker:
         raise NotImplementedError()
 
 class BatchSubmissionManager:
+    """
+    Handles submitting jobs to a cluster
+    """
     def __init__(self, worker_list, num_approx_batches, worker_folder):
+        """
+        @param worker_list: List of ParallelWorkers
+        @param num_approx_batches: number of batches to make approximately (might be a bit more)
+        @param worker_folder: the folder to make all the results from the workers
+        """
         self.batch_worker_cmds = []
         self.output_files = []
         self.create_batch_worker_cmds(worker_list, num_approx_batches, worker_folder)
@@ -45,10 +53,6 @@ class BatchSubmissionManager:
         Pickles the workers as input files to the jobs
         The commands specify the output file names for each job - read these output files
         to retrieve the results from the jobs
-        @param worker_list: List of ParallelWorkers
-        @param num_approx_batches: number of batches to make approximately (might be a bit more)
-        @param worker_folder: the folder to make all the results from the workers
-        @return list of commands and the output file names
         """
         num_workers = len(worker_list)
         num_per_batch = num_workers/num_approx_batches

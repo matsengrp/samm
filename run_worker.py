@@ -1,5 +1,7 @@
 """
-Runs a bunch of gibbs samplers, prints results to a file
+Runs a bunch of parallel workers
+Reads pickled files as input
+Pickles results to an output file
 """
 import sys
 import argparse
