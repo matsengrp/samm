@@ -36,7 +36,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
 
         prev_feat_dicts, prev_intermediate_seqs, prev_log_probs, prev_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(prev_order)
         feat_dicts, intermediate_seqs, slow_log_probs, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
-        fast_log_probs = self.gibbs_sampler._update_log_prob_from_shuffle(2, prev_log_probs, curr_order, prev_order, feat_dicts, prev_feat_dicts, feature_vec_theta_sums, prev_feature_vec_theta_sums)
+        fast_log_probs = self.gibbs_sampler._update_log_prob_from_shuffle(2, prev_log_probs, curr_order, prev_order, feature_vec_theta_sums, prev_feature_vec_theta_sums)
 
         self.assertTrue(np.allclose(slow_log_probs, fast_log_probs))
 
