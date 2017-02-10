@@ -13,10 +13,6 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description=__doc__)
 
-    parser.add_argument('--seed',
-        type=int,
-        help='rng seed for replicability',
-        default=1533)
     parser.add_argument('--input-file',
         type=str,
         help='a pickle file',
@@ -31,7 +27,6 @@ def parse_args():
 
 def main(args=sys.argv[1:]):
     args = parse_args()
-    np.random.seed(args.seed)
     with open(args.input_file, "r") as input_file:
         workers = pickle.load(input_file)
 

@@ -16,6 +16,12 @@ ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
+def get_randint():
+    """
+    @return a random integer from a large range
+    """
+    return np.random.randint(low=0, high=2**32 - 1)
+
 def get_nonzero_theta_print_lines(theta, motif_list):
     """
     @return a string that summarizes the theta vector/matrix

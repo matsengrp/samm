@@ -1,8 +1,10 @@
 import sys
+import numpy as np
 import traceback
 from multiprocessing import Pool
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker, BatchSubmissionManager
+from common import get_randint
 import utils
 
 class SamplerCollection:
@@ -39,9 +41,10 @@ class SamplerCollection:
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
 
         """
+        rand_seed = get_randint()
         worker_list = [
-            SamplerPoolWorker(sampler, init_order, num_samples, burn_in_sweeps)
-            for sampler, init_order in zip(self.samplers, init_orders_for_iter)
+            SamplerPoolWorker(rand_seed + i, sampler, init_order, num_samples, burn_in_sweeps)
+            for i, (sampler, init_order) in enumerate(zip(self.samplers, init_orders_for_iter))
         ]
         batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "results/gibbs_workers")
         # TODO: what to do if fails?
@@ -53,13 +56,14 @@ class SamplerPoolWorker(ParallelWorker):
     """
     Stores the information for running a sampler
     """
-    def __init__(self, sampler, init_order, num_samples, burn_in_sweeps):
+    def __init__(self, seed, sampler, init_order, num_samples, burn_in_sweeps):
+        self.seed = seed
         self.sampler = sampler
         self.num_samples = num_samples
         self.burn_in_sweeps = burn_in_sweeps
         self.init_order = init_order
 
-    def run(self):
+    def _run(self):
         sampler_res = self.sampler.run(self.init_order, self.num_samples, self.burn_in_sweeps)
         return sampler_res
 

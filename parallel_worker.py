@@ -3,6 +3,7 @@ import traceback
 import pickle
 import utils
 from utils import CustomCommand
+import numpy as np
 
 class ParallelWorker:
     """
@@ -11,10 +12,17 @@ class ParallelWorker:
     1. Submit ParallelWorkers to a job submission system, e.g. slurm
     2. Run ParallelWorkers on multiple CPUs on the same machine
     """
-    def __init__(self):
+    def __init__(self, seed):
+        """
+        @param seed: a seed for for each parallel worker
+        """
         raise NotImplementedError()
 
     def run(self):
+        np.random.seed(self.seed)
+        return self._run()
+
+    def _run(self):
         """
         Returns whatever value needed from this task
         """
@@ -59,7 +67,7 @@ class BatchSubmissionManager:
             with open(input_file_name, "w") as cmd_input_file:
                 # Pickle the worker as input to the job
                 pickle.dump(batched_workers, cmd_input_file)
-                cmd_str = "python run_worker.py --seed %d --input-file %s --output-file %s" % (batch_idx, input_file_name, output_file_name)
+                cmd_str = "python run_worker.py --input-file %s --output-file %s" % (input_file_name, output_file_name)
                 batch_cmd = CustomCommand(
                     cmd_str,
                     outfname=output_file_name,
@@ -85,6 +93,8 @@ def run_multiprocessing_worker(worker):
     Function called by each worker process in the multiprocessing pool
     Note: this must be a global function
     """
+    np.random.seed(worker.seed)
+
     result = None
     try:
         result = worker.run()
