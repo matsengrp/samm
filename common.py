@@ -156,7 +156,7 @@ def read_bcr_hd5(path, remove_gap=True):
     else:
         return sites
 
-def read_partis_annotations(annotations_file_name, chain='h', use_v=True, species='human'):
+def read_partis_annotations(annotations_file_name, chain='h', use_v=True, species='human', use_np=True):
     """
     Function to read partis annotations csv
 
@@ -164,6 +164,7 @@ def read_partis_annotations(annotations_file_name, chain='h', use_v=True, specie
     @param chain: h for heavy, k or l for kappa or lambda light chain
     @param use_v: use just the V gene or use the whole sequence?
     @param species: 'human' or 'mouse'
+    @param use_np: use nonproductive sequences only
 
     TODO: do we want to output intermediate genes.csv/seqs.csv files?
 
@@ -180,22 +181,35 @@ def read_partis_annotations(annotations_file_name, chain='h', use_v=True, specie
     obs_data = []
 
     if use_v:
+        # cut sequences at V gene
         seqs_col = 'v_qr_seqs'
         gene_col = 'v_gl_seq'
     else:
+        # use whole sequence
         seqs_col = 'seqs'
         gene_col = 'naive_seq'
+
+    if use_np:
+        # return only nonproductive sequences
+        # here "nonproductive" is defined as having a stop codon or being
+        # out of frame or having a mutated conserved cysteine
+        good_seq = lambda seqs: seqs['stops'] or not seqs['in_frames'] or seqs['mutated_invariants']
+    else:
+        # return all sequences
+        good_seq = lambda seqs: [True for seq in seqs]
 
     with open(annotations_file_name, "r") as csvfile:
         reader = csv.DictReader(csvfile)
         for idx, line in enumerate(reader):
+            # add goodies from partis
             utils.process_input_line(line)
             utils.add_implicit_info(glfo, line)
             # for now just use V gene for ID
             key = 'clone{}-{}'.format(*[idx, line['v_gene']])
             gene_dict[key] = line[gene_col]
             start_seq = line[gene_col].lower()
-            for end_seq in line[seqs_col]:
+            good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
+            for end_seq in good_seqs:
                 obs_data.append(
                     ObservedSequenceMutations(
                         start_seq=start_seq[:len(end_seq)],
