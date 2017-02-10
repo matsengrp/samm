@@ -1,6 +1,15 @@
 import csv
 import numpy as np
 import pandas as pd
+import sys
+
+PARTIS_PATH = './partis'
+sys.path.insert(1, PARTIS_PATH + '/python')
+import utils
+import glutils
+
+# needed to read partis files
+csv.field_size_limit(sys.maxsize)
 
 from models import ObservedSequenceMutations
 NUM_NUCLEOTIDES = 4
@@ -12,6 +21,7 @@ NUCLEOTIDE_DICT = {
     "g": 3,
 }
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
+SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
@@ -154,6 +164,75 @@ def read_bcr_hd5(path, remove_gap=True):
         return sites.query('base != "-"')
     else:
         return sites
+
+def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None):
+    """
+    Function to read partis annotations csv
+
+    @param annotations_file_names: list of paths to annotations files
+    @param chain: h for heavy, k or l for kappa or lambda light chain
+    @param use_v: use just the V gene or use the whole sequence?
+    @param species: 'human' or 'mouse'
+    @param use_np: use nonproductive sequences only
+    @param inferred_gls: list of paths to partis-inferred germlines
+
+    TODO: do we want to output intermediate genes.csv/seqs.csv files?
+
+    TODO: do we want support for including multiple annotations files?
+    is this something people do, or is this done at the partis level?
+
+    @return gene_dict, obs_data
+    """
+
+    if not isinstance(annotations_file_names, list):
+        annotations_file_names = [annotations_file_names]
+
+    # read default germline info
+    if inferred_gls is not None:
+        germlines = {}
+        for germline_file in set(inferred_gls):
+            germlines[germline_file] = glutils.read_glfo(germline_file, chain=chain)
+    else:
+        glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
+        inferred_gls = [None] * len(annotations_file_names)
+    
+    gene_dict = {}
+    obs_data = []
+
+    seqs_col = 'v_qr_seqs' if use_v else 'seqs'
+    gene_col = 'v_gl_seq' if use_v else 'naive_seq'
+
+    if use_np:
+        # return only nonproductive sequences
+        # here "nonproductive" is defined as having a stop codon or being
+        # out of frame or having a mutated conserved cysteine
+        good_seq = lambda seqs: seqs['stops'] or not seqs['in_frames'] or seqs['mutated_invariants']
+    else:
+        # return all sequences
+        good_seq = lambda seqs: [True for seq in seqs[seqs_col]]
+
+    for annotations_file, germline_file in zip(annotations_file_names, inferred_gls):
+        if germline_file is not None:
+            glfo = germlines[germline_file]
+        with open(annotations_file, "r") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for idx, line in enumerate(reader):
+                # add goodies from partis
+                utils.process_input_line(line)
+                utils.add_implicit_info(glfo, line)
+                # for now just use V gene for ID
+                key = 'clone{}-{}'.format(*[idx, line['v_gene']])
+                gene_dict[key] = line[gene_col]
+                start_seq = line[gene_col].lower()
+                good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
+                for end_seq in good_seqs:
+                    obs_data.append(
+                        ObservedSequenceMutations(
+                            start_seq=start_seq[:len(end_seq)],
+                            end_seq=end_seq.lower(),
+                        )
+                    )
+    return gene_dict, obs_data
 
 def read_gene_seq_csv_data(gene_file_name, seq_file_name):
     gene_dict = {}

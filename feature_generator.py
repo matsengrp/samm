@@ -179,12 +179,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         @param no_feat_vec_pos: don't create feature vectors for these positions
         """
-        if pos < self.flank_end_len or pos > len(intermediate_seq) - 1 - self.flank_end_len:
-            # do special stuff cause positions are at the ends
+        submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
+        any_degenerate = any([nucleotide not in NUCLEOTIDES for nucleotide in submotif])
+        if pos < self.flank_end_len or pos > len(intermediate_seq) - 1 - self.flank_end_len or any_degenerate:
+            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
             # TODO: update this. right now it sets all extreme positions to the same feature
             idx = self.feature_vec_len - 1
         else:
-            submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
             idx = self.motif_dict[submotif]
         return [idx]
 
