@@ -156,7 +156,7 @@ class MutationOrderGibbsSampler(Sampler):
                 # multiply the sequence of multinomials to get the probability of the full ordering
                 # the product in {eq:full_ordering}
                 if self.approx == 'none':
-                    log_probs = self._update_log_prob_from_shuffle(i, log_probs, possible_full_order, prev_full_order, feat_vec_dicts, prev_feat_dicts, feature_vec_theta_sums, prev_feature_vec_theta_sums)
+                    log_probs = self._update_log_prob_from_shuffle(i, log_probs, possible_full_order, prev_full_order, feature_vec_theta_sums, prev_feature_vec_theta_sums)
                     full_ordering_log_prob = log_probs.sum()
                 else:
                     # Stupid speed up #2:
@@ -190,7 +190,7 @@ class MutationOrderGibbsSampler(Sampler):
         return gibbs_step_info, trace
 
     # @profile
-    def _update_log_prob_from_shuffle(self, i, old_log_probs, order, prev_order, feat_dicts, prev_feat_dicts, feature_vec_theta_sums, prev_feature_vec_theta_sums):
+    def _update_log_prob_from_shuffle(self, i, old_log_probs, order, prev_order, feature_vec_theta_sums, prev_feature_vec_theta_sums):
         """
         Calculate multinomial probs - only need to update 2 values (the one where this position mutates and
         the position that mutates right after it), rest are the same
@@ -198,8 +198,8 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_probs: the previous log probabilities - most of these are correct. only corrections need to occur in i and i + 1
         @param order: the order after the shuffle
         @param prev_order: the order before the shuffle
-        @param feat_dicts: the features after all mutation steps for the mutation order specified in `order`
-        @param prev_feat_dicts: the features after all mutation steps for the mutation order specified in `prev_order`
+        @param feature_vec_theta_sums: the theta sum values for each position after the shuffle
+        @param prev_feature_vec_theta_sums: the theta sum values for each position before the shuffle
         """
         log_probs = np.copy(old_log_probs)
         pos_mutate_earlier = order[i]
@@ -232,11 +232,11 @@ class MutationOrderGibbsSampler(Sampler):
 
 
     # @profile
-    def _get_multinomial_log_prob(self, feat_vec_dict, numerator_pos, feature_vec_theta_sum):
+    def _get_multinomial_log_prob(self, numerator_pos, feature_vec_theta_sum):
         """
         a single term in {eq:full_ordering}
         """
-        theta_sums = feature_vec_theta_sum.values() #[feature_vec_theta_sum[feat_vec] for feat_vec in feat_vec_dict.keys()]
+        theta_sums = feature_vec_theta_sum.values()
         multinomial_prob = feature_vec_theta_sum[numerator_pos] - scipy.misc.logsumexp(theta_sums)
         return multinomial_prob
 
@@ -274,13 +274,13 @@ class MutationOrderGibbsSampler(Sampler):
         if gibbs_step_base is None:
             # Compute probabilities if they haven't been already
             log_probs = np.array([
-                self._get_multinomial_log_prob(feat_vec_dict_step, curr_mutate_pos, theta_sum)
-                for curr_mutate_pos, feat_vec_dict_step, theta_sum in zip(curr_order, feat_vec_dicts, feature_vec_theta_sums)
+                self._get_multinomial_log_prob(curr_mutate_pos, theta_sum)
+                for curr_mutate_pos, theta_sum in zip(curr_order, feature_vec_theta_sums)
             ])
         elif self.approx == "none":
             log_probs = np.copy(gibbs_step_base.log_probs)
             for i in update_positions:
-                log_probs[i] = self._get_multinomial_log_prob(feat_vec_dicts[i], curr_order[i], feature_vec_theta_sums[i])
+                log_probs[i] = self._get_multinomial_log_prob( curr_order[i], feature_vec_theta_sums[i])
         else:
             # Otherwise just reorder precomputed probabilities
             log_probs = np.array([gibbs_step_base.log_probs[gibbs_step_base.order.index(item)] for item in curr_order])
