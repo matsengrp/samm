@@ -99,6 +99,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq
         intermediate_seqs = [intermediate_seq] + [None] * num_steps
         feature_vec_dicts = [self.create_for_sequence(intermediate_seq)] + [None] * num_steps
+
+        feature_vec_thetasums = None
         if theta is not None:
             feature_vec_thetasums = [
                 { p : get_theta_sum_mask(theta, feat_vec) for p,feat_vec in feature_vec_dicts[0].iteritems() }
@@ -137,10 +139,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                     feature_vec_thetasum_next[p] = get_theta_sum_mask(theta, feat_vec)
                 feature_vec_thetasums[i + 1] = feature_vec_thetasum_next
 
-        if theta is None:
-            return feature_vec_dicts, intermediate_seqs
-        else:
-            return feature_vec_dicts, intermediate_seqs, feature_vec_thetasums
+        return feature_vec_dicts, intermediate_seqs, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
     def update_for_mutation_steps(self,
@@ -161,7 +160,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         num_steps = len(base_intermediate_seqs)
         intermediate_seqs = list(base_intermediate_seqs)
         feature_vec_dicts = list(base_feat_vec_dicts)
-        feature_vec_thetasums = list(base_feature_vec_theta_sums)
+        feature_vec_thetasums = None
+        if theta is not None and base_feature_vec_theta_sums is not None:
+            feature_vec_thetasums = list(base_feature_vec_theta_sums)
         for i in update_steps:
             if i >= num_steps - 1:
                 break
@@ -198,10 +199,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                     feature_vec_thetasum_next[p] = get_theta_sum_mask(theta, feat_vec)
                 feature_vec_thetasums[i + 1] = feature_vec_thetasum_next
 
-        if theta is None:
-            return feature_vec_dicts, intermediate_seqs
-        else:
-            return feature_vec_dicts, intermediate_seqs, feature_vec_thetasums
+        return feature_vec_dicts, intermediate_seqs, feature_vec_thetasums
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """
