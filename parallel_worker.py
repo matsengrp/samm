@@ -1,8 +1,8 @@
 import os
 import traceback
 import pickle
-import utils
-from utils import CustomCommand
+import custom_utils
+from custom_utils import CustomCommand
 import numpy as np
 
 class ParallelWorker:
@@ -43,7 +43,7 @@ class BatchSubmissionManager:
         self.create_batch_worker_cmds(worker_list, num_approx_batches, worker_folder)
 
     def run(self):
-        utils.run_cmds(self.batch_worker_cmds)
+        custom_utils.run_cmds(self.batch_worker_cmds)
         res = self.read_batch_worker_results()
         return res
 
