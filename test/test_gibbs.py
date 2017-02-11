@@ -34,26 +34,27 @@ class MCMC_EM_TestCase(unittest.TestCase):
         prev_order = self.obs_seq_m.mutation_pos_dict.keys()
         curr_order = prev_order[:2] + [prev_order[3], prev_order[2]] + prev_order[4:]
 
-        prev_feat_dicts, prev_intermediate_seqs, prev_log_probs = self.gibbs_sampler._compute_log_probs(prev_order)
-        feat_dicts, intermediate_seqs, slow_log_probs = self.gibbs_sampler._compute_log_probs(curr_order)
-        fast_log_probs = self.gibbs_sampler._update_log_prob_from_shuffle(2, prev_log_probs, curr_order, prev_order, feat_dicts, prev_feat_dicts)
+        prev_feat_dicts, prev_intermediate_seqs, prev_log_probs, prev_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(prev_order)
+        feat_dicts, intermediate_seqs, slow_log_probs, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
+        fast_log_probs = self.gibbs_sampler._update_log_prob_from_shuffle(2, prev_log_probs, curr_order, prev_order, feature_vec_theta_sums, prev_feature_vec_theta_sums)
 
         self.assertTrue(np.allclose(slow_log_probs, fast_log_probs))
 
     def test_update_log_prob_for_positions(self):
         curr_order = self.obs_seq_m.mutation_pos_dict.keys()
-        curr_dicts, curr_seqs, curr_log_probs = self.gibbs_sampler._compute_log_probs(curr_order)
+        curr_dicts, curr_seqs, curr_log_probs, curr_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
 
         new_order = [curr_order[0], curr_order[-1]] + curr_order[1:-1]
-        feat_vec_dicts_slow, intermediate_seqs_slow, multinomial_sequence_slow = self.gibbs_sampler._compute_log_probs(new_order)
-        feat_vec_dicts, intermediate_seqs, multinomial_sequence = self.gibbs_sampler._compute_log_probs(
+        feat_vec_dicts_slow, intermediate_seqs_slow, multinomial_sequence_slow, feature_vec_theta_sums_slow = self.gibbs_sampler._compute_log_probs(new_order)
+        feat_vec_dicts, intermediate_seqs, multinomial_sequence, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(
             new_order,
-            GibbsStepInfo(curr_order, curr_dicts, curr_seqs, curr_log_probs),
+            GibbsStepInfo(curr_order, curr_dicts, curr_seqs, curr_feature_vec_theta_sums, curr_log_probs),
             update_positions=range(1, len(new_order)),
         )
         self.assertEqual(intermediate_seqs, intermediate_seqs_slow)
         self.assertEqual(feat_vec_dicts, feat_vec_dicts_slow)
         self.assertTrue(np.allclose(multinomial_sequence, multinomial_sequence_slow))
+        self.assertEqual(feature_vec_theta_sums, feature_vec_theta_sums_slow)
 
     def test_joint_distribution(self):
         """

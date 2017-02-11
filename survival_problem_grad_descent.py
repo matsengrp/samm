@@ -13,7 +13,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_param, theta_mask, num_threads):
+    def __init__(self, feat_generator, samples, penalty_param, theta_mask, num_threads=1):
         """
         @param feat_generator: feature generator
         @param init_theta: where to initialize the gradient descent procedure from

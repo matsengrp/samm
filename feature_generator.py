@@ -1,7 +1,6 @@
 import time
 import numpy as np
-from common import mutate_string
-from common import NUCLEOTIDES
+from common import *
 import itertools
 
 class FeatureGenerator:
@@ -77,9 +76,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
         feature_vec_dict = dict()
-        return self.update_for_sequence(feature_vec_dict, sequence, no_feat_vec_pos, do_feat_vec_pos)
+        return self.update_for_sequence(sequence, no_feat_vec_pos, do_feat_vec_pos)
 
-    def update_for_sequence(self, feature_vec_dict, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
+    def update_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
+        feature_vec_dict = dict()
         if do_feat_vec_pos is None:
             do_feat_vec_pos = set(range(len(sequence)))
 
@@ -90,15 +90,25 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feature_vec_dict
 
     # TODO: make this a real feature generator (deal with ends properly)
-    def create_for_mutation_steps(self, seq_mut_order):
+    def create_for_mutation_steps(self, seq_mut_order, theta=None):
         """
         @param seq_mut_order: ImputedSequenceMutations
-        @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
+        @param theta: if a theta vector is given, it will also calculate the theta sum (theta * feature vector) for each position
+
+        @return: 1. list of sparse feature vectors for positions in the risk group after the i-th mutation,
+                2. list of intermediate sequences formed at each mutation step
+                3. If theta is given, list of theta sums for positions in the risk group at each mutation step. Otherwise None
         """
         num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
         intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq
         intermediate_seqs = [intermediate_seq] + [None] * num_steps
         feature_vec_dicts = [self.create_for_sequence(intermediate_seq)] + [None] * num_steps
+
+        feature_vec_thetasums = None
+        if theta is not None:
+            feature_vec_thetasums = [
+                { p : get_theta_sum_mask(theta, feat_vec) for p,feat_vec in feature_vec_dicts[0].iteritems() }
+            ] + [None] * num_steps
 
         for i, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
             # update to get the new sequence after the i-th mutation
@@ -115,18 +125,25 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 max(mutation_pos - self.flank_end_len, 0),
                 min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
             ))
-            feat_vec_dict_update = feature_vec_dicts[i].copy()
-            feat_vec_dict_update.pop(seq_mut_order.mutation_order[i], None)
+            feat_vec_dict_next = feature_vec_dicts[i].copy()
+            feat_vec_dict_next.pop(seq_mut_order.mutation_order[i], None)
             feat_vec_dict_update = self.update_for_sequence(
-                feat_vec_dict_update,
                 intermediate_seq,
                 no_feat_vec_pos=no_feat_vec_pos,
                 do_feat_vec_pos=do_feat_vec_pos,
             )
-
-            feature_vec_dicts[i + 1] = feat_vec_dict_update
+            feat_vec_dict_next.update(feat_vec_dict_update)
+            feature_vec_dicts[i + 1] = feat_vec_dict_next
             intermediate_seqs[i + 1] = intermediate_seq
-        return feature_vec_dicts, intermediate_seqs
+
+            if theta is not None:
+                feature_vec_thetasum_next = feature_vec_thetasums[i].copy()
+                feature_vec_thetasum_next.pop(seq_mut_order.mutation_order[i], None)
+                for p, feat_vec in feat_vec_dict_update.iteritems():
+                    feature_vec_thetasum_next[p] = get_theta_sum_mask(theta, feat_vec)
+                feature_vec_thetasums[i + 1] = feature_vec_thetasum_next
+
+        return feature_vec_dicts, intermediate_seqs, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
     def update_for_mutation_steps(self,
@@ -134,17 +151,30 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         update_steps,
         base_feat_vec_dicts,
         base_intermediate_seqs,
+        base_feature_vec_theta_sums=None,
+        theta=None
     ):
         """
-        Returns a feature vec Given a list of steps that need to be updated
+        Returns a feature vec given a list of steps that need to be updated
         Note: This makes a copy of the lists given so it won't modify `base_feat_vec_dicts, base_intermediate_seqs` in place.
 
         @param seq_mut_order: ImputedSequenceMutations
-        @return: list of sparse feature vectors for positions in the risk group after the i-th mutation
+        @param update_steps: which steps in the mutation sequence are different and need to be updated
+        @param base_feat_vec_dicts: list of feature vectors for positions from a similar mutation sequence
+        @param base_intermediate_seqs: list of sequences from a similar mutation sequence
+        @param base_feature_vec_theta_sums: list of theta sums from a similar mutation sequence
+        @param theta: if a theta vector is given, function will also calculate the theta sum (theta * feature vector) for each position
+
+        @return: 1. list of sparse feature vectors for positions in the risk group after the i-th mutation,
+                2. list of intermediate sequences formed at each mutation step
+                3. If theta and base_feature_vec_theta_sums given, list of theta sums for positions in the risk group at each mutation step. Otherwise None
         """
         num_steps = len(base_intermediate_seqs)
         intermediate_seqs = list(base_intermediate_seqs)
         feature_vec_dicts = list(base_feat_vec_dicts)
+        feature_vec_thetasums = None
+        if theta is not None and base_feature_vec_theta_sums is not None:
+            feature_vec_thetasums = list(base_feature_vec_theta_sums)
         for i in update_steps:
             if i >= num_steps - 1:
                 break
@@ -163,17 +193,25 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 max(mutation_pos - self.flank_end_len, 0),
                 min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
             ))
-            feat_vec_dict_update = feature_vec_dicts[i].copy()
-            feat_vec_dict_update.pop(seq_mut_order.mutation_order[i], None)
+            feat_vec_dict_next = feature_vec_dicts[i].copy()
+            feat_vec_dict_next.pop(seq_mut_order.mutation_order[i], None)
             feat_vec_dict_update = self.update_for_sequence(
-                feat_vec_dict_update,
                 intermediate_seqs[i + 1],
                 no_feat_vec_pos=no_feat_vec_pos,
                 do_feat_vec_pos=do_feat_vec_pos,
             )
+            feat_vec_dict_next.update(feat_vec_dict_update)
 
-            feature_vec_dicts[i + 1] = feat_vec_dict_update
-        return feature_vec_dicts, intermediate_seqs
+            feature_vec_dicts[i + 1] = feat_vec_dict_next
+
+            if theta is not None:
+                feature_vec_thetasum_next = feature_vec_thetasums[i].copy()
+                feature_vec_thetasum_next.pop(seq_mut_order.mutation_order[i], None)
+                for p, feat_vec in feat_vec_dict_update.iteritems():
+                    feature_vec_thetasum_next[p] = get_theta_sum_mask(theta, feat_vec)
+                feature_vec_thetasums[i + 1] = feature_vec_thetasum_next
+
+        return feature_vec_dicts, intermediate_seqs, feature_vec_thetasums
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """

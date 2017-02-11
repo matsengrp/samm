@@ -1,7 +1,7 @@
 from common import NUM_NUCLEOTIDES
 
 class SurvivalProblem:
-    def __init__(self, feature_generator, samples, penalty_param, theta_mask, num_threads):
+    def __init__(self, feature_generator, samples, penalty_param, theta_mask, num_threads=1):
         """
         @param samples: the observations for this problem, list of ImputedSequenceMutations
         @param feature_generator: FeatureGenerator
@@ -19,15 +19,14 @@ class SurvivalProblem:
         self.per_target_model = self.theta_num_col == NUM_NUCLEOTIDES
         self.num_threads = num_threads
 
-    def solve(self, init_theta=None, max_iters=None, num_threads=1):
+    def solve(self, init_theta=None, max_iters=None):
         """
         Solve the problem
         @param init_theta: if this param is used, then the problem solver will initialize the theta
                             at this value
         @param max_iters: if this param is used, then this is the maximum number of iterations for
                             the problem solver
-        @param num_threads: if this param is used, number of threads to use to calculate the gradient
-
+        
         @return final fitted value of theta and objective function value
         """
         raise NotImplementedError()
