@@ -5,7 +5,7 @@ from multiprocessing import Pool
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker, BatchSubmissionManager, run_multiprocessing_worker
 from common import get_randint
-import utils
+import custom_utils
 
 class SamplerCollection:
     """
