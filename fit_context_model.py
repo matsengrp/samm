@@ -18,6 +18,7 @@ import scipy.stats
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from feature_generator import SubmotifFeatureGenerator
+from feat_generator_sparse import MotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
@@ -140,7 +141,8 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    # feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = MotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
     true_theta = load_true_theta(args.theta_file, args.per_target_model)

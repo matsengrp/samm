@@ -40,3 +40,8 @@ Run specific test method:
 ```
 python -m unittest test.test__YOUR_TEST__.__YOUR_TEST_CLASS__TestCase.__YOUR_TEST_METHOD__
 ```
+
+## Profiling code
+```
+kernprof -l -v __YOUR_PYTHON_FILE__.py
+```

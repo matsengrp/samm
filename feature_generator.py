@@ -2,6 +2,7 @@ import time
 import numpy as np
 from common import *
 import itertools
+from profile_support import profile
 
 class FeatureGenerator:
     """
@@ -76,10 +77,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
     def create_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
         feature_vec_dict = dict()
-        return self.update_for_sequence(sequence, no_feat_vec_pos, do_feat_vec_pos)
-
-    def update_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
-        feature_vec_dict = dict()
         if do_feat_vec_pos is None:
             do_feat_vec_pos = set(range(len(sequence)))
 
@@ -90,6 +87,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feature_vec_dict
 
     # TODO: make this a real feature generator (deal with ends properly)
+    @profile
     def create_for_mutation_steps(self, seq_mut_order, theta=None):
         """
         @param seq_mut_order: ImputedSequenceMutations
@@ -127,7 +125,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             ))
             feat_vec_dict_next = feature_vec_dicts[i].copy()
             feat_vec_dict_next.pop(seq_mut_order.mutation_order[i], None)
-            feat_vec_dict_update = self.update_for_sequence(
+            feat_vec_dict_update = self.create_for_sequence(
                 intermediate_seq,
                 no_feat_vec_pos=no_feat_vec_pos,
                 do_feat_vec_pos=do_feat_vec_pos,
@@ -195,7 +193,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             ))
             feat_vec_dict_next = feature_vec_dicts[i].copy()
             feat_vec_dict_next.pop(seq_mut_order.mutation_order[i], None)
-            feat_vec_dict_update = self.update_for_sequence(
+            feat_vec_dict_update = self.create_for_sequence(
                 intermediate_seqs[i + 1],
                 no_feat_vec_pos=no_feat_vec_pos,
                 do_feat_vec_pos=do_feat_vec_pos,
@@ -225,7 +223,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             idx = self.feature_vec_len - 1
         else:
             idx = self.motif_dict[submotif]
-        return [idx]
+        return np.array([idx])
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))

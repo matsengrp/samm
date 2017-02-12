@@ -7,6 +7,9 @@ from common import *
 
 from sampler_collection import Sampler
 from sampler_collection import SamplerResult
+from profile_support import profile
+
+from feature_generator import SubmotifFeatureGenerator
 
 class GibbsStepInfo:
     def __init__(self, order, feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums, log_probs):
@@ -240,7 +243,7 @@ class MutationOrderGibbsSampler(Sampler):
         multinomial_prob = feature_vec_theta_sum[numerator_pos] - scipy.misc.logsumexp(theta_sums)
         return multinomial_prob
 
-    # @profile
+    @profile
     def _compute_log_probs(self, curr_order, gibbs_step_base=None, update_positions=None):
         """
         Driver to compute probabilities with some precompute if statements
@@ -250,13 +253,22 @@ class MutationOrderGibbsSampler(Sampler):
         """
         if gibbs_step_base is None:
             # Compute dictionaries if we haven't yet
-            feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = self.feature_generator.create_for_mutation_steps(
+            feat_vec_things = self.feature_generator.create_for_mutation_steps(
                 ImputedSequenceMutations(
                     self.obs_seq_mutation,
                     curr_order,
                 ),
                 self.theta
             )
+            bad_feature_generator = SubmotifFeatureGenerator(motif_len = 3)
+            feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = bad_feature_generator.create_for_mutation_steps(
+                ImputedSequenceMutations(
+                    self.obs_seq_mutation,
+                    curr_order,
+                ),
+                self.theta
+            )
+            1/0
         else:
             # Update dictionaries if they've been computed already
             feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = self.feature_generator.update_for_mutation_steps(

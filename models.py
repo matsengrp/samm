@@ -1,3 +1,7 @@
+import numpy as np
+from profile_support import profile
+import scipy.sparse
+
 class ObservedSequenceMutations:
     def __init__(self, start_seq, end_seq):
         assert(len(start_seq) == len(end_seq))
@@ -63,3 +67,79 @@ class MutationEvent:
 
     def __str__(self):
         return "%d=%s (%.2g)" % (self.pos, self.target_nucleotide, self.time)
+
+class SequencePositionFeatures:
+    """
+    ?
+    """
+    def __init__(self, seq_str, feat_matrix, is_sparse, active_rows):
+        """
+        @param active_rows: np boolean array indicating active rows
+        @param theta_sums: np array with theta sums
+        """
+        self.seq_str = seq_str
+        self.feat_matrix = feat_matrix
+        self.csr_matrix = None
+        self.active_rows = active_rows
+        self.is_sparse = is_sparse
+        self.theta_sums = None
+
+    def get_active_positions(self):
+        return np.nonzero(self.active_rows)[0]
+
+    @profile
+    def update_feat_matrix(self, pos, feat_vec_idxs):
+        if self.is_sparse:
+            # We are manipulating the lil_matrix format
+            self.feat_matrix.rows[pos] = feat_vec_idxs
+            self.feat_matrix.data[pos] = [True] * feat_vec_idxs.size
+
+    @profile
+    def update_theta_sums(self, theta, pos_idxs=None):
+        if self.theta_sums is None:
+            self.theta_sums = np.NaN * np.ones(self.active_rows.size)
+
+        if self.is_sparse:
+            if pos_idxs is None:
+                # Update all the active positions
+                if self.csr_matrix is None:
+                    self.csr_matrix = scipy.sparse.csr_matrix(self.feat_matrix)
+                self.theta_sums[self.active_rows] = self.csr_matrix[self.active_rows, :] * theta
+            else:
+                # Update all the specified positions
+                # self.theta_sums[pos_idxs] = self.feat_matrix[pos_idxs, :] * theta
+
+                for p in pos_idxs:
+                    self.theta_sums[p] = theta[self.feat_matrix.rows[p]].sum()
+        else:
+            raise NotImplementedError()
+
+    @profile
+    def copy(self):
+        if self.is_sparse:
+            copy_feat_matrix = scipy.sparse.lil_matrix(self.feat_matrix)
+            # copy ONLY the wrapper around the matrix data, not the matrix data itself
+            # a lot of the lists will stay the same, so we want to keep those untouched
+            copy_feat_matrix.rows = self.feat_matrix.rows.copy()
+            copy_feat_matrix.data = self.feat_matrix.data.copy()
+        else:
+            raise NotImplementedError()
+
+        copy_feat = SequencePositionFeatures(
+            self.seq_str,
+            copy_feat_matrix,
+            self.is_sparse,
+            self.active_rows.copy(),
+        )
+
+        copy_feat.theta_sums = self.theta_sums.copy()
+        return copy_feat
+
+    def inactivate_position(self, position):
+        self.active_rows[position] = 0
+
+    def get_rows(self, pos_list):
+        return np.array([pos_row_dict[p] for p in pos_list])
+
+    def __str__(self):
+        return "%s" % self.seq_str
