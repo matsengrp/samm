@@ -33,7 +33,7 @@ class MCMC_EM:
         self.theta_mask = theta_mask
         self.approx = approx
 
-    @profile
+    # @profile
     def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
         """
         @param theta: initial value for theta in MCMC-EM

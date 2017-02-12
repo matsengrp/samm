@@ -38,17 +38,41 @@ class MotifFeatureGenerator(FeatureGenerator):
         @param obs_seq_mutation: ObservedSequenceMutations
         @returns SequencePositionFeatures
         """
-        feat_matrix = scipy.sparse.lil_matrix((obs_seq_mutation.seq_len, self.feature_vec_len), dtype=bool)
+        # feat_matrix = scipy.sparse.lil_matrix((obs_seq_mutation.seq_len, self.feature_vec_len), dtype=bool)
+        # for pos in range(obs_seq_mutation.seq_len):
+        #     feat_vec_idxs = self._get_feature_idxs(pos, obs_seq_mutation.start_seq)
+        #     feat_matrix.rows[pos] = feat_vec_idxs
+        #     feat_matrix.data[pos] = [True] * feat_vec_idxs.size
+
+        num_entries = 0
+        indices = []
+        indptr = [0]
+        # feat_matrix = scipy.sparse.lil_matrix((obs_seq_mutation.seq_len, self.feature_vec_len), dtype=bool)
+        rows = []
+        data = []
         for pos in range(obs_seq_mutation.seq_len):
             feat_vec_idxs = self._get_feature_idxs(pos, obs_seq_mutation.start_seq)
-            feat_matrix.rows[pos] = feat_vec_idxs
-            feat_matrix.data[pos] = [True] * feat_vec_idxs.size
+            rows.append(feat_vec_idxs)
+            num_entries += len(feat_vec_idxs)
+            indptr.append(num_entries)
+
+            # rows.append(feat_vec_idxs)
+            # data.append([True] * len(feat_vec_idxs))
+
+        data = [True] * num_entries
+        indices = np.concatenate(rows)
+        csr_matrix = scipy.sparse.csr_matrix((data, indices, indptr), shape=(obs_seq_mutation.seq_len, self.feature_vec_len),dtype=bool)
+        # feat_matrix = csr_matrix.tolil()
+        feat_matrix = None
 
         seq_pos_feats = SequencePositionFeatures(
             obs_seq_mutation.start_seq,
             feat_matrix,
             is_sparse,
-            np.ones(obs_seq_mutation.seq_len, dtype=bool)
+            np.ones(obs_seq_mutation.seq_len, dtype=bool),
+            csr_matrix=csr_matrix,
+            # feat_rows=rows,
+            # feat_data=data,
         )
         if theta is not None:
             seq_pos_feats.update_theta_sums(theta)
@@ -99,13 +123,48 @@ class MotifFeatureGenerator(FeatureGenerator):
 
         return mutation_risk_groups
 
-    # def update_for_mutation_steps(
-    #     self,
-    #     seq_mut_order,
-    #     update_steps,
-    #     base_feat_vec_dicts,
-    #     base_intermediate_seqs,
-    # ):
+    def update_for_mutation_steps(
+        self,
+        seq_mut_order,
+        update_steps,
+        base_mutation_risk_groups,
+        theta=None
+    ):
+        mutation_risk_groups = list(base_mutation_risk_groups)
+        no_feat_vec_pos = set(seq_mut_order.mutation_order[:update_steps[0]])
+        for i in update_steps:
+            mutation_pos = seq_mut_order.mutation_order[i]
+            # Make a copy of the features from the previous mutation step and update it
+            mutation_risk_groups[i+1] = mutation_risk_groups[i].copy()
+
+
+            # mutation_pos is the position that just mutated (so no longer in the risk group)
+            mutation_risk_groups[i+1].inactivate_position(mutation_pos)
+
+            # update to get the new sequence after the i-th mutation
+            mutation_risk_groups[i+1].seq_str = mutate_string(
+                mutation_risk_groups[i+1].seq_str,
+                mutation_pos,
+                seq_mut_order.obs_seq_mutation.mutation_pos_dict[mutation_pos]
+            )
+
+            # Get the feature vectors for the positions that might be affected by the latest mutation
+            # Don't calculate feature vectors for positions that have mutated already
+            no_feat_vec_pos = no_feat_vec_pos.union([mutation_pos])
+            # print "no_feat_vec_pos", no_feat_vec_pos
+            # Calculate feature vectors for positions that are close to the previous mutation
+            do_feat_vec_pos = set(range(
+                max(mutation_pos - self.flank_end_len, 0),
+                min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
+            ))
+            self.update_for_sequence(
+                mutation_risk_groups[i+1],
+                no_feat_vec_pos=no_feat_vec_pos,
+                do_feat_vec_pos=do_feat_vec_pos,
+                theta=theta
+            )
+
+        return mutation_risk_groups
 
     def _get_feature_idxs(self, pos, intermediate_seq):
         submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
@@ -116,7 +175,7 @@ class MotifFeatureGenerator(FeatureGenerator):
             idx = self.feature_vec_len - 1
         else:
             idx = self.motif_dict[submotif]
-        return np.array([idx])
+        return [idx]
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))

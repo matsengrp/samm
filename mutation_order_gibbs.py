@@ -92,7 +92,7 @@ class MutationOrderGibbsSampler(Sampler):
             traces
         )
 
-    # @profile
+    @profile
     def _do_gibbs_sweep(self, curr_order, gibbs_step_info=None):
         """
         One gibbs sweep is a gibbs sampling step for all the positions
@@ -144,6 +144,39 @@ class MutationOrderGibbsSampler(Sampler):
                     # If not the last mutation, update two feature vecs
                     update_steps = [i, i+1]
                 possible_full_order = partial_order[:i] + [position] + partial_order[i:]
+
+                feat_vec_things = self.feature_generator.create_for_mutation_steps(
+                    ImputedSequenceMutations(
+                        self.obs_seq_mutation,
+                        curr_order,
+                    ),
+                    self.theta
+                )
+
+                # Update dictionaries if they've been computed already
+                new_feat_vec_things = self.feature_generator.update_for_mutation_steps(
+                    ImputedSequenceMutations(
+                        self.obs_seq_mutation,
+                        curr_order,
+                    ),
+                    update_steps=update_steps,
+                    base_mutation_risk_groups = feat_vec_things,
+                    theta=self.theta,
+                )
+                bad_feature_generator = SubmotifFeatureGenerator(motif_len = 3)
+                feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = bad_feature_generator.update_for_mutation_steps(
+                    ImputedSequenceMutations(
+                        self.obs_seq_mutation,
+                        possible_full_order
+                    ),
+                    update_steps=update_steps,
+                    base_feat_vec_dicts = feat_vec_dicts,
+                    base_intermediate_seqs = intermediate_seqs,
+                    base_feature_vec_theta_sums = feature_vec_theta_sums,
+                    theta=self.theta,
+                )
+                1/0
+
                 feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = self.feature_generator.update_for_mutation_steps(
                     ImputedSequenceMutations(
                         self.obs_seq_mutation,
@@ -268,10 +301,26 @@ class MutationOrderGibbsSampler(Sampler):
                 ),
                 self.theta
             )
-            1/0
         else:
+            feat_vec_things = self.feature_generator.create_for_mutation_steps(
+                ImputedSequenceMutations(
+                    self.obs_seq_mutation,
+                    curr_order,
+                ),
+                self.theta
+            )
             # Update dictionaries if they've been computed already
-            feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = self.feature_generator.update_for_mutation_steps(
+            new_feat_vec_things = self.feature_generator.update_for_mutation_steps(
+                ImputedSequenceMutations(
+                    self.obs_seq_mutation,
+                    curr_order,
+                ),
+                update_steps=update_positions,
+                base_mutation_steps = feat_vec_things,
+                theta=self.theta,
+            )
+            bad_feature_generator = SubmotifFeatureGenerator(motif_len = 3)
+            feat_vec_dicts, intermediate_seqs, feature_vec_theta_sums = bad_feature_generator.update_for_mutation_steps(
                 ImputedSequenceMutations(
                     self.obs_seq_mutation,
                     curr_order,
@@ -282,6 +331,7 @@ class MutationOrderGibbsSampler(Sampler):
                 base_feature_vec_theta_sums = gibbs_step_base.feature_vec_theta_sums,
                 theta=self.theta,
             )
+            1/0
 
         if gibbs_step_base is None:
             # Compute probabilities if they haven't been already
