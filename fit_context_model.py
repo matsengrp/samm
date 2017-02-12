@@ -47,24 +47,24 @@ def parse_args():
     parser.add_argument('--num-cpu-threads',
         type=int,
         help='number of threads to use during M-step',
-        default=4)
+        default=1)
     parser.add_argument('--num-jobs',
         type=int,
         help='number of jobs to submit during E-step',
-        default=2)
+        default=1)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso with prox solver',
         choices=["CL", "CFL", "L", "FL"],
         default="FL")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
-        default=5)
+        default=3)
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
-        default=20)
+        default=1)
     parser.add_argument('--burn-in',
         type=int,
         help='number of burn-in iterations for E-step',
@@ -84,7 +84,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.01")
+        default="0.001")
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled true context model',
