@@ -43,6 +43,12 @@ class SurvivalProblemCustom(SurvivalProblem):
     def post_init(self):
         return
 
+    def get_value(self, theta):
+        """
+        @return negative penalized log likelihood
+        """
+        raise NotImplementedError()
+
     def get_log_lik(self, theta):
         """
         @return negative penalized log likelihood
@@ -60,6 +66,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                     SurvivalProblemCustom.calculate_per_sample_log_lik(prev_theta, sample, feature_vecs, self.motif_len)
         return llr_vec
 
+    # @profile
     @staticmethod
     def calculate_per_sample_log_lik(theta, sample, feature_vecs, motif_len):
         """
@@ -157,6 +164,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
 
+    # @profile
     @staticmethod
     def get_gradient_log_lik_per_sample(theta, sample, feature_vecs, motif_len):
         grad = np.zeros(theta.shape)
