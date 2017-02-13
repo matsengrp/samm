@@ -8,8 +8,9 @@ all of this in a separate file.
 from itertools import product
 
 LAURA_DATA_PATH = '/fh/fast/matsen_e/processed-data/partis/laura-mb-2016-12-22/v8'
+KATE_DATA_PATH = '/fh/fast/matsen_e/processed-data/partis/laura-mb-2016-12-22/v8'
 
-def get_annotation_paths_from_lauras_data(pth, chain='h', ig_class='G'):
+def get_atreca_seeded_data(pth, chain='h', ig_class='G'):
     """
     @param pth: prefix path to partis-processed data
     @param chain: 'h', 'k' or 'l'
@@ -19,7 +20,8 @@ def get_annotation_paths_from_lauras_data(pth, chain='h', ig_class='G'):
     to inferred germlines
 
     Notes:
-    Data is in directories of the form
+    Data in LAURA_DATA_PATH and KATE_DATA_PATH are in similar forms, as are other data sets
+    obtained via Atreca. Typically we have
     
     BF520.{0}-ig{1}/Hs-LN-{2}-5RACE-Ig{3}/
 
