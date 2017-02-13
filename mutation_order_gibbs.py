@@ -89,7 +89,7 @@ class MutationOrderGibbsSampler(Sampler):
             traces
         )
 
-    @profile
+    # @profile
     def _do_gibbs_sweep(self, curr_order, gibbs_step_info=None):
         """
         One gibbs sweep is a gibbs sampling step for all the positions
@@ -238,7 +238,7 @@ class MutationOrderGibbsSampler(Sampler):
         multinomial_prob = feature_vec_theta_sum[numerator_pos] - scipy.misc.logsumexp(theta_sums)
         return multinomial_prob
 
-    @profile
+    # @profile
     def _compute_log_probs(self, curr_order, gibbs_step_base=None, update_positions=None):
         """
         Driver to compute probabilities with some precompute if statements

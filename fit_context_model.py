@@ -46,11 +46,11 @@ def parse_args():
     parser.add_argument('--num-cpu-threads',
         type=int,
         help='number of threads to use during M-step',
-        default=4)
+        default=1)
     parser.add_argument('--num-jobs',
         type=int,
         help='number of jobs to submit during E-step',
-        default=2)
+        default=1)
     parser.add_argument('--solver',
         type=str,
         help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',

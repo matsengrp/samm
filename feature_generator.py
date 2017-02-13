@@ -1,3 +1,6 @@
+import numpy as np
+from common import get_theta_sum_mask
+
 class FeatureGenerator:
     """
     Subclass this to have various types of feature vector generators.
@@ -70,7 +73,7 @@ class FeatureMutationSteps:
     """
     Store all the features and other intermediate info at each mutation step
     """
-    def __init__(self, seq_mut_order=None, intermediate_seqs=None, feature_vec_dicts=None, feat_matrix0=None):
+    def __init__(self, seq_mut_order=None, intermediate_seqs=None, feature_vec_dicts=None, feat_matrix0=None, feat_matrix0T=None):
         """
         @param seq_mut_order: ImputedSequenceMutations[ObservedSequenceMutationsFeatures]
         """
@@ -79,17 +82,31 @@ class FeatureMutationSteps:
             self.intermediate_seqs = [seq_mut_order.obs_seq_mutation.start_seq] + [None] * num_steps
             self.feature_vec_dicts = [seq_mut_order.obs_seq_mutation.feat_dict] + [None] * num_steps
             self.feat_matrix0 = seq_mut_order.obs_seq_mutation.feat_matrix
-        elif intermediate_seqs is not None and feature_vec_dicts is not None and feat_matrix0 is not None:
+            self.feat_matrix0T = self.feat_matrix0.transpose()
+        elif intermediate_seqs is not None:
             self.intermediate_seqs = intermediate_seqs
             self.feature_vec_dicts = feature_vec_dicts
             self.feat_matrix0 = feat_matrix0
+            self.feat_matrix0T = feat_matrix0T
+
 
     def copy(self):
         return FeatureMutationSteps(
             intermediate_seqs=list(self.intermediate_seqs),
             feature_vec_dicts=list(self.feature_vec_dicts),
             feat_matrix0=self.feat_matrix0,
+            feat_matrix0T=self.feat_matrix0T,
         )
+
+    def get_theta_sum(self, mutation_step, position, theta, col_idx=None):
+        """
+        @param position:
+        """
+        if col_idx is not None:
+            return theta[self.feature_vec_dicts[mutation_step][position], col_idx].sum()
+        else:
+            mini_theta = theta[self.feature_vec_dicts[mutation_step][position], :]
+            return mini_theta.sum(axis=0)
 
     def get_init_theta_sum(self, theta):
         return self.feat_matrix0.dot(theta)

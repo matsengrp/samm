@@ -6,6 +6,7 @@ import logging as log
 from survival_problem import SurvivalProblem
 from parallel_worker import *
 from common import *
+from profile_support import profile
 
 class SurvivalProblemCustom(SurvivalProblem):
     """
@@ -13,23 +14,18 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
+    # TODO: Think about grouping samples together if they are from the same gibbs sampler
     def __init__(self, feat_generator, samples, penalty_param, theta_mask, num_threads=1):
-        """
-        @param feat_generator: feature generator
-        @param init_theta: where to initialize the gradient descent procedure from
-        @param penalty_param: the lasso parameter. should be non-negative
-        @param theta_mask: which elements in theta to estimate
-        """
         assert(penalty_param >= 0)
-
         self.feature_generator = feat_generator
         self.motif_len = feat_generator.motif_len
         self.samples = samples
         self.theta_mask = theta_mask
         self.num_samples = len(self.samples)
-        self.feature_vec_sample_pair = [
+        self.feature_mut_steps_pair = [
             (
                 sample,
+                # generate features, ignore the second return value from create_for_mutation_steps
                 self.feature_generator.create_for_mutation_steps(sample)[0],
             )
             for sample in samples
@@ -54,42 +50,74 @@ class SurvivalProblemCustom(SurvivalProblem):
         @return negative penalized log likelihood
         """
         log_lik = np.sum([
-            SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_vecs, self.motif_len)
-            for sample, feature_vecs in self.feature_vec_sample_pair
+            SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_mut_steps, self.motif_len)
+            for sample, feature_mut_steps in self.feature_mut_steps_pair
         ])
         return 1.0/self.num_samples * log_lik
 
     def calculate_log_lik_ratio_vec(self, theta, prev_theta):
         llr_vec = np.zeros(self.num_samples)
-        for sample_id, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair):
-            llr_vec[sample_id] = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_vecs, self.motif_len) - \
-                    SurvivalProblemCustom.calculate_per_sample_log_lik(prev_theta, sample, feature_vecs, self.motif_len)
+        for sample_id, (sample, feature_mut_steps) in enumerate(self.feature_mut_steps_pair):
+            llr_vec[sample_id] = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_mut_steps, self.motif_len) - \
+                    SurvivalProblemCustom.calculate_per_sample_log_lik(prev_theta, sample, feature_mut_steps, self.motif_len)
         return llr_vec
 
-    # @profile
+    def _get_log_lik_parallel(self, theta):
+        """
+        @return negative penalized log likelihood
+        """
+        if self.pool is None:
+            raise ValueError("Pool has not been initialized")
+
+        rand_seed = get_randint()
+        worker_list = [
+            ObjectiveValueWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+            for i, (sample, feature_vecs) in enumerate(self.feature_mut_steps_pair)
+        ]
+        if self.num_threads > 1:
+            ll = self.pool.map(run_multiprocessing_worker, worker_list)
+        else:
+            ll = map(run_multiprocessing_worker, worker_list)
+        return 1.0/self.num_samples * np.sum(ll)
+
+    def _get_gradient_log_lik(self, theta):
+        """
+        @param theta: where to take the gradient of the total log likelihood
+
+        @return the gradient of the total log likelihood wrt theta
+        """
+        if self.pool is None:
+            raise ValueError("Pool has not been initialized")
+
+        rand_seed = get_randint()
+        worker_list = [
+            GradientWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+            for i, (sample, feature_vecs) in enumerate(self.feature_mut_steps_pair)
+        ]
+        if self.num_threads > 1:
+            l = self.pool.map(run_multiprocessing_worker, worker_list)
+        else:
+            l = map(run_multiprocessing_worker, worker_list)
+        grad_ll_dtheta = np.sum(l, axis=0)
+        return -1.0/self.num_samples * grad_ll_dtheta
+
     @staticmethod
-    def calculate_per_sample_log_lik(theta, sample, feature_vecs, motif_len):
+    @profile
+    def calculate_per_sample_log_lik(theta, sample, feature_mutation_steps, motif_len):
         """
         Calculate the log likelihood of this sample - tries to minimize recalculations as much as possible
         """
         log_lik = 0
-        max_pos = len(feature_vecs[0]) - 1
+        max_pos = sample.obs_seq_mutation.seq_len - 1
 
         # Store the exp terms so we don't need to recalculate things
         # Gets updated when a position changes
-        exp_terms = np.exp(
-            [
-                [theta[one_feats, i].sum() for i in range(theta.shape[1])]
-                for one_feats in feature_vecs[0].values()
-            ]
-        )
-        # The sum of the exp terms. Update the sum accordingly to minimize recalculation
+        exp_terms = np.exp(feature_mutation_steps.get_init_theta_sum(theta))
         exp_sum = exp_terms.sum()
 
-        prev_pos_changed = [] # track positions that have mutated already
+        prev_pos_changed = set() # track positions that have mutated already
         prev_mutating_pos = None
-        prev_vecs_at_mutation_step = None
-        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
+        for mut_step, mutating_pos in enumerate(sample.mutation_order):
             if prev_mutating_pos is not None:
                 # Find the positions near the position that just mutated
                 # TODO: Assumes that the motif lengths are odd!
@@ -108,7 +136,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value
-                        exp_terms[p, :] = np.exp([theta[vecs_at_mutation_step[p], i].sum() for i in range(theta.shape[1])])
+                        exp_terms[p, :] = feature_mutation_steps.get_theta_sum(mut_step, p, theta)
                 # Add in the new exp terms from the exp sum
                 exp_sum += exp_terms[change_pos].sum()
 
@@ -119,77 +147,33 @@ class SurvivalProblemCustom(SurvivalProblem):
                 col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
 
             # Add to the log likelihood the log likelihood at this step: theta * psi - log(sum(exp terms))
-            log_lik += theta[vecs_at_mutation_step[mutating_pos], col_idx].sum() - np.log(exp_sum)
+            log_lik += feature_mutation_steps.get_theta_sum(mut_step, mutating_pos, theta, col_idx) - np.log(exp_sum)
 
             prev_mutating_pos = mutating_pos
-            prev_vecs_at_mutation_step = vecs_at_mutation_step
-            prev_pos_changed.append(mutating_pos)
+            prev_pos_changed.add(mutating_pos)
         return log_lik
 
-    def _get_log_lik_parallel(self, theta):
-        """
-        @return negative penalized log likelihood
-        """
-        if self.pool is None:
-            raise ValueError("Pool has not been initialized")
-
-        rand_seed = get_randint()
-        worker_list = [
-            ObjectiveValueWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
-            for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
-        ]
-        if self.num_threads > 1:
-            ll = self.pool.map(run_multiprocessing_worker, worker_list)
-        else:
-            ll = map(run_multiprocessing_worker, worker_list)
-        return 1.0/self.num_samples * np.sum(ll)
-
-    def _get_gradient_log_lik(self, theta):
-        """
-        @param theta: where to take the gradient of the total log likelihood
-
-        @return the gradient of the total log likelihood wrt theta
-        """
-        if self.pool is None:
-            raise ValueError("Pool has not been initialized")
-
-        rand_seed = get_randint()
-        l = self.pool.map(
-            run_multiprocessing_worker,
-            [
-                GradientWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
-                for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
-            ]
-        )
-        grad_ll_dtheta = np.sum(l, axis=0)
-        return -1.0/self.num_samples * grad_ll_dtheta
-
-    # @profile
     @staticmethod
-    def get_gradient_log_lik_per_sample(theta, sample, feature_vecs, motif_len):
+    @profile
+    def get_gradient_log_lik_per_sample(theta, sample, feature_mutation_steps, motif_len):
+        """
+        @param feature_mutation_steps: FeatureMutationSteps
+        """
         grad = np.zeros(theta.shape)
-        max_pos = len(feature_vecs[0]) - 1
+        max_pos = sample.obs_seq_mutation.seq_len - 1
 
         # Store the exp terms so we don't need to recalculate things
         # Gets updated when a position changes
-        exp_terms = np.exp(
-            [
-                [theta[one_feats, i].sum() for i in range(theta.shape[1])]
-                for one_feats in feature_vecs[0].values()
-            ]
-        )
-        # The sum of the exp terms. Update the sum accordingly to minimize recalculation
+        exp_terms = np.exp(feature_mutation_steps.get_init_theta_sum(theta))
         exp_sum = exp_terms.sum()
 
         # Store the gradient vector (not normalized) so we don't need to recalculate things
-        grad_log_sum_exp = np.zeros(theta.shape)
-        for pos, feat_vec in feature_vecs[0].iteritems():
-            grad_log_sum_exp[feat_vec, :] += exp_terms[pos, :]
+        grad_log_sum_exp = feature_mutation_steps.feat_matrix0T * exp_terms
 
         prev_pos_changed = [] # track positions that have mutated already
         prev_mutating_pos = None
         prev_vecs_at_mutation_step = None
-        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
+        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_mutation_steps.feature_vec_dicts):
             if prev_mutating_pos is not None:
                 # Find the positions near the position that just mutated
                 # TODO: Assumes that the motif lengths are odd!
@@ -212,9 +196,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
                         # remove old exp term from gradient
                         grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= exp_terms[p, :]
-                        exp_terms[p,:] = np.exp(
-                            [theta[vecs_at_mutation_step[p], i].sum() for i in range(theta.shape[1])]
-                        )
+                        exp_terms[p,:] = np.exp(theta[vecs_at_mutation_step[p], :].sum(axis=0))
                         # add new exp term to gradient
                         grad_log_sum_exp[vecs_at_mutation_step[p], :] += exp_terms[p, :]
                 # Add in the new exp terms from the exp sum
@@ -254,6 +236,7 @@ class GradientWorker(ParallelWorker):
         @return the gradient of the log likelihood for this sample
         """
         return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs, self.motif_len)
+        # return get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs, self.motif_len)
 
 class ObjectiveValueWorker(ParallelWorker):
     """
@@ -276,3 +259,4 @@ class ObjectiveValueWorker(ParallelWorker):
         @return the log likelihood for this sample
         """
         return SurvivalProblemCustom.calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs, self.motif_len)
+        # return calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs, self.motif_len)
