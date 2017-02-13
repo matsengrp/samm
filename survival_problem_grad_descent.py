@@ -154,13 +154,15 @@ class SurvivalProblemCustom(SurvivalProblem):
             raise ValueError("Pool has not been initialized")
 
         rand_seed = get_randint()
-        l = self.pool.map(
-            run_multiprocessing_worker,
-            [
-                GradientWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
-                for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
-            ]
-        )
+        worker_list = [
+            GradientWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+            for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
+        ]
+        if self.num_threads > 1:
+            l = self.pool.map(run_multiprocessing_worker, worker_list)
+        else:
+            l = map(run_multiprocessing_worker, worker_list)
+
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
 
