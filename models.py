@@ -22,7 +22,8 @@ class ObservedSequenceMutations:
 class ImputedSequenceMutations:
     def __init__(self, obs_seq_mutation, mutation_order):
         """
-        @param obs_seq_mutation: ObservedSequenceMutations
+        @param obs_seq_mutation: any object that needs to get augmented by a mutation order
+                                (e.g. ObservedSequenceMutations or ObservedSequenceMutationsFeatures)
         @param mutation_order: a list of the positions in the order they mutated
         """
         self.obs_seq_mutation = obs_seq_mutation

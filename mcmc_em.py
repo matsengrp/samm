@@ -9,7 +9,7 @@ from sampler_collection import SamplerCollection
 class MCMC_EM:
     def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_jobs=1, num_threads=1, approx='none'):
         """
-        @param observed_data: list of observed data (start and end sequences)
+        @param observed_data: list of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
         @param sampler_cls: a Sampler class
         @param problem_solver_cls: SurvivalProblem class

@@ -14,7 +14,7 @@ class SamplerCollection:
     """
     def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs, approx):
         """
-        @param observed_data: list of ObservedSequenceMutations objects
+        @param observed_data: list of ObservedSequenceMutationsFeatures objects
         @param theta: numpy vector
         @param sampler_cls: class that inherits from Sampler class
         @param feat_generator: FeatureGenerator
@@ -86,7 +86,7 @@ class Sampler:
         """
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
-        @param obs_seq_mutation: a ObservedSequenceMutations to know the starting and ending sequence
+        @param obs_seq_mutation: ObservedSequenceMutationsFeatures
         @param approx: level of approximation to use to speed up Gibbs sampling (none, faster)
         """
         self.theta = theta

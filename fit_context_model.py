@@ -17,7 +17,7 @@ import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
@@ -148,7 +148,11 @@ def main(args=sys.argv[1:]):
 
     log.info("Reading data")
     gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
-    log.info("Number of sequences %d" % len(obs_data))
+    obs_seq_feat_base = []
+    for obs_seq_mutation in obs_data:
+        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
+
+    log.info("Number of sequences %d" % len(obs_seq_feat_base))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
@@ -165,7 +169,7 @@ def main(args=sys.argv[1:]):
     theta[~theta_mask] = -np.inf
 
     em_algo = MCMC_EM(
-        obs_data,
+        obs_seq_feat_base,
         feat_generator,
         args.sampler_cls,
         args.problem_solver_cls,
