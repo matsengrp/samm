@@ -136,7 +136,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value
-                        exp_terms[p, :] = feature_mutation_steps.get_theta_sum(mut_step, p, theta)
+                        exp_terms[p, :] = np.exp(feature_mutation_steps.get_theta_sum(mut_step, p, theta))
                 # Add in the new exp terms from the exp sum
                 exp_sum += exp_terms[change_pos].sum()
 
