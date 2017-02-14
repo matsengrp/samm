@@ -200,6 +200,7 @@ class MutationOrderGibbsSampler(Sampler):
         @param feature_vec_theta_sums: the theta sum values for each position after the shuffle
         @param prev_feature_vec_theta_sums: the theta sum values for each position before the shuffle
         """
+        ### TODO: IS THIS FUNCTION CORRECT FOR MULTIPLE THETA COLUMNS
         log_probs = np.copy(old_log_probs)
         pos_mutate_earlier = order[i]
         pos_mutate_later = prev_order[i]

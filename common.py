@@ -278,6 +278,3 @@ def get_idx_differ_by_one_character(s1, s2):
             count_diffs += 1
             idx_differ = i
     return idx_differ
-
-def get_theta_sum_mask(theta, feature_mask):
-    return theta[feature_mask].sum()

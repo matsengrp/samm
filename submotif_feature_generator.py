@@ -53,16 +53,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feat_dict,
         )
 
-    @profile
-    def create_for_sequence(self, sequence, do_feat_vec_pos, no_feat_vec_pos=set()):
-        feature_vec_dict = dict()
-
-        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
-        for pos in do_feat_vec_pos - no_feat_vec_pos:
-            feature_vec_dict[pos] = self._create_feature_vec_for_pos(pos, sequence)
-
-        return feature_vec_dict
-
     # TODO: make this a real feature generator (deal with ends properly)
     def create_for_mutation_steps(self, seq_mut_order, theta=None):
         num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
@@ -162,11 +152,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             max(mutation_pos - self.flank_end_len, 0),
             min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
         ))
-        feat_vec_dict_update = self.create_for_sequence(
-            new_intermediate_seq,
-            no_feat_vec_pos=no_feat_vec_pos,
-            do_feat_vec_pos=do_feat_vec_pos,
-        )
+
+        # Generate features for the positions that need to be updated
+        # (don't make a function out of this -- python function call overhead is too high)
+        feat_vec_dict_update = dict()
+        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        for pos in do_feat_vec_pos - no_feat_vec_pos:
+            feat_vec_dict_update[pos] = self._create_feature_vec_for_pos(pos, new_intermediate_seq)
 
         feat_vec_dict_next = feat_mutation_steps.feature_vec_dicts[i].copy() # shallow copy of dictionary
         feat_vec_dict_next.pop(mutation_pos, None)
@@ -177,8 +169,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
             feature_vec_thetasum_next.pop(mutation_pos, None)
             for p, feat_vec in feat_vec_dict_update.iteritems():
-                ### TODO: IS THIS CORRECT FOR MULTIPLE THETA COLUMNS
-                feature_vec_thetasum_next[p] = get_theta_sum_mask(theta, feat_vec)
+                ### TODO: IS THIS CORRECT FOR MULTIPLE THETA COLUMNS?
+                feature_vec_thetasum_next[p] = theta[feat_vec,:].sum()
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 

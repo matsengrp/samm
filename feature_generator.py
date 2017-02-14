@@ -1,5 +1,4 @@
 import numpy as np
-from common import get_theta_sum_mask
 
 class FeatureGenerator:
     """
@@ -9,17 +8,6 @@ class FeatureGenerator:
     corresponding index in the list of motifs (changing the right-hand bases
     first). We call these "sparse feature vectors".
     """
-
-    def create_for_sequence(self, sequence, do_feat_vec_pos, no_feat_vec_pos=[]):
-        """
-        @param sequence: current sequence (string)
-        @param no_feat_vec_pos: do NOT generate feature vectors for these positions
-        @return: list of sparse feature vectors
-
-        If there are positions in both no_feat_vec_pos and do_feat_vec_pos, then
-        no feature vector is generated for that position.
-        """
-        raise NotImplementedError()
 
     def create_for_mutation_steps(self, seq_mut_order):
         """
