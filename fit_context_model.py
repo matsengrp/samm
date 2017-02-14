@@ -19,7 +19,6 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
-from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
@@ -128,11 +127,10 @@ def parse_args():
             args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     # Determine sampler
+    args.sampler_cls = MutationOrderGibbsSampler
     if args.per_target_model:
-        args.sampler_cls = MutationOrderGibbsSamplerMultiTarget
         args.theta_num_col = NUM_NUCLEOTIDES
     else:
-        args.sampler_cls = MutationOrderGibbsSampler
         args.theta_num_col = 1
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)

@@ -105,8 +105,9 @@ def run_multiprocessing_worker(worker):
     try:
         result = worker.run()
     except Exception as e:
-        if DEBUG:
-            raise Exception(e)
         print "Exception caught: %s" % e
         traceback.print_exc()
+        if DEBUG:
+            raise Exception
+
     return result

@@ -157,7 +157,14 @@ class MutationOrderGibbsSampler(Sampler):
                 # multiply the sequence of multinomials to get the probability of the full ordering
                 # the product in {eq:full_ordering}
                 if self.approx == 'none':
-                    log_probs = self._update_log_prob_from_shuffle(i, log_probs, possible_full_order, prev_full_order, feature_vec_theta_sums, prev_feature_vec_theta_sums)
+                    log_probs = self._update_log_prob_from_shuffle(
+                        i,
+                        log_probs,
+                        possible_full_order,
+                        prev_full_order,
+                        feature_vec_theta_sums,
+                        prev_feature_vec_theta_sums,
+                    )
                     full_ordering_log_prob = log_probs.sum()
                 else:
                     # Stupid speed up #2:
@@ -200,13 +207,14 @@ class MutationOrderGibbsSampler(Sampler):
         @param feature_vec_theta_sums: the theta sum values for each position after the shuffle
         @param prev_feature_vec_theta_sums: the theta sum values for each position before the shuffle
         """
-        ### TODO: IS THIS FUNCTION CORRECT FOR MULTIPLE THETA COLUMNS
         log_probs = np.copy(old_log_probs)
         pos_mutate_earlier = order[i]
         pos_mutate_later = prev_order[i]
 
         # Term at `i` is easy to update: just change out the numerator from the multinomial (but log it)
-        log_probs[i] += feature_vec_theta_sums[i][pos_mutate_earlier] - feature_vec_theta_sums[i][pos_mutate_later]
+        col_idx_earlier = self._get_target_col(pos_mutate_earlier) if self.per_target_model else 0
+        col_idx_later = self._get_target_col(pos_mutate_later) if self.per_target_model else 0
+        log_probs[i] += feature_vec_theta_sums[i][pos_mutate_earlier][col_idx_earlier] - feature_vec_theta_sums[i][pos_mutate_later][col_idx_later]
 
         # Term at `i + 1` is complicated: we need to change out the numerator and some terms in the denominator
         # Remember that the denominator is the sum of exp thetas - some of the thetas are have the wrong value if the mutation order is shuffled
@@ -217,29 +225,18 @@ class MutationOrderGibbsSampler(Sampler):
             + range(max(pos_mutate_later - self.motif_len/2, 0), min(pos_mutate_later + self.motif_len/2 + 1, self.seq_len))
         ) - set(order[:i])
 
-        old_sumexp = np.exp(prev_feature_vec_theta_sums[i + 1][pos_mutate_earlier] - log_probs[i + 1])
+        old_sumexp = np.exp(prev_feature_vec_theta_sums[i + 1][pos_mutate_earlier][col_idx_earlier] - log_probs[i + 1])
 
-        # TODO: ARE THESE CORRECT if theta is multi column?
-        old_sumexp_terms = sum([
-            np.exp(prev_feature_vec_theta_sums[i + 1][p]) for p in changed_feature_positions if p != pos_mutate_later
+        old_sumexp_terms = np.exp([
+            prev_feature_vec_theta_sums[i + 1][p] for p in changed_feature_positions if p != pos_mutate_later
         ])
-        new_sumexp_terms = sum(np.exp([feature_vec_theta_sums[i + 1][p] for p in changed_feature_positions if p != pos_mutate_earlier]))
+        new_sumexp_terms = np.exp([feature_vec_theta_sums[i + 1][p] for p in changed_feature_positions if p != pos_mutate_earlier])
 
-        log_probs[i + 1] = feature_vec_theta_sums[i + 1][pos_mutate_later] - np.log(
-            old_sumexp + new_sumexp_terms - old_sumexp_terms
+        log_probs[i + 1] = feature_vec_theta_sums[i + 1][pos_mutate_later][col_idx_later] - np.log(
+            old_sumexp + new_sumexp_terms.sum() - old_sumexp_terms.sum()
         )
 
         return log_probs
-
-
-    def _get_multinomial_log_prob(self, numerator_pos, feature_vec_theta_sum):
-        """
-        a single term in {eq:full_ordering}
-        """
-        # TODO: TAKE THIS OUT - this can get slow! we need to use previous computations
-        theta_sums = feature_vec_theta_sum.values()
-        multinomial_prob = feature_vec_theta_sum[numerator_pos] - scipy.misc.logsumexp(theta_sums)
-        return multinomial_prob
 
     def _compute_log_probs(self, curr_order, gibbs_step_base=None, update_positions=None):
         """
@@ -270,7 +267,7 @@ class MutationOrderGibbsSampler(Sampler):
                 theta=self.theta,
             )
 
-        # TODO: UPDATE THIS SECION - this can get slow! we need to use previous computations
+        # TODO: UPDATE THIS SECTION - this can get slow! we need to use previous computations
         if gibbs_step_base is None:
             # Compute probabilities if they haven't been already
             log_probs = np.array([
@@ -287,25 +284,22 @@ class MutationOrderGibbsSampler(Sampler):
 
         return feat_mutation_steps, log_probs, feature_vec_theta_sums
 
-class MutationOrderGibbsSamplerMultiTarget(MutationOrderGibbsSampler):
-    """
-    Deals with different theta vector for each target nucleotide
-    """
-    def _get_multinomial_prob(self, feat_vec_dict, numerator_pos):
+    def _get_multinomial_log_prob(self, numerator_pos, feature_vec_theta_sum):
         """
+        This is for the case where theta is 1-dimensional!
         a single term in {eq:full_ordering}
         """
-        # Calculate the components in the risk group (risk group is all positions
-        # that have not mutated yet)
-        theta_sums = [
-            self.theta[feat_vec, i].sum() for pos, feat_vec in feat_vec_dict.iteritems() for i in range(NUM_NUCLEOTIDES)
-        ]
-
-        numerator_target_nucleotide = self.obs_seq_mutation.mutation_pos_dict[numerator_pos]
-        multinomial_prob = np.exp(
-            self.theta[
-                feat_vec_dict[numerator_pos], # motif idx
-                NUCLEOTIDE_DICT[numerator_target_nucleotide] # target nucleotide
-            ].sum() - scipy.misc.logsumexp(theta_sums)
-        )
+        # TODO: TAKE THIS OUT - this can get slow! we need to use previous computations
+        theta_sums = feature_vec_theta_sum.values()
+        col_idx = self._get_target_col(numerator_pos) if self.per_target_model else 0
+        multinomial_prob = feature_vec_theta_sum[numerator_pos][col_idx] - scipy.misc.logsumexp(theta_sums)
         return multinomial_prob
+
+    def _get_target_col(self, mutation_pos):
+        """
+        ONLY call this if self.per_target_model is True
+        Determine which column to read out corresponding to the target nucleotide
+        """
+        # TODO: switch dna sequences to numerical
+        target_nucleotide = self.obs_seq_mutation.mutation_pos_dict[mutation_pos]
+        return NUCLEOTIDE_DICT[target_nucleotide]

@@ -4,7 +4,7 @@ import traceback
 from multiprocessing import Pool
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker, BatchSubmissionManager, run_multiprocessing_worker
-from common import get_randint
+from common import get_randint, NUM_NUCLEOTIDES
 import custom_utils
 
 class SamplerCollection:
@@ -90,6 +90,7 @@ class Sampler:
         @param approx: level of approximation to use to speed up Gibbs sampling (none, faster)
         """
         self.theta = theta
+        self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES
         self.feature_generator = feature_generator
         self.motif_len = self.feature_generator.motif_len
         self.obs_seq_mutation = obs_seq_mutation
