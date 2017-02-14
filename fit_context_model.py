@@ -17,7 +17,7 @@ import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
@@ -47,16 +47,16 @@ def parse_args():
     parser.add_argument('--num-cpu-threads',
         type=int,
         help='number of threads to use during M-step',
-        default=4)
+        default=1)
     parser.add_argument('--num-jobs',
         type=int,
         help='number of jobs to submit during E-step',
-        default=2)
+        default=1)
     parser.add_argument('--solver',
         type=str,
         help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
         choices=["CL", "CFL", "L", "FL"],
-        default="FL")
+        default="L")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -170,7 +170,11 @@ def main(args=sys.argv[1:]):
         gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
     else:
         gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
-    log.info("Number of sequences %d" % len(obs_data))
+
+    obs_seq_feat_base = []
+    for obs_seq_mutation in obs_data:
+        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
+    log.info("Number of sequences %d" % len(obs_seq_feat_base))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
@@ -187,7 +191,7 @@ def main(args=sys.argv[1:]):
     theta[~theta_mask] = -np.inf
 
     em_algo = MCMC_EM(
-        obs_data,
+        obs_seq_feat_base,
         feat_generator,
         args.sampler_cls,
         args.problem_solver_cls,

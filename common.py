@@ -14,6 +14,7 @@ csv.field_size_limit(sys.maxsize)
 from models import ObservedSequenceMutations
 NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "atcg"
+NUCLEOTIDE_SET = set(["a", "t", "c", "g"])
 NUCLEOTIDE_DICT = {
     "a": 0,
     "t": 1,
@@ -25,6 +26,12 @@ SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
+
+def contains_degenerate_base(seq_str):
+    for nucleotide in seq_str:
+        if nucleotide not in NUCLEOTIDE_SET:
+            return True
+    return False
 
 def get_randint():
     """
@@ -197,7 +204,7 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
     else:
         glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
         inferred_gls = [None] * len(annotations_file_names)
-    
+
     gene_dict = {}
     obs_data = []
 
@@ -273,6 +280,3 @@ def get_idx_differ_by_one_character(s1, s2):
             count_diffs += 1
             idx_differ = i
     return idx_differ
-
-def get_theta_sum_mask(theta, feature_mask):
-    return theta[feature_mask].sum()

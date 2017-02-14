@@ -8,6 +8,7 @@ class SurvivalProblem:
         @param penalty_param: the coefficient on the penalty function(s). This assumes a single
                                 shared penalty parameter across all penalties for now.
         @param theta_mask: a mask indicating which theta values to estimate
+        @oaram num_threads: number of threads to use when solving this problem
         """
         assert(penalty_param >= 0)
 
@@ -26,7 +27,7 @@ class SurvivalProblem:
                             at this value
         @param max_iters: if this param is used, then this is the maximum number of iterations for
                             the problem solver
-        
+
         @return final fitted value of theta and objective function value
         """
         raise NotImplementedError()

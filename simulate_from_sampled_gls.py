@@ -19,7 +19,7 @@ import pickle
 
 from common import *
 from Bio import SeqIO
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 
 sys.path.append('gctree/bin')
 from gctree import MutationModel, CollapsedTree

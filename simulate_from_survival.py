@@ -8,7 +8,7 @@ import csv
 import re
 
 from survival_model_simulator import SurvivalModelSimulator
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from common import *
 
 def parse_args():

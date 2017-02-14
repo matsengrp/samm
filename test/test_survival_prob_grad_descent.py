@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 
 from models import ImputedSequenceMutations, ObservedSequenceMutations
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_grad_descent import SurvivalProblemCustom
 from common import NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
@@ -20,7 +20,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         feat_gen = SubmotifFeatureGenerator(motif_len)
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        obs = ObservedSequenceMutations("ggtgggtta", "ggagagtta")
+        obs = feat_gen.create_base_features(ObservedSequenceMutations("ggtgggtta", "ggagagtta"))
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
         feature_vecs = feat_gen.create_for_mutation_steps(sample)[0]
 
@@ -44,7 +44,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         feat_gen = SubmotifFeatureGenerator(motif_len)
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        obs = ObservedSequenceMutations("ggatcgtgatcgagt", "aaatcaaaaacgatg")
+        obs = feat_gen.create_base_features(ObservedSequenceMutations("ggatcgtgatcgagt", "aaatcaaaaacgatg"))
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
         feature_vecs = feat_gen.create_for_mutation_steps(sample)[0]
 
@@ -62,7 +62,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
 
         grad = np.zeros(theta.shape)
-        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
+        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs.feature_vec_dicts):
             col_idx = 0
             if per_target_model:
                 col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
@@ -87,7 +87,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
 
         obj = 0
-        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs):
+        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_vecs.feature_vec_dicts):
             # vecs_at_mutation_step[i] are the feature vectors of the at-risk group after mutation i
             feature_vec_mutated = vecs_at_mutation_step[mutating_pos]
             col_idx = 0

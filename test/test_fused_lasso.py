@@ -6,7 +6,7 @@ import numpy as np
 from cvxpy import *
 from common import *
 
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 import solver_wrappers
 
 class Fused_LassoC_TestCase(unittest.TestCase):
