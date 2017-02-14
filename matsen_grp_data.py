@@ -15,7 +15,7 @@ PARTIS_PROCESSED_PATH = '/fh/fast/matsen_e/processed-data/partis'
 LAURA_DATA_PATH = PARTIS_PROCESSED_PATH+'/laura-mb-2016-12-22/v8'
 KATE_DATA_PATH = PARTIS_PROCESSED_PATH+'/kate-qrs-2016-09-09/v8'
 
-def get_seeded_data(pth, chain='h', ig_class='G', pid=None):
+def get_paths_to_partis_annotations(pth, chain='h', ig_class='G', pid=None):
     """
     @param pth: prefix path to partis-processed data
     @param chain: 'h', 'k' or 'l'
@@ -30,6 +30,7 @@ def get_seeded_data(pth, chain='h', ig_class='G', pid=None):
     annotations_paths = []
     germline_paths = []
     meta = {}
+    # regex jazz hands
     regex = re.compile(r'^(?P<pid>[^.]*).(?P<seedid>[0-9]*)-(?P<chain>[^/]*)/(?P<timepoint>[^.]*)')
 
     if chain != 'h':
@@ -37,7 +38,6 @@ def get_seeded_data(pth, chain='h', ig_class='G', pid=None):
 
     for root, dirnames, filenames in os.walk(pth):
         for fname in fnmatch.filter(filenames, 'partition-cluster-annotations.csv'):
-            # regex jazz hands
             # remove initial path
             m = regex.match(re.sub(pth+'/seeds/', '', root))
             if m:

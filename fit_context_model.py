@@ -99,13 +99,13 @@ def parse_args():
     parser.add_argument('--per-target-model',
         action='store_true')
     parser.add_argument('--chain',
-        type=str,
-        help='h, k or l (default: h)',
-        default='h')
+        default='h',
+        choices=('h', 'k', 'l'),
+        help='heavy chain or kappa/lambda light chain')
     parser.add_argument('--igclass',
-        type=str,
-        help='immunoglobulin class',
-        default='G')
+        default='G',
+        choices=('G', 'M', 'K', 'L'),
+        help='immunoglobulin class')
 
     parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
@@ -166,7 +166,7 @@ def main(args=sys.argv[1:]):
 
     log.info("Reading data")
     if args.use_partis:
-        annotations, germlines = get_seeded_data(args.input_partis, chain=args.chain, ig_class=args.igclass)
+        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
         gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
     else:
         gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
