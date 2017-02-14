@@ -22,6 +22,16 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         motif_list = self.get_motif_list()
         self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
 
+    def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
+        feat_vec_dict = dict()
+        if do_feat_vec_pos is None:
+            do_feat_vec_pos = range(len(seq_str))
+
+        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        for pos in do_feat_vec_pos:
+            feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str)
+        return feat_vec_dict
+
     def create_base_features(self, obs_seq_mutation):
         """
         Create the feature matrices and feature vector dictionary
