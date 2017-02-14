@@ -170,7 +170,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         # Store the gradient vector (not normalized) so we don't need to recalculate things
         grad_log_sum_exp = feature_mutation_steps.feat_matrix0T * exp_terms
 
-        prev_pos_changed = [] # track positions that have mutated already
+        prev_pos_changed = set() # track positions that have mutated already
         prev_mutating_pos = None
         prev_vecs_at_mutation_step = None
         for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, feature_mutation_steps.feature_vec_dicts):
@@ -185,20 +185,18 @@ class SurvivalProblemCustom(SurvivalProblem):
                 exp_sum -= exp_terms[change_pos, :].sum()
                 # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
+                    prev_exp_terms = exp_terms[p, :]
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p]] -= exp_terms[p]
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= prev_exp_terms
                         exp_terms[p, :] = 0
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value and the corresponding gradient vector
-
-                        # remove old exp term from gradient
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= exp_terms[p, :]
                         exp_terms[p,:] = np.exp(theta[vecs_at_mutation_step[p], :].sum(axis=0))
-                        # add new exp term to gradient
-                        grad_log_sum_exp[vecs_at_mutation_step[p], :] += exp_terms[p, :]
+                        # add new exp term to gradient and remove old exp term from gradient
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] += exp_terms[p,:] - prev_exp_terms
                 # Add in the new exp terms from the exp sum
                 exp_sum += exp_terms[change_pos, :].sum()
 
@@ -212,7 +210,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
             prev_mutating_pos = mutating_pos
             prev_vecs_at_mutation_step = vecs_at_mutation_step
-            prev_pos_changed.append(mutating_pos)
+            prev_pos_changed.add(mutating_pos)
         return grad
 
 class GradientWorker(ParallelWorker):
