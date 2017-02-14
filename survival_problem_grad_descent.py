@@ -188,7 +188,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= prev_exp_terms
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= exp_terms[p, :]
                         exp_terms[p, :] = 0
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
