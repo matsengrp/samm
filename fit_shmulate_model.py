@@ -100,21 +100,22 @@ def main(args=sys.argv[1:]):
     pickle.dump(model_array, open(args.model_pkl, 'w'))
 
     # Let's compare the true vs. fitted models
-    true_theta = pickle.load(open(args.theta_file, 'rb'))
-    theta_mask = get_possible_motifs_to_targets(motif_list, true_theta.shape)
-
-    theta_shape = (theta_mask.sum(), 1)
-    flat_model = model_array[theta_mask].reshape(theta_shape)
-    # Convert the true model (parameterized in theta) to the the same scale as shmulate
-    flat_true_model = np.exp(true_theta[theta_mask].reshape(theta_shape))
-
-    log.info("THETA")
-    log.info(scipy.stats.spearmanr(flat_model, flat_true_model))
-    log.info(scipy.stats.kendalltau(flat_model, flat_true_model))
-
-    log.info("THRESHOLDED THETA")
-    log.info(scipy.stats.spearmanr(flat_model, flat_true_model))
-    log.info(scipy.stats.kendalltau(flat_model, flat_true_model))
+    if args.theta_file is not None:
+        true_theta = pickle.load(open(args.theta_file, 'rb'))
+        theta_mask = get_possible_motifs_to_targets(motif_list, true_theta.shape)
+    
+        theta_shape = (theta_mask.sum(), 1)
+        flat_model = model_array[theta_mask].reshape(theta_shape)
+        # Convert the true model (parameterized in theta) to the the same scale as shmulate
+        flat_true_model = np.exp(true_theta[theta_mask].reshape(theta_shape))
+    
+        log.info("THETA")
+        log.info(scipy.stats.spearmanr(flat_model, flat_true_model))
+        log.info(scipy.stats.kendalltau(flat_model, flat_true_model))
+    
+        log.info("THRESHOLDED THETA")
+        log.info(scipy.stats.spearmanr(flat_model, flat_true_model))
+        log.info(scipy.stats.kendalltau(flat_model, flat_true_model))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
