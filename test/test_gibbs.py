@@ -8,7 +8,7 @@ from collections import Counter
 from common import *
 from models import ObservedSequenceMutations
 from survival_model_simulator import SurvivalModelSimulator
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
 class MCMC_EM_TestCase(unittest.TestCase):
@@ -26,33 +26,33 @@ class MCMC_EM_TestCase(unittest.TestCase):
         cls.big_theta[motif_list_len,] = cls.big_theta[motif_list_len,] - np.log(4)
         theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.big_theta.shape)
         cls.big_theta[~theta_mask] = -np.inf
-        cls.theta = np.max(cls.big_theta, axis=1)
-        cls.obs_seq_m = ObservedSequenceMutations("ttcgtata", "taagttat")
+        cls.theta = np.matrix(np.max(cls.big_theta, axis=1)).T
+        cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("ttcgtata", "taagttat"))
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
     def test_update_log_prob_for_shuffle(self):
         prev_order = self.obs_seq_m.mutation_pos_dict.keys()
         curr_order = prev_order[:2] + [prev_order[3], prev_order[2]] + prev_order[4:]
 
-        prev_feat_dicts, prev_intermediate_seqs, prev_log_probs, prev_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(prev_order)
-        feat_dicts, intermediate_seqs, slow_log_probs, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
+        _, prev_log_probs, prev_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(prev_order)
+        _, slow_log_probs, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
         fast_log_probs = self.gibbs_sampler._update_log_prob_from_shuffle(2, prev_log_probs, curr_order, prev_order, feature_vec_theta_sums, prev_feature_vec_theta_sums)
 
         self.assertTrue(np.allclose(slow_log_probs, fast_log_probs))
 
     def test_update_log_prob_for_positions(self):
         curr_order = self.obs_seq_m.mutation_pos_dict.keys()
-        curr_dicts, curr_seqs, curr_log_probs, curr_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
+        curr_feat_mut_steps, curr_log_probs, curr_feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(curr_order)
 
         new_order = [curr_order[0], curr_order[-1]] + curr_order[1:-1]
-        feat_vec_dicts_slow, intermediate_seqs_slow, multinomial_sequence_slow, feature_vec_theta_sums_slow = self.gibbs_sampler._compute_log_probs(new_order)
-        feat_vec_dicts, intermediate_seqs, multinomial_sequence, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(
+        feat_mut_steps_slow, multinomial_sequence_slow, feature_vec_theta_sums_slow = self.gibbs_sampler._compute_log_probs(new_order)
+        feat_mut_steps, multinomial_sequence, feature_vec_theta_sums = self.gibbs_sampler._compute_log_probs(
             new_order,
-            GibbsStepInfo(curr_order, curr_dicts, curr_seqs, curr_feature_vec_theta_sums, curr_log_probs),
+            GibbsStepInfo(curr_order, curr_feat_mut_steps, curr_feature_vec_theta_sums, curr_log_probs),
             update_positions=range(1, len(new_order)),
         )
-        self.assertEqual(intermediate_seqs, intermediate_seqs_slow)
-        self.assertEqual(feat_vec_dicts, feat_vec_dicts_slow)
+        self.assertEqual(feat_mut_steps_slow.intermediate_seqs, feat_mut_steps.intermediate_seqs)
+        self.assertEqual(feat_mut_steps_slow.feature_vec_dicts, feat_mut_steps.feature_vec_dicts)
         self.assertTrue(np.allclose(multinomial_sequence, multinomial_sequence_slow))
         self.assertEqual(feature_vec_theta_sums, feature_vec_theta_sums_slow)
 
@@ -76,7 +76,9 @@ class MCMC_EM_TestCase(unittest.TestCase):
         full_seq_muts = [surv_simulator.simulate(START_SEQ, censoring_time=CENSORING_TIME) for i in range(NUM_OBS_SAMPLES)]
         # We make the mutation orders strings so easy to process
         true_order_distr = ["".join(map(str,m.get_mutation_order())) for m in full_seq_muts]
-        obs_seq_mutations = [ObservedSequenceMutations(START_SEQ, m.obs_seq_mutation.end_seq) for m in full_seq_muts]
+        obs_seq_mutations = [
+            self.feat_gen.create_base_features(ObservedSequenceMutations(START_SEQ, m.obs_seq_mutation.end_seq)) for m in full_seq_muts
+        ]
 
         # Now get the distribution of orders from our gibbs sampler (so sample mutation order
         # given known mutation positions)

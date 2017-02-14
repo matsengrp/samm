@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from models import ImputedSequenceMutations, ObservedSequenceMutations
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from common import *
@@ -19,7 +19,7 @@ class Survival_Problem_TestCase(unittest.TestCase):
         theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
         theta[~theta_mask] = -np.inf
 
-        obs = ObservedSequenceMutations("ggtgggtta", "ggagagtta")
+        obs = feat_gen.create_base_features(ObservedSequenceMutations("ggtgggtta", "ggagagtta"))
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
         problem_cvx = SurvivalProblemLassoCVXPY(feat_gen, [sample], penalty_param, theta_mask)
         ll_cvx = problem_cvx.calculate_per_sample_log_lik(theta, sample)

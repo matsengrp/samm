@@ -65,7 +65,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feature_vec_dict
 
     # TODO: make this a real feature generator (deal with ends properly)
-    @profile
     def create_for_mutation_steps(self, seq_mut_order, theta=None):
         num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
         feat_mutation_steps = FeatureMutationSteps(seq_mut_order)
@@ -82,10 +81,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         for i, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
             no_feat_vec_pos.add(mutation_pos)
             seq_str, feat_dict, thetasum = self._update_mutation_step(
+                i,
                 mutation_pos,
-                feat_mutation_steps.intermediate_seqs[i],
-                feat_mutation_steps.feature_vec_dicts[i],
-                feature_vec_thetasums[i],
+                feat_mutation_steps,
+                feature_vec_thetasums,
                 seq_mut_order,
                 no_feat_vec_pos,
                 theta,
@@ -97,7 +96,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feat_mutation_steps, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
-    @profile
+
     def update_for_mutation_steps(
         self,
         seq_mut_order,
@@ -125,10 +124,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             no_feat_last_idx = i + 1
 
             seq_str, feat_dict, thetasum = self._update_mutation_step(
+                i,
                 mutation_pos,
-                feat_mutation_steps.intermediate_seqs[i],
-                feat_mutation_steps.feature_vec_dicts[i],
-                feature_vec_thetasums[i],
+                feat_mutation_steps,
+                feature_vec_thetasums,
                 seq_mut_order,
                 no_feat_vec_pos,
                 theta,
@@ -139,13 +138,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return feat_mutation_steps, feature_vec_thetasums
 
-    def _update_mutation_step(self, mutation_pos, prev_seq_str, prev_feat_dict, prev_thetasum, seq_mut_order, no_feat_vec_pos, theta=None):
+    def _update_mutation_step(self, i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, no_feat_vec_pos, theta=None):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
+        @param i: mutation step index
         @param mutation_pos: the position that is mutating
-        @param prev_seq_str: string at previous mutation step
-        @param prev_feat_dict: feature vector dict at previous mutation step
-        @param prev_thetasum: theta sum dict at previous mutation step
+        @param feat_mutation_steps: FeatureMutationSteps
+        @param feature_vec_thetasums: theta sums (should be None if theta is None)
         @param seq_mut_order: the observed mutation order information (ObservedSequenceMutationsFeatures)
         @param no_feat_vec_pos: the positions that mutated already and should not have calculations performed for them
         @param theta: if passed in, calculate theta sum values too
@@ -154,7 +153,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         # update to get the new sequence after the i-th mutation
         new_intermediate_seq = mutate_string(
-            prev_seq_str,
+            feat_mutation_steps.intermediate_seqs[i],
             mutation_pos,
             seq_mut_order.obs_seq_mutation.mutation_pos_dict[mutation_pos]
         )
@@ -171,13 +170,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             do_feat_vec_pos=do_feat_vec_pos,
         )
 
-        feat_vec_dict_next = prev_feat_dict.copy() # shallow copy of dictionary
+        feat_vec_dict_next = feat_mutation_steps.feature_vec_dicts[i].copy() # shallow copy of dictionary
         feat_vec_dict_next.pop(mutation_pos, None)
         feat_vec_dict_next.update(feat_vec_dict_update)
 
         feature_vec_thetasum_next = None
         if theta is not None:
-            feature_vec_thetasum_next = prev_thetasum.copy() # shallow copy of dictionary
+            feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
             feature_vec_thetasum_next.pop(mutation_pos, None)
             for p, feat_vec in feat_vec_dict_update.iteritems():
                 ### TODO: IS THIS CORRECT FOR MULTIPLE THETA COLUMNS

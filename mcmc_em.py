@@ -32,7 +32,7 @@ class MCMC_EM:
         self.num_threads = num_threads
         self.theta_mask = theta_mask
         self.approx = approx
-    @profile
+
     def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
         """
         @param theta: initial value for theta in MCMC-EM
@@ -81,7 +81,7 @@ class MCMC_EM:
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
-                1/0
+
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 

@@ -63,7 +63,7 @@ def parse_args():
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
-        default=2)
+        default=20)
     parser.add_argument('--burn-in',
         type=int,
         help='number of burn-in iterations for E-step',

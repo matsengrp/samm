@@ -18,7 +18,7 @@ import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from common import *
 

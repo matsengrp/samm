@@ -102,7 +102,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         return -1.0/self.num_samples * grad_ll_dtheta
 
     @staticmethod
-    @profile
     def calculate_per_sample_log_lik(theta, sample, feature_mutation_steps, motif_len):
         """
         Calculate the log likelihood of this sample - tries to minimize recalculations as much as possible
@@ -154,7 +153,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         return log_lik
 
     @staticmethod
-    @profile
     def get_gradient_log_lik_per_sample(theta, sample, feature_mutation_steps, motif_len):
         """
         @param feature_mutation_steps: FeatureMutationSteps
@@ -175,7 +173,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
 
-    # @profile
     @staticmethod
     def get_gradient_log_lik_per_sample(theta, sample, feature_mutation_steps, motif_len):
         grad = np.zeros(theta.shape)

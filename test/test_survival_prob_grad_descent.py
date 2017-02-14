@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 
 from models import ImputedSequenceMutations, ObservedSequenceMutations
-from feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_grad_descent import SurvivalProblemCustom
 from common import NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
