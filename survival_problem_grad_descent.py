@@ -159,6 +159,25 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         @param feature_mutation_steps: FeatureMutationSteps
         """
+        if self.pool is None:
+            raise ValueError("Pool has not been initialized")
+
+        rand_seed = get_randint()
+        worker_list = [
+            GradientWorker(rand_seed + i, theta, sample, feature_vecs, self.motif_len)
+            for i, (sample, feature_vecs) in enumerate(self.feature_vec_sample_pair)
+        ]
+        if self.num_threads > 1:
+            l = self.pool.map(run_multiprocessing_worker, worker_list)
+        else:
+            l = map(run_multiprocessing_worker, worker_list)
+
+        grad_ll_dtheta = np.sum(l, axis=0)
+        return -1.0/self.num_samples * grad_ll_dtheta
+
+    # @profile
+    @staticmethod
+    def get_gradient_log_lik_per_sample(theta, sample, feature_vecs, motif_len):
         grad = np.zeros(theta.shape)
         max_pos = sample.obs_seq_mutation.seq_len - 1
 
