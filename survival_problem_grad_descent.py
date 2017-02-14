@@ -186,6 +186,8 @@ class SurvivalProblemCustom(SurvivalProblem):
                 # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
                     prev_exp_terms = exp_terms[p, :]
+                    prev_feat_vec = prev_vecs_at_mutation_step[p]
+                    curr_feat_vec = vecs_at_mutation_step[p]
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
@@ -194,9 +196,10 @@ class SurvivalProblemCustom(SurvivalProblem):
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value and the corresponding gradient vector
-                        exp_terms[p,:] = np.exp(theta[vecs_at_mutation_step[p], :].sum(axis=0))
+                        grad_log_sum_exp[prev_feat_vec, :] -= exp_terms[p, :]
+                        exp_terms[p,:] = np.exp(theta[curr_feat_vec, :].sum(axis=0))
+                        grad_log_sum_exp[curr_feat_vec, :] += exp_terms[p, :]
                         # add new exp term to gradient and remove old exp term from gradient
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] += exp_terms[p,:] - prev_exp_terms
                 # Add in the new exp terms from the exp sum
                 exp_sum += exp_terms[change_pos, :].sum()
 
