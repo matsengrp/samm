@@ -196,6 +196,8 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
 
     # read default germline info
     if inferred_gls is not None:
+        if not isinstance(inferred_gls, list):
+            inferred_gls = [inferred_gls]
         germlines = {}
         for germline_file in set(inferred_gls):
             germlines[germline_file] = glutils.read_glfo(germline_file, chain=chain)

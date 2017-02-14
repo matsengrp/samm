@@ -18,8 +18,7 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 sim_methods = [
-    'survival_big',
-    'survival_mini',
+    'survival',
     'shmulate',
 ]
 
@@ -27,8 +26,20 @@ nest.add(
     'simulation_methods',
     sim_methods)
 
-# Nest for replicates
+nest.add(
+    'simulation_options',
+    lambda c: ['python simulate_from_survival.py --motif-len 5' if c['simulation_methods']=='survival' else 'python simulate_from_sampled_gls.py simulate'],
+    create_dir=False)
 
+sim_size_dict = [{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50, 'min_censor_time': .2, 'ratio_nonzero': .2},
+                 {'size': 'big', 'n_taxa': 10, 'n_germlines': 100, 'germline_size': 200, 'min_censor_time': .1, 'ratio_nonzero': .1}]
+
+nest.add(
+    'simulation_size',
+    sim_size_dict,
+    label_func=lambda c: c['size'])
+
+# Nest for replicates
 nest.add(
     'replicate',
     range(localenv['NREPS']),
@@ -44,56 +55,23 @@ nest.add(
 # TODO: put this all in one driver function so sources/targets jibe with one another
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    if c['simulation_methods'] == "shmulate":
-        cmd = ['python simulate_from_sampled_gls.py',
-               'simulate',
-               '--seed',
-               c['seed'],
-               '--n-taxa',
-               5,
-               '--n-germlines',
-               50,
-               '--output-true-theta ${TARGETS[0]}',
-               '--output-file ${TARGETS[1]}',
-               '--output-genes ${TARGETS[2]}']
-    elif c['simulation_methods'] == "survival_mini":
-        cmd = ['python simulate_from_survival.py',
-               '--seed',
-               c['seed'],
-               '--n-taxa',
-               5,
-               '--n-germlines',
-               50,
-               '--motif-len',
-               5,
-               '--random-gene-len',
-               50,
-               '--min-censor-time',
-               0.2,
-               '--ratio-nonzero',
-               0.2,
-               '--output-true-theta ${TARGETS[0]}',
-               '--output-file ${TARGETS[1]}',
-               '--output-genes ${TARGETS[2]}']
-    elif c['simulation_methods'] == "survival_big":
-        cmd = ['python simulate_from_survival.py',
-               '--seed',
-               c['seed'],
-               '--n-taxa',
-               10,
-               '--n-germlines',
-               100,
-               '--motif-len',
-               5,
-               '--random-gene-len',
-               200,
-               '--min-censor-time',
-               0.1,
-               '--ratio-nonzero',
-               0.1,
-               '--output-true-theta ${TARGETS[0]}',
-               '--output-file ${TARGETS[1]}',
-               '--output-genes ${TARGETS[2]}']
+    cmd = [c['simulation_options']] + ['--seed',
+                c['seed'],
+                '--n-taxa',
+                c['simulation_size']['n_taxa'],
+                '--n-germlines',
+                c['simulation_size']['n_germlines'],
+                '--output-true-theta ${TARGETS[0]}',
+                '--output-file ${TARGETS[1]}',
+                '--output-genes ${TARGETS[2]}']
+    if c['simulation_methods'] == 'survival':
+        cmd += ['--random-gene-len',
+           c['simulation_size']['germline_size'],
+           '--min-censor-time',
+           c['simulation_size']['min_censor_time'],
+           '--ratio-nonzero',
+           c['simulation_size']['ratio_nonzero']]
+
     return env.Command(
         [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
         [],

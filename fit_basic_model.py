@@ -20,6 +20,7 @@ from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from common import *
+from matsen_grp_data import *
 
 def parse_args():
     ''' parse command line arguments '''
@@ -55,8 +56,8 @@ def parse_args():
         default=5)
     parser.add_argument('--theta-file',
         type=str,
-        help='file with pickled context model',
-        default='_output/true_theta.pkl')
+        help='file with pickled true context model (default: None, for no truth)',
+        default=None)
     parser.add_argument('--prop-file',
         type=str,
         help='file to output fitted proportions',
@@ -65,6 +66,14 @@ def parse_args():
         type=str,
         help='file to output logs',
         default='_output/basic_log.txt')
+    parser.add_argument('--chain',
+        default='h',
+        choices=('h', 'k', 'l'),
+        help='heavy chain or kappa/lambda light chain')
+    parser.add_argument('--igclass',
+        default='G',
+        choices=('G', 'M', 'K', 'L'),
+        help='immunoglobulin class')
 
     args = parser.parse_args()
 
@@ -81,56 +90,58 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     if args.use_partis:
-        gene_dict, obs_data = read_partis_annotations(args.input_partis)
+        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
+        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
     else:
         gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 
     motif_list = feat_generator.get_motif_list()
     motif_list.append('EDGES')
 
-    mutations = dict.fromkeys(motif_list, 0)
-    appearances = dict.fromkeys(motif_list, 0)
+    mutations = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
+    proportions = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
+    appearances = {motif: 0. for motif in motif_list}
 
     for obs_seq in obs_data:
-        mutated_positions = obs_seq.mutation_pos_dict.keys()
         germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
 
         for key, value in germline_motifs.iteritems():
             appearances[motif_list[value[0]]] += 1
 
-        for mut_pos in mutated_positions:
+        for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
             for mutation in germline_motifs[mut_pos]:
-                mutations[motif_list[mutation]] += 1
+                mutations[motif_list[mutation]][mut_nuc] += 1
 
-    proportions = {}
     for key in motif_list:
-        if appearances[key] > 0:
-            proportions[key] = 1. * mutations[key] / appearances[key]
-        else:
-            proportions[key] = 0.
+        for nucleotide in 'acgt':
+            if appearances[key] > 0:
+                proportions[key][nucleotide] = 1. * mutations[key][nucleotide] / appearances[key]
 
-    theta = pickle.load(open(args.theta_file, 'rb'))
-    prop_list = [proportions[motif_list[i]] for i in range(theta.shape[0])]
+    prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in 'acgt'] for i in range(len(motif_list))])
+    pickle.dump(prop_list, open(args.prop_file, 'w'))
 
     # Print the motifs with the highest and lowest proportions
-    threshold_prop_list = [0] * len(prop_list)
-    mean_prop = np.mean(prop_list)
-    sd_prop = np.sqrt(np.var(prop_list))
-    for i in range(theta.shape[0]):
-        if np.abs(proportions[motif_list[i]] - mean_prop) > 0.5 * sd_prop:
-            log.info("%d: %f, %s, %f" % (i, np.max(theta[i,]), motif_list[i], proportions[motif_list[i]]))
-            threshold_prop_list[i] = proportions[motif_list[i]]
-
-    theta_flat = np.max(theta, axis=1)
-    log.info("THETA")
-    log.info(scipy.stats.spearmanr(theta_flat, prop_list))
-    log.info(scipy.stats.kendalltau(theta_flat, prop_list))
-
-    log.info("THRESHOLDED THETA")
-    log.info(scipy.stats.spearmanr(theta_flat, threshold_prop_list))
-    log.info(scipy.stats.kendalltau(theta_flat, threshold_prop_list))
-
-    pickle.dump(np.array(prop_list), open(args.prop_file, 'w'))
+    if args.theta_file is not None:
+        theta = pickle.load(open(args.theta_file, 'rb'))
+        threshold_prop_list = np.zeros(prop_list.shape)
+        mean_prop = np.mean(prop_list, axis=0)
+        sd_prop = np.sqrt(np.var(prop_list, axis=0))
+        for i in range(theta.shape[0]):
+            for idx, nucleotide in enumerate('acgt'):
+                if np.abs(proportions[motif_list[i]][nucleotide] - mean_prop[idx]) > 0.5 * sd_prop[idx]:
+                    log.info("%d: %f, %s, %f" % (i, np.max(theta[i,idx]), motif_list[i], proportions[motif_list[i]][nucleotide]))
+                    threshold_prop_list[i][idx] = proportions[motif_list[i]][nucleotide]
+    
+        theta_flat = np.ravel(theta)
+        prop_flat = np.ravel(prop_list)
+        thresh_flat = np.ravel(threshold_prop_list)
+        log.info("THETA")
+        log.info(scipy.stats.spearmanr(theta_flat, prop_flat))
+        log.info(scipy.stats.kendalltau(theta_flat, prop_flat))
+    
+        log.info("THRESHOLDED THETA")
+        log.info(scipy.stats.spearmanr(theta_flat, thresh_flat))
+        log.info(scipy.stats.kendalltau(theta_flat, thresh_flat))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
