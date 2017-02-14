@@ -25,6 +25,7 @@ from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from common import *
+from matsen_grp_data import *
 
 def parse_args():
     ''' parse command line arguments '''
@@ -86,10 +87,25 @@ def parse_args():
         default="0.01")
     parser.add_argument('--theta-file',
         type=str,
-        help='file with pickled true context model',
-        default='_output/true_theta.pkl')
+        help='file with pickled true context model (default: None, for no truth)',
+        default=None)
+    parser.add_argument('--input-partis',
+        type=str,
+        help='partis annotations file',
+        default=SAMPLE_PARTIS_ANNOTATIONS)
+    parser.add_argument('--use-partis',
+        action='store_true',
+        help='use partis annotations file')
     parser.add_argument('--per-target-model',
         action='store_true')
+    parser.add_argument('--chain',
+        default='h',
+        choices=('h', 'k', 'l'),
+        help='heavy chain or kappa/lambda light chain')
+    parser.add_argument('--igclass',
+        default='G',
+        choices=('G', 'M', 'K', 'L'),
+        help='immunoglobulin class')
 
     parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
@@ -143,15 +159,21 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
-    true_theta = load_true_theta(args.theta_file, args.per_target_model)
-    assert(true_theta.shape[0] == feat_generator.feature_vec_len)
+    if args.theta_file is not None:
+        # no true theta if we run on real data
+        true_theta = load_true_theta(args.theta_file, args.per_target_model)
+        assert(true_theta.shape[0] == feat_generator.feature_vec_len)
 
     log.info("Reading data")
-    gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+    if args.use_partis:
+        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
+        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
+    else:
+        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-
     log.info("Number of sequences %d" % len(obs_seq_feat_base))
     log.info("Settings %s" % args)
 
@@ -190,20 +212,20 @@ def main(args=sys.argv[1:]):
         )
         results_list.append((penalty_param, theta))
 
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
+
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        theta_shape = (theta_mask.sum(), 1)
-        flat_theta = theta[theta_mask].reshape(theta_shape)
-        flat_true_theta = true_theta[theta_mask].reshape(theta_shape)
-        log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
-        log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
-        log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
-        log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
-        print "L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta)
-
-        with open(args.out_file, "w") as f:
-            pickle.dump(results_list, f)
+        if args.theta_file is not None:
+            theta_shape = (theta_mask.sum(), 1)
+            flat_theta = theta[theta_mask].reshape(theta_shape)
+            flat_true_theta = true_theta[theta_mask].reshape(theta_shape)
+            log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
+            log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
+            log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
+            log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
