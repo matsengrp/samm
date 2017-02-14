@@ -15,7 +15,6 @@ from models import ObservedSequenceMutations
 
 DEBUG = True
 
-
 NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "atcg"
 NUCLEOTIDE_SET = set(["a", "t", "c", "g"])
