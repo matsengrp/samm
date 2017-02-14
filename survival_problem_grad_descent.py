@@ -187,13 +187,13 @@ class SurvivalProblemCustom(SurvivalProblem):
                 for p in change_pos:
                     prev_exp_terms = exp_terms[p, :]
                     prev_feat_vec = prev_vecs_at_mutation_step[p]
-                    curr_feat_vec = vecs_at_mutation_step[p]
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
                         grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= prev_exp_terms
                         exp_terms[p, :] = 0
                     elif p not in prev_pos_changed:
+                        curr_feat_vec = vecs_at_mutation_step[p]
                         # position hasn't mutated yet.
                         # need to update its exp value and the corresponding gradient vector
                         grad_log_sum_exp[prev_feat_vec, :] -= exp_terms[p, :]
