@@ -107,7 +107,7 @@ def parse_args():
         choices=('G', 'M', 'K', 'L'),
         help='immunoglobulin class')
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=True)
     args = parser.parse_args()
 
     # Determine problem solver

@@ -70,10 +70,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         feature_vec_thetasums = None
         if theta is not None:
-            assert(theta.shape[1] == 1)
             theta_sum0 = feat_mutation_steps.get_init_theta_sum(theta)
             feature_vec_thetasums = [
-                { p : theta_sum0[p, 0] for p in range(seq_mut_order.obs_seq_mutation.seq_len)}
+                { p : theta_sum0[p, :] for p in range(seq_mut_order.obs_seq_mutation.seq_len)}
             ] + [None] * num_steps
 
         no_feat_vec_pos = set()
@@ -179,8 +178,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
             feature_vec_thetasum_next.pop(mutation_pos, None)
             for p, feat_vec in feat_vec_dict_update.iteritems():
-                ### TODO: IS THIS CORRECT FOR MULTIPLE THETA COLUMNS?
-                feature_vec_thetasum_next[p] = theta[feat_vec,:].sum()
+                feature_vec_thetasum_next[p] = theta[feat_vec,:].sum(axis=0)
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
