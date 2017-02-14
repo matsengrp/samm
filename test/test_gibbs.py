@@ -118,11 +118,11 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
-        theta = np.random.rand(self.feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
+        theta = np.random.rand(self.feat_gen.feature_vec_len, NUM_NUCLEOTIDES) * 4
         theta_mask = get_possible_motifs_to_targets(self.feat_gen.get_motif_list(), theta.shape)
         theta[~theta_mask] = -np.inf
 
         rho, pval = self._test_joint_distribution(theta)
 
-        self.assertTrue(rho > 0.94)
-        self.assertTrue(pval < 1e-32)
+        self.assertTrue(rho > 0.98)
+        self.assertTrue(pval < 1e-37)
