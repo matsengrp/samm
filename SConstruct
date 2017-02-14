@@ -43,3 +43,6 @@ SConscript(flag + '/sconscript', exports=['flag'])
 flag = 'survival_ctmc'
 SConscript(flag + '/sconscript', exports=['flag'])
 
+flag = 'run_on_partis'
+SConscript(flag + '/sconscript', exports=['flag'])
+
