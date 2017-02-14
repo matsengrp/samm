@@ -81,7 +81,7 @@ class MCMC_EM:
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
-
+                1/0
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 

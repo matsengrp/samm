@@ -65,7 +65,6 @@ class MutationOrderGibbsSampler(Sampler):
     """
     def run(self, init_order, burn_in, num_samples):
         assert(check_unordered_equal(init_order, self.mutated_positions))
-
         traces = []
         if self.num_mutations < 2:
             # If there are zero or one mutations then the same initial order will be returned for

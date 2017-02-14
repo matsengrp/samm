@@ -6,7 +6,7 @@ import sys
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 import utils
-import glutils
+# import glutils
 
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
@@ -195,7 +195,7 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
     else:
         glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
         inferred_gls = [None] * len(annotations_file_names)
-    
+
     gene_dict = {}
     obs_data = []
 

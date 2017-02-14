@@ -55,7 +55,7 @@ def parse_args():
         type=str,
         help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
         choices=["CL", "CFL", "L", "FL"],
-        default="FL")
+        default="L")
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -63,7 +63,7 @@ def parse_args():
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
-        default=20)
+        default=2)
     parser.add_argument('--burn-in',
         type=int,
         help='number of burn-in iterations for E-step',
@@ -200,6 +200,7 @@ def main(args=sys.argv[1:]):
         log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
         log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
         log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
+        print "L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta)
 
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
