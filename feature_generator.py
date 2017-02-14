@@ -9,6 +9,15 @@ class FeatureGenerator:
     first). We call these "sparse feature vectors".
     """
 
+    def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
+        """
+        @param sequence: current sequence (string)
+        @param do_feat_vec_pos: do generate feature vectors for these positions.
+                    By default, this will be set to all positions in the sequence.
+        @return: list of sparse feature vectors
+        """
+        raise NotImplementedError()
+
     def create_for_mutation_steps(self, seq_mut_order):
         """
         @param seq_mut_order: a ImputedSequenceMutations
