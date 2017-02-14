@@ -11,11 +11,17 @@ from profile_support import profile
 
 class GibbsStepInfo:
     """
-    Store the state of each gibs sample and intermediate computations
+    Store the state of each gibbs sample and intermediate computations
     """
-    def __init__(self, order, feat_mutation_steps_list, feature_vec_theta_sums, log_probs):
+    def __init__(self, order, feat_mutation_steps, feature_vec_theta_sums, log_probs):
+        """
+        @param order: a list with positions in the order the mutations happened
+        @param feat_mutation_steps: class FeatureMutationSteps
+        @param feature_vec_theta_sums: list of numpy vectors with theta sums for each position (theta * psi)
+        @param log_probs: the log of the probability at each mutation step
+        """
         self.order = order
-        self.feat_mutation_steps_list = feat_mutation_steps_list
+        self.feat_mutation_steps = feat_mutation_steps
         self.feature_vec_theta_sums = feature_vec_theta_sums
         self.log_probs = log_probs
 
@@ -262,7 +268,7 @@ class MutationOrderGibbsSampler(Sampler):
                     curr_order,
                 ),
                 update_steps=update_positions,
-                base_feat_mutation_steps = gibbs_step_base.feat_mutation_steps_list,
+                base_feat_mutation_steps = gibbs_step_base.feat_mutation_steps,
                 base_feature_vec_theta_sums = gibbs_step_base.feature_vec_theta_sums,
                 theta=self.theta,
             )

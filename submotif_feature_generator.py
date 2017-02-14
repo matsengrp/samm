@@ -24,6 +24,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
     def create_base_features(self, obs_seq_mutation):
         """
+        Create the feature matrices and feature vector dictionary
+        before any mutations have occurred
+
         @return ObservedSequenceMutationsFeatures
         """
         indices = np.array([])
@@ -75,8 +78,18 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 { p : theta_sum0[p, 0] for p in range(seq_mut_order.obs_seq_mutation.seq_len)}
             ] + [None] * num_steps
 
+        no_feat_vec_pos = set()
         for i, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
-            seq_str, feat_dict, thetasum = self._update_mutation_step(i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, theta)
+            no_feat_vec_pos.add(mutation_pos)
+            seq_str, feat_dict, thetasum = self._update_mutation_step(
+                mutation_pos,
+                feat_mutation_steps.intermediate_seqs[i],
+                feat_mutation_steps.feature_vec_dicts[i],
+                feature_vec_thetasums[i],
+                seq_mut_order,
+                no_feat_vec_pos,
+                theta,
+            )
             feat_mutation_steps.update(i + 1, seq_str, feat_dict)
             if theta is not None:
                 feature_vec_thetasums[i + 1] = thetasum
@@ -84,6 +97,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feat_mutation_steps, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
+    @profile
     def update_for_mutation_steps(
         self,
         seq_mut_order,
@@ -96,36 +110,56 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         feat_mutation_steps = base_feat_mutation_steps.copy()
 
         feature_vec_thetasums = None
-        if base_feature_vec_theta_sums is not None:
+        if theta is not None:
             feature_vec_thetasums = list(base_feature_vec_theta_sums)
 
+        no_feat_last_idx = 0
+        no_feat_vec_pos = set()
         for i in update_steps:
             if i >= num_steps - 1:
                 break
+
             mutation_pos = seq_mut_order.mutation_order[i]
 
-            seq_str, feat_dict, thetasum = self._update_mutation_step(i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, theta)
+            no_feat_vec_pos.update(seq_mut_order.mutation_order[no_feat_last_idx:i + 1])
+            no_feat_last_idx = i + 1
+
+            seq_str, feat_dict, thetasum = self._update_mutation_step(
+                mutation_pos,
+                feat_mutation_steps.intermediate_seqs[i],
+                feat_mutation_steps.feature_vec_dicts[i],
+                feature_vec_thetasums[i],
+                seq_mut_order,
+                no_feat_vec_pos,
+                theta,
+            )
             feat_mutation_steps.update(i + 1, seq_str, feat_dict)
-            feature_vec_thetasums[i + 1] = thetasum
+            if theta is not None:
+                feature_vec_thetasums[i + 1] = thetasum
 
         return feat_mutation_steps, feature_vec_thetasums
 
-    def _update_mutation_step(self, i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, theta=None):
+    def _update_mutation_step(self, mutation_pos, prev_seq_str, prev_feat_dict, prev_thetasum, seq_mut_order, no_feat_vec_pos, theta=None):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
-        @param i: mutation step
+        @param mutation_pos: the position that is mutating
+        @param prev_seq_str: string at previous mutation step
+        @param prev_feat_dict: feature vector dict at previous mutation step
+        @param prev_thetasum: theta sum dict at previous mutation step
+        @param seq_mut_order: the observed mutation order information (ObservedSequenceMutationsFeatures)
+        @param no_feat_vec_pos: the positions that mutated already and should not have calculations performed for them
+        @param theta: if passed in, calculate theta sum values too
 
         @return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
         """
         # update to get the new sequence after the i-th mutation
         new_intermediate_seq = mutate_string(
-            feat_mutation_steps.intermediate_seqs[i],
+            prev_seq_str,
             mutation_pos,
             seq_mut_order.obs_seq_mutation.mutation_pos_dict[mutation_pos]
         )
         # Get the feature vectors for the positions that might be affected by the latest mutation
         # Don't calculate feature vectors for positions that have mutated already
-        no_feat_vec_pos = set(seq_mut_order.mutation_order[:i + 1])
         # Calculate feature vectors for positions that are close to the mutation
         do_feat_vec_pos = set(range(
             max(mutation_pos - self.flank_end_len, 0),
@@ -137,19 +171,18 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             do_feat_vec_pos=do_feat_vec_pos,
         )
 
-        feat_vec_dict_next = feat_mutation_steps.feature_vec_dicts[i].copy() # shallow copy of dictionary
-        feat_vec_dict_next.pop(seq_mut_order.mutation_order[i], None)
+        feat_vec_dict_next = prev_feat_dict.copy() # shallow copy of dictionary
+        feat_vec_dict_next.pop(mutation_pos, None)
         feat_vec_dict_next.update(feat_vec_dict_update)
-        feat_mutation_steps.update(i + 1, new_intermediate_seq, feat_vec_dict_next)
 
         feature_vec_thetasum_next = None
         if theta is not None:
-            feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
-            feature_vec_thetasum_next.pop(seq_mut_order.mutation_order[i], None)
+            feature_vec_thetasum_next = prev_thetasum.copy() # shallow copy of dictionary
+            feature_vec_thetasum_next.pop(mutation_pos, None)
             for p, feat_vec in feat_vec_dict_update.iteritems():
                 ### TODO: IS THIS CORRECT FOR MULTIPLE THETA COLUMNS
                 feature_vec_thetasum_next[p] = get_theta_sum_mask(theta, feat_vec)
-            feature_vec_thetasums[i + 1] = feature_vec_thetasum_next
+
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):

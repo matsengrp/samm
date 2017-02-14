@@ -59,6 +59,10 @@ class ObservedSequenceMutationsFeatures:
     An augmented ObservedSequenceMutations with features from before mutations have occured
     """
     def __init__(self, obs_seq_mutation, feat_matrix, feat_dict):
+        """
+        @param feat_matrix: a scipy sparse csr_matrix, the features before any mutations have occurred
+        @param feat_dict: a dictionary of our own implementation of feature vectors, the features before any mutations have occurred
+        """
         self.feat_matrix = feat_matrix
         self.feat_dict = feat_dict
 
@@ -75,7 +79,15 @@ class FeatureMutationSteps:
     """
     def __init__(self, seq_mut_order=None, intermediate_seqs=None, feature_vec_dicts=None, feat_matrix0=None, feat_matrix0T=None):
         """
+        Two options for instantiating this object:
+        Option 1:
         @param seq_mut_order: ImputedSequenceMutations[ObservedSequenceMutationsFeatures]
+
+        Option 2:
+        @param intermediate_seqs: list of strings at each mutation step
+        @param feature_vec_dicts: list of dictionaries with our own sparse feature vector representation
+        @param feat_matrix0: scipy sparse csr_matrix representation of the features at each position before any mutations have occurred
+        @param feat_matrix0T: the transpose of feat_matrix0
         """
         if seq_mut_order is not None:
             num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
@@ -91,6 +103,9 @@ class FeatureMutationSteps:
 
 
     def copy(self):
+        """
+        Creates a semi-shallow copy of this object
+        """
         return FeatureMutationSteps(
             intermediate_seqs=list(self.intermediate_seqs),
             feature_vec_dicts=list(self.feature_vec_dicts),
@@ -100,7 +115,11 @@ class FeatureMutationSteps:
 
     def get_theta_sum(self, mutation_step, position, theta, col_idx=None):
         """
-        @param position:
+        Calculate feature vector * theta for a given mutation step
+        @param mutation_step: index of the mutation step
+        @param position: the position to calculate the theta sum for
+        @param theta: numpy vector
+        @param col_idx: if provided, only calculates the theta sum for that column
         """
         if col_idx is not None:
             return theta[self.feature_vec_dicts[mutation_step][position], col_idx].sum()
@@ -109,11 +128,20 @@ class FeatureMutationSteps:
             return mini_theta.sum(axis=0)
 
     def get_init_theta_sum(self, theta):
+        """
+        Multiply theta with our initial matrix
+        """
         return self.feat_matrix0.dot(theta)
 
-    def update(self, i, seq_str, feat_dict):
-        self.intermediate_seqs[i] = seq_str
-        self.feature_vec_dicts[i] = feat_dict
+    def update(self, mutation_step, seq_str, feat_dict):
+        """
+        Update the state of a mutation step
+        @param mutation_step: the index of the mutation step to be updated
+        @param seq_str: string
+        @param feat_dict: a dictionary with our own sparse feature implementation
+        """
+        self.intermediate_seqs[mutation_step] = seq_str
+        self.feature_vec_dicts[mutation_step] = feat_dict
 
     def __str__(self):
         return ",".join(self.intermediate_seqs)
