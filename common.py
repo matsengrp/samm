@@ -14,6 +14,7 @@ csv.field_size_limit(sys.maxsize)
 from models import ObservedSequenceMutations
 NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "atcg"
+NUCLEOTIDE_SET = set(["a", "t", "c", "g"])
 NUCLEOTIDE_DICT = {
     "a": 0,
     "t": 1,
@@ -25,6 +26,12 @@ SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
+
+def contains_degenerate_base(seq_str):
+    for nucleotide in seq_str:
+        if nucleotide not in NUCLEOTIDE_SET:
+            return True
+    return False
 
 def get_randint():
     """

@@ -10,12 +10,10 @@ class FeatureGenerator:
     first). We call these "sparse feature vectors".
     """
 
-    def create_for_sequence(self, sequence, no_feat_vec_pos=[], do_feat_vec_pos=None):
+    def create_for_sequence(self, sequence, do_feat_vec_pos, no_feat_vec_pos=[]):
         """
         @param sequence: current sequence (string)
         @param no_feat_vec_pos: do NOT generate feature vectors for these positions
-        @param do_feat_vec_pos: do generate feature vectors for these positions.
-                                By default, this will be set to all positions in the sequence.
         @return: list of sparse feature vectors
 
         If there are positions in both no_feat_vec_pos and do_feat_vec_pos, then

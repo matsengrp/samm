@@ -1,9 +1,9 @@
 import time
 import numpy as np
-from common import *
 import itertools
 import scipy.sparse
 
+from common import *
 from feature_generator import *
 from profile_support import profile
 
@@ -53,13 +53,12 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feat_dict,
         )
 
-    def create_for_sequence(self, sequence, no_feat_vec_pos=set(), do_feat_vec_pos=None):
+    @profile
+    def create_for_sequence(self, sequence, do_feat_vec_pos, no_feat_vec_pos=set()):
         feature_vec_dict = dict()
-        if do_feat_vec_pos is None:
-            do_feat_vec_pos = set(range(len(sequence)))
 
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
-        for pos in do_feat_vec_pos-no_feat_vec_pos:
+        for pos in do_feat_vec_pos - no_feat_vec_pos:
             feature_vec_dict[pos] = self._create_feature_vec_for_pos(pos, sequence)
 
         return feature_vec_dict
@@ -96,7 +95,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feat_mutation_steps, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
-
     def update_for_mutation_steps(
         self,
         seq_mut_order,
@@ -189,14 +187,19 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @param no_feat_vec_pos: don't create feature vectors for these positions
         """
         submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
-        any_degenerate = any([nucleotide not in NUCLEOTIDES for nucleotide in submotif])
-        if pos < self.flank_end_len or pos > len(intermediate_seq) - 1 - self.flank_end_len or any_degenerate:
+        if len(submotif) < self.motif_len:
+            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
+            # TODO: update this. right now it sets all extreme positions to the same feature
+            idx = self.feature_vec_len - 1
+        # TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
+        # can we just change the input strings or the motif dictionary?
+        elif contains_degenerate_base(submotif):
             # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
             # TODO: update this. right now it sets all extreme positions to the same feature
             idx = self.feature_vec_len - 1
         else:
             idx = self.motif_dict[submotif]
-        return np.array([idx], dtype=np.intp)
+        return np.array([idx])
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
