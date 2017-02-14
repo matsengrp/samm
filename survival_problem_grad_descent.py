@@ -177,7 +177,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     # @profile
     @staticmethod
-    def get_gradient_log_lik_per_sample(theta, sample, feature_vecs, motif_len):
+    def get_gradient_log_lik_per_sample(theta, sample, feature_mutation_steps, motif_len):
         grad = np.zeros(theta.shape)
         max_pos = sample.obs_seq_mutation.seq_len - 1
 

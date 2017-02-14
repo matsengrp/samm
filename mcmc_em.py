@@ -5,6 +5,7 @@ import logging as log
 from models import *
 from common import *
 from sampler_collection import SamplerCollection
+from profile_support import profile
 
 class MCMC_EM:
     def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_jobs=1, num_threads=1, approx='none'):
@@ -31,7 +32,7 @@ class MCMC_EM:
         self.num_threads = num_threads
         self.theta_mask = theta_mask
         self.approx = approx
-
+    @profile
     def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
         """
         @param theta: initial value for theta in MCMC-EM
