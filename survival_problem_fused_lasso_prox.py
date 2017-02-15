@@ -24,7 +24,6 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
         # index lists: the first entry of the first list minus the first entry in the second list, etc.
         motifs_fused_lasso1 = []
         motifs_fused_lasso2 = []
-        num_features = self.theta_mask.shape[0]
         for i1, m1 in enumerate(self.motif_list):
             for i2, m2 in enumerate(self.motif_list):
                 if i1 == i2:
