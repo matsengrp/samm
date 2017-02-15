@@ -12,7 +12,7 @@ class ObservedSequenceMutations:
                 # ignore mutations happening close to edge
                 if i < start_index + motif_len/2:
                     start_index = i + 1
-                elif i > end_index - motif_len/2 - 1:
+                elif i >= end_index - motif_len/2:
                     end_index = i
                 else:
                     self.mutation_pos_dict[i - start_index] = end_seq[i]

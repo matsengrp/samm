@@ -15,7 +15,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     just use an indicator to denote the position is on the edge.
     TODO: Do something else for edge positions?
     """
-    def __init__(self, motif_len=3):
+    def __init__(self, motif_len=1):
         assert(motif_len % 2 == 1)
         self.motif_len = motif_len
         self.flank_end_len = motif_len/2

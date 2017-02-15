@@ -15,7 +15,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(10)
-        cls.motif_len = 3
+        cls.motif_len = 1
         cls.BURN_IN = 10
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
         motif_list = cls.feat_gen.get_motif_list()
@@ -77,7 +77,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # We make the mutation orders strings so easy to process
         true_order_distr = ["".join(map(str,m.get_mutation_order())) for m in full_seq_muts]
         obs_seq_mutations = [
-            self.feat_gen.create_base_features(ObservedSequenceMutations(START_SEQ, m.obs_seq_mutation.end_seq)) for m in full_seq_muts
+            self.feat_gen.create_base_features(ObservedSequenceMutations(m.obs_seq_mutation.start_seq, m.obs_seq_mutation.end_seq)) for m in full_seq_muts
         ]
 
         # Now get the distribution of orders from our gibbs sampler (so sample mutation order
@@ -105,5 +105,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.90)
-        self.assertTrue(pval < 1e-22)
+        self.assertTrue(rho > 0.93)
+        self.assertTrue(pval < 1e-23)
