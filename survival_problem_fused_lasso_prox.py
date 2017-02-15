@@ -24,6 +24,7 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
         # index lists: the first entry of the first list minus the first entry in the second list, etc.
         motifs_fused_lasso1 = []
         motifs_fused_lasso2 = []
+        num_features = self.theta_mask.shape[0]
         for i1, m1 in enumerate(self.motif_list):
             for i2, m2 in enumerate(self.motif_list):
                 if i1 == i2:
@@ -33,6 +34,15 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
                     motifs_fused_lasso2.append(i2)
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)
         self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=np.intc)
+        # we need a flat version for sending to C++ solver
+        if self.per_target_model:
+            fused_lasso_increments = np.array([0, num_features, num_features * 2, num_features * 3], dtype=np.intc)
+            self.fused_lasso_idx1_flat = np.repeat(self.fused_lasso_idx1, repeats=4) + np.tile(fused_lasso_increments, self.fused_lasso_idx1.size)
+            self.fused_lasso_idx1_flat = self.fused_lasso_idx1_flat[self.theta_mask]
+            self.fused_lasso_idx2_flat = np.repeat(self.fused_lasso_idx2, repeats=4) + np.tile(fused_lasso_increments, self.fused_lasso_idx2.size)
+        else:
+            self.fused_lasso_idx1_flat = self.fused_lasso_idx1
+            self.fused_lasso_idx2_flat = self.fused_lasso_idx2
 
         self.penalty_param_fused = self.penalty_param
         # TODO: This is a hack for now since we assume only one penalty param

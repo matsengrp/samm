@@ -21,6 +21,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.motif_len = feat_generator.motif_len
         self.samples = samples
         self.theta_mask = theta_mask
+        self.per_target_model = self.theta_mask.shape[1] == NUM_NUCLEOTIDES
         self.num_samples = len(self.samples)
         self.feature_mut_steps_pair = [
             (
@@ -125,17 +126,17 @@ class SurvivalProblemCustom(SurvivalProblem):
                 change_pos = np.arange(change_pos_min, change_pos_max + 1)
 
                 # Remove old exp terms from the exp sum
-                exp_sum -= exp_terms[change_pos, :].sum()
+                exp_sum -= exp_terms[change_pos,].sum()
                 # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
-                        exp_terms[prev_mutating_pos, :] = 0
+                        exp_terms[prev_mutating_pos,] = 0
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value
-                        exp_terms[p, :] = np.exp(feature_mutation_steps.get_theta_sum(mut_step, p, theta))
+                        exp_terms[p,] = np.exp(feature_mutation_steps.get_theta_sum(mut_step, p, theta))
                 # Add in the new exp terms from the exp sum
                 exp_sum += exp_terms[change_pos].sum()
 
@@ -198,24 +199,24 @@ class SurvivalProblemCustom(SurvivalProblem):
                 change_pos = np.arange(change_pos_min, change_pos_max + 1)
 
                 # Remove old exp terms from the exp sum
-                exp_sum -= exp_terms[change_pos, :].sum()
+                exp_sum -= exp_terms[change_pos,].sum()
                 # Update the exp terms for the positions near the position that just mutated
                 for p in change_pos:
                     if p == prev_mutating_pos:
                         # if it is previously mutated position, should be removed from risk group
                         # therefore exp term should be set to zero
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= exp_terms[p, :]
-                        exp_terms[p, :] = 0
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p],] -= exp_terms[p,]
+                        exp_terms[p,] = 0
                     elif p not in prev_pos_changed:
                         # position hasn't mutated yet.
                         # need to update its exp value and the corresponding gradient vector
-                        grad_log_sum_exp[prev_vecs_at_mutation_step[p], :] -= exp_terms[p, :]
+                        grad_log_sum_exp[prev_vecs_at_mutation_step[p],] -= exp_terms[p,]
                         curr_feat_vec = vecs_at_mutation_step[p]
-                        exp_terms[p,:] = np.exp(theta[curr_feat_vec, :].sum(axis=0))
-                        grad_log_sum_exp[curr_feat_vec, :] += exp_terms[p, :]
+                        exp_terms[p,] = np.exp(theta[curr_feat_vec,].sum(axis=0))
+                        grad_log_sum_exp[curr_feat_vec,] += exp_terms[p,]
                         # add new exp term to gradient and remove old exp term from gradient
                 # Add in the new exp terms from the exp sum
-                exp_sum += exp_terms[change_pos, :].sum()
+                exp_sum += exp_terms[change_pos,].sum()
 
             # Add to the gradient the gradient at this step
             col_idx = 0
@@ -251,7 +252,6 @@ class GradientWorker(ParallelWorker):
         @return the gradient of the log likelihood for this sample
         """
         return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs, self.motif_len)
-        # return get_gradient_log_lik_per_sample(self.theta, self.sample, self.feature_vecs, self.motif_len)
 
 class ObjectiveValueWorker(ParallelWorker):
     """
@@ -274,4 +274,3 @@ class ObjectiveValueWorker(ParallelWorker):
         @return the log likelihood for this sample
         """
         return SurvivalProblemCustom.calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs, self.motif_len)
-        # return calculate_per_sample_log_lik(self.theta, self.sample, self.feature_vecs, self.motif_len)
