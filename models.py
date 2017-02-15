@@ -1,17 +1,27 @@
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq):
+    def __init__(self, start_seq, end_seq, motif_len):
         assert(len(start_seq) == len(end_seq))
 
-        self.start_seq = start_seq
-        self.end_seq = end_seq
-
+        start_index = 0
+        end_index = len(start_seq)
+        
         # A dictionary with key as position and value as target nucleotide
         self.mutation_pos_dict = dict()
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
-                self.mutation_pos_dict[i] = end_seq[i]
-        self.num_mutations = len(self.mutation_pos_dict.keys())
-        self.seq_len = len(start_seq)
+                # ignore mutations happening close to edge
+                if i < start_index + (motif_len - 1) / 2:
+                    start_index = i + 1
+                elif i > end_index - (motif_len - 1) / 2:
+                    end_index = i
+                else:
+                    self.mutation_pos_dict[i - start_index] = end_seq[i]
+        
+        self.num_mutations = len(mutation_pos_dict.keys())
+        self.start_seq = start_seq[start_index:end_index]
+        self.end_seq = end_seq[start_index:end_index]
+        self.seq_len = len(self.start_seq)
+        assert(self.seq_len > 0)
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (
