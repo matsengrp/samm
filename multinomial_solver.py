@@ -5,8 +5,14 @@ class MultinomialSolver:
     @staticmethod
     def solve(obs_data, feat_generator):
         """
+        This model supposes the same hazard rate for different target nucleotides but different probabilities
+        of mutating to target nucleotides for each motif. This probability vector can be fitted by finding
+        the MLE of the multinomial distribution. So this is just the number of times we observe a mutation to
+        a particular target nucleotide out of the number of times we saw this motif mutate.
+
         @param obs_data: ObservedSequenceMutations, the observed start and end sequences
         @param feat_generator: FeatureGenerator
+        @return MLE of a multinomial distribution
         """
         motif_list = feat_generator.get_motif_list()
         num_motifs = len(motif_list)
