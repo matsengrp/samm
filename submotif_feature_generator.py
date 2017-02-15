@@ -2,6 +2,8 @@ import time
 import numpy as np
 import itertools
 import scipy.sparse
+import re
+import random
 
 from common import *
 from feature_generator import *
@@ -186,21 +188,25 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """
-        @param no_feat_vec_pos: don't create feature vectors for these positions
+        @param pos: central mutating position
+        @param intermediate_seq: intermediate sequence to determine motif
         """
         submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
-        if len(submotif) < self.motif_len:
-            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
-            # TODO: update this. right now it sets all extreme positions to the same feature
-            idx = self.feature_vec_len - 1
-        # TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
-        # can we just change the input strings or the motif dictionary?
-        elif contains_degenerate_base(submotif):
-            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
-            # TODO: update this. right now it sets all extreme positions to the same feature
-            idx = self.feature_vec_len - 1
-        else:
-            idx = self.motif_dict[submotif]
+
+        if 'n' in submotif:
+            for match in re.compile('n').finditer(submotif):
+                submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
+
+        idx = self.motif_dict[submotif]
+
+        # TODO: change ObservedSeqMute to handle cases where first and last two mutate...
+        #if len(submotif) < self.motif_len:
+        #    # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
+        #    # TODO: update this. right now it sets all extreme positions to the same feature
+        #    idx = self.feature_vec_len - 1
+        ## TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
+        ## can we just change the input strings or the motif dictionary?
+
         return np.array([idx])
 
     def get_motif_list(self):
