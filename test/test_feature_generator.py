@@ -8,28 +8,28 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         feat_generator = SubmotifFeatureGenerator()
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
-                start_seq="attacg",
-                end_seq="tgcacg"
+                start_seq="aattacgc",
+                end_seq="atgcacgc",
                 motif_len=3,
             )
         )
 
         ordered_seq_mut = ImputedSequenceMutations(
             obs_seq_mut,
-            [0,1,2]
+            [1,2,3]
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        # (position 2 mutates last)
+        # (position 3 mutates last)
         base_feat_mut_steps, base_intermediate_seqs = feat_generator.create_for_mutation_steps(
             ordered_seq_mut,
         )
 
         # Compare update to create feature vectors by changing the mutation order by one step
-        # (position 2 mutates second)
+        # (position 3 mutates second)
         ordered_seq_mut1 = ImputedSequenceMutations(
             obs_seq_mut,
-            [0,2,1]
+            [1,3,2]
         )
         feat_mut_steps1_update, _ = feat_generator.update_for_mutation_steps(
             ordered_seq_mut1,
@@ -44,10 +44,10 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         self.assertEqual(feat_mut_steps1.feature_vec_dicts, feat_mut_steps1_update.feature_vec_dicts)
 
         # Compare update to create feature vectors by changing the mutation order by another step
-        # (position 2 mutates first)
+        # (position 3 mutates first)
         ordered_seq_mut2 = ImputedSequenceMutations(
             obs_seq_mut,
-            [2,0,1]
+            [3,1,2]
         )
         feat_mut_steps2_update, _ = feat_generator.update_for_mutation_steps(
             ordered_seq_mut2,
