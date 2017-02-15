@@ -5,6 +5,8 @@ import custom_utils
 from custom_utils import CustomCommand
 import numpy as np
 
+from common import DEBUG
+
 class ParallelWorker:
     """
     Stores the information for running something in parallel
@@ -105,4 +107,7 @@ def run_multiprocessing_worker(worker):
     except Exception as e:
         print "Exception caught: %s" % e
         traceback.print_exc()
+        if DEBUG:
+            raise Exception
+
     return result

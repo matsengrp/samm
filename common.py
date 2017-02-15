@@ -12,6 +12,9 @@ import glutils
 csv.field_size_limit(sys.maxsize)
 
 from models import ObservedSequenceMutations
+
+DEBUG = False
+
 NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "atcg"
 NUCLEOTIDE_SET = set(["a", "t", "c", "g"])
@@ -48,9 +51,9 @@ def get_nonzero_theta_print_lines(theta, motif_list):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 if i == theta.shape[0] - 1:
-                    lines.append("%d: %s (EDGES)" % (i, theta[i, :]))
+                    lines.append("%d: %s (EDGES)" % (i, theta[i,]))
                 else:
-                    lines.append("%d: %s (%s)" % (i, theta[i, :], motif_list[i]))
+                    lines.append("%d: %s (%s)" % (i, theta[i,], motif_list[i]))
                 break
     return "\n".join(lines)
 
