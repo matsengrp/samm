@@ -10,6 +10,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             ObservedSequenceMutations(
                 start_seq="attacg",
                 end_seq="tgcacg"
+                motif_len=3,
             )
         )
 

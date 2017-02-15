@@ -27,7 +27,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.big_theta.shape)
         cls.big_theta[~theta_mask] = -np.inf
         cls.theta = np.matrix(np.max(cls.big_theta, axis=1)).T
-        cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("ttcgtata", "taagttat"))
+        cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("ttcgtata", "taagttat"), cls.motif_len)
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
     def test_update_log_prob_for_shuffle(self):

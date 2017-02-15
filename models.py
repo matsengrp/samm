@@ -1,5 +1,5 @@
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq, motif_len):
+    def __init__(self, start_seq, end_seq, motif_len=1):
         assert(len(start_seq) == len(end_seq))
 
         start_index = 0
