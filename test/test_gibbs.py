@@ -105,5 +105,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
 
-        self.assertTrue(rho > 0.93)
-        self.assertTrue(pval < 1e-23)
+        self.assertTrue(rho > 0.90)
+        self.assertTrue(pval < 1e-22)
