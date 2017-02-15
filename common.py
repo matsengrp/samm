@@ -240,7 +240,7 @@ def read_partis_annotations(annotations_file_names, motif_len, chain='h', use_v=
                         ObservedSequenceMutations(
                             start_seq=start_seq[:len(end_seq)],
                             end_seq=process_degenerates(end_seq.lower(), motif_len),
-                            motif_len,
+                            motif_len=motif_len,
                         )
                     )
     return gene_dict, obs_data
@@ -282,7 +282,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len):
                 ObservedSequenceMutations(
                     start_seq=start_seq[:len(end_seq)],
                     end_seq=end_seq,
-                    motif_len,
+                    motif_len=motif_len,
                 )
             )
     return gene_dict, obs_data

@@ -21,7 +21,7 @@ class SurvivalModelSimulator:
         self.feature_generator = feature_generator
         self.lambda0 = lambda0
 
-    def simulate(self, start_seq, censoring_time, motif_len, with_replacement=False):
+    def simulate(self, start_seq, censoring_time, motif_len=1, with_replacement=False):
         """
         @param start_seq: string for the original sequence
         @param censoring_time: how long to mutate the sequence for

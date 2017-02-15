@@ -20,7 +20,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         feat_gen = SubmotifFeatureGenerator(motif_len)
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        obs = feat_gen.create_base_features(ObservedSequenceMutations("ggtgggtta", "ggagagtta"), motif_len)
+        obs = feat_gen.create_base_features(ObservedSequenceMutations("ggtgggtta", "ggagagtta", motif_len))
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
         feature_vecs = feat_gen.create_for_mutation_steps(sample)[0]
 

@@ -10,14 +10,14 @@ class ObservedSequenceMutations:
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
                 # ignore mutations happening close to edge
-                if i < start_index + (motif_len - 1) / 2:
+                if i < start_index + motif_len/2:
                     start_index = i + 1
-                elif i > end_index - (motif_len - 1) / 2:
+                elif i > end_index - motif_len/2:
                     end_index = i
                 else:
                     self.mutation_pos_dict[i - start_index] = end_seq[i]
         
-        self.num_mutations = len(mutation_pos_dict.keys())
+        self.num_mutations = len(self.mutation_pos_dict.keys())
         self.start_seq = start_seq[start_index:end_index]
         self.end_seq = end_seq[start_index:end_index]
         self.seq_len = len(self.start_seq)
