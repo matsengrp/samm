@@ -195,7 +195,15 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         ## TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
         ## can we just change the input strings or the motif dictionary?
 
-        submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
+        submotif = intermediate_seq[max(0, pos - self.flank_end_len): pos + self.flank_end_len + 1]
+
+        if len(submotif) < self.motif_len:
+            # TODO: assign a motif since we know there are no mutations?
+            extra_nucleotides = "a" * (self.motif_len - len(submotif))
+            if pos - self.flank_end_len < 0:
+                submotif = extra_nucleotides + submotif
+            else:
+                submotif = submotif + extra_nucleotides
 
         if 'n' in submotif:
             for match in re.compile('n').finditer(submotif):
