@@ -72,7 +72,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         if theta is not None:
             theta_sum0 = feat_mutation_steps.get_init_theta_sum(theta)
             feature_vec_thetasums = [
-                { p : theta_sum0[p, :] for p in range(seq_mut_order.obs_seq_mutation.seq_len)}
+                { p : theta_sum0[p,] for p in range(seq_mut_order.obs_seq_mutation.seq_len)}
             ] + [None] * num_steps
 
         no_feat_vec_pos = set()

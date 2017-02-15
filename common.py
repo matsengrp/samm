@@ -13,7 +13,7 @@ csv.field_size_limit(sys.maxsize)
 
 from models import ObservedSequenceMutations
 
-DEBUG = True
+DEBUG = False
 
 NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "atcg"
