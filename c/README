@@ -1,0 +1,7 @@
+Main procedures in C++
+----------------------------------
+* In the E-step, we kick off parallel gibbs samplers. The gibbs samplers will be implemented in C++.
+* Gibbs sampler
+   - Initialize with data: observed start and end sequence, an initial order, theta
+   - Also specify the feature generator
+   - Return back: samples of the mutation order, so a list of integers
