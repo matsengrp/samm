@@ -91,12 +91,11 @@ def main(args=sys.argv[1:]):
 
     if args.use_partis:
         annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
+        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain, motif_len=args.motif_len)
     else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len)
 
     motif_list = feat_generator.get_motif_list()
-    motif_list.append('EDGES')
 
     mutations = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
     proportions = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
