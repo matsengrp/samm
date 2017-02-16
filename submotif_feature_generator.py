@@ -190,16 +190,21 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, flanks):
         """
         @param pos: central mutating position
-        @param intermediate_seq: intermediate sequence to determine motif
+        @param intermediate_seq: intermediate sequence to determine motif, flanks removed
+        @param flanks: flank nucleotide information
+
+        Create features for subsequence using information from flanks.
         """
 
         ## TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
         ## can we just change the input strings or the motif dictionary?
 
-        pos = pos + self.flank_end_len - 1 if len(flanks) > 0 else pos + self.flank_end_len
+        # if motif length is one then submotifs will be single nucleotides and position remains unchanged
+        pos = pos + max(0, self.flank_end_len - 1)
         expanded_seq = flanks[:self.flank_end_len] + intermediate_seq + flanks[self.flank_end_len:]
         submotif = expanded_seq[pos: pos + self.motif_len]
 
+        # generate random nucleotide if an "n" occurs in the middle of a sequence
         if 'n' in submotif:
             for match in re.compile('n').finditer(submotif):
                 submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
