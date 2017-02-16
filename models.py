@@ -7,13 +7,19 @@ class ObservedSequenceMutations:
         
         # A dictionary with key as position and value as target nucleotide
         self.mutation_pos_dict = dict()
-        for i in range(len(start_seq)):
+        for i in range(len(start_seq)/2):
             if start_seq[i] != end_seq[i]:
                 # ignore mutations happening close to edge
                 if i < start_index + motif_len/2:
                     start_index = i + 1
-                elif i >= end_index - motif_len/2:
-                    end_index = i
+                else:
+                    self.mutation_pos_dict[i - start_index] = end_seq[i]
+
+        for i in reversed(range(1+len(start_seq)/2, len(start_seq))):
+            if start_seq[i] != end_seq[i]:
+                # ignore mutations happening close to edge
+                if i >= end_index - motif_len/2:
+                    end_index = end_index - motif_len/2
                 else:
                     self.mutation_pos_dict[i - start_index] = end_seq[i]
         
