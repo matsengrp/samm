@@ -19,11 +19,11 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
-from mutation_order_gibbs import MutationOrderGibbsSamplerMultiTarget
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
+from multinomial_solver import MultinomialSolver
 from common import *
 from matsen_grp_data import *
 
@@ -128,11 +128,10 @@ def parse_args():
             args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     # Determine sampler
+    args.sampler_cls = MutationOrderGibbsSampler
     if args.per_target_model:
-        args.sampler_cls = MutationOrderGibbsSamplerMultiTarget
         args.theta_num_col = NUM_NUCLEOTIDES
     else:
-        args.sampler_cls = MutationOrderGibbsSampler
         args.theta_num_col = 1
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
@@ -190,6 +189,12 @@ def main(args=sys.argv[1:]):
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
 
+    fitted_prob_vector = None
+    if not args.per_target_model:
+        fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator)
+        log.info("=== Fitted Probability Vector ===")
+        log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
+
     em_algo = MCMC_EM(
         obs_seq_feat_base,
         feat_generator,
@@ -210,7 +215,7 @@ def main(args=sys.argv[1:]):
             penalty_param=penalty_param,
             max_em_iters=args.em_max_iters,
         )
-        results_list.append((penalty_param, theta))
+        results_list.append((penalty_param, theta, fitted_prob_vector))
 
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
