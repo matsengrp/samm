@@ -181,7 +181,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
             feature_vec_thetasum_next.pop(mutation_pos, None)
             for p, feat_vec in feat_vec_dict_update.iteritems():
-                feature_vec_thetasum_next[p] = theta[feat_vec,].sum(axis=0)
+                feature_vec_thetasum_next[p] = theta[feat_vec,]
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
