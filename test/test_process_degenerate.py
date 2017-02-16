@@ -9,21 +9,27 @@ class Degenerate_TestCase(unittest.TestCase):
         """
         Test processing of degenerate bases
         """
+
+        MOTIF_LEN = 5
+
         START_SEQ = "acgntac...a.....acnntcgggaaaaca"
-        END_SEQ =   "ttgntgc......c..acnntaggtaaaaaa"
+        END_SEQ =   "ttgntgc......c..acnntaggtaacaaa"
 
-        for motif_len in [3, 5]:
-            print "motif length: ", motif_len
+        # what they should be processed as
+        PROC_START = "acgntacnnacnntcgggaaaaca"
+        PROC_END =   "ttgntgcnnacnntaggtaacaaa"
 
-            # can we process correctly?
-            start_processed, end_processed = process_degenerates(START_SEQ, END_SEQ, motif_len)
-            print start_processed
-            print end_processed
+        # what they should be trimmed to
+        TRIM_START = "gntacnnacnntcgggaa"
+        TRIM_DICT = {3: 'g', 12: 'a', 15: 't'}
 
-            # can we handle edge mutations?
-            obs_mute = ObservedSequenceMutations(start_processed, end_processed, motif_len)
-            print obs_mute
+        # can we process correctly?
+        start_processed, end_processed = process_degenerates(START_SEQ, END_SEQ, MOTIF_LEN)
+        self.assertEquals(PROC_START, start_processed)
+        self.assertEquals(PROC_END, end_processed)
 
-            # can we read real data?
-            gene_dict, obs_data_raw = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
+        # can we handle edge mutations?
+        obs_mute = ObservedSequenceMutations(start_processed, end_processed, MOTIF_LEN)
+        self.assertEquals(obs_mute.start_seq, TRIM_START)
+        self.assertEquals(obs_mute.mutation_pos_dict, TRIM_DICT)
 
