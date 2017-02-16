@@ -8,7 +8,7 @@ from sampler_collection import SamplerCollection
 from profile_support import profile
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=50, num_jobs=1, num_threads=1, approx='none'):
+    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_jobs=1, num_threads=1, approx='none'):
         """
         @param observed_data: list of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
