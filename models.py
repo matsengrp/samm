@@ -13,7 +13,7 @@ class ObservedSequenceMutations:
                 if i < start_index + motif_len/2:
                     start_index = i + 1
                 else:
-                    self.mutation_pos_dict[i - start_index] = end_seq[i]
+                    self.mutation_pos_dict[i - start_index - motif_len/2] = end_seq[i]
 
         for i in reversed(range(len(start_seq)/2, len(start_seq))):
             if start_seq[i] != end_seq[i]:
@@ -21,11 +21,13 @@ class ObservedSequenceMutations:
                 if i >= end_index - motif_len/2:
                     end_index = end_index - motif_len/2
                 else:
-                    self.mutation_pos_dict[i - start_index] = end_seq[i]
+                    self.mutation_pos_dict[i - start_index - motif_len/2] = end_seq[i]
         
         self.num_mutations = len(self.mutation_pos_dict.keys())
-        self.start_seq = start_seq[start_index:end_index]
-        self.end_seq = end_seq[start_index:end_index]
+        self.flanks = start_seq[start_index:start_index + motif_len/2] + start_seq[end_index - motif_len/2:end_index]
+
+        self.start_seq = start_seq[start_index + motif_len/2:end_index - motif_len/2]
+        self.end_seq = end_seq[start_index + motif_len/2:end_index - motif_len/2]
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 

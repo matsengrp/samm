@@ -16,20 +16,20 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
         ordered_seq_mut = ImputedSequenceMutations(
             obs_seq_mut,
-            [1,2,3]
+            [0,1,2]
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        # (position 3 mutates last)
+        # (position 2 mutates last)
         base_feat_mut_steps, base_intermediate_seqs = feat_generator.create_for_mutation_steps(
             ordered_seq_mut,
         )
 
         # Compare update to create feature vectors by changing the mutation order by one step
-        # (position 3 mutates second)
+        # (position 2 mutates second)
         ordered_seq_mut1 = ImputedSequenceMutations(
             obs_seq_mut,
-            [1,3,2]
+            [0,2,1]
         )
         feat_mut_steps1_update, _ = feat_generator.update_for_mutation_steps(
             ordered_seq_mut1,
@@ -44,10 +44,10 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         self.assertEqual(feat_mut_steps1.feature_vec_dicts, feat_mut_steps1_update.feature_vec_dicts)
 
         # Compare update to create feature vectors by changing the mutation order by another step
-        # (position 3 mutates first)
+        # (position 2 mutates first)
         ordered_seq_mut2 = ImputedSequenceMutations(
             obs_seq_mut,
-            [3,1,2]
+            [2,0,1]
         )
         feat_mut_steps2_update, _ = feat_generator.update_for_mutation_steps(
             ordered_seq_mut2,

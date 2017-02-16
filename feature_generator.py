@@ -64,6 +64,7 @@ class ObservedSequenceMutationsFeatures:
         # (shallow) copy over the rest of the data
         self.start_seq = obs_seq_mutation.start_seq
         self.end_seq = obs_seq_mutation.end_seq
+        self.flanks = obs_seq_mutation.flanks
         self.mutation_pos_dict = obs_seq_mutation.mutation_pos_dict
         self.num_mutations = obs_seq_mutation.num_mutations
         self.seq_len = obs_seq_mutation.seq_len

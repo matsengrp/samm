@@ -24,14 +24,14 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         motif_list = self.get_motif_list()
         self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
 
-    def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
+    def create_for_sequence(self, seq_str, seq_flank, do_feat_vec_pos=None):
         feat_vec_dict = dict()
         if do_feat_vec_pos is None:
-            do_feat_vec_pos = range(self.flank_end_len, len(seq_str) - self.flank_end_len)
+            do_feat_vec_pos = range(len(seq_str))
 
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
         for pos in do_feat_vec_pos:
-            feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str)
+            feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str, seq_flank)
         return feat_vec_dict
 
     def create_base_features(self, obs_seq_mutation):
@@ -46,8 +46,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         num_entries = 0
 
         feat_dict = dict()
-        for pos in range(self.flank_end_len, obs_seq_mutation.seq_len - self.flank_end_len):
-            feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq)
+        for pos in range(obs_seq_mutation.seq_len):
+            feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq, obs_seq_mutation.flanks)
             feat_dict[pos] = feat_vect
             num_entries += feat_vect.size
             indptr.append(num_entries)
@@ -56,7 +56,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         data = [True] * num_entries
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
-            shape=(obs_seq_mutation.seq_len - 2*self.flank_end_len, self.feature_vec_len),
+            shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
             dtype=bool,
         )
         return ObservedSequenceMutationsFeatures(
@@ -161,16 +161,17 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         # Don't calculate feature vectors for positions that have mutated already
         # Calculate feature vectors for positions that are close to the mutation
         do_feat_vec_pos = set(range(
-            max(mutation_pos - self.flank_end_len, self.flank_end_len),
-            min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len - self.flank_end_len),
+            max(mutation_pos - self.flank_end_len, 0),
+            min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
         ))
 
         # Generate features for the positions that need to be updated
         # (don't make a function out of this -- python function call overhead is too high)
         feat_vec_dict_update = dict()
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        # also the flanks don't change since we've trimmed them
         for pos in do_feat_vec_pos - no_feat_vec_pos:
-            feat_vec_dict_update[pos] = self._create_feature_vec_for_pos(pos, new_intermediate_seq)
+            feat_vec_dict_update[pos] = self._create_feature_vec_for_pos(pos, new_intermediate_seq, seq_mut_order.obs_seq_mutation.flanks)
 
         feat_vec_dict_next = feat_mutation_steps.feature_vec_dicts[i].copy() # shallow copy of dictionary
         feat_vec_dict_next.pop(mutation_pos, None)
@@ -186,7 +187,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
-    def _create_feature_vec_for_pos(self, pos, intermediate_seq):
+    def _create_feature_vec_for_pos(self, pos, intermediate_seq, flanks):
         """
         @param pos: central mutating position
         @param intermediate_seq: intermediate sequence to determine motif
@@ -195,7 +196,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         ## TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
         ## can we just change the input strings or the motif dictionary?
 
-        submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
+        pos = pos + self.flank_end_len - 1 if len(flanks) > 0 else pos + self.flank_end_len
+        expanded_seq = flanks[:self.flank_end_len] + intermediate_seq + flanks[self.flank_end_len:]
+        submotif = expanded_seq[pos: pos + self.motif_len]
 
         if 'n' in submotif:
             for match in re.compile('n').finditer(submotif):

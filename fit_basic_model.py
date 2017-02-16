@@ -102,7 +102,7 @@ def main(args=sys.argv[1:]):
     appearances = {motif: 0. for motif in motif_list}
 
     for obs_seq in obs_data:
-        germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
+        germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.flanks)
 
         for key, value in germline_motifs.iteritems():
             appearances[motif_list[value[0]]] += 1
