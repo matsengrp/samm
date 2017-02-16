@@ -263,6 +263,11 @@ def process_degenerates(start_seq, end_seq, motif_len):
             end_list[idx.start()] = 'n'
         processed_end_seq = ''.join(end_list)
 
+        # first remove beginning and trailing "n"s
+        processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
+        processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
+
+        # now collapse interior "n"s
         processed_start_seq = re.sub(pattern, repl, processed_start_seq)
         processed_end_seq = re.sub(pattern, repl, processed_end_seq)
 

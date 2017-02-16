@@ -12,8 +12,8 @@ class Degenerate_TestCase(unittest.TestCase):
 
         MOTIF_LEN = 5
 
-        START_SEQ = "acgntac...a.....acnntcgggaaaaca"
-        END_SEQ =   "ttgntgc......c..acnntaggtaacaaa"
+        START_SEQ = "tagacgntac...a.....acnntcgggaaaacannn"
+        END_SEQ =   "nnnttgntgc......c..acnntaggtaacaaannn"
 
         # what they should be processed as
         PROC_START = "acgntacnnacnntcgggaaaaca"
