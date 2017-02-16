@@ -47,7 +47,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         for pos in range(obs_seq_mutation.seq_len):
             feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq)
             feat_dict[pos] = feat_vect
-            # num_entries += feat_vect.size
             indptr.append(pos + 1)
             indices.append(feat_vect)
 
@@ -193,10 +192,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             idx = self.feature_vec_len - 1
         # TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
         # can we just change the input strings or the motif dictionary?
-        # elif contains_degenerate_base(submotif):
-        #     # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
-        #     # TODO: update this. right now it sets all extreme positions to the same feature
-        #     idx = self.feature_vec_len - 1
+        elif contains_degenerate_base(submotif):
+            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
+            # TODO: update this. right now it sets all extreme positions to the same feature
+            idx = self.feature_vec_len - 1
         else:
             idx = self.motif_dict[submotif]
         return idx
