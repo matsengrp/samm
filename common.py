@@ -173,7 +173,7 @@ def read_bcr_hd5(path, remove_gap=True):
     else:
         return sites
 
-def read_partis_annotations(annotations_file_names, motif_len, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None):
+def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -232,32 +232,46 @@ def read_partis_annotations(annotations_file_names, motif_len, chain='h', use_v=
                 utils.add_implicit_info(glfo, line)
                 # for now just use V gene for ID
                 key = 'clone{}-{}'.format(*[idx, line['v_gene']])
-                gene_dict[key] = process_degenerates(line[gene_col].lower(), motif_len)
-                start_seq = process_degenerates(line[gene_col].lower(), motif_len)
+                gene_dict[key] = line[gene_col].lower()
                 good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
                 for end_seq in good_seqs:
+                    gl_seq, ch_seq = process_degenerates(line[gene_col].lower(), end_seq.lower(), motif_len)
                     obs_data.append(
                         ObservedSequenceMutations(
-                            start_seq=start_seq[:len(end_seq)],
-                            end_seq=process_degenerates(end_seq.lower(), motif_len),
+                            start_seq=gl_seq,
+                            end_seq=ch_seq,
                             motif_len=motif_len,
                         )
                     )
     return gene_dict, obs_data
 
-def process_degenerates(seq, motif_len):
+def process_degenerates(start_seq, end_seq, motif_len):
     """ replace unknown characters with "n" and collapse runs of "n"s """
 
-    repl = 'n' * ((motif_len - 1) / 2)
-    pattern = repl + '+'
-    processed_seq = re.sub('[^agctn]', 'n', seq)
-    if re.search('n', processed_seq):
-        # collapse degenerates
-        processed_seq = re.sub(pattern, repl, processed_seq)
+    # replace all unknowns with an "n"
+    processed_start_seq = re.sub('[^agctn]', 'n', start_seq)
+    processed_end_seq = re.sub('[^agctn]', 'n', end_seq)
 
-    return processed_seq
+    # conform unknowns and collapse "n"s
+    repl = 'n' * (motif_len/2)
+    pattern = repl + '+' if motif_len > 1 else 'n'
+    if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
+        # turn known bases in start_seq to "n"s and collapse degenerates
+        start_list = list(processed_start_seq)
+        end_list = list(processed_end_seq)
+        for idx in re.finditer('n', processed_end_seq):
+            start_list[idx.start()] = 'n'
+        processed_start_seq = ''.join(start_list)
+        for idx in re.finditer('n', processed_start_seq):
+            end_list[idx.start()] = 'n'
+        processed_end_seq = ''.join(end_list)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len):
+        processed_start_seq = re.sub(pattern, repl, processed_start_seq)
+        processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+
+    return processed_start_seq, processed_end_seq
+
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
@@ -269,18 +283,17 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len):
         gene_reader.next()
         for row in gene_reader:
             # replace unknown characters with 'n'
-            gene_dict[row[0]] = process_degenerates(row[1].lower(), motif_len)
+            gene_dict[row[0]] = row[1].lower()
 
     obs_data = []
     with open(seq_file_name, "r") as seq_csv:
         seq_reader = csv.reader(seq_csv, delimiter=",")
         seq_reader.next()
         for row in seq_reader:
-            start_seq = gene_dict[row[0]].lower()
-            end_seq = process_degenerates(row[2].lower(), motif_len)
+            start_seq, end_seq = process_degenerates(gene_dict[row[0]], row[2].lower(), motif_len)
             obs_data.append(
                 ObservedSequenceMutations(
-                    start_seq=start_seq[:len(end_seq)],
+                    start_seq=start_seq,
                     end_seq=end_seq,
                     motif_len=motif_len,
                 )

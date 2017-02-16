@@ -9,15 +9,14 @@ class Degenerate_TestCase(unittest.TestCase):
         """
         Test processing of degenerate bases
         """
-        START_SEQ = "acgntac.........acnntcgggaaaaca"
-        END_SEQ = "ttgntgc.........acnntaggtaaaaaa"
+        START_SEQ = "acgntac...a.....acnntcgggaaaaca"
+        END_SEQ =   "ttgntgc......c..acnntaggtaaaaaa"
 
         for motif_len in [3, 5]:
             print "motif length: ", motif_len
 
             # can we process correctly?
-            start_processed = process_degenerates(START_SEQ, motif_len)
-            end_processed = process_degenerates(END_SEQ, motif_len)
+            start_processed, end_processed = process_degenerates(START_SEQ, END_SEQ, motif_len)
             print start_processed
             print end_processed
 
