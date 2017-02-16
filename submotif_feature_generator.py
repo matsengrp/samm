@@ -27,7 +27,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
         feat_vec_dict = dict()
         if do_feat_vec_pos is None:
-            do_feat_vec_pos = range(len(seq_str))
+            do_feat_vec_pos = range(self.flank_end_len, len(seq_str) - self.flank_end_len)
 
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
         for pos in do_feat_vec_pos:
@@ -46,7 +46,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         num_entries = 0
 
         feat_dict = dict()
-        for pos in range(obs_seq_mutation.seq_len):
+        for pos in range(self.flank_end_len, obs_seq_mutation.seq_len - self.flank_end_len):
             feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq)
             feat_dict[pos] = feat_vect
             num_entries += feat_vect.size
@@ -56,7 +56,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         data = [True] * num_entries
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
-            shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
+            shape=(obs_seq_mutation.seq_len - 2*self.flank_end_len, self.feature_vec_len),
             dtype=bool,
         )
         return ObservedSequenceMutationsFeatures(
@@ -161,8 +161,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         # Don't calculate feature vectors for positions that have mutated already
         # Calculate feature vectors for positions that are close to the mutation
         do_feat_vec_pos = set(range(
-            max(mutation_pos - self.flank_end_len, 0),
-            min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
+            max(mutation_pos - self.flank_end_len, self.flank_end_len),
+            min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len - self.flank_end_len),
         ))
 
         # Generate features for the positions that need to be updated
@@ -195,15 +195,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         ## TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
         ## can we just change the input strings or the motif dictionary?
 
-        submotif = intermediate_seq[max(0, pos - self.flank_end_len): pos + self.flank_end_len + 1]
-
-        if len(submotif) < self.motif_len:
-            # TODO: assign a motif since we know there are no mutations?
-            extra_nucleotides = "a" * (self.motif_len - len(submotif))
-            if pos - self.flank_end_len < 0:
-                submotif = extra_nucleotides + submotif
-            else:
-                submotif = submotif + extra_nucleotides
+        submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
 
         if 'n' in submotif:
             for match in re.compile('n').finditer(submotif):

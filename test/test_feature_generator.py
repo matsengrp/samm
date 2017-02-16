@@ -5,7 +5,7 @@ from models import *
 
 class FeatureGeneratorTestCase(unittest.TestCase):
     def test_update(self):
-        feat_generator = SubmotifFeatureGenerator()
+        feat_generator = SubmotifFeatureGenerator(motif_len=3)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
                 start_seq="aattacgc",
