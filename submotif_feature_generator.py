@@ -31,7 +31,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         for pos in do_feat_vec_pos:
             feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str)
         return feat_vec_dict
-    @profile
+
     def create_base_features(self, obs_seq_mutation):
         """
         Create the feature matrices and feature vector dictionary
@@ -64,7 +64,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         )
 
     # TODO: make this a real feature generator (deal with ends properly)
-    @profile
     def create_for_mutation_steps(self, seq_mut_order, theta=None):
         num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
         feat_mutation_steps = FeatureMutationSteps(seq_mut_order)
@@ -95,7 +94,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feat_mutation_steps, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
-    @profile
     def update_for_mutation_steps(
         self,
         seq_mut_order,
@@ -137,7 +135,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return feat_mutation_steps, feature_vec_thetasums
 
-    @profile
     def _update_mutation_step(self, i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, no_feat_vec_pos, theta=None):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
@@ -185,7 +182,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
-    @profile
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """
         @param no_feat_vec_pos: don't create feature vectors for these positions
