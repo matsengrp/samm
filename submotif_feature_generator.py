@@ -31,7 +31,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         for pos in do_feat_vec_pos:
             feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str)
         return feat_vec_dict
-
+    @profile
     def create_base_features(self, obs_seq_mutation):
         """
         Create the feature matrices and feature vector dictionary
@@ -39,7 +39,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         @return ObservedSequenceMutationsFeatures
         """
-        indices = np.array([])
+        indices = []
         indptr = [0]
         num_entries = 0
 
@@ -47,11 +47,11 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         for pos in range(obs_seq_mutation.seq_len):
             feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq)
             feat_dict[pos] = feat_vect
-            num_entries += feat_vect.size
-            indptr.append(num_entries)
-            indices = np.concatenate((indices, feat_vect))
+            # num_entries += feat_vect.size
+            indptr.append(pos + 1)
+            indices.append(feat_vect)
 
-        data = [True] * num_entries
+        data = [True] * obs_seq_mutation.seq_len
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
             shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
@@ -64,6 +64,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         )
 
     # TODO: make this a real feature generator (deal with ends properly)
+    @profile
     def create_for_mutation_steps(self, seq_mut_order, theta=None):
         num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
         feat_mutation_steps = FeatureMutationSteps(seq_mut_order)
@@ -94,6 +95,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return feat_mutation_steps, feature_vec_thetasums
 
     # TODO: make this a real feature generator (deal with ends properly)
+    @profile
     def update_for_mutation_steps(
         self,
         seq_mut_order,
@@ -135,6 +137,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return feat_mutation_steps, feature_vec_thetasums
 
+    @profile
     def _update_mutation_step(self, i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, no_feat_vec_pos, theta=None):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
@@ -182,6 +185,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
+    @profile
     def _create_feature_vec_for_pos(self, pos, intermediate_seq):
         """
         @param no_feat_vec_pos: don't create feature vectors for these positions
@@ -193,13 +197,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             idx = self.feature_vec_len - 1
         # TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
         # can we just change the input strings or the motif dictionary?
-        elif contains_degenerate_base(submotif):
-            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
-            # TODO: update this. right now it sets all extreme positions to the same feature
-            idx = self.feature_vec_len - 1
+        # elif contains_degenerate_base(submotif):
+        #     # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
+        #     # TODO: update this. right now it sets all extreme positions to the same feature
+        #     idx = self.feature_vec_len - 1
         else:
             idx = self.motif_dict[submotif]
-        return np.array([idx])
+        return idx
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))

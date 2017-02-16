@@ -93,7 +93,7 @@ class MutationOrderGibbsSampler(Sampler):
             [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in sampled_orders],
             traces
         )
-
+    @profile
     def _do_gibbs_sweep(self, curr_order, gibbs_step_info=None):
         """
         One gibbs sweep is a gibbs sampling step for all the positions
@@ -195,7 +195,7 @@ class MutationOrderGibbsSampler(Sampler):
             trace.append(curr_order_probs)
 
         return gibbs_step_info, trace
-
+    @profile
     def _update_log_prob_from_shuffle(self, i, old_log_probs, order, prev_order, feature_vec_theta_sums, prev_feature_vec_theta_sums):
         """
         Calculate multinomial probs - only need to update 2 values (the one where this position mutates and
@@ -237,7 +237,7 @@ class MutationOrderGibbsSampler(Sampler):
         )
 
         return log_probs
-
+    @profile
     def _compute_log_probs(self, curr_order, gibbs_step_base=None, update_positions=None):
         """
         Driver to compute probabilities with some precompute if statements
