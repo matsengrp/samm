@@ -23,10 +23,10 @@ class MultinomialSolver:
         for obs_seq in obs_data:
             germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
             for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
-                for feature_idx in germline_motifs[mut_pos]:
-                    if feature_idx < num_motifs:
-                        motif_count[feature_idx] += 1.
-                        target_mutation_count[feature_idx, NUCLEOTIDE_DICT[mut_nuc]] += 1.
+                feature_idx = germline_motifs[mut_pos]
+                if feature_idx < num_motifs:
+                    motif_count[feature_idx] += 1.
+                    target_mutation_count[feature_idx, NUCLEOTIDE_DICT[mut_nuc]] += 1.
 
         proportions = np.matrix([[0.] * NUM_NUCLEOTIDES] * num_motifs)
         for motif_idx, motif_count in enumerate(motif_count):
