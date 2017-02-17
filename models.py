@@ -27,7 +27,7 @@ class ObservedSequenceMutations:
         for flank_start_idx in range(len(start_seq)/2):
             if start_seq[flank_start_idx] != end_seq[flank_start_idx]:
                 start_idx = flank_start_idx + 1
-            elif start_idx + flank_len == flank_start_idx + 1:
+            elif start_idx == flank_start_idx:
                 break
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides

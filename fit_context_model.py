@@ -166,9 +166,9 @@ def main(args=sys.argv[1:]):
     log.info("Reading data")
     if args.use_partis:
         annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
+        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain, motif_len=args.motif_len)
     else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len)
 
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
