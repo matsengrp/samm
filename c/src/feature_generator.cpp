@@ -78,10 +78,9 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
 }
 
 int SubmotifFeatureGenerator::get_feature_idx_for_pos(int position, const VectorNucleotide &nuc_seq) {
+  // Initial testing shows that this is faster than stoi and map lookup
   int idx = 0;
   int base = 1;
-  // TODO: Is an unordereed map faster?
-  // TODO: Is stoi faster?
   for (int i = 0; i < motif_len; i++) {
     idx += nuc_seq[position + motif_len_half - i] * base;
     base = base << 2;

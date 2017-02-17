@@ -1,5 +1,5 @@
-#ifndef FEATURE_GEN_H
-#define FEATURE_GEN_H
+#ifndef FEATURE_GEN_HPP
+#define FEATURE_GEN_HPP
 
 #include <iostream>
 #include <vector>
