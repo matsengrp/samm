@@ -43,11 +43,11 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
   );
 
   for (int i = 1; i < ordered_mut_steps->num_steps; i++) {
-    int mutating_pos = mut_order[i - 1];
+    int mutated_pos = mut_order[i - 1];
     VectorNucleotide intermediate_seq = common::get_mutated_string(
       ordered_mut_steps->mut_steps[i - 1]->nuc_vec,
-      mutating_pos,
-      obs_sample->end_seq[mutating_pos]
+      mutated_pos,
+      obs_sample->end_seq[mutated_pos]
     );
 
     // Do something really stupid right now. Just make a new one.
@@ -55,7 +55,7 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
     VectorFeature intermediate_feats;
     for (int p = 0; p < obs_sample->num_pos; p++) {
       int prev_feat_idx = ordered_mut_steps->mut_steps[i - 1]->feature_vec[p];
-      if (prev_feat_idx == MUTATED) {
+      if (p == mutated_pos || prev_feat_idx == MUTATED) {
         intermediate_feats.push_back(MUTATED);
       } else {
         intermediate_feats.push_back(
@@ -63,7 +63,6 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
         );
       }
     }
-    cout << "asdfasdf" << i<<"\n";
     ordered_mut_steps->set(
       i,
       make_shared<MutationStep>(
@@ -82,6 +81,10 @@ int SubmotifFeatureGenerator::get_feature_idx_for_pos(int position, const Vector
   int idx = 0;
   int base = 1;
   for (int i = 0; i < motif_len; i++) {
+    if (position + motif_len_half - i < 0 || position + motif_len_half - i > nuc_seq.size() - 1) {
+      // TODO: replace me with reasonable things
+      return 10000;
+    }
     idx += nuc_seq[position + motif_len_half - i] * base;
     base = base << 2;
   }

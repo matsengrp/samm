@@ -2,3 +2,7 @@
 _output/
 .sconsign.dblite
 .fus*
+*.o
+*.gch
+*.lprof
+*.so
