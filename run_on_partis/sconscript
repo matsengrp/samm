@@ -40,7 +40,7 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['basic', 'survival'])
+    ['basic'])
 
 # Nest for model fitting
 @nest.add_target_with_env(localenv)

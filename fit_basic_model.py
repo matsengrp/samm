@@ -95,8 +95,19 @@ def main(args=sys.argv[1:]):
     else:
         gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 
+    obs_seq_feat_base = []
+    total_mutations = 0
+    for obs_seq_mutation in obs_data:
+        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
+        total_mutations += obs_seq_feat_base[-1].num_mutations
+
+    log.info("Number of germlines %d" % len(gene_dict))
+    log.info("Number of sequences %d" % len(obs_data))
+    log.info("Number of mutations %d" % total_mutations)
+
     motif_list = feat_generator.get_motif_list()
     motif_list.append('EDGES')
+    # remove^
 
     mutations = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
     proportions = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
@@ -106,11 +117,10 @@ def main(args=sys.argv[1:]):
         germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
 
         for key, value in germline_motifs.iteritems():
-            appearances[motif_list[value[0]]] += 1
+            appearances[motif_list[value]] += 1
 
         for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
-            for mutation in germline_motifs[mut_pos]:
-                mutations[motif_list[mutation]][mut_nuc] += 1
+            mutations[motif_list[germline_motifs[mut_pos]]][mut_nuc] += 1
 
     for key in motif_list:
         for nucleotide in 'acgt':

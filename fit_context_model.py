@@ -171,9 +171,14 @@ def main(args=sys.argv[1:]):
         gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
 
     obs_seq_feat_base = []
+    total_mutations = 0
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
+        total_mutations += obs_seq_feat_base[-1].num_mutations
+
+    log.info("Number of germlines %d" % len(gene_dict))
     log.info("Number of sequences %d" % len(obs_seq_feat_base))
+    log.info("Number of mutations %d" % total_mutations)
     log.info("Settings %s" % args)
 
     log.info("Running EM")
