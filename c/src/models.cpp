@@ -4,7 +4,7 @@ ObservedSample::ObservedSample(
   VectorNucleotide s,
   VectorNucleotide e,
   VectorFeature f
-): start_seq{s}, end_seq{e}, start_seq_features{f} {
+): start_nucs{s}, end_nucs{e}, start_features{f} {
     num_pos = s.val.size();
 }
 

@@ -16,13 +16,13 @@ from models import ObservedSequenceMutations
 DEBUG = False
 
 NUM_NUCLEOTIDES = 4
-NUCLEOTIDES = "atcg"
-NUCLEOTIDE_SET = set(["a", "t", "c", "g"])
+NUCLEOTIDES = "acgt"
+NUCLEOTIDE_SET = set(["a", "c", "g", "t"])
 NUCLEOTIDE_DICT = {
     "a": 0,
-    "t": 1,
-    "c": 2,
-    "g": 3,
+    "c": 1,
+    "g": 2,
+    "t": 3,
 }
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'

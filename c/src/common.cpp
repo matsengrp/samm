@@ -1,9 +1,9 @@
 #include "common.hpp"
 
 namespace common {
-  VectorNucleotide get_mutated_string(const VectorNucleotide &seq, int position, Nuc target_nuc) {
-    VectorNucleotide mutated_seq(seq);
-    mutated_seq.val[position] = target_nuc;
-    return mutated_seq;
+  VectorNucleotide get_mutated_nucleotide_vector(const VectorNucleotide &nuc_vec, int position, Nuc target_nuc) {
+    VectorNucleotide mutated_nucs(nuc_vec);
+    mutated_nucs.val[position] = target_nuc;
+    return mutated_nucs;
   }
 }

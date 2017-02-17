@@ -21,8 +21,8 @@ class SubmotifFeatureGenerator {
     // Make an ObservedSample object from the raw observed data
     // Calculates the features before any mutations have occurred
     shared_ptr<ObservedSample> create_observed_sample(
-      VectorNucleotide start_nuc,
-      VectorNucleotide end_nuc
+      VectorNucleotide start_nucs,
+      VectorNucleotide end_nucs
     );
 
     // Calculate features for all mutation steps

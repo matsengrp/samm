@@ -34,17 +34,17 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
   unique_ptr<OrderedMutationSteps> ordered_mut_steps(new OrderedMutationSteps(mut_order));
 
   for (int i = 0; i < ordered_mut_steps->num_steps; i++) {
-    VectorNucleotide intermediate_seq;
+    VectorNucleotide intermediate_nucs;
     VectorFeature intermediate_feats;
     if (i == 0) {
-      intermediate_seq = obs_sample->start_seq;
-      intermediate_feats = obs_sample->start_seq_features;
+      intermediate_nucs = obs_sample->start_nucs;
+      intermediate_feats = obs_sample->start_features;
     } else {
       int mutated_pos = mut_order.val[i - 1];
-      intermediate_seq = common::get_mutated_string(
+      intermediate_nucs = common::get_mutated_nucleotide_vector(
         ordered_mut_steps->mut_steps[i - 1]->nuc_vec,
         mutated_pos,
-        obs_sample->end_seq.val[mutated_pos]
+        obs_sample->end_nucs.val[mutated_pos]
       );
 
       // Do something really stupid right now. Just make a new one.
@@ -55,15 +55,15 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
           intermediate_feats.val.push_back(MUTATED);
         } else {
           intermediate_feats.val.push_back(
-            get_feature_idx_for_pos(p, intermediate_seq)
+            get_feature_idx_for_pos(p, intermediate_nucs)
           );
         }
       }
     }
 
-    pair<bool, ThetaSums> theta_sum_option(theta.first, ThetaSums());
+    pair<bool, VectorThetaSums> theta_sum_option(theta.first, VectorThetaSums());
     if (theta.first) {
-      ThetaSums theta_sums;
+      VectorThetaSums theta_sums;
       for (int p = 0; p < obs_sample->num_pos; p++) {
         int feat_idx = intermediate_feats.val[p];
         if (feat_idx == MUTATED) {
@@ -77,7 +77,7 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
     ordered_mut_steps->set(
       i,
       make_shared<MutationStep>(
-        intermediate_seq,
+        intermediate_nucs,
         intermediate_feats,
         theta_sum_option
       )
@@ -87,16 +87,16 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
   return ordered_mut_steps;
 }
 
-int SubmotifFeatureGenerator::get_feature_idx_for_pos(int position, const VectorNucleotide &nuc_seq) {
+int SubmotifFeatureGenerator::get_feature_idx_for_pos(int position, const VectorNucleotide &nuc_vec) {
   // Initial testing shows that this is faster than stoi and map lookup
   int idx = 0;
   int base = 1;
   for (int i = 0; i < motif_len; i++) {
-    if (position + motif_len_half - i < 0 || position + motif_len_half - i > nuc_seq.val.size() - 1) {
+    if (position + motif_len_half - i < 0 || position + motif_len_half - i > nuc_vec.val.size() - 1) {
       // TODO: replace me with reasonable things
       return 10000;
     }
-    idx += nuc_seq.val[position + motif_len_half - i] * base;
+    idx += nuc_vec.val[position + motif_len_half - i] * base;
     base = base << 2;
   }
   return idx;

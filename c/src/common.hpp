@@ -7,7 +7,7 @@
 using namespace std;
 
 namespace common {
-  VectorNucleotide get_mutated_string(const VectorNucleotide &seq, int position, Nuc target_nuc);
+  VectorNucleotide get_mutated_nucleotide_vector(const VectorNucleotide &nuc_vec, int position, Nuc target_nuc);
 }
 
 #endif
