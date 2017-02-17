@@ -235,7 +235,8 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
                 gene_dict[key] = line[gene_col].lower()
                 good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
                 for end_seq in good_seqs:
-                    gl_seq, ch_seq = process_degenerates(line[gene_col].lower(), end_seq.lower(), motif_len)
+                    # process sequences
+                    gl_seq, ch_seq = trim_degenerates_and_collapse(line[gene_col].lower(), end_seq.lower(), motif_len)
                     obs_data.append(
                         ObservedSequenceMutations(
                             start_seq=gl_seq,
@@ -245,8 +246,10 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
                     )
     return gene_dict, obs_data
 
-def process_degenerates(start_seq, end_seq, motif_len):
+def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
     """ replace unknown characters with "n" and collapse runs of "n"s """
+
+    assert(len(start_seq) == len(end_seq))
 
     # replace all unknowns with an "n"
     processed_start_seq = re.sub('[^agctn]', 'n', start_seq)
@@ -287,7 +290,6 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
         gene_reader = csv.reader(gene_csv, delimiter=',')
         gene_reader.next()
         for row in gene_reader:
-            # replace unknown characters with 'n'
             gene_dict[row[0]] = row[1].lower()
 
     obs_data = []
@@ -295,7 +297,8 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
         seq_reader = csv.reader(seq_csv, delimiter=",")
         seq_reader.next()
         for row in seq_reader:
-            start_seq, end_seq = process_degenerates(gene_dict[row[0]], row[2].lower(), motif_len)
+            # process sequences
+            start_seq, end_seq = trim_degenerates_and_collapse(gene_dict[row[0]], row[2].lower(), motif_len)
             obs_data.append(
                 ObservedSequenceMutations(
                     start_seq=start_seq,

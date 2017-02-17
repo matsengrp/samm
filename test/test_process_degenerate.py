@@ -25,7 +25,7 @@ class Degenerate_TestCase(unittest.TestCase):
         TRIM_DICT = {1: 'g', 10: 'a', 13: 't'}
 
         # can we process correctly?
-        start_processed, end_processed = process_degenerates(START_SEQ, END_SEQ, MOTIF_LEN)
+        start_processed, end_processed = trim_degenerates_and_collapse(START_SEQ, END_SEQ, MOTIF_LEN)
         self.assertEquals(PROC_START, start_processed)
         self.assertEquals(PROC_END, end_processed)
 
