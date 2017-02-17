@@ -212,7 +212,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                         # need to update its exp value and the corresponding gradient vector
                         grad_log_sum_exp[prev_vecs_at_mutation_step[p],] -= exp_terms[p,]
                         curr_feat_vec = vecs_at_mutation_step[p]
-                        exp_terms[p,] = np.exp(theta[curr_feat_vec,].sum(axis=0))
+                        exp_terms[p,] = np.exp(theta[curr_feat_vec,])
                         grad_log_sum_exp[curr_feat_vec,] += exp_terms[p,]
                         # add new exp term to gradient and remove old exp term from gradient
                 # Add in the new exp terms from the exp sum

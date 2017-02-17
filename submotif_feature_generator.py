@@ -40,7 +40,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         @return ObservedSequenceMutationsFeatures
         """
-        indices = np.array([])
+        indices = []
         indptr = [0]
         num_entries = 0
 
@@ -48,11 +48,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         for pos in range(obs_seq_mutation.seq_len):
             feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq, obs_seq_mutation.seq_len, obs_seq_mutation.left_flank, obs_seq_mutation.right_flank)
             feat_dict[pos] = feat_vect
-            num_entries += feat_vect.size
-            indptr.append(num_entries)
-            indices = np.concatenate((indices, feat_vect))
+            indptr.append(pos + 1)
+            indices.append(feat_vect)
 
-        data = [True] * num_entries
+        data = [True] * obs_seq_mutation.seq_len
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
             shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
@@ -180,7 +179,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
             feature_vec_thetasum_next.pop(mutation_pos, None)
             for p, feat_vec in feat_vec_dict_update.iteritems():
-                feature_vec_thetasum_next[p] = theta[feat_vec,].sum(axis=0)
+                feature_vec_thetasum_next[p] = theta[feat_vec,]
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
@@ -208,8 +207,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
 
         idx = self.motif_dict[submotif]
-
-        return np.array([idx])
+        return idx
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
