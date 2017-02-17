@@ -20,13 +20,14 @@ class MCMC_EM_TestCase(unittest.TestCase):
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
         motif_list = cls.feat_gen.get_motif_list()
         motif_list_len = len(motif_list)
-        # NOTE: THIS IS A SMALL THETA
-        cls.big_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
-        cls.big_theta[:motif_list_len,] = cls.big_theta[:motif_list_len,] - np.log(3)
-        cls.big_theta[motif_list_len,] = cls.big_theta[motif_list_len,] - np.log(4)
-        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.big_theta.shape)
-        cls.big_theta[~theta_mask] = -np.inf
-        cls.theta = np.matrix(np.max(cls.big_theta, axis=1)).T
+
+        # This generates a theta where columns are repeated
+        cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
+        cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,] - np.log(3)
+        cls.repeat_theta[motif_list_len,] = cls.repeat_theta[motif_list_len,] - np.log(4)
+        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.repeat_theta.shape)
+        cls.repeat_theta[~theta_mask] = -np.inf
+        cls.theta = np.matrix(np.max(cls.repeat_theta, axis=1)).T
         cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("ttcgtata", "taagttat"))
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
@@ -109,9 +110,9 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
-        rho, pval = self._test_joint_distribution(self.big_theta, self.theta)
-        self.assertTrue(rho > 0.93)
-        self.assertTrue(pval < 1e-23)
+        rho, pval = self._test_joint_distribution(self.repeat_theta, self.theta)
+        self.assertTrue(rho > 0.95)
+        self.assertTrue(pval < 1e-35)
 
     def test_joint_distribution_per_target_model(self):
         """
