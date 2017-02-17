@@ -23,8 +23,8 @@ class MCMC_EM_TestCase(unittest.TestCase):
 
         # This generates a theta where columns are repeated
         cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
-        cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,] - np.log(3)
-        cls.repeat_theta[motif_list_len,] = cls.repeat_theta[motif_list_len,] - np.log(4)
+        cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,]
+        cls.repeat_theta[motif_list_len,] = cls.repeat_theta[motif_list_len,]
         theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.repeat_theta.shape)
         cls.repeat_theta[~theta_mask] = -np.inf
         cls.theta = np.matrix(np.max(cls.repeat_theta, axis=1)).T
