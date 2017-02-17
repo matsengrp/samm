@@ -23,11 +23,10 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # This generates a theta where columns are repeated
         cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
         cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,]
-        cls.repeat_theta[motif_list_len,] = cls.repeat_theta[motif_list_len,]
         theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.repeat_theta.shape)
         cls.repeat_theta[~theta_mask] = -np.inf
         cls.theta = np.matrix(np.max(cls.repeat_theta, axis=1)).T
-        cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("ttcgtata", "taagttat", cls.motif_len))
+        cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("attcgtatac", "ataagttatc", cls.motif_len))
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
     def test_update_log_prob_for_shuffle(self):
@@ -62,7 +61,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         from the survival model vs. when we generate mutation orders given the mutation positions from the
         gibbs sampler
         """
-        START_SEQ = "ttcg" # MUST BE LESS THAN TEN
+        START_SEQ = "attcgc" # MUST BE LESS THAN TEN
         NUM_OBS_SAMPLES = 5000
         BURN_IN = 15
         CENSORING_TIME = 2.0
@@ -76,7 +75,8 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # We make the mutation orders strings so easy to process
         true_order_distr = ["".join(map(str,m.get_mutation_order())) for m in full_seq_muts]
         obs_seq_mutations = [
-            self.feat_gen.create_base_features(ObservedSequenceMutations(m.obs_seq_mutation.start_seq, m.obs_seq_mutation.end_seq, self.motif_len)) for m in full_seq_muts
+            self.feat_gen.create_base_features(ObservedSequenceMutations(m.obs_seq_mutation.left_flank + m.obs_seq_mutation.start_seq + m.obs_seq_mutation.right_flank,
+                m.obs_seq_mutation.left_flank + m.obs_seq_mutation.end_seq + m.obs_seq_mutation.right_flank, self.motif_len)) for m in full_seq_muts
         ]
 
         # Now get the distribution of orders from our gibbs sampler (so sample mutation order

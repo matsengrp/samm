@@ -86,8 +86,8 @@ class SurvivalModelSimulator:
             intermediate_seq = mutate_string(intermediate_seq, mutate_pos, nucleotide_target)
         return FullSequenceMutations(
             ObservedSequenceMutations(
-                start_seq,
-                intermediate_seq,
+                left_flank + start_seq + right_flank,
+                left_flank + intermediate_seq + right_flank,
                 self.feature_generator.motif_len,
             ),
             mutations
