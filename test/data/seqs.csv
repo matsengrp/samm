@@ -7,10 +7,10 @@ FAKE_GENE_1,FAKE_GENE_1-sample-0,cccggcccggaagctcgttgtgtct
 FAKE_GENE_1,FAKE_GENE_1-sample-1,cccggctgggaagctcgttgggtgt
 FAKE_GENE_1,FAKE_GENE_1-sample-2,cccggctgggaagctagttgtgtgt
 FAKE_GENE_1,FAKE_GENE_1-sample-3,cccggctgggaagctcgttgtgtgt
-FAKE_GENE_2,FAKE_GENE_2-sample-0,caacagcaagcttattgagcccgag
-FAKE_GENE_2,FAKE_GENE_2-sample-1,caacatcaacctcagtgagcccgag
-FAKE_GENE_2,FAKE_GENE_2-sample-2,caacatcaaactcagtgagcccgag
-FAKE_GENE_2,FAKE_GENE_2-sample-3,caacatcaacctcagtgatcccgag
+FAKE_GENE_2,FAKE_GENE_2-sample-0,caacagcaagcttattgagcccgnn
+FAKE_GENE_2,FAKE_GENE_2-sample-1,caacatcaacctcagtgagcccgnn
+FAKE_GENE_2,FAKE_GENE_2-sample-2,caacatcaaactcagtgagcccgnn
+FAKE_GENE_2,FAKE_GENE_2-sample-3,caacatcaacctcagtgatcccgnn
 FAKE_GENE_3,FAKE_GENE_3-sample-0,acccatgggtgcccatcctttctaa
 FAKE_GENE_3,FAKE_GENE_3-sample-1,acacatgggtgctcatccttcctaa
 FAKE_GENE_3,FAKE_GENE_3-sample-2,agacatgggtgcccatccttcctaa
@@ -35,7 +35,7 @@ FAKE_GENE_8,FAKE_GENE_8-sample-0,tattgcgaacagacacctgtgtcac
 FAKE_GENE_8,FAKE_GENE_8-sample-1,gatatcgaaaggacaactgtgtcgc
 FAKE_GENE_8,FAKE_GENE_8-sample-2,cattgcgaactgacaactgtgtcac
 FAKE_GENE_8,FAKE_GENE_8-sample-3,cattgcgaagtgacaactgtttcac
-FAKE_GENE_9,FAKE_GENE_9-sample-0,taaactgtcgacccctagaacagtt
-FAKE_GENE_9,FAKE_GENE_9-sample-1,taaattgtcgacccctagaacagtt
-FAKE_GENE_9,FAKE_GENE_9-sample-2,taaactgtagacccctaggacagtt
-FAKE_GENE_9,FAKE_GENE_9-sample-3,taaactgtcgacccctagaacagtt
+FAKE_GENE_9,FAKE_GENE_9-sample-0,taaactgtnnnnnnnnagaacagtt
+FAKE_GENE_9,FAKE_GENE_9-sample-1,taaattgtnnnnnnnnagaacagtt
+FAKE_GENE_9,FAKE_GENE_9-sample-2,taaactgtnnnnnnnnaggacagtt
+FAKE_GENE_9,FAKE_GENE_9-sample-3,taaactgtnnnnnnnnagaacagtt

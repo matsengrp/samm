@@ -30,15 +30,19 @@ class SurvivalModelSimulator:
         @return FullSequenceMutations, ending sequence and entire history of mutations
         """
         mutations = []
+
+        left_flank = start_seq[:self.feature_generator.motif_len/2]
+        right_flank = start_seq[len(start_seq) - self.feature_generator.motif_len/2:]
+        start_seq = start_seq[self.feature_generator.motif_len/2:len(start_seq) - self.feature_generator.motif_len/2]
         intermediate_seq = start_seq
         pos_to_mutate = set(range(len(start_seq)))
         last_mutate_time = 0
         while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
             if with_replacement:
-                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq)
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank)
             else:
-                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, do_feat_vec_pos=pos_to_mutate)
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, do_feat_vec_pos=pos_to_mutate)
 
             # Fill in all the hazard weights -- only fill in for the positions eligible for mutation
             # and only fill in target nucleotides that are possible to mutate into.
@@ -82,8 +86,9 @@ class SurvivalModelSimulator:
             intermediate_seq = mutate_string(intermediate_seq, mutate_pos, nucleotide_target)
         return FullSequenceMutations(
             ObservedSequenceMutations(
-                start_seq,
-                intermediate_seq,
+                left_flank + start_seq + right_flank,
+                left_flank + intermediate_seq + right_flank,
+                self.feature_generator.motif_len,
             ),
             mutations
         )

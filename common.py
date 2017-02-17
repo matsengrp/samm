@@ -2,6 +2,7 @@ import csv
 import numpy as np
 import pandas as pd
 import sys
+import re
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -50,10 +51,7 @@ def get_nonzero_theta_print_lines(theta, motif_list):
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
-                if i == theta.shape[0] - 1:
-                    lines.append("%d: %s (EDGES)" % (i, theta[i,]))
-                else:
-                    lines.append("%d: %s (%s)" % (i, theta[i,], motif_list[i]))
+                lines.append("%d: %s (%s)" % (i, theta[i,], motif_list[i]))
                 break
     return "\n".join(lines)
 
@@ -175,7 +173,7 @@ def read_bcr_hd5(path, remove_gap=True):
     else:
         return sites
 
-def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None):
+def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -234,37 +232,78 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
                 utils.add_implicit_info(glfo, line)
                 # for now just use V gene for ID
                 key = 'clone{}-{}'.format(*[idx, line['v_gene']])
-                gene_dict[key] = line[gene_col]
-                start_seq = line[gene_col].lower()
+                gene_dict[key] = line[gene_col].lower()
                 good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
                 for end_seq in good_seqs:
+                    # process sequences
+                    gl_seq, ch_seq = trim_degenerates_and_collapse(line[gene_col].lower(), end_seq.lower(), motif_len)
                     obs_data.append(
                         ObservedSequenceMutations(
-                            start_seq=start_seq[:len(end_seq)],
-                            end_seq=end_seq.lower(),
+                            start_seq=gl_seq,
+                            end_seq=ch_seq,
+                            motif_len=motif_len,
                         )
                     )
     return gene_dict, obs_data
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name):
+def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
+    """ replace unknown characters with "n" and collapse runs of "n"s """
+
+    assert(len(start_seq) == len(end_seq))
+
+    # replace all unknowns with an "n"
+    processed_start_seq = re.sub('[^agctn]', 'n', start_seq)
+    processed_end_seq = re.sub('[^agctn]', 'n', end_seq)
+
+    # conform unknowns and collapse "n"s
+    repl = 'n' * (motif_len/2)
+    pattern = repl + '+' if motif_len > 1 else 'n'
+    if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
+        # turn known bases in start_seq to "n"s and collapse degenerates
+        start_list = list(processed_start_seq)
+        end_list = list(processed_end_seq)
+        for idx in re.finditer('n', processed_end_seq):
+            start_list[idx.start()] = 'n'
+        processed_start_seq = ''.join(start_list)
+        for idx in re.finditer('n', processed_start_seq):
+            end_list[idx.start()] = 'n'
+        processed_end_seq = ''.join(end_list)
+
+        # first remove beginning and trailing "n"s
+        processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
+        processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
+
+        # now collapse interior "n"s
+        processed_start_seq = re.sub(pattern, repl, processed_start_seq)
+        processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+
+    return processed_start_seq, processed_end_seq
+
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
+    """
+    @param gene_file_name: csv file with germline names and sequences
+    @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
+    @param motif_len: length of motif we're using; used to collapse series of "n"s
+    """
     gene_dict = {}
     with open(gene_file_name, "r") as gene_csv:
         gene_reader = csv.reader(gene_csv, delimiter=',')
         gene_reader.next()
         for row in gene_reader:
-            gene_dict[row[0]] = row[1]
+            gene_dict[row[0]] = row[1].lower()
 
     obs_data = []
     with open(seq_file_name, "r") as seq_csv:
         seq_reader = csv.reader(seq_csv, delimiter=",")
         seq_reader.next()
         for row in seq_reader:
-            start_seq = gene_dict[row[0]].lower()
-            end_seq = row[2]
+            # process sequences
+            start_seq, end_seq = trim_degenerates_and_collapse(gene_dict[row[0]], row[2].lower(), motif_len)
             obs_data.append(
                 ObservedSequenceMutations(
-                    start_seq=start_seq[:len(end_seq)],
+                    start_seq=start_seq,
                     end_seq=end_seq,
+                    motif_len=motif_len,
                 )
             )
     return gene_dict, obs_data

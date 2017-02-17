@@ -21,7 +21,7 @@ class MultinomialSolver:
         # count number of times we see a motif
         motif_count = [0] * num_motifs
         for obs_seq in obs_data:
-            germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
+            germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
             for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
                 feature_idx = germline_motifs[mut_pos]
                 if feature_idx < num_motifs:

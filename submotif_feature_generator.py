@@ -2,6 +2,8 @@ import time
 import numpy as np
 import itertools
 import scipy.sparse
+import re
+import random
 
 from common import *
 from feature_generator import *
@@ -9,27 +11,26 @@ from profile_support import profile
 
 class SubmotifFeatureGenerator(FeatureGenerator):
     """
-    This makes motifs of the same length (must be odd). For positions on the edge, we currently
-    just use an indicator to denote the position is on the edge.
-    TODO: Do something else for edge positions?
+    This makes motifs of the same length (must be odd).
     """
-    def __init__(self, motif_len=3):
+    def __init__(self, motif_len=1):
         assert(motif_len % 2 == 1)
         self.motif_len = motif_len
-        self.flank_end_len = motif_len/2
-        self.feature_vec_len = np.power(4, motif_len) + 1
+        self.half_motif_len = motif_len/2
+        self.feature_vec_len = np.power(4, motif_len)
 
         motif_list = self.get_motif_list()
         self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
 
-    def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
         feat_vec_dict = dict()
+        seq_len = len(seq_str)
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
 
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
         for pos in do_feat_vec_pos:
-            feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str)
+            feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str, seq_len, left_flank, right_flank)
         return feat_vec_dict
 
     def create_base_features(self, obs_seq_mutation):
@@ -45,7 +46,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
-            feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq)
+            feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq, obs_seq_mutation.seq_len, obs_seq_mutation.left_flank, obs_seq_mutation.right_flank)
             feat_dict[pos] = feat_vect
             indptr.append(pos + 1)
             indices.append(feat_vect)
@@ -157,16 +158,17 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         # Don't calculate feature vectors for positions that have mutated already
         # Calculate feature vectors for positions that are close to the mutation
         do_feat_vec_pos = set(range(
-            max(mutation_pos - self.flank_end_len, 0),
-            min(mutation_pos + self.flank_end_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
+            max(mutation_pos - self.half_motif_len, 0),
+            min(mutation_pos + self.half_motif_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
         ))
 
         # Generate features for the positions that need to be updated
         # (don't make a function out of this -- python function call overhead is too high)
         feat_vec_dict_update = dict()
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        # also the flanks don't change since we've trimmed them
         for pos in do_feat_vec_pos - no_feat_vec_pos:
-            feat_vec_dict_update[pos] = self._create_feature_vec_for_pos(pos, new_intermediate_seq)
+            feat_vec_dict_update[pos] = self._create_feature_vec_for_pos(pos, new_intermediate_seq, seq_mut_order.obs_seq_mutation.seq_len, seq_mut_order.obs_seq_mutation.left_flank, seq_mut_order.obs_seq_mutation.right_flank)
 
         feat_vec_dict_next = feat_mutation_steps.feature_vec_dicts[i].copy() # shallow copy of dictionary
         feat_vec_dict_next.pop(mutation_pos, None)
@@ -181,23 +183,30 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
 
-    def _create_feature_vec_for_pos(self, pos, intermediate_seq):
+    def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
         """
-        @param no_feat_vec_pos: don't create feature vectors for these positions
+        @param pos: central mutating position
+        @param intermediate_seq: intermediate sequence to determine motif, flanks removed
+        @param left flank: left flank nucleotide information
+        @param right flank: right flank nucleotide information
+
+        Create features for subsequence using information from flanks.
         """
-        submotif = intermediate_seq[pos - self.flank_end_len: pos + self.flank_end_len + 1]
-        if len(submotif) < self.motif_len:
-            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
-            # TODO: update this. right now it sets all extreme positions to the same feature
-            idx = self.feature_vec_len - 1
-        # TODO: THIS FUNCTION IS REALLY SLOW (40% of the function - slowest thing in gibbs right now)
-        # can we just change the input strings or the motif dictionary?
-        elif contains_degenerate_base(submotif):
-            # do special stuff cause positions are at the ends or have degenerate bases (N or . usually)
-            # TODO: update this. right now it sets all extreme positions to the same feature
-            idx = self.feature_vec_len - 1
+
+        # if motif length is one then submotifs will be single nucleotides and position remains unchanged
+        if pos < self.half_motif_len:
+            submotif = left_flank[pos:] + intermediate_seq[:self.half_motif_len + pos + 1]
+        elif pos >= seq_len - self.half_motif_len:
+            submotif = intermediate_seq[pos - self.half_motif_len:] + right_flank[:pos + self.half_motif_len - seq_len + 1]
         else:
-            idx = self.motif_dict[submotif]
+            submotif = intermediate_seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
+
+        # generate random nucleotide if an "n" occurs in the middle of a sequence
+        if 'n' in submotif:
+            for match in re.compile('n').finditer(submotif):
+                submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
+
+        idx = self.motif_dict[submotif]
         return idx
 
     def get_motif_list(self):

@@ -91,26 +91,24 @@ def main(args=sys.argv[1:]):
 
     if args.use_partis:
         annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
+        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain, motif_len=args.motif_len)
     else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len)
 
     motif_list = feat_generator.get_motif_list()
-    motif_list.append('EDGES')
 
     mutations = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
     proportions = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
     appearances = {motif: 0. for motif in motif_list}
 
     for obs_seq in obs_data:
-        germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
+        germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
 
         for key, value in germline_motifs.iteritems():
-            appearances[motif_list[value[0]]] += 1
+            appearances[motif_list[value]] += 1
 
         for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
-            for mutation in germline_motifs[mut_pos]:
-                mutations[motif_list[mutation]][mut_nuc] += 1
+            mutations[motif_list[germline_motifs[mut_pos]]][mut_nuc] += 1
 
     for key in motif_list:
         for nucleotide in 'acgt':
