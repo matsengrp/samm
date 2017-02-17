@@ -21,7 +21,8 @@ class Degenerate_TestCase(unittest.TestCase):
 
         # what they should be trimmed to
         TRIM_START = "tacnnacnntcggg"
-        TRIM_FLANK = "gnaa"
+        TRIM_FLANK_LEFT = "gn"
+        TRIM_FLANK_RIGHT = "aa"
         TRIM_DICT = {1: 'g', 10: 'a', 13: 't'}
 
         # can we process correctly?
@@ -32,6 +33,7 @@ class Degenerate_TestCase(unittest.TestCase):
         # can we handle edge mutations?
         obs_mute = ObservedSequenceMutations(start_processed, end_processed, MOTIF_LEN)
         self.assertEquals(obs_mute.start_seq, TRIM_START)
-        self.assertEquals(obs_mute.flanks, TRIM_FLANK)
+        self.assertEquals(obs_mute.left_flank, TRIM_FLANK_LEFT)
+        self.assertEquals(obs_mute.right_flank, TRIM_FLANK_RIGHT)
         self.assertEquals(obs_mute.mutation_pos_dict, TRIM_DICT)
 

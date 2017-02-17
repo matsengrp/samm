@@ -19,36 +19,38 @@ class ObservedSequenceMutations:
 
         assert(len(start_seq) == len(end_seq))
 
-        start_index = 0
-        end_index = len(start_seq)
+        start_idx = 0
+        end_idx = len(start_seq)
         flank_len = motif_len/2
-        self.mutation_pos_dict = dict()
 
         # Go through half the sequence forward to find beginning conserved nucleotides
-        for i in range(len(start_seq)/2):
-            if start_seq[i] != end_seq[i]:
-                # ignore mutations happening close to starting edge and update start of sequence
-                if i < start_index + flank_len:
-                    start_index = i + 1
-                else:
-                    self.mutation_pos_dict[i - start_index - flank_len] = end_seq[i]
+        for flank_start_idx in range(len(start_seq)/2):
+            if start_seq[flank_start_idx] != end_seq[flank_start_idx]:
+                start_idx = flank_start_idx + 1
+            elif start_idx + flank_len == flank_start_idx + 1:
+                break
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides
-        for i in reversed(range(len(start_seq)/2, len(start_seq))):
+        for flank_end_idx in reversed(range(len(start_seq)/2, len(start_seq))):
+            if start_seq[flank_end_idx] != end_seq[flank_end_idx]:
+                end_idx = flank_end_idx
+            elif end_idx - flank_len == flank_end_idx:
+                break
+
+        self.left_flank = start_seq[start_idx:start_idx + flank_len]
+        self.right_flank = start_seq[end_idx - flank_len:end_idx]
+
+        start_seq = start_seq[start_idx + flank_len:end_idx - flank_len]
+        end_seq = end_seq[start_idx + flank_len:end_idx - flank_len]
+
+        self.mutation_pos_dict = dict()
+        for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
-                # ignore mutations happening close to final edge and update end of sequence
-                if i >= end_index - flank_len:
-                    end_index = end_index - flank_len
-                else:
-                    self.mutation_pos_dict[i - start_index - flank_len] = end_seq[i]
-        
+                self.mutation_pos_dict[i] = end_seq[i]
+
         self.num_mutations = len(self.mutation_pos_dict.keys())
-
-        self.flanks = start_seq[start_index:start_index + flank_len] + start_seq[end_index - flank_len:end_index]
-
-        # take subsequences with flanks removed
-        self.start_seq = start_seq[start_index + flank_len:end_index - flank_len]
-        self.end_seq = end_seq[start_index + flank_len:end_index - flank_len]
+        self.start_seq = start_seq
+        self.end_seq = end_seq
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 
