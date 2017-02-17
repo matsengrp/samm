@@ -5,11 +5,11 @@ ObservedSample::ObservedSample(
   VectorNucleotide e,
   VectorFeature f
 ): start_seq{s}, end_seq{e}, start_seq_features{f} {
-    num_pos = s.size();
+    num_pos = s.val.size();
 }
 
 OrderedMutationSteps::OrderedMutationSteps(VectorOrder ord_v) {
-  num_steps = ord_v.size();
+  num_steps = ord_v.val.size();
   order_vec = ord_v;
   mut_steps.resize(num_steps);
 }

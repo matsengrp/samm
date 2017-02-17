@@ -7,18 +7,28 @@
 using namespace std;
 
 typedef int Nuc; // 0 = A, 1 = T, 2 = C, G = 3
-typedef vector<Nuc> VectorNucleotide; // Nucleotide sequence
+// Nucleotide sequence
+typedef struct {
+  vector<Nuc> val;
+} VectorNucleotide;
 
-typedef vector<int> VectorOrder; // Position indices by observed mutation order
+// Position indices by observed mutation order
+typedef struct {
+  vector<int> val;
+} VectorOrder;
 
 // Indices of the feature at each position
 // Positions at risk of mutating have a nonnegative feature index
 // Positions no longer in the risk group have a MUTATED=-1 feature index
-typedef vector<int> VectorFeature;
+typedef struct {
+  vector<int> val;
+} VectorFeature;
 // Theta * psi for every position in sequence
 // Check if position in ThetaSums is valid by checking if position is in risk group
 // So check VectorFeature
-typedef vector<double> ThetaSums;
+typedef struct {
+  vector<double> val;
+} ThetaSums;
 
 class ObservedSample {
   public:
