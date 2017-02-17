@@ -21,11 +21,13 @@ class ObservedSample {
     VectorNucleotide start_seq;
     VectorNucleotide end_seq;
     VectorFeature start_seq_features;
+    int num_pos;
+
     ObservedSample(
       VectorNucleotide s,
       VectorNucleotide e,
       VectorFeature f
-    ):start_seq{s}, end_seq{e}, start_seq_features{f} { };
+    );
 };
 
 class MutationStep {
@@ -45,14 +47,13 @@ class MutationStep {
 
 class OrderedMutationSteps {
   public:
-    vector<shared_ptr<MutationStep>> mut_steps;
+    int num_steps;
     VectorOrder order_vec;
+    vector<shared_ptr<MutationStep>> mut_steps;
 
     // Initialize with the observed sample and the order under consideration
-    OrderedMutationSteps(
-      const ObservedSample &obs_sample,
-      VectorOrder order_vec
-    );
+    OrderedMutationSteps(VectorOrder ord_v);
+
     // Update the mutation step with mut_step
     void set(
       int step_i,
