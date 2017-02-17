@@ -20,13 +20,14 @@ class MCMC_EM_TestCase(unittest.TestCase):
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
         motif_list = cls.feat_gen.get_motif_list()
         motif_list_len = len(motif_list)
-        # NOTE: THIS IS A SMALL THETA
-        cls.big_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
-        cls.big_theta[:motif_list_len,] = cls.big_theta[:motif_list_len,] - np.log(3)
-        cls.big_theta[motif_list_len,] = cls.big_theta[motif_list_len,] - np.log(4)
-        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.big_theta.shape)
-        cls.big_theta[~theta_mask] = -np.inf
-        cls.theta = np.matrix(np.max(cls.big_theta, axis=1)).T
+
+        # This generates a theta where columns are repeated
+        cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
+        cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,]
+        cls.repeat_theta[motif_list_len,] = cls.repeat_theta[motif_list_len,]
+        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.repeat_theta.shape)
+        cls.repeat_theta[~theta_mask] = -np.inf
+        cls.theta = np.matrix(np.max(cls.repeat_theta, axis=1)).T
         cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("ttcgtata", "taagttat"))
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
@@ -56,7 +57,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(multinomial_sequence, multinomial_sequence_slow))
         self.assertEqual(feature_vec_theta_sums, feature_vec_theta_sums_slow)
 
-    def _test_joint_distribution(self, theta):
+    def _test_joint_distribution(self, simulator_theta, gibbs_theta):
         """
         Check that the distribution of mutation orders is similar when we generate mutation orders directly
         from the survival model vs. when we generate mutation orders given the mutation positions from the
@@ -69,8 +70,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
 
-        surv_simulator = SurvivalModelSimulator(theta, self.feat_gen, lambda0=LAMBDA0)
-
+        surv_simulator = SurvivalModelSimulator(simulator_theta, self.feat_gen, lambda0=LAMBDA0)
         # Simulate some data from the same starting sequence
         # Get the distribution of mutation orders from our survival model
         full_seq_muts = [surv_simulator.simulate(START_SEQ, censoring_time=CENSORING_TIME) for i in range(NUM_OBS_SAMPLES)]
@@ -84,7 +84,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(theta, self.feat_gen, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(gibbs_theta, self.feat_gen, obs_seq_m)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
             order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
@@ -110,9 +110,9 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
-        rho, pval = self._test_joint_distribution(self.big_theta)
-        self.assertTrue(rho > 0.93)
-        self.assertTrue(pval < 1e-23)
+        rho, pval = self._test_joint_distribution(self.repeat_theta, self.theta)
+        self.assertTrue(rho > 0.95)
+        self.assertTrue(pval < 1e-35)
 
     def test_joint_distribution_per_target_model(self):
         """
@@ -122,7 +122,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         theta_mask = get_possible_motifs_to_targets(self.feat_gen.get_motif_list(), theta.shape)
         theta[~theta_mask] = -np.inf
 
-        rho, pval = self._test_joint_distribution(theta)
+        rho, pval = self._test_joint_distribution(theta, theta)
 
         self.assertTrue(rho > 0.98)
         self.assertTrue(pval < 1e-37)
