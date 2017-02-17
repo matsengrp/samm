@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import sys
 import re
+import random
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -276,6 +277,12 @@ def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
         # now collapse interior "n"s
         processed_start_seq = re.sub(pattern, repl, processed_start_seq)
         processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+
+        # generate random nucleotide if an "n" occurs in the middle of a sequence
+        for match in re.compile('n').finditer(processed_start_seq):
+            random_nuc = random.choice(NUCLEOTIDES)
+            processed_start_seq = mutate_string(processed_start_seq, match.start(), random_nuc)
+            processed_end_seq = mutate_string(processed_end_seq, match.start(), random_nuc)
 
     return processed_start_seq, processed_end_seq
 

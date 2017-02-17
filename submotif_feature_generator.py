@@ -3,7 +3,6 @@ import numpy as np
 import itertools
 import scipy.sparse
 import re
-import random
 
 from common import *
 from feature_generator import *
@@ -200,11 +199,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             submotif = intermediate_seq[pos - self.half_motif_len:] + right_flank[:pos + self.half_motif_len - seq_len + 1]
         else:
             submotif = intermediate_seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
-
-        # generate random nucleotide if an "n" occurs in the middle of a sequence
-        if 'n' in submotif:
-            for match in re.compile('n').finditer(submotif):
-                submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
 
         idx = self.motif_dict[submotif]
         return idx
