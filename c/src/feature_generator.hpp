@@ -11,6 +11,7 @@
 using namespace std;
 
 class SubmotifFeatureGenerator {
+  // Use this in VectorFeature to indicate that this position has mutated
   const int MUTATED = -1;
 
   public:
@@ -27,12 +28,15 @@ class SubmotifFeatureGenerator {
     // Calculate features for all mutation steps
     // Before the first mutation to before the last mutation
     // Doesn't calculate the features after the last mutation since that is not relevant.
+    // Calculates theta sums if theta is passed in (so the first elem in pair is positive)
     unique_ptr<OrderedMutationSteps> create_for_mutation_steps(
       const shared_ptr<ObservedSample> &obs_sample,
       VectorOrder mut_order,
       const pair<bool, vector<double>> &theta
     );
 
+    // The feature index of a position is the base 4 number corresponding to the motif
+    // at the position
     int get_feature_idx_for_pos(int position, const VectorNucleotide &nuc_seq);
 
   private:

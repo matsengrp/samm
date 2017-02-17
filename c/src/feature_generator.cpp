@@ -33,42 +33,53 @@ unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_s
 ) {
   unique_ptr<OrderedMutationSteps> ordered_mut_steps(new OrderedMutationSteps(mut_order));
 
-  ordered_mut_steps->set(
-    0,
-    make_shared<MutationStep>(
-      obs_sample->start_seq,
-      obs_sample->start_seq_features,
-      make_pair(false, ThetaSums())
-    )
-  );
-
-  for (int i = 1; i < ordered_mut_steps->num_steps; i++) {
-    int mutated_pos = mut_order[i - 1];
-    VectorNucleotide intermediate_seq = common::get_mutated_string(
-      ordered_mut_steps->mut_steps[i - 1]->nuc_vec,
-      mutated_pos,
-      obs_sample->end_seq[mutated_pos]
-    );
-
-    // Do something really stupid right now. Just make a new one.
-    // TODO: be smart
+  for (int i = 0; i < ordered_mut_steps->num_steps; i++) {
+    VectorNucleotide intermediate_seq;
     VectorFeature intermediate_feats;
-    for (int p = 0; p < obs_sample->num_pos; p++) {
-      int prev_feat_idx = ordered_mut_steps->mut_steps[i - 1]->feature_vec[p];
-      if (p == mutated_pos || prev_feat_idx == MUTATED) {
-        intermediate_feats.push_back(MUTATED);
-      } else {
-        intermediate_feats.push_back(
-          get_feature_idx_for_pos(p, intermediate_seq)
-        );
+    if (i == 0) {
+      intermediate_seq = obs_sample->start_seq;
+      intermediate_feats = obs_sample->start_seq_features;
+    } else {
+      int mutated_pos = mut_order[i - 1];
+      intermediate_seq = common::get_mutated_string(
+        ordered_mut_steps->mut_steps[i - 1]->nuc_vec,
+        mutated_pos,
+        obs_sample->end_seq[mutated_pos]
+      );
+
+      // Do something really stupid right now. Just make a new one.
+      // TODO: be smart
+      for (int p = 0; p < obs_sample->num_pos; p++) {
+        int prev_feat_idx = ordered_mut_steps->mut_steps[i - 1]->feature_vec[p];
+        if (p == mutated_pos || prev_feat_idx == MUTATED) {
+          intermediate_feats.push_back(MUTATED);
+        } else {
+          intermediate_feats.push_back(
+            get_feature_idx_for_pos(p, intermediate_seq)
+          );
+        }
       }
     }
+
+    pair<bool, ThetaSums> theta_sum_option(theta.first, ThetaSums());
+    if (theta.first) {
+      ThetaSums theta_sums;
+      for (int p = 0; p < obs_sample->num_pos; p++) {
+        int feat_idx = intermediate_feats[p];
+        if (feat_idx == MUTATED) {
+          theta_sum_option.second.push_back(MUTATED);
+        } else {
+          theta_sum_option.second.push_back(theta.second[feat_idx]);
+        }
+      }
+    }
+
     ordered_mut_steps->set(
       i,
       make_shared<MutationStep>(
         intermediate_seq,
         intermediate_feats,
-        make_pair(false, ThetaSums())
+        theta_sum_option
       )
     );
   }
