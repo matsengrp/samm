@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <memory>
 
 using namespace std;
 
@@ -56,7 +57,7 @@ class MutationStep {
       VectorNucleotide nucs,
       VectorFeature feats,
       pair<bool, VectorThetaSums> t_sum_option
-    ): nuc_vec{nucs}, feature_vec{feats}, theta_sum_option{t_sum_option} {};
+    ): nuc_vec(nucs), feature_vec(feats), theta_sum_option(t_sum_option) {};
 };
 
 class OrderedMutationSteps {
