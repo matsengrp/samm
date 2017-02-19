@@ -4,8 +4,10 @@
 ObservedSample::ObservedSample(
   VectorNucleotide s,
   VectorNucleotide e,
+  VectorNucleotide l,
+  VectorNucleotide r,
   VectorFeature f
-): start_nucs(s), end_nucs(e), start_features(f) {
+): start_nucs(s), end_nucs(e), left_flank(l), right_flank(r), start_features(f) {
   assert(s.val.size() == e.val.size());
   num_pos = s.val.size();
   for (unsigned int i = 0; i < num_pos; i++) {
