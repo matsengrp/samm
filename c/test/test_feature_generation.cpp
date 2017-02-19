@@ -98,7 +98,7 @@ TEST_CASE("Feature Generator") {
     for (int i = 0; i < VEC_LEN; i++) {
       Nuc start_nuc = start_nucs.val[i];
       Nuc new_nucleotide;
-      if (i % 4 == 0) {
+      if (i % 10 == 0) {
         if (start_nuc == 0) {
           new_nucleotide = 3;
         } else {
