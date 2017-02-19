@@ -15,7 +15,7 @@ typedef struct {
 
 // Position indices by observed mutation order
 typedef struct {
-  vector<int> val;
+  vector<unsigned int> val;
 } VectorOrder;
 
 // Indices of the feature at each position
@@ -36,6 +36,7 @@ class ObservedSample {
     VectorNucleotide start_nucs;
     VectorNucleotide end_nucs;
     VectorFeature start_features;
+    vector<unsigned int> mutated_postions;
     int num_pos;
 
     ObservedSample(

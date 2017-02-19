@@ -10,13 +10,13 @@ SubmotifFeatureGenerator::SubmotifFeatureGenerator(int m) {
   feature_vec_len = 1 << (2 * motif_len);
 }
 
-shared_ptr<ObservedSample> SubmotifFeatureGenerator::create_observed_sample(
+shared_ptr<ObservedSample> SubmotifFeatureGenerator::CreateObservedSample(
   VectorNucleotide start_nuc,
   VectorNucleotide end_nuc
 ) {
   VectorFeature feature_vec;
   for (int i = 0; i < start_nuc.val.size(); i++) {
-    feature_vec.val.push_back(get_feature_idx_for_pos(i, start_nuc));
+    feature_vec.val.push_back(GetFeatureIdxForPos(i, start_nuc));
   }
   shared_ptr<ObservedSample> obs_sample(new ObservedSample(
     start_nuc,
@@ -26,68 +26,55 @@ shared_ptr<ObservedSample> SubmotifFeatureGenerator::create_observed_sample(
   return obs_sample;
 }
 
-unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::create_for_mutation_steps(
+unique_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::CreateForMutationSteps(
   const shared_ptr<ObservedSample> &obs_sample,
   VectorOrder mut_order,
   const pair<bool, vector<double>> &theta
 ) {
   unique_ptr<OrderedMutationSteps> ordered_mut_steps(new OrderedMutationSteps(mut_order));
-
   for (int i = 0; i < ordered_mut_steps->num_steps; i++) {
-    VectorNucleotide intermediate_nucs;
-    VectorFeature intermediate_feats;
+    shared_ptr<MutationStep> mutation_step;
+
     if (i == 0) {
-      intermediate_nucs = obs_sample->start_nucs;
-      intermediate_feats = obs_sample->start_features;
-    } else {
-      int mutated_pos = mut_order.val[i - 1];
-      intermediate_nucs = common::get_mutated_nucleotide_vector(
-        ordered_mut_steps->mut_steps[i - 1]->nuc_vec,
-        mutated_pos,
-        obs_sample->end_nucs.val[mutated_pos]
-      );
+      // The first step is special - we have precalculated a bunch of values already.
+      VectorNucleotide intermediate_nucs = obs_sample->start_nucs;
+      VectorFeature intermediate_feats = obs_sample->start_features;
 
-      // Do something really stupid right now. Just make a new one.
-      // TODO: be smart
-      for (int p = 0; p < obs_sample->num_pos; p++) {
-        int prev_feat_idx = ordered_mut_steps->mut_steps[i - 1]->feature_vec.val[p];
-        if (p == mutated_pos || prev_feat_idx == MUTATED) {
-          intermediate_feats.val.push_back(MUTATED);
-        } else {
-          intermediate_feats.val.push_back(
-            get_feature_idx_for_pos(p, intermediate_nucs)
-          );
+      pair<bool, VectorThetaSums> theta_sum_option(theta.first, VectorThetaSums());
+      if (theta.first) {
+        // calculate theta sum from scratch
+        for (int p = 0; p < obs_sample->num_pos; p++) {
+          int feat_idx = intermediate_feats.val[p];
+          if (feat_idx == MUTATED) {
+            theta_sum_option.second.val.push_back(MUTATED);
+          } else {
+            theta_sum_option.second.val.push_back(theta.second[feat_idx]);
+          }
         }
       }
-    }
 
-    pair<bool, VectorThetaSums> theta_sum_option(theta.first, VectorThetaSums());
-    if (theta.first) {
-      VectorThetaSums theta_sums;
-      for (int p = 0; p < obs_sample->num_pos; p++) {
-        int feat_idx = intermediate_feats.val[p];
-        if (feat_idx == MUTATED) {
-          theta_sum_option.second.val.push_back(MUTATED);
-        } else {
-          theta_sum_option.second.val.push_back(theta.second[feat_idx]);
-        }
-      }
-    }
-
-    ordered_mut_steps->set(
-      i,
-      make_shared<MutationStep>(
+      mutation_step = make_shared<MutationStep>(
         intermediate_nucs,
         intermediate_feats,
         theta_sum_option
-      )
-    );
+      );
+    } else {
+      mutation_step = UpdateMutationStep(
+        i,
+        mut_order.val[i - 1],
+        ordered_mut_steps,
+        obs_sample,
+        theta
+      );
+    }
+
+    ordered_mut_steps->set(i, mutation_step);
   }
 
   return ordered_mut_steps;
 }
 
-int SubmotifFeatureGenerator::get_feature_idx_for_pos(int position, const VectorNucleotide &nuc_vec) {
+int SubmotifFeatureGenerator::GetFeatureIdxForPos(int position, const VectorNucleotide &nuc_vec) {
   // Initial testing shows that this is faster than stoi and map lookup
   int idx = 0;
   int base = 1;
@@ -100,4 +87,64 @@ int SubmotifFeatureGenerator::get_feature_idx_for_pos(int position, const Vector
     base = base << 2;
   }
   return idx;
+}
+
+/*
+* PRIVATE FUNCTIONS
+*/
+shared_ptr<MutationStep> SubmotifFeatureGenerator::UpdateMutationStep(
+  int i,
+  int mutated_pos,
+  const unique_ptr<OrderedMutationSteps> &ordered_mut_steps,
+  const shared_ptr<ObservedSample> &obs_sample,
+  const pair<bool, vector<double>> &theta
+) {
+  VectorNucleotide intermediate_nucs;
+  VectorFeature intermediate_feats;
+  pair<bool, VectorThetaSums> theta_sum_option(theta.first, VectorThetaSums());
+
+  intermediate_nucs = common::get_mutated_nucleotide_vector(
+    ordered_mut_steps->mut_steps[i - 1]->nuc_vec,
+    mutated_pos,
+    obs_sample->end_nucs.val[mutated_pos]
+  );
+
+  // copy over old feature indices and then update positions near the mutation
+  intermediate_feats.val = ordered_mut_steps->mut_steps[i - 1]->feature_vec.val;
+  for (int p = mutated_pos - motif_len_half; p < mutated_pos + motif_len_half + 1; p++) {
+    if (p < 0 || p >= obs_sample->num_pos) {
+      intermediate_feats.val[p] = 10000;
+    } else {
+      int prev_feat_idx = ordered_mut_steps->mut_steps[i - 1]->feature_vec.val[p];
+      if (p == mutated_pos || prev_feat_idx == MUTATED) {
+        intermediate_feats.val[p] = MUTATED;
+      } else {
+        intermediate_feats.val[p] = GetFeatureIdxForPos(p, intermediate_nucs);
+      }
+    }
+  }
+
+  if (theta.first) {
+    // copy over old theta sum values and then update positions near the mutation
+    theta_sum_option.second.val = ordered_mut_steps->mut_steps[i - 1]->theta_sum_option.second.val;
+    for (int p = mutated_pos - motif_len_half; p < mutated_pos + motif_len_half + 1; p++) {
+      if (p < 0 || p >= obs_sample->num_pos) {
+        // TODO: fix me
+        theta_sum_option.second.val[p] = 10000;
+      } else {
+        int feat_idx = intermediate_feats.val[p];
+        if (feat_idx == MUTATED) {
+          theta_sum_option.second.val[p] = MUTATED;
+        } else {
+          theta_sum_option.second.val[p] = theta.second[feat_idx];
+        }
+      }
+    }
+  }
+
+  return make_shared<MutationStep>(
+    intermediate_nucs,
+    intermediate_feats,
+    theta_sum_option
+  );
 }
