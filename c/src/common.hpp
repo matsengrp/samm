@@ -12,6 +12,8 @@ namespace common {
 
   vector<double> GetRandomNormalRV(int motif_len, double mean=0, double sd=1);
 
+  VectorNucleotide GetRandomVectorNucleotide(int vec_len);
+
   template <typename T>
   void PrintVector(vector<T> v) {
     for (auto i: v) {

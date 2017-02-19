@@ -4,6 +4,7 @@
 #include <string>
 #include <map>
 #include <utility>
+#include <chrono>
 
 #include "models.hpp"
 #include "common.hpp"
@@ -88,4 +89,48 @@ TEST_CASE("Feature Generator") {
     // Make sure we didn't change the old object
     REQUIRE(mm_new_fast->mut_steps[2]->feature_vec.val != mm_base->mut_steps[2]->feature_vec.val);
   }
+
+  SECTION("Time test"){
+    int VEC_LEN = 400;
+    VectorNucleotide start_nucs = common::GetRandomVectorNucleotide(VEC_LEN);
+    VectorNucleotide end_nucs;
+    // Mutate every 4 nucleotides
+    for (int i = 0; i < VEC_LEN; i++) {
+      Nuc start_nuc = start_nucs.val[i];
+      Nuc new_nucleotide;
+      if (i % 4 == 0) {
+        if (start_nuc == 0) {
+          new_nucleotide = 3;
+        } else {
+          new_nucleotide = start_nuc - 1;
+        }
+      } else {
+        new_nucleotide = start_nuc;
+      }
+      end_nucs.val.push_back(new_nucleotide);
+    }
+
+    auto start_time = chrono::system_clock::now();
+    shared_ptr<ObservedSample> obs_sample = feat_gen.CreateObservedSample(
+      start_nucs,
+      end_nucs,
+      left_flank,
+      right_flank
+    );
+    auto end_time = chrono::system_clock::now();
+    chrono::duration<double> diff = end_time-start_time;
+    cout << "Time" << diff.count() << "\n";
+
+    auto start_time1 = chrono::system_clock::now();
+    VectorOrder my_order = {obs_sample->mutated_postions};
+    shared_ptr<OrderedMutationSteps> mm = feat_gen.CreateForMutationSteps(
+      obs_sample,
+      my_order,
+      pair<bool, vector<double> >(true, theta)
+    );
+    auto end_time1 = chrono::system_clock::now();
+    chrono::duration<double> diff1 = end_time1-start_time1;
+    cout << "Time" << diff1.count() << "\n";
+  }
+
 }
