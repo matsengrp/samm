@@ -77,12 +77,18 @@ class ImputedSequenceMutations:
         )
 
 class FullSequenceMutations:
-    def __init__(self, obs_seq_mutation, mutations):
+    def __init__(self, start_seq, end_seq, left_flank, right_flank, mutations):
         """
-        @param obs_seq_mutation: ObservedSequenceMutations
+        @param start_seq: processed start seq without flanks
+        @param end_seq: processed end seq without flanks
+        @param left_flank: left flank string
+        @param right_flank: right flank string
         @param mutations: an ordered list of MutationPosTime
         """
-        self.obs_seq_mutation = obs_seq_mutation
+        self.start_seq = start_seq
+        self.end_seq = end_seq
+        self.left_flank = left_flank
+        self.right_flank = right_flank
         self.mutations = mutations
 
     def get_mutation_order(self):
