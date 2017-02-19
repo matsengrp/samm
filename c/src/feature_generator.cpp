@@ -86,7 +86,11 @@ shared_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::UpdateForMutationStep
   const shared_ptr<OrderedMutationSteps> &base_mut_order,
   const pair<bool, vector<double> > &theta
 ) {
-  shared_ptr<OrderedMutationSteps> ordered_mut_steps = make_shared<OrderedMutationSteps>(*base_mut_order);
+  shared_ptr<OrderedMutationSteps> ordered_mut_steps = make_shared<OrderedMutationSteps>(
+    base_mut_order->num_steps,
+    base_mut_order->order_vec,
+    base_mut_order->mut_steps
+  );
   ordered_mut_steps->order_vec = mut_order;
 
   for (int i: update_steps) {
