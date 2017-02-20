@@ -45,58 +45,65 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         print "create_for_mutation_steps time", time.time() - st_time
 
     def test_update(self):
-        feat_generator = SubmotifFeatureGenerator(motif_len=3)
+        feat_generator = SubmotifFastFeatureGenerator(motif_len=3)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
-                start_seq="aattacgc",
-                end_seq="atgcacgc",
+                start_seq="aattatgaatgc",
+                end_seq=  "atgcaagatagc",
                 motif_len=3,
             )
         )
-
+        self.assertEqual(obs_seq_mut.feat_dict_start[0], 3)
+        self.assertEqual(obs_seq_mut.feat_dict_start[1], 4 * 3 + 3)
         ordered_seq_mut = ImputedSequenceMutations(
             obs_seq_mut,
-            [0,1,2]
+            obs_seq_mut.mutation_pos_dict.keys()
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
         # (position 2 mutates last)
-        base_feat_mut_steps, base_intermediate_seqs = feat_generator.create_for_mutation_steps(
-            ordered_seq_mut,
-        )
+        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
+        self.assertEqual(base_feat_mut_steps[0].mutating_pos_feat, 3)
+        self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
+        self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
+        self.assertEqual(base_feat_mut_steps[1].mutating_pos_feat, 16 * 3 + 3 * 4 + 3)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new.keys(), [1])
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_old.keys(), [1])
+        self.assertEqual(set(base_feat_mut_steps[4].neighbors_feat_new.keys()), set([3,5]))
+        self.assertEqual(set(base_feat_mut_steps[4].neighbors_feat_old.keys()), set([3,5]))
 
         # Compare update to create feature vectors by changing the mutation order by one step
         # (position 2 mutates second)
+        new_order = obs_seq_mut.mutation_pos_dict.keys()
+        new_order = new_order[0:-2] + [new_order[-1], new_order[-2]]
         ordered_seq_mut1 = ImputedSequenceMutations(
             obs_seq_mut,
-            [0,2,1]
-        )
-        feat_mut_steps1_update, _ = feat_generator.update_for_mutation_steps(
-            ordered_seq_mut1,
-            update_steps=[1],
-            base_feat_mutation_steps = base_feat_mut_steps,
+            new_order
         )
 
-        feat_mut_steps1, _ = feat_generator.create_for_mutation_steps(
-            ordered_seq_mut1
+        feat_mut_steps1 = feat_generator.create_for_mutation_steps(ordered_seq_mut1)
+        first_mutation_feat, second_mut_step = feat_generator.update_for_mutation_steps(
+            ordered_seq_mut1,
+            update_steps=[obs_seq_mut.num_mutations - 2, obs_seq_mut.num_mutations - 1],
         )
-        self.assertEqual(feat_mut_steps1.intermediate_seqs, feat_mut_steps1_update.intermediate_seqs)
-        self.assertEqual(feat_mut_steps1.feature_vec_dicts, feat_mut_steps1_update.feature_vec_dicts)
+        self.assertEqual(first_mutation_feat, 14)
+        self.assertEqual(feat_mut_steps1[-2].mutating_pos_feat, 14)
+        self.assertEqual(second_mut_step.mutating_pos_feat, 0)
+        self.assertEqual(feat_mut_steps1[-1].mutating_pos_feat, 0)
 
         # Compare update to create feature vectors by changing the mutation order by another step
-        # (position 2 mutates first)
+        new_order = new_order[0:-2] + [new_order[-1], new_order[-2]]
         ordered_seq_mut2 = ImputedSequenceMutations(
             obs_seq_mut,
-            [2,0,1]
-        )
-        feat_mut_steps2_update, _ = feat_generator.update_for_mutation_steps(
-            ordered_seq_mut2,
-            update_steps=[0,1],
-            base_feat_mutation_steps = feat_mut_steps1,
+            new_order
         )
 
-        feat_mut_steps2, _ = feat_generator.create_for_mutation_steps(
-            ordered_seq_mut2
+        feat_mut_steps2 = feat_generator.create_for_mutation_steps(ordered_seq_mut2)
+        first_mutation_feat2, second_mut_step2 = feat_generator.update_for_mutation_steps(
+            ordered_seq_mut2,
+            update_steps=[obs_seq_mut.num_mutations - 3, obs_seq_mut.num_mutations - 2],
         )
-        self.assertEqual(feat_mut_steps2.intermediate_seqs, feat_mut_steps2_update.intermediate_seqs)
-        self.assertEqual(feat_mut_steps2.feature_vec_dicts, feat_mut_steps2_update.feature_vec_dicts)
+        self.assertEqual(first_mutation_feat2, 14)
+        self.assertEqual(second_mut_step2.mutating_pos_feat, 3)
+        self.assertEqual(second_mut_step2.neighbors_feat_old, feat_mut_steps2[-2].neighbors_feat_old)
+        self.assertEqual(second_mut_step2.neighbors_feat_new, feat_mut_steps2[-2].neighbors_feat_new)

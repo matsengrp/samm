@@ -74,7 +74,6 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         old_mutation_pos = None
         for mutation_step, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
-            # print "mutation_step", mutation_step
             feat_mut_step = self._update_mutation_step(
                 mutation_step,
                 mutation_pos,
@@ -84,11 +83,10 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
             feat_mutation_steps.append(feat_mut_step)
             old_mutation_pos = mutation_pos
 
-        # print "mutation_step", seq_mut_order.obs_seq_mutation.num_mutations - 1
         final_mutation_feat = self._get_feature_idx_for_pos_at_step(
             seq_mut_order.mutation_order[-1],
             seq_mut_order,
-            seq_mut_order.obs_seq_mutation.num_mutations - 1,
+            seq_mut_order.obs_seq_mutation.num_mutations - 2,
         )
         feat_mutation_steps.append(FeatureMutationStep(final_mutation_feat))
 
@@ -98,42 +96,32 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         self,
         seq_mut_order,
         update_steps,
-        base_feat_mutation_steps,
-        base_feature_vec_theta_sums=None,
-        theta=None
     ):
-        num_steps = seq_mut_order.obs_seq_mutation.num_mutations
-        feat_mutation_steps = base_feat_mutation_steps.copy()
+        feat_mutation_steps = []
 
-        feature_vec_thetasums = None
-        if theta is not None:
-            feature_vec_thetasums = list(base_feature_vec_theta_sums)
-
-        no_feat_last_idx = 0
-        no_feat_vec_pos = set()
-        for i in update_steps:
-            if i >= num_steps - 1:
-                break
-
-            mutation_pos = seq_mut_order.mutation_order[i]
-
-            no_feat_vec_pos.update(seq_mut_order.mutation_order[no_feat_last_idx:i + 1])
-            no_feat_last_idx = i + 1
-
-            seq_str, feat_dict, thetasum = self._update_mutation_step(
-                i,
-                mutation_pos,
-                feat_mutation_steps,
-                feature_vec_thetasums,
+        first_mutation_pos = seq_mut_order.mutation_order[update_steps[0]]
+        first_mutation_feat = self._get_feature_idx_for_pos_at_step(
+            first_mutation_pos,
+            seq_mut_order,
+            update_steps[0] - 1,
+        )
+        second_mutation_pos = seq_mut_order.mutation_order[update_steps[1]]
+        if update_steps[1] < seq_mut_order.obs_seq_mutation.num_mutations - 1:
+            second_feat_mut_step = self._update_mutation_step(
+                update_steps[1],
+                second_mutation_pos,
+                first_mutation_pos,
                 seq_mut_order,
-                no_feat_vec_pos,
-                theta,
             )
-            feat_mutation_steps.update(i + 1, seq_str, feat_dict)
-            if theta is not None:
-                feature_vec_thetasums[i + 1] = thetasum
+        else:
+            second_mutation_feat = self._get_feature_idx_for_pos_at_step(
+                second_mutation_pos,
+                seq_mut_order,
+                update_steps[1] - 1,
+            )
+            second_feat_mut_step = FeatureMutationStep(second_mutation_feat)
 
-        return feat_mutation_steps, feature_vec_thetasums
+        return first_mutation_feat, second_feat_mut_step
 
     @profile
     def _update_mutation_step(
@@ -152,9 +140,6 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         @return FeatureMutationStep
         """
-        # print "seq_mut_order.obs_seq_mutation", seq_mut_order.obs_seq_mutation.start_seq
-        # print "mutation_pos", mutation_pos
-
         mutating_pos_feat = self._get_feature_idx_for_pos_at_step(mutation_pos, seq_mut_order, mutation_step - 1)
         feat_vec_dict_new = dict()
         feat_vec_dict_old = dict()
@@ -165,15 +150,14 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
                 start_region_idx,
                 end_region_idx,
                 seq_mut_order,
-                [mutation_step - 2, mutation_step - 1]
+                mutation_step_prev=mutation_step - 2,
+                mutation_step_curr=mutation_step - 1
             )
 
             # Calculate features for positions in the risk group at the time of this mutation step
             # Only requires updating feature values that were close to the previous mutation
             # Get the feature vectors for the positions that might be affected by the previous mutation
             update_positions = range(start_region_idx, old_mutation_pos) + range(old_mutation_pos + 1, end_region_idx + 1)
-            # print "updated_positions", update_positions
-
             for pos in update_positions:
                 if seq_mut_order.mutation_order_all_pos[pos] > mutation_step - 1:
                     # Only update the positions that are in the risk group (the ones that haven't mutated yet)
@@ -187,12 +171,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         )
 
     def _get_feature_idx(self, pos, seq):
-        # print "seq", seq
-        # print "pos,", pos
-        # print "pos - self.half_motif_len", pos - self.half_motif_len
-        # print "pos + self.half_motif_len + 1", pos + self.half_motif_len + 1
         submotif = seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
-        # print "submotif", submotif
         return self.motif_dict[submotif]
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
@@ -221,7 +200,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         return idx
 
     @profile
-    def _construct_region_at_steps(self, pos_begin, pos_end, seq_mut_order, mutation_steps):
+    def _construct_region_at_steps(self, pos_begin, pos_end, seq_mut_order, mutation_step_prev, mutation_step_curr):
         """
         @param pos: central mutating position
         @param seq_mut_order: ImputedSequenceMutations
@@ -229,11 +208,12 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         TODO: UPDATE COMMENT
         @return the feature index at position `pos` after the `mutation_step`-th mutation step
         """
-        seq_len = seq_mut_order.obs_seq_mutation.seq_len
+        obs_seq_mutation = seq_mut_order.obs_seq_mutation
+        seq_len = obs_seq_mutation.seq_len
         region = ""
         if pos_begin < self.half_motif_len:
             # Position is very close to beginning of sequence - copy over the flanks
-            region = seq_mut_order.obs_seq_mutation.left_flank[pos_begin:]
+            region = obs_seq_mutation.left_flank[pos_begin:]
             range_begin = 0
         else:
             range_begin = pos_begin - self.half_motif_len
@@ -243,23 +223,19 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         else:
             range_end = pos_end + self.half_motif_len + 1
 
-        regions = [region for i in mutation_steps]
+        regions = [region, region]
         for i in range(range_begin, range_end):
-            start_nuc = seq_mut_order.obs_seq_mutation.start_seq[i]
-            end_nuc = seq_mut_order.obs_seq_mutation.end_seq[i]
+            start_nuc = obs_seq_mutation.start_seq[i]
+            end_nuc = obs_seq_mutation.end_seq[i]
             pos_mut_step = seq_mut_order.mutation_order_all_pos[i]
-            for j, mutation_step in enumerate(mutation_steps):
-                if pos_mut_step > mutation_step:
-                    regions[j] += start_nuc
-                else:
-                    regions[j] += end_nuc
+            regions[0] += start_nuc if pos_mut_step > mutation_step_prev else end_nuc
+            regions[1] += start_nuc if pos_mut_step > mutation_step_curr else end_nuc
 
         if pos_end >= seq_len - self.half_motif_len:
             # Position is very close to end of sequence - copy over the flanks
-            suffix = seq_mut_order.obs_seq_mutation.right_flank[:pos_end + self.half_motif_len - seq_len + 1]
-            for j in len(mutation_steps):
-                regions[j] += suffix
-
+            suffix = obs_seq_mutation.right_flank[:pos_end + self.half_motif_len - seq_len + 1]
+            regions[0] += suffix
+            regions[1] += suffix
         return regions
 
 
