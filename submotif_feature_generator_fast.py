@@ -161,25 +161,15 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         if old_mutation_pos is not None:
             start_region_idx = max(old_mutation_pos - self.half_motif_len, 0)
             end_region_idx = min(old_mutation_pos + self.half_motif_len, seq_mut_order.obs_seq_mutation.seq_len - 1)
-            # print "old_mutation_pos", old_mutation_pos
-            # print "start_region_idx", start_region_idx, "end", end_region_idx
-            seq_at_step = self._construct_region_at_step(
+            seq_at_prev_step, seq_at_step = self._construct_region_at_steps(
                 start_region_idx,
                 end_region_idx,
                 seq_mut_order,
-                mutation_step - 1
+                [mutation_step - 2, mutation_step - 1]
             )
-            # print "seq_at_step", seq_at_step
-            seq_at_prev_step = self._construct_region_at_step(
-                start_region_idx,
-                end_region_idx,
-                seq_mut_order,
-                mutation_step - 2
-            )
-            # print "seq_at_prev_step", seq_at_prev_step
+
             # Calculate features for positions in the risk group at the time of this mutation step
             # Only requires updating feature values that were close to the previous mutation
-
             # Get the feature vectors for the positions that might be affected by the previous mutation
             update_positions = range(start_region_idx, old_mutation_pos) + range(old_mutation_pos + 1, end_region_idx + 1)
             # print "updated_positions", update_positions
@@ -231,12 +221,12 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         return idx
 
     @profile
-    def _construct_region_at_step(self, pos_begin, pos_end, seq_mut_order, mutation_step):
+    def _construct_region_at_steps(self, pos_begin, pos_end, seq_mut_order, mutation_steps):
         """
         @param pos: central mutating position
         @param seq_mut_order: ImputedSequenceMutations
         @param mutation_step: if negative, that means no mutations have occured yet
-
+        TODO: UPDATE COMMENT
         @return the feature index at position `pos` after the `mutation_step`-th mutation step
         """
         seq_len = seq_mut_order.obs_seq_mutation.seq_len
@@ -253,17 +243,24 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         else:
             range_end = pos_end + self.half_motif_len + 1
 
+        regions = [region for i in mutation_steps]
         for i in range(range_begin, range_end):
-            if seq_mut_order.mutation_order_all_pos[i] > mutation_step:
-                region += seq_mut_order.obs_seq_mutation.start_seq[i]
-            else:
-                region += seq_mut_order.obs_seq_mutation.end_seq[i]
+            start_nuc = seq_mut_order.obs_seq_mutation.start_seq[i]
+            end_nuc = seq_mut_order.obs_seq_mutation.end_seq[i]
+            pos_mut_step = seq_mut_order.mutation_order_all_pos[i]
+            for j, mutation_step in enumerate(mutation_steps):
+                if pos_mut_step > mutation_step:
+                    regions[j] += start_nuc
+                else:
+                    regions[j] += end_nuc
 
         if pos_end >= seq_len - self.half_motif_len:
             # Position is very close to end of sequence - copy over the flanks
-            region += seq_mut_order.obs_seq_mutation.right_flank[:pos_end + self.half_motif_len - seq_len + 1]
+            suffix = seq_mut_order.obs_seq_mutation.right_flank[:pos_end + self.half_motif_len - seq_len + 1]
+            for j in len(mutation_steps):
+                regions[j] += suffix
 
-        return region
+        return regions
 
 
     @profile
