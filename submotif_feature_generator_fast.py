@@ -46,7 +46,13 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
-            feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq, obs_seq_mutation.seq_len, obs_seq_mutation.left_flank, obs_seq_mutation.right_flank)
+            feat_vect = self._create_feature_vec_for_pos(
+                pos,
+                obs_seq_mutation.start_seq,
+                obs_seq_mutation.seq_len,
+                obs_seq_mutation.left_flank,
+                obs_seq_mutation.right_flank,
+            )
             feat_dict[pos] = feat_vect
             indptr.append(pos + 1)
             indices.append(feat_vect)
@@ -172,13 +178,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         else:
             submotif = intermediate_seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
 
-        # generate random nucleotide if an "n" occurs in the middle of a sequence
-        if 'n' in submotif:
-            for match in re.compile('n').finditer(submotif):
-                submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
-
-        idx = self.motif_dict[submotif]
-        return idx
+        return self.motif_dict[submotif]
 
     @profile
     def _construct_region_at_steps(self, pos_begin, pos_end, seq_mut_order, mutation_step_prev, mutation_step_curr):

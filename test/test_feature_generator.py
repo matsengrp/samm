@@ -67,6 +67,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
         self.assertEqual(base_feat_mut_steps[1].mutating_pos_feat, 16 * 3 + 3 * 4 + 3)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_old[1], 15)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new[1], 63)
         self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new.keys(), [1])
         self.assertEqual(base_feat_mut_steps[1].neighbors_feat_old.keys(), [1])
         self.assertEqual(set(base_feat_mut_steps[4].neighbors_feat_new.keys()), set([3,5]))
