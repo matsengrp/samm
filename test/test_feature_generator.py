@@ -11,14 +11,18 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         """
         Just a test to see how fast things are running
         """
-        motif_len = 5
+        np.random.seed(0)
+
+        motif_len = 3
+        seq_length = 400
+        mut_per_length = 10
+
         feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
 
-        seq_length = 400
         start_seq = get_random_dna_seq(seq_length)
         # Mutate a 10th of the sequence
         end_seq = list(start_seq)
-        for i in range(0, seq_length, 10):
+        for i in range(motif_len/2, seq_length, mut_per_length):
             if NUCLEOTIDE_DICT[end_seq[i]] == 0:
                 end_seq[i] = "t"
             else:
