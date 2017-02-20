@@ -56,4 +56,4 @@ class FeatureMutationStep:
         self.neighbors_feat_new = neighbors_feat_new
 
     def __str__(self):
-        return "(%d, %s, %s)" % (self.mutating_pos_feat, self.neighbors_feat_old, self.neighbors_feat_new)
+        return "(%d, old: %s, new: %s)" % (self.mutating_pos_feat, self.neighbors_feat_old, self.neighbors_feat_new)

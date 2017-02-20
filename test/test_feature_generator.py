@@ -105,5 +105,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
         self.assertEqual(first_mutation_feat2, 14)
         self.assertEqual(second_mut_step2.mutating_pos_feat, 3)
+        self.assertEqual(second_mut_step2.neighbors_feat_old, {3: 19, 5: 56})
+        self.assertEqual(second_mut_step2.neighbors_feat_new, {3: 16, 5: 8})
         self.assertEqual(second_mut_step2.neighbors_feat_old, feat_mut_steps2[-2].neighbors_feat_old)
         self.assertEqual(second_mut_step2.neighbors_feat_new, feat_mut_steps2[-2].neighbors_feat_new)
