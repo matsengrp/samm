@@ -2,6 +2,7 @@ import unittest
 import time
 
 from submotif_feature_generator import SubmotifFeatureGenerator
+from submotif_feature_generator_fast import SubmotifFastFeatureGenerator
 from models import *
 from common import *
 
@@ -10,8 +11,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         """
         Just a test to see how fast things are running
         """
-        motif_len = 3
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
+        motif_len = 5
+        feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
 
         seq_length = 400
         start_seq = get_random_dna_seq(seq_length)

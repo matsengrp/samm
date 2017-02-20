@@ -54,6 +54,10 @@ class ObservedSequenceMutations:
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 
+        # Feature generators should fill in these two fields!
+        self.feat_matrix_start = None
+        self.feat_dict_start = None
+
     def __str__(self):
         return "Seq %s, Mutations %s" % (
             self.start_seq,
@@ -69,6 +73,12 @@ class ImputedSequenceMutations:
         """
         self.obs_seq_mutation = obs_seq_mutation
         self.mutation_order = mutation_order
+
+        # Positions that do not mutate will have their mutation order set to a big number - the total number of mutations observed
+        self.mutation_order_all_pos = [obs_seq_mutation.num_mutations] * obs_seq_mutation.seq_len
+        # Positions that mutated will have a corresponding mutation order in that position
+        for i, mutation_pos in enumerate(self.mutation_order):
+            self.mutation_order_all_pos[mutation_pos] = i
 
     def __str__(self):
         return "Seq %s, Mutation Order %s" % (
