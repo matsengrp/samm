@@ -7,7 +7,7 @@
 
 using namespace std;
 
-typedef int Nuc; // 0 = A, 1 = C, 2 = G, 3 = T
+typedef char Nuc; // 0 = A, 1 = C, 2 = G, 3 = T
 // Nucleotide sequence
 typedef struct {
   vector<Nuc> val;

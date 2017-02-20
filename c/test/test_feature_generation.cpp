@@ -91,6 +91,7 @@ TEST_CASE("Feature Generator") {
   }
 
   SECTION("Time test"){
+    // We're measuring time here for easy comparison to the python code.
     int VEC_LEN = 400;
     VectorNucleotide start_nucs = common::GetRandomVectorNucleotide(VEC_LEN);
     VectorNucleotide end_nucs;
@@ -123,11 +124,47 @@ TEST_CASE("Feature Generator") {
 
     auto start_time1 = chrono::system_clock::now();
     VectorOrder my_order = {obs_sample->mutated_postions};
-    shared_ptr<OrderedMutationSteps> mm = feat_gen.CreateForMutationSteps(
+
+    // Try different mutation orders - similar calculations as a gibbs step
+    vector<shared_ptr<OrderedMutationSteps> > all_the_mut_steps;
+
+    // Position mutates last
+    all_the_mut_steps.push_back(feat_gen.CreateForMutationSteps(
       obs_sample,
       my_order,
       pair<bool, vector<double> >(true, theta)
-    );
+    ));
+    for (int i = my_order.val.size() - 2; i >= 0; i--) {
+      // Position is the i-th mutation
+
+      // Create the new ordering
+      VectorOrder new_order;
+      for (int j = 0; j < i; j++) {
+        new_order.val.push_back(my_order.val[j]);
+      }
+      new_order.val.push_back(my_order.val[my_order.val.size() - 1]);
+      for (int j = i; j < my_order.val.size() - 1; j++) {
+        new_order.val.push_back(my_order.val[j]);
+      }
+
+      // Indicate which steps need updating
+      vector<int> update_steps;
+      if (i != my_order.val.size() - 2) {
+        update_steps = {i + 1, i + 2};
+      } else {
+        update_steps = {i + 1};
+      }
+
+      // Actually update the feature calculations
+      all_the_mut_steps.push_back(feat_gen.UpdateForMutationSteps(
+        obs_sample,
+        new_order,
+        update_steps,
+        all_the_mut_steps[my_order.val.size() - i - 2],
+        pair<bool, vector<double> >(true, theta)
+      ));
+    }
+
     auto end_time1 = chrono::system_clock::now();
     chrono::duration<double> diff1 = end_time1-start_time1;
     cout << "Time" << diff1.count() << "\n";
