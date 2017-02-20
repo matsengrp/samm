@@ -30,7 +30,7 @@ env = Environment(ENV=os.environ,
                   NREPS = GetOption('nreps'),
                   OUTPUT_NAME = GetOption('output_name'),
                   CXX = 'clang++',
-                  CXXFLAGS = '-std=c++11 -stdlib=libc++',
+                  CXXFLAGS = '-std=c++11 -stdlib=libc++ -g',
                   LINKFLAGS = '-stdlib=libc++')
 
 

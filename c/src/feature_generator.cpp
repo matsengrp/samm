@@ -75,7 +75,6 @@ shared_ptr<OrderedMutationSteps> SubmotifFeatureGenerator::CreateForMutationStep
 
     ordered_mut_steps->set(i, mutation_step);
   }
-
   return ordered_mut_steps;
 }
 
@@ -158,7 +157,7 @@ shared_ptr<MutationStep> SubmotifFeatureGenerator::UpdateMutationStep(
   intermediate_feats.val = ordered_mut_steps->mut_steps[i - 1]->feature_vec.val;
   int start_p = max(mutated_pos - motif_len_half, 0);
   int end_p = min(mutated_pos + motif_len_half + 1, obs_sample->num_pos);
-  for (int p = mutated_pos - motif_len_half; p < end_p; p++) {
+  for (int p = start_p; p < end_p; p++) {
     int prev_feat_idx = ordered_mut_steps->mut_steps[i - 1]->feature_vec.val[p];
     if (p == mutated_pos || prev_feat_idx == MUTATED) {
       intermediate_feats.val[p] = MUTATED;
