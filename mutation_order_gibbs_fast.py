@@ -32,11 +32,7 @@ class FullMutationOrderGibbsStepOptions:
     that are consistent with the partial ordering
     """
     def __init__(self):
-        self.order_list = []
-        self.feat_mutation_steps_list = []
-        self.feature_vec_theta_sums_list = []
-        self.log_probs_list = []
-        self.full_ordering_log_probs = []
+        self.full_ordering_probs = []
 
     def append(self, order, feat_mutation_steps, feature_vec_theta_sums, log_probs, full_ordering_log_prob):
         """
@@ -109,7 +105,10 @@ class MutationOrderGibbsFastSampler(Sampler):
         """
         # sample full ordering from conditional prob for this position
         trace = []
+
         for position in np.random.permutation(self.mutated_positions):
+            all_log_probs = []
+
             # Take out the position we are going to sample order for and get the partial ordering under consideration
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
@@ -117,82 +116,45 @@ class MutationOrderGibbsFastSampler(Sampler):
             # Compute probabilities for the orderings under consideration
             # First consider the full ordering with position under consideration mutating last
             full_order_last = partial_order + [position]
-            feat_mutation_steps, log_probs, feature_vec_theta_sums = self._compute_log_probs(
+            feat_mutation_steps, log_numerators, denominators = self._compute_log_probs(
                 full_order_last,
                 gibbs_step_info,
                 update_positions=range(pos_order_idx, self.num_mutations),
             )
+            full_ordering_log_prob = log_numerators.sum() - (np.log(denominators)).sum()
 
-            gibbs_step_options = FullMutationOrderGibbsStepOptions()
-            gibbs_step_options.append(
-                full_order_last,
-                feat_mutation_steps,
-                feature_vec_theta_sums,
-                log_probs,
-                log_probs.sum(),
-            )
-
+            all_log_probs.append(full_ordering_log_prob)
             # iterate through the rest of the possible full mutation orders consistent with this partial order
-            prev_full_order = full_order_last
-            prev_feature_vec_theta_sums = feature_vec_theta_sums
             for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
-                if i == self.num_mutations - 2:
-                    # If the last mutation, only need to update one feature vec
-                    update_steps = [i]
-                else:
-                    # If not the last mutation, update two feature vecs
-                    update_steps = [i, i+1]
                 possible_full_order = partial_order[:i] + [position] + partial_order[i:]
-                feat_mutation_steps, feature_vec_theta_sums = self.feature_generator.update_for_mutation_steps(
+                first_mutation_feat, second_feat_mut_step = self.feature_generator.update_for_mutation_steps(
                     ImputedSequenceMutations(
                         self.obs_seq_mutation,
                         possible_full_order
                     ),
-                    update_steps=update_steps,
-                    base_feat_mutation_steps = feat_mutation_steps,
-                    base_feature_vec_theta_sums = feature_vec_theta_sums,
-                    theta=self.theta,
+                    update_steps=[i, i+1],
                 )
 
-                # multiply the sequence of multinomials to get the probability of the full ordering
-                # the product in {eq:full_ordering}
-                if self.approx == 'none':
-                    log_probs = self._update_log_prob_from_shuffle(
-                        i,
-                        log_probs,
-                        possible_full_order,
-                        prev_full_order,
-                        feature_vec_theta_sums,
-                        prev_feature_vec_theta_sums,
-                    )
-                    full_ordering_log_prob = log_probs.sum()
-                else:
-                    # Stupid speed up #2:
-                    # The change in theta doesn't really change the i+1 element
-                    # of our multinomial vector from the previous ith element:
-                    full_ordering_log_prob = gibbs_step_options.full_ordering_log_probs[-1] + \
-                        self.theta[feature_vec_theta_sums[i][possible_full_order[i]]].sum() - \
-                        self.theta[feat_mutation_steps.feat_vec_dicts[i][full_order_last[i]]].sum() + \
-                        log_probs[i] - log_probs[i + 1]
+                # correct the full ordering probability by taking away the old terms
+                full_ordering_log_prob += -log_numerators[i] - log_numerators[i + 1] + np.log(denominators[i + 1])
 
-                prev_full_order = possible_full_order
-                prev_feature_vec_theta_sums = feature_vec_theta_sums
+                log_numerators[i] = self.theta[first_mutation_feat]
+                log_numerators[i + 1] = self.theta[second_feat_mut_step.mutating_pos_feat]
+                denominators[i + 1] = self._get_denom_update(denominators[i], log_numerators[i], second_feat_mut_step)
 
-                gibbs_step_options.append(
-                    possible_full_order,
-                    feat_mutation_steps,
-                    feature_vec_theta_sums,
-                    log_probs,
-                    full_ordering_log_prob,
-                )
+                # correct the full ordering probability by adding back the new terms
+                full_ordering_log_prob += log_numerators[i] + log_numerators[i + 1] - np.log(denominators[i + 1])
+                all_log_probs.append(full_ordering_log_prob)
 
-            # now perform a draw from the multinomial distribution of full orderings
-            # the multinomial follows the distribution in {eq:order_conditional_prob}
-            gibbs_step_info, curr_order_probs = gibbs_step_options.sample()
-            curr_order = gibbs_step_info.order
+            all_probs = np.exp(all_log_probs)
+            sampled_idx = sample_multinomial(all_probs)
+
+            # Now reconstruct our decision
+            idx = self.num_mutations - sampled_idx - 1
+            curr_order = partial_order[:idx] + [position] + partial_order[idx:]
 
             # Output all log probabilities for trace
-            trace.append(curr_order_probs)
+            trace.append(all_probs[sampled_idx])
 
         return gibbs_step_info, trace
 
@@ -255,16 +217,13 @@ class MutationOrderGibbsFastSampler(Sampler):
             )
 
             # Get the components -- numerators and the denomiators
-            numerators = np.exp([self.theta[mut_step.mutating_pos_feat] for mut_step in feat_mutation_steps])
+            log_numerators = np.array([self.theta[mut_step.mutating_pos_feat] for mut_step in feat_mutation_steps])
             denominators = [
                 (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
             ]
-            for i, feat_mut_step in enumerate(feat_mutation_steps[:-1]):
-                old_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old]
-                new_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new]
-                denominators.append(
-                    denominators[-1] - numerators[i] - (np.exp(old_feat_theta_sums + new_feat_theta_sums)).sum()
-                )
+            for i, feat_mut_step in enumerate(feat_mutation_steps[1:]):
+                new_denom = self._get_denom_update(denominators[i], log_numerators[i], feat_mut_step)
+                denominators.append(new_denom)
         else:
             # Update if we have previous computations
             feat_mutation_steps, feature_vec_theta_sums = self.feature_generator.update_for_mutation_steps(
@@ -278,7 +237,12 @@ class MutationOrderGibbsFastSampler(Sampler):
                 theta=self.theta,
             )
 
-        return feat_mutation_steps, log_probs, feature_vec_theta_sums
+        return feat_mutation_steps, log_numerators, denominators
+
+    def _get_denom_update(self, old_denominator, old_log_numerator, feat_mut_step):
+        old_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+        new_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
+        return old_denominator - np.exp(old_log_numerator) - (np.exp(old_feat_theta_sums)).sum() + (np.exp(new_feat_theta_sums)).sum()
 
     def _get_multinomial_log_prob(self, numerator_pos, feature_vec_theta_sum):
         """

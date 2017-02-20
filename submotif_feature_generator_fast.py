@@ -73,7 +73,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         feat_mutation_steps = []
 
         old_mutation_pos = None
-        for mutation_step, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
+        for mutation_step, mutation_pos in enumerate(seq_mut_order.mutation_order):
             feat_mut_step = self._update_mutation_step(
                 mutation_step,
                 mutation_pos,
@@ -83,22 +83,11 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
             feat_mutation_steps.append(feat_mut_step)
             old_mutation_pos = mutation_pos
 
-        final_mutation_feat = self._get_feature_idx_for_pos_at_step(
-            seq_mut_order.mutation_order[-1],
-            seq_mut_order,
-            seq_mut_order.obs_seq_mutation.num_mutations - 2,
-        )
-        feat_mutation_steps.append(FeatureMutationStep(final_mutation_feat))
-
+        assert(len(feat_mutation_steps) == seq_mut_order.obs_seq_mutation.num_mutations)
         return feat_mutation_steps
 
-    def update_for_mutation_steps(
-        self,
-        seq_mut_order,
-        update_steps,
-    ):
+    def update_for_mutation_steps(self, seq_mut_order, update_steps):
         feat_mutation_steps = []
-
         first_mutation_pos = seq_mut_order.mutation_order[update_steps[0]]
         first_mutation_feat = self._get_feature_idx_for_pos_at_step(
             first_mutation_pos,
@@ -106,20 +95,12 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
             update_steps[0] - 1,
         )
         second_mutation_pos = seq_mut_order.mutation_order[update_steps[1]]
-        if update_steps[1] < seq_mut_order.obs_seq_mutation.num_mutations - 1:
-            second_feat_mut_step = self._update_mutation_step(
-                update_steps[1],
-                second_mutation_pos,
-                first_mutation_pos,
-                seq_mut_order,
-            )
-        else:
-            second_mutation_feat = self._get_feature_idx_for_pos_at_step(
-                second_mutation_pos,
-                seq_mut_order,
-                update_steps[1] - 1,
-            )
-            second_feat_mut_step = FeatureMutationStep(second_mutation_feat)
+        second_feat_mut_step = self._update_mutation_step(
+            update_steps[1],
+            second_mutation_pos,
+            first_mutation_pos,
+            seq_mut_order,
+        )
 
         return first_mutation_feat, second_feat_mut_step
 
@@ -166,8 +147,8 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         return FeatureMutationStep(
             mutating_pos_feat,
+            feat_vec_dict_old,
             feat_vec_dict_new,
-            feat_vec_dict_old
         )
 
     def _get_feature_idx(self, pos, seq):
@@ -269,7 +250,6 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         if pos >= seq_len - self.half_motif_len:
             # Position is very close to end of sequence - copy over the flanks
             submotif += seq_mut_order.obs_seq_mutation.right_flank[:pos + self.half_motif_len - seq_len + 1]
-
         idx = self.motif_dict[submotif]
         return idx
 
