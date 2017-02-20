@@ -162,8 +162,8 @@ shared_ptr<MutationStep> SubmotifFeatureGenerator::UpdateMutationStep(
     if (p == mutated_pos || prev_feat_idx == MUTATED) {
       intermediate_feats.val[p] = MUTATED;
     } else {
+      intermediate_feats.val[p] = GetFeatureIdxForPos(p, intermediate_nucs, obs_sample->left_flank, obs_sample->right_flank);
     }
-    intermediate_feats.val[p] = GetFeatureIdxForPos(p, intermediate_nucs, obs_sample->left_flank, obs_sample->right_flank);
   }
 
   pair<bool, VectorThetaSums> theta_sum_option(theta.first, VectorThetaSums());
