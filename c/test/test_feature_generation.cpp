@@ -94,7 +94,7 @@ TEST_CASE("Feature Generator") {
     int VEC_LEN = 400;
     VectorNucleotide start_nucs = common::GetRandomVectorNucleotide(VEC_LEN);
     VectorNucleotide end_nucs;
-    // Mutate every 4 nucleotides
+    // Mutate every 10 nucleotides
     for (int i = 0; i < VEC_LEN; i++) {
       Nuc start_nuc = start_nucs.val[i];
       Nuc new_nucleotide;
