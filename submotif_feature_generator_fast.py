@@ -94,7 +94,6 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         return feat_mutation_steps
 
-    # TODO: make this a real feature generator (deal with ends properly)
     def update_for_mutation_steps(
         self,
         seq_mut_order,
@@ -135,6 +134,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
                 feature_vec_thetasums[i + 1] = thetasum
 
         return feat_mutation_steps, feature_vec_thetasums
+
     @profile
     def _update_mutation_step(
             self,
