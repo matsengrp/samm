@@ -1,9 +1,44 @@
 import unittest
+import time
 
 from submotif_feature_generator import SubmotifFeatureGenerator
 from models import *
+from common import *
 
 class FeatureGeneratorTestCase(unittest.TestCase):
+        def test_time(self):
+            """
+            Just a test to see how fast things are running
+            """
+            motif_len = 5
+            feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
+
+            seq_length = 400
+            start_seq = get_random_dna_seq(seq_length)
+            # Mutate a 10th of the sequence
+            end_seq = list(start_seq)
+            for i in range(0, seq_length, 10):
+                if NUCLEOTIDE_DICT[end_seq[i]] == 0:
+                    end_seq[i] = "t"
+                else:
+                    end_seq[i] = NUCLEOTIDES[NUCLEOTIDE_DICT[end_seq[i]] - 1]
+            end_seq = "".join(end_seq)
+
+            obs_seq_mutation = ObservedSequenceMutations(start_seq, end_seq, motif_len)
+
+            st_time = time.time()
+            obs_seq_mutation = feat_generator.create_base_features(obs_seq_mutation)
+            print "create_base_features time", time.time() - st_time
+
+            my_order = obs_seq_mutation.mutation_pos_dict.keys()
+            seq_mut_order = ImputedSequenceMutations(
+                obs_seq_mutation,
+                my_order,
+            )
+            st_time = time.time()
+            mutation_steps = feat_generator.create_for_mutation_steps(seq_mut_order)
+            print "create_for_mutation_steps time", time.time() - st_time
+
     def test_update(self):
         feat_generator = SubmotifFeatureGenerator(motif_len=3)
         obs_seq_mut = feat_generator.create_base_features(
