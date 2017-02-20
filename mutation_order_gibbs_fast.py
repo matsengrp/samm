@@ -21,8 +21,8 @@ class GibbsStepInfo:
         @param log_probs: the log of the probability at each mutation step
         """
         self.order = order
-        self.feat_mutation_steps = feat_mutation_steps
-        self.feature_vec_theta_sums = feature_vec_theta_sums
+        self.log_numerators = log_numerators
+        self.denominators = denominators
         self.log_probs = log_probs
 
 class FullMutationOrderGibbsStepOptions:
@@ -116,14 +116,20 @@ class MutationOrderGibbsFastSampler(Sampler):
             # Compute probabilities for the orderings under consideration
             # First consider the full ordering with position under consideration mutating last
             full_order_last = partial_order + [position]
+            print "full_order_last", full_order_last
             feat_mutation_steps, log_numerators, denominators = self._compute_log_probs(
                 full_order_last,
                 gibbs_step_info,
                 update_positions=range(pos_order_idx, self.num_mutations),
             )
-            full_ordering_log_prob = log_numerators.sum() - (np.log(denominators)).sum()
+            full_ordering_log_prob = np.sum(log_numerators) - (np.log(denominators)).sum()
 
             all_log_probs.append(full_ordering_log_prob)
+
+            log_numerator_hist = [[i] for i in log_numerators]
+            log_numerator_hist[-1].append(log_numerators[-1])
+            denominator_hist = [[i] for i in denominators]
+
             # iterate through the rest of the possible full mutation orders consistent with this partial order
             for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
                 possible_full_order = partial_order[:i] + [position] + partial_order[i:]
@@ -138,9 +144,12 @@ class MutationOrderGibbsFastSampler(Sampler):
                 # correct the full ordering probability by taking away the old terms
                 full_ordering_log_prob += -log_numerators[i] - log_numerators[i + 1] + np.log(denominators[i + 1])
 
-                log_numerators[i] = self.theta[first_mutation_feat]
-                log_numerators[i + 1] = self.theta[second_feat_mut_step.mutating_pos_feat]
+                log_numerators[i] = self.theta[first_mutation_feat].item(0)
+                log_numerators[i + 1] = self.theta[second_feat_mut_step.mutating_pos_feat][0]
                 denominators[i + 1] = self._get_denom_update(denominators[i], log_numerators[i], second_feat_mut_step)
+                log_numerator_hist[i].append(log_numerators[i])
+                log_numerator_hist[i + 1].append(log_numerators[i + 1])
+                denominator_hist[i+1].append(denominators[i + 1])
 
                 # correct the full ordering probability by adding back the new terms
                 full_ordering_log_prob += log_numerators[i] + log_numerators[i + 1] - np.log(denominators[i + 1])
@@ -152,6 +161,18 @@ class MutationOrderGibbsFastSampler(Sampler):
             # Now reconstruct our decision
             idx = self.num_mutations - sampled_idx - 1
             curr_order = partial_order[:idx] + [position] + partial_order[idx:]
+            my_denominators = (
+                [denominator_hist[0][0]]
+                + [denominator_hist[i][0] for i in range(1, self.num_mutations - sampled_idx)]
+                + [denominator_hist[i][1] for i in range(self.num_mutations - sampled_idx, self.num_mutations)]
+            )
+            my_log_numerators = (
+                [log_numerator_hist[i][0] for i in range(self.num_mutations - sampled_idx - 1)]
+                + [log_numerator_hist[self.num_mutations - sampled_idx - 1][1]]
+                + [log_numerator_hist[i][2] for i in range(self.num_mutations - sampled_idx, self.num_mutations)]
+            )
+
+            gibbs_step_info
 
             # Output all log probabilities for trace
             trace.append(all_probs[sampled_idx])
@@ -217,7 +238,7 @@ class MutationOrderGibbsFastSampler(Sampler):
             )
 
             # Get the components -- numerators and the denomiators
-            log_numerators = np.array([self.theta[mut_step.mutating_pos_feat] for mut_step in feat_mutation_steps])
+            log_numerators = [np.asscalar(self.theta[mut_step.mutating_pos_feat]) for mut_step in feat_mutation_steps]
             denominators = [
                 (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
             ]
