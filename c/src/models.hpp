@@ -82,7 +82,7 @@ class OrderedMutationSteps {
       int num_s,
       VectorOrder order_v,
       vector<shared_ptr<MutationStep> > m_vec
-    ): num_steps(num_s), order_vec(order_v), mut_steps(m_vec) {};
+    );
 
     // Initialize with the observed sample and the order under consideration
     shared_ptr<OrderedMutationSteps> copy(const shared_ptr<OrderedMutationSteps> &mut_order);
