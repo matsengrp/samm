@@ -1,3 +1,5 @@
+from common import mutate_string
+
 class ObservedSequenceMutations:
     def __init__(self, start_seq, end_seq, motif_len=1):
         """
@@ -52,6 +54,7 @@ class ObservedSequenceMutations:
         self.start_seq = start_seq
         self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank
         self.end_seq = end_seq
+        self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 
@@ -75,11 +78,19 @@ class ImputedSequenceMutations:
         self.obs_seq_mutation = obs_seq_mutation
         self.mutation_order = mutation_order
 
-        # Positions that do not mutate will have their mutation order set to a big number - the total number of mutations observed
-        self.mutation_order_all_pos = [obs_seq_mutation.num_mutations] * obs_seq_mutation.seq_len
-        # Positions that mutated will have a corresponding mutation order in that position
-        for i, mutation_pos in enumerate(self.mutation_order):
-            self.mutation_order_all_pos[mutation_pos] = i
+    def get_seq_at_step(self, step_idx, flanked=False):
+        intermediate_seq = self.obs_seq_mutation.start_seq
+        for i in range(step_idx):
+            mut_pos = self.mutation_order[i]
+            intermediate_seq = mutate_string(
+                intermediate_seq,
+                mut_pos,
+                self.obs_seq_mutation.end_seq[mut_pos]
+            )
+        if flanked:
+            return self.obs_seq_mutation.left_flank + intermediate_seq + self.obs_seq_mutation.right_flank
+        else:
+            return intermediate_seq
 
     def __str__(self):
         return "Seq %s, Mutation Order %s" % (
