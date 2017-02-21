@@ -59,8 +59,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
             dtype=bool,
         )
 
-        obs_seq_mutation.feat_matrix_start = feat_matrix
-        obs_seq_mutation.feat_dict_start = feat_dict
+        obs_seq_mutation.set_start_feats(feat_dict, feat_matrix)
 
         return obs_seq_mutation
 
