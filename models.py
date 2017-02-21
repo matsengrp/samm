@@ -50,6 +50,7 @@ class ObservedSequenceMutations:
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
         self.start_seq = start_seq
+        self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank
         self.end_seq = end_seq
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
