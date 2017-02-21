@@ -114,10 +114,11 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         # create features - the slow version
         feat_mut_steps1 = feat_generator.create_for_mutation_steps(ordered_seq_mut1)
         # get the feature delta - the fast version
-        first_mutation_feat, second_mut_step = feat_generator.update_for_mutation_steps(
+        first_mutation_feat, second_mut_step = feat_generator.get_shuffled_mutation_steps_delta(
             ordered_seq_mut1,
-            update_steps=[obs_seq_mut.num_mutations - 2, obs_seq_mut.num_mutations - 1],
+            update_step=obs_seq_mut.num_mutations - 2,
             flanked_seq=flanked_seq,
+            already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 2]),
         )
         self.assertEqual(first_mutation_feat, 14)
         self.assertEqual(feat_mut_steps1[-2].mutating_pos_feat, 14)
@@ -140,10 +141,11 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         # create features - the slow version
         feat_mut_steps2 = feat_generator.create_for_mutation_steps(ordered_seq_mut2)
         # get the feature delta - the fast version
-        first_mutation_feat2, second_mut_step2 = feat_generator.update_for_mutation_steps(
+        first_mutation_feat2, second_mut_step2 = feat_generator.get_shuffled_mutation_steps_delta(
             ordered_seq_mut2,
-            update_steps=[obs_seq_mut.num_mutations - 3, obs_seq_mut.num_mutations - 2],
-            flanked_seq=flanked_seq
+            update_step=obs_seq_mut.num_mutations - 3,
+            flanked_seq=flanked_seq,
+            already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 3]),
         )
         self.assertEqual(first_mutation_feat2, 14)
         self.assertEqual(second_mut_step2.mutating_pos_feat, 14)
