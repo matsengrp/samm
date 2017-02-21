@@ -58,9 +58,15 @@ class ObservedSequenceMutations:
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 
-        # Feature generators should fill in these two fields!
+        # Feature generators should fill in these fields!
         self.feat_matrix_start = None
+        self.feat_matrix_startT = None
         self.feat_dict_start = None
+
+    def set_start_feats(self, feat_dict, feat_matrix):
+        self.feat_matrix_start = feat_matrix
+        self.feat_matrix_startT = feat_matrix.T
+        self.feat_dict_start = feat_dict
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (
