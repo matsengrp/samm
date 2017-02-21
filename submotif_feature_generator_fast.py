@@ -46,16 +46,11 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
-            feat_vect = self._create_feature_vec_for_pos(
-                pos,
-                obs_seq_mutation.start_seq,
-                obs_seq_mutation.seq_len,
-                obs_seq_mutation.left_flank,
-                obs_seq_mutation.right_flank,
-            )
-            feat_dict[pos] = feat_vect
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos: pos + self.motif_len]
+            feat_idx = self.motif_dict[submotif]
+            feat_dict[pos] = feat_idx
             indptr.append(pos + 1)
-            indices.append(feat_vect)
+            indices.append(feat_idx)
 
         data = [True] * obs_seq_mutation.seq_len
         feat_matrix = scipy.sparse.csr_matrix(
@@ -79,20 +74,34 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         feat_mutation_steps = []
 
         old_mutation_pos = None
+        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq_with_flanks
+        feat_dict_prev = dict()
         for mutation_step, mutation_pos in enumerate(seq_mut_order.mutation_order):
-            feat_mut_step = self._update_mutation_step(
+            mutating_pos_feat, feat_dict_curr, feat_dict_future = self._update_mutation_step(
                 mutation_step,
                 mutation_pos,
                 old_mutation_pos,
                 seq_mut_order,
+                intermediate_seq,
             )
-            feat_mutation_steps.append(feat_mut_step)
+            feat_mutation_steps.append(FeatureMutationStep(
+                mutating_pos_feat,
+                feat_dict_prev,
+                feat_dict_curr,
+            ))
+
+            intermediate_seq = mutate_string(
+                intermediate_seq,
+                mutation_pos + self.half_motif_len,
+                seq_mut_order.obs_seq_mutation.end_seq[mutation_pos]
+            )
+            feat_dict_prev = feat_dict_future
             old_mutation_pos = mutation_pos
 
         assert(len(feat_mutation_steps) == seq_mut_order.obs_seq_mutation.num_mutations)
         return feat_mutation_steps
 
-    def update_for_mutation_steps(self, seq_mut_order, update_steps):
+    def update_for_mutation_steps(self, seq_mut_order, update_steps, intermediate_seq):
         feat_mutation_steps = []
         first_mutation_pos = seq_mut_order.mutation_order[update_steps[0]]
         first_mutation_feat = self._get_feature_idx_for_pos_at_step(
@@ -117,6 +126,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
             mutation_pos,
             old_mutation_pos,
             seq_mut_order,
+            intermediate_seq,
         ):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
@@ -124,43 +134,39 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         @param mutation_pos: the position that is mutating
         @param old_mutation_pos: the position that mutated previously - None if this is first mutation
         @param seq_mut_order: ImputedSequenceMutations
+        @param intermediate_seq: nucleotide sequence INCLUDING flanks - before the mutation step occurs
 
         @return FeatureMutationStep
         """
-        mutating_pos_feat = self._get_feature_idx_for_pos_at_step(mutation_pos, seq_mut_order, mutation_step - 1)
-        feat_vec_dict_new = dict()
-        feat_vec_dict_old = dict()
+        mutating_pos_motif = intermediate_seq[mutation_pos: mutation_pos + self.motif_len]
+        mutating_pos_feat = self.motif_dict[mutating_pos_motif]
+
+        feat_dict_curr = dict()
+        # Calculate features for positions in the risk group at the time of this mutation step
+        # Only requires updating feature values that were close to the previous mutation
+        # Get the feature vectors for the positions that might be affected by the previous mutation
         if old_mutation_pos is not None:
-            start_region_idx = max(old_mutation_pos - self.half_motif_len, 0)
-            end_region_idx = min(old_mutation_pos + self.half_motif_len, seq_mut_order.obs_seq_mutation.seq_len - 1)
-            seq_at_prev_step, seq_at_step = self._construct_region_at_steps(
-                start_region_idx,
-                end_region_idx,
-                seq_mut_order,
-                mutation_step_prev=mutation_step - 2,
-                mutation_step_curr=mutation_step - 1
-            )
+            feat_dict_curr = self._get_feature_dict_for_region(old_mutation_pos, mutation_step - 1, seq_mut_order, intermediate_seq)
 
-            # Calculate features for positions in the risk group at the time of this mutation step
-            # Only requires updating feature values that were close to the previous mutation
-            # Get the feature vectors for the positions that might be affected by the previous mutation
-            update_positions = range(start_region_idx, old_mutation_pos) + range(old_mutation_pos + 1, end_region_idx + 1)
-            for pos in update_positions:
-                if seq_mut_order.mutation_order_all_pos[pos] > mutation_step - 1:
-                    # Only update the positions that are in the risk group (the ones that haven't mutated yet)
-                    feat_vec_dict_new[pos] = self._get_feature_idx(pos - start_region_idx + self.half_motif_len, seq_at_step)
-                    feat_vec_dict_old[pos] = self._get_feature_idx(pos - start_region_idx + self.half_motif_len, seq_at_prev_step)
+        # Calculate the features in these special positions for updating the next mutation step's risk group
+        # Get the feature vectors for the positions that will be affected by current mutation
+        feat_dict_future = self._get_feature_dict_for_region(mutation_pos, mutation_step, seq_mut_order, intermediate_seq)
+        return mutating_pos_feat, feat_dict_curr, feat_dict_future
 
-        return FeatureMutationStep(
-            mutating_pos_feat,
-            feat_vec_dict_old,
-            feat_vec_dict_new,
-        )
+    @profile
+    def _get_feature_dict_for_region(self, mutation_pos, mutation_step, seq_mut_order, intermediate_seq):
+        feat_dict = dict()
+        start_region_idx = max(mutation_pos - self.half_motif_len, 0)
+        end_region_idx = min(mutation_pos + self.half_motif_len, seq_mut_order.obs_seq_mutation.seq_len - 1)
+        update_positions = range(start_region_idx, mutation_pos) + range(mutation_pos + 1, end_region_idx + 1)
+        for pos in update_positions:
+            if seq_mut_order.mutation_order_all_pos[pos] > mutation_step:
+                # Only update the positions that are in the risk group (the ones that haven't mutated yet)
+                submotif = intermediate_seq[pos: pos + self.motif_len]
+                feat_dict[pos] = self.motif_dict[submotif]
+        return feat_dict
 
-    def _get_feature_idx(self, pos, seq):
-        submotif = seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
-        return self.motif_dict[submotif]
-
+    @profile
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
         """
         @param pos: central mutating position
