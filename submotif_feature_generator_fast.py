@@ -90,6 +90,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
                 feat_dict_curr,
             ))
 
+            # Apply mutation
             intermediate_seq = mutate_string(
                 intermediate_seq,
                 mutation_pos + self.half_motif_len,
@@ -101,23 +102,48 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         assert(len(feat_mutation_steps) == seq_mut_order.obs_seq_mutation.num_mutations)
         return feat_mutation_steps
 
-    def update_for_mutation_steps(self, seq_mut_order, update_steps, intermediate_seq):
+    def update_for_mutation_steps(
+        self,
+        seq_mut_order,
+        update_steps,
+        flanked_seq,
+    ):
+        """
+        @param flanked_seq: must be a FLANKED sequence
+        """
         feat_mutation_steps = []
         first_mutation_pos = seq_mut_order.mutation_order[update_steps[0]]
-        first_mutation_feat = self._get_feature_idx_for_pos_at_step(
-            first_mutation_pos,
-            seq_mut_order,
-            update_steps[0] - 1,
-        )
         second_mutation_pos = seq_mut_order.mutation_order[update_steps[1]]
-        second_feat_mut_step = self._update_mutation_step(
+
+        first_mut_pos_feat, _, feat_dict_future = self._update_mutation_step(
+            update_steps[1],
+            first_mutation_pos,
+            None,
+            seq_mut_order,
+            flanked_seq,
+        )
+
+        # Apply mutation
+        flanked_seq = mutate_string(
+            flanked_seq,
+            first_mutation_pos + self.half_motif_len,
+            seq_mut_order.obs_seq_mutation.end_seq[first_mutation_pos]
+        )
+
+        second_mut_pos_feat, feat_dict_curr, _ = self._update_mutation_step(
             update_steps[1],
             second_mutation_pos,
             first_mutation_pos,
             seq_mut_order,
+            flanked_seq,
+            calc_future_dict=False,
         )
 
-        return first_mutation_feat, second_feat_mut_step
+        return first_mut_pos_feat, FeatureMutationStep(
+            second_mut_pos_feat,
+            feat_dict_future,
+            feat_dict_curr,
+        )
 
     @profile
     def _update_mutation_step(
@@ -127,6 +153,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
             old_mutation_pos,
             seq_mut_order,
             intermediate_seq,
+            calc_future_dict=True,
         ):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
@@ -142,6 +169,7 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
         mutating_pos_feat = self.motif_dict[mutating_pos_motif]
 
         feat_dict_curr = dict()
+        feat_dict_future = dict()
         # Calculate features for positions in the risk group at the time of this mutation step
         # Only requires updating feature values that were close to the previous mutation
         # Get the feature vectors for the positions that might be affected by the previous mutation
@@ -150,7 +178,8 @@ class SubmotifFastFeatureGenerator(FeatureGenerator):
 
         # Calculate the features in these special positions for updating the next mutation step's risk group
         # Get the feature vectors for the positions that will be affected by current mutation
-        feat_dict_future = self._get_feature_dict_for_region(mutation_pos, mutation_step, seq_mut_order, intermediate_seq)
+        if calc_future_dict:
+            feat_dict_future = self._get_feature_dict_for_region(mutation_pos, mutation_step, seq_mut_order, intermediate_seq)
         return mutating_pos_feat, feat_dict_curr, feat_dict_future
 
     @profile
