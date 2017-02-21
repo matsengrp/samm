@@ -44,8 +44,9 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         mutation_steps = feat_generator.create_for_mutation_steps(seq_mut_order)
         print "create_for_mutation_steps time", time.time() - st_time
 
-    def test_update(self):
-        feat_generator = SubmotifFastFeatureGenerator(motif_len=3)
+    def test_create(self):
+        motif_len = 3
+        feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
@@ -74,19 +75,49 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         self.assertEqual(set(base_feat_mut_steps[4].neighbors_feat_new.keys()), set([3,5]))
         self.assertEqual(set(base_feat_mut_steps[4].neighbors_feat_old.keys()), set([3,5]))
 
+    def test_update(self):
+        motif_len = 3
+        feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
+        obs_seq_mut = feat_generator.create_base_features(
+            ObservedSequenceMutations(
+                start_seq="aattatgaatgc",
+                end_seq=  "atgcaagatagc",
+                motif_len=3,
+            )
+        )
+
         # Compare update to create feature vectors by changing the mutation order by one step
-        # (position 2 mutates second)
+        # Shuffle last two positions
         new_order = obs_seq_mut.mutation_pos_dict.keys()
         new_order = new_order[0:-2] + [new_order[-1], new_order[-2]]
         ordered_seq_mut1 = ImputedSequenceMutations(
             obs_seq_mut,
             new_order
         )
-
+        # Revert the sequence back two steps
+        intermediate_seq = obs_seq_mut.end_seq
+        intermediate_seq = (
+            intermediate_seq[:new_order[-2]]
+            + obs_seq_mut.start_seq[new_order[-2]]
+            + intermediate_seq[new_order[-2] + 1:]
+        )
+        intermediate_seq = (
+            intermediate_seq[:new_order[-1]]
+            + obs_seq_mut.start_seq[new_order[-1]]
+            + intermediate_seq[new_order[-1] + 1:]
+        )
+        flanked_seq = (
+            obs_seq_mut.left_flank
+            + intermediate_seq
+            + obs_seq_mut.right_flank
+        )
+        # create features - the slow version
         feat_mut_steps1 = feat_generator.create_for_mutation_steps(ordered_seq_mut1)
+        # get the feature delta - the fast version
         first_mutation_feat, second_mut_step = feat_generator.update_for_mutation_steps(
             ordered_seq_mut1,
             update_steps=[obs_seq_mut.num_mutations - 2, obs_seq_mut.num_mutations - 1],
+            flanked_seq=flanked_seq,
         )
         self.assertEqual(first_mutation_feat, 14)
         self.assertEqual(feat_mut_steps1[-2].mutating_pos_feat, 14)
@@ -94,20 +125,29 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         self.assertEqual(feat_mut_steps1[-1].mutating_pos_feat, 0)
 
         # Compare update to create feature vectors by changing the mutation order by another step
-        new_order = new_order[0:-2] + [new_order[-1], new_order[-2]]
+        # Shuffle second to last with the third to last mutation positions
+        flanked_seq = (
+            flanked_seq[:motif_len/2 + new_order[-3]]
+            + obs_seq_mut.start_seq[new_order[-3]]
+            + flanked_seq[motif_len/2 + new_order[-3] + 1:]
+        )
+        new_order = new_order[0:-3] + [new_order[-2], new_order[-3], new_order[-1]]
         ordered_seq_mut2 = ImputedSequenceMutations(
             obs_seq_mut,
             new_order
         )
 
+        # create features - the slow version
         feat_mut_steps2 = feat_generator.create_for_mutation_steps(ordered_seq_mut2)
+        # get the feature delta - the fast version
         first_mutation_feat2, second_mut_step2 = feat_generator.update_for_mutation_steps(
             ordered_seq_mut2,
             update_steps=[obs_seq_mut.num_mutations - 3, obs_seq_mut.num_mutations - 2],
+            flanked_seq=flanked_seq
         )
         self.assertEqual(first_mutation_feat2, 14)
-        self.assertEqual(second_mut_step2.mutating_pos_feat, 3)
-        self.assertEqual(second_mut_step2.neighbors_feat_old, {3: 19, 5: 56})
-        self.assertEqual(second_mut_step2.neighbors_feat_new, {3: 16, 5: 8})
+        self.assertEqual(second_mut_step2.mutating_pos_feat, 14)
+        self.assertEqual(second_mut_step2.neighbors_feat_old, {9: 57, 7: 3})
+        self.assertEqual(second_mut_step2.neighbors_feat_new, {9: 9, 7: 0})
         self.assertEqual(second_mut_step2.neighbors_feat_old, feat_mut_steps2[-2].neighbors_feat_old)
         self.assertEqual(second_mut_step2.neighbors_feat_new, feat_mut_steps2[-2].neighbors_feat_new)
