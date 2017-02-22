@@ -32,10 +32,42 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.pool = None
         self.num_threads = num_threads
 
+        self._create_gradient_matrices()
+
         self.post_init()
 
     def post_init(self):
         return
+
+    def _create_gradient_matrices(self):
+        self.all_grad_matrices = []
+        self.init_grad = np.zeros((self.feature_generator.feature_vec_len, 1))
+        for sample, feat_mut_steps in self.feature_mut_steps_pair:
+            # get the grad component from grad of psi * theta
+            for feat_mut_step in feat_mut_steps:
+                self.init_grad[feat_mut_step.mutating_pos_feat] += 1
+
+            # Get the grad component from grad of log(sum(exp(psi * theta)))
+            # This matrix is just the number of times we saw each feature in the risk group
+            grad_matrix = np.zeros((
+                self.feature_generator.feature_vec_len,
+                sample.obs_seq_mutation.num_mutations
+            ))
+            grad_matrix[:,0] = sample.obs_seq_mutation.feat_counts
+            prev_feat_mut_step = feat_mut_steps[0]
+            for i, feat_mut_step in enumerate(feat_mut_steps[1:]):
+                grad_matrix[:,i + 1] = grad_matrix[:,i]
+
+                grad_matrix[prev_feat_mut_step.mutating_pos_feat, i + 1] -= 1
+
+                # Need to update the terms for positions near the previous mutation
+                old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
+                grad_matrix[old_feat_idxs, i + 1] -= 1
+
+                new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
+                grad_matrix[new_feat_idxs, i + 1] += 1
+                prev_feat_mut_step = feat_mut_step
+            self.all_grad_matrices.append(grad_matrix)
 
     def get_value(self, theta):
         """
@@ -129,8 +161,25 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param sample: ImputedSequenceMutations
         @param feature_mutation_steps: a list of FeatureMutationStep
         """
+
         exp_theta = np.exp(theta)
 
+        my_counts = np.random.randint(low=0, high=10, size=(theta.size, sample.obs_seq_mutation.num_mutations))
+        st_time = time.time()
+        grad_log_sum_exps = np.multiply(my_counts, exp_theta)
+        print "grad_log_sum_exps", grad_log_sum_exps.shape
+        sums = grad_log_sum_exps.sum(axis=0)
+        sums_inv = 1.0/sums
+        print "sums", sums.shape
+        grad_components = np.multiply(sums_inv, grad_log_sum_exps)
+        print "grad_components", grad_components.shape
+        grad_tot = grad_components.sum(axis=1)
+        print "grad_tot", grad_tot.shape
+        print "fast time?", time.time() - st_time
+
+        1/0
+
+        st_time = time.time()
         # Calculate the gradient associated with the first mutation step
         exp_terms = exp_theta[sample.obs_seq_mutation.feat_dict_vals_start,]
 
