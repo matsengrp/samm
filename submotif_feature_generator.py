@@ -63,9 +63,11 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return obs_seq_mutation
 
-    @profile
     def create_for_mutation_steps(self, seq_mut_order):
         """
+        Calculate the feature values for the mutation steps
+        Only returns the deltas at each mutation step
+
         @param seq_mut_order: ImputedSequenceMutations
 
         @return list of FeatureMutationStep (correponding to after first mutation to before last mutation)
@@ -110,9 +112,14 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         update_step_start,
     ):
         """
-        @param seq_mut_order: ImputedSequenceMutations
+        Calculate the feature values for the mutation steps starting the the `update_step_start`-th step
+        Only returns the deltas at each mutation step
 
-        @return list of FeatureMutationStep (correponding to after first mutation to before last mutation)
+        @param seq_mut_order: ImputedSequenceMutations
+        @param update_step_start: which mutation step to start calculating features for
+
+        @return list of FeatureMutationStep (correponding to after `update_step_start`-th mutation
+                    to before last mutation)
         """
         feat_mutation_steps = []
 
@@ -155,8 +162,12 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         already_mutated_pos,
     ):
         """
+        @param seq_mut_order: a list of the positions in the mutation order
+        @param update_step: the index of the mutation step being shuffled with the (`update_step` + 1)-th step
         @param flanked_seq: must be a FLANKED sequence
         @param already_mutated_pos: set of positions that already mutated - dont calculate feature vals for these
+
+        @return a tuple with the feature at this mutation step and the feature mutation step of the next mutation step
         """
         feat_mutation_steps = []
         first_mutation_pos = seq_mut_order.mutation_order[update_step]
@@ -194,7 +205,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feat_dict_curr,
         )
 
-    @profile
     def _update_mutation_step(
             self,
             mutation_step,
@@ -213,7 +223,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @param seq_mut_order: ImputedSequenceMutations
         @param intermediate_seq: nucleotide sequence INCLUDING flanks - before the mutation step occurs
 
-        @return FeatureMutationStep
+        @return tuple with
+            1. the feature index of the position that mutated
+            2. a dict with the positions next to the previous mutation and their feature index
+            3. a dict with the positions next to the current mutation and their feature index
         """
         mutating_pos_motif = intermediate_seq[mutation_pos: mutation_pos + self.motif_len]
         mutating_pos_feat = self.motif_dict[mutating_pos_motif]
@@ -226,9 +239,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         if old_mutation_pos is not None:
             feat_dict_curr = self._get_feature_dict_for_region(
                 old_mutation_pos,
-                mutation_step - 1,
-                seq_mut_order,
                 intermediate_seq,
+                seq_mut_order.obs_seq_mutation.seq_len,
                 already_mutated_pos,
             )
 
@@ -237,26 +249,31 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         if calc_future_dict:
             feat_dict_future = self._get_feature_dict_for_region(
                 mutation_pos,
-                mutation_step,
-                seq_mut_order,
                 intermediate_seq,
+                seq_mut_order.obs_seq_mutation.seq_len,
                 already_mutated_pos,
             )
         return mutating_pos_feat, feat_dict_curr, feat_dict_future
 
-    @profile
     def _get_feature_dict_for_region(
         self,
-        mutation_pos,
-        mutation_step,
-        seq_mut_order,
+        position,
         intermediate_seq,
+        seq_len,
         already_mutated_pos,
     ):
+        """
+        @param position: the position around which to calculate the feature indices for
+        @param intermediate_seq: the nucleotide sequence
+        @param seq_len: the length of this sequence
+        @param already_mutated_pos: which positions already mutated - dont calculate features for these positions
+
+        @return a dict with the positions next to the given position and their feature index
+        """
         feat_dict = dict()
-        start_region_idx = max(mutation_pos - self.half_motif_len, 0)
-        end_region_idx = min(mutation_pos + self.half_motif_len, seq_mut_order.obs_seq_mutation.seq_len - 1)
-        update_positions = range(start_region_idx, mutation_pos) + range(mutation_pos + 1, end_region_idx + 1)
+        start_region_idx = max(position - self.half_motif_len, 0)
+        end_region_idx = min(position + self.half_motif_len, seq_len - 1)
+        update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx + 1)
         for pos in update_positions:
             if pos not in already_mutated_pos:
                 # Only update the positions that are in the risk group (the ones that haven't mutated yet)
@@ -264,7 +281,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 feat_dict[pos] = self.motif_dict[submotif]
         return feat_dict
 
-    @profile
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
         """
         @param pos: central mutating position
@@ -283,79 +299,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             submotif = intermediate_seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
 
         return self.motif_dict[submotif]
-
-    @profile
-    def _construct_region_at_steps(self, pos_begin, pos_end, seq_mut_order, mutation_step_prev, mutation_step_curr):
-        """
-        @param pos: central mutating position
-        @param seq_mut_order: ImputedSequenceMutations
-        @param mutation_step: if negative, that means no mutations have occured yet
-        TODO: UPDATE COMMENT
-        @return the feature index at position `pos` after the `mutation_step`-th mutation step
-        """
-        obs_seq_mutation = seq_mut_order.obs_seq_mutation
-        seq_len = obs_seq_mutation.seq_len
-        region = ""
-        if pos_begin < self.half_motif_len:
-            # Position is very close to beginning of sequence - copy over the flanks
-            region = obs_seq_mutation.left_flank[pos_begin:]
-            range_begin = 0
-        else:
-            range_begin = pos_begin - self.half_motif_len
-
-        if pos_end >= seq_len - self.half_motif_len:
-            range_end = seq_len
-        else:
-            range_end = pos_end + self.half_motif_len + 1
-
-        regions = [region, region]
-        for i in range(range_begin, range_end):
-            start_nuc = obs_seq_mutation.start_seq[i]
-            end_nuc = obs_seq_mutation.end_seq[i]
-            pos_mut_step = seq_mut_order.mutation_order_all_pos[i]
-            regions[0] += start_nuc if pos_mut_step > mutation_step_prev else end_nuc
-            regions[1] += start_nuc if pos_mut_step > mutation_step_curr else end_nuc
-
-        if pos_end >= seq_len - self.half_motif_len:
-            # Position is very close to end of sequence - copy over the flanks
-            suffix = obs_seq_mutation.right_flank[:pos_end + self.half_motif_len - seq_len + 1]
-            regions[0] += suffix
-            regions[1] += suffix
-        return regions
-
-
-    @profile
-    def _get_feature_idx_for_pos_at_step(self, pos, seq_mut_order, mutation_step):
-        """
-        @param pos: central mutating position
-        @param seq_mut_order: ImputedSequenceMutations
-        @param mutation_step: if negative, that means no mutations have occured yet
-
-        @return the feature index at position `pos` after the `mutation_step`-th mutation step
-        """
-        seq_len = seq_mut_order.obs_seq_mutation.seq_len
-        submotif = ""
-        if pos < self.half_motif_len:
-            # Position is very close to beginning of sequence - copy over the flanks
-            submotif = seq_mut_order.obs_seq_mutation.left_flank[pos:]
-            pos_range = range(self.half_motif_len + pos + 1)
-        elif pos >= seq_len - self.half_motif_len:
-            # Position is very close to end of sequence - dont go past the end
-            pos_range = range(pos - self.half_motif_len, seq_len)
-        else:
-            pos_range = range(pos - self.half_motif_len, pos + self.half_motif_len + 1)
-
-        for i in pos_range:
-            if seq_mut_order.mutation_order_all_pos[i] > mutation_step:
-                submotif += seq_mut_order.obs_seq_mutation.start_seq[i]
-            else:
-                submotif += seq_mut_order.obs_seq_mutation.end_seq[i]
-
-        if pos >= seq_len - self.half_motif_len:
-            # Position is very close to end of sequence - copy over the flanks
-            submotif += seq_mut_order.obs_seq_mutation.right_flank[:pos + self.half_motif_len - seq_len + 1]
-        idx = self.motif_dict[submotif]
-        return idx
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))

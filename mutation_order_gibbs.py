@@ -70,13 +70,21 @@ class MutationOrderGibbsSampler(Sampler):
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
 
-            gibbs_step_info, log_lik = self._do_gibbs_step(partial_order, position, pos_order_idx, gibbs_step_info)
+            gibbs_step_info, log_lik = self._do_gibbs_step(partial_order, position, gibbs_step_info, pos_order_idx)
             curr_order = gibbs_step_info.order
             # Output probabilities for trace
             trace.append(log_lik)
         return gibbs_step_info, trace
 
-    def _do_gibbs_step(self, partial_order, position, pos_order_idx, gibbs_step_info=None):
+    def _do_gibbs_step(self, partial_order, position, gibbs_step_info=None, pos_order_idx=None):
+        """
+        Performs a single gibbs step
+        @param partial_order: the partial order under consideration
+        @param position: the position we are trying to determine the full ordering for
+        @param gibbs_step_info: if None, compute all features from scratch. otherwise use info from a previous gibbs step
+                                to minimize calculations in this step
+        @param pos_order_idx: the position's mutation step from the order in `gibbs_step_info`
+        """
         # A holder for all the log probs - we need to normalize these later to get our sampled order
         all_log_probs = []
 
@@ -167,6 +175,19 @@ class MutationOrderGibbsSampler(Sampler):
         return gibbs_step_info, log_lik
 
     def _sample_order(self, all_log_probs, partial_order, position, denominator_hist, log_numerator_hist):
+        """
+        Sample mutation order from all the possible full mutation orders
+        Reconstruct the intermediate calculations for this sampled order for faster future computations
+
+        @param partial_order: the partial ordering we were originally considering
+        @param position: the position we need to determine the order for
+        @param denominator_hist: the history of all the denominators for reconstructing the intermediate
+                                calculations for the sampled mutation order
+        @param log_numerator_hist: the history of all the (log) numerators for reconstructing the intermediate
+                                calculations for the sampled mutation order
+
+        @return tuple of GibbsStepInfo and log likelihood of the sampled mutation order
+        """
         all_probs = np.exp(all_log_probs)
         sampled_idx = sample_multinomial(all_probs)
 
@@ -235,6 +256,16 @@ class MutationOrderGibbsSampler(Sampler):
         return log_probs
 
     def _compute_log_probs_from_scratch(self, curr_order):
+        """
+        Compute the log likelihood for this full mutation ordering
+        Calculates the log likelihood of each mutation step
+
+        @params curr_order: the full mutation ordering under consideration
+        @return tuple of
+            1. feature mutation steps
+            2. the log numerators in the log likelihood of each mutation step
+            3. the denominator in the log likelihood of each mutation step
+        """
         feat_mutation_steps = self.feature_generator.create_for_mutation_steps(
             ImputedSequenceMutations(
                 self.obs_seq_mutation,
@@ -253,12 +284,15 @@ class MutationOrderGibbsSampler(Sampler):
 
         return feat_mutation_steps, log_numerators, denominators
 
-    def _compute_log_probs_with_reference(self, curr_order, gibbs_step_base=None, update_step_start=0):
+    def _compute_log_probs_with_reference(self, curr_order, gibbs_step_base, update_step_start=0):
         """
-        Driver to compute probabilities with some precompute if statements
-        for speeding up computation.
+        Compute probabilities that takes advantage of precomputed information from `gibbs_step_base`
 
-        @params same as in _do_gibbs_sweep
+        @params curr_order: the full mutation ordering under consideration
+        @param gibbs_step_base: GibbsStepInfo, the reference mutation order and its intermediate computations
+        @param update_step_start: which mutations step to start recalculating the log liklihood terms from
+
+        @return similar to _compute_log_probs_from_scratch
         """
         # Update if we have previous computations
         feat_mutation_steps = self.feature_generator.create_remaining_mutation_steps(
@@ -279,14 +313,17 @@ class MutationOrderGibbsSampler(Sampler):
             new_denom = self._get_denom_update(denominators[i], log_numerators[i], feat_mut_step)
             denominators.append(new_denom)
 
-        # f, n, d = self._compute_log_probs_from_scratch(curr_order)
-        #
-        # assert(np.allclose(n, log_numerators))
-        # assert(np.allclose(d, denominators))
-
         return feat_mutation_steps, log_numerators, denominators
 
     def _get_denom_update(self, old_denominator, old_log_numerator, feat_mut_step):
+        """
+        Calculate the denominator of the next mutation step quickly by reusing past computations
+        and incorporating the deltas appropriately
+
+        @param old_denominator: the denominator from the previous mutation step
+        @param old_log_numerator: the numerator from the previous mutation step
+        @param feat_mut_step: the features that differed for this next mutation step
+        """
         old_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
         new_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
         return old_denominator - np.exp(old_log_numerator) - (np.exp(old_feat_theta_sums)).sum() + (np.exp(new_feat_theta_sums)).sum()

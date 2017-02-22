@@ -85,6 +85,9 @@ class ImputedSequenceMutations:
         self.mutation_order = mutation_order
 
     def get_seq_at_step(self, step_idx, flanked=False):
+        """
+        @return the nucleotide sequence after the `step_idx`-th  mutation
+        """
         intermediate_seq = self.obs_seq_mutation.start_seq
         for i in range(step_idx):
             mut_pos = self.mutation_order[i]
