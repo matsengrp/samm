@@ -4,6 +4,7 @@ import pandas as pd
 import sys
 import re
 import random
+import warnings
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -273,6 +274,12 @@ def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
         # first remove beginning and trailing "n"s
         processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
         processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
+
+        # ensure there are not too many internal "n"s
+        num_ns = processed_end_seq.count('n')
+        seq_len = len(processed_end_seq)
+        if num_ns > 0.3 * seq_len:
+            warnings.warn("Sequence of length {0} had {1} unknown bases".format(seq_len, num_ns))
 
         # now collapse interior "n"s
         processed_start_seq = re.sub(pattern, repl, processed_start_seq)
