@@ -38,7 +38,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         Create the feature matrices and feature vector dictionary
         before any mutations have occurred
 
-        @return ObservedSequenceMutationsFeatures
+        @return ObservedSequenceMutations augmented with a feature matrix and dictionary
         """
         indices = []
         indptr = [0]
@@ -46,10 +46,11 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
-            feat_vect = self._create_feature_vec_for_pos(pos, obs_seq_mutation.start_seq, obs_seq_mutation.seq_len, obs_seq_mutation.left_flank, obs_seq_mutation.right_flank)
-            feat_dict[pos] = feat_vect
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos: pos + self.motif_len]
+            feat_idx = self.motif_dict[submotif]
+            feat_dict[pos] = feat_idx
             indptr.append(pos + 1)
-            indices.append(feat_vect)
+            indices.append(feat_idx)
 
         data = [True] * obs_seq_mutation.seq_len
         feat_matrix = scipy.sparse.csr_matrix(
@@ -57,131 +58,228 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
             dtype=bool,
         )
-        return ObservedSequenceMutationsFeatures(
-            obs_seq_mutation,
-            feat_matrix,
-            feat_dict,
-        )
 
-    # TODO: make this a real feature generator (deal with ends properly)
-    def create_for_mutation_steps(self, seq_mut_order, theta=None):
-        num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
-        feat_mutation_steps = FeatureMutationSteps(seq_mut_order)
+        obs_seq_mutation.set_start_feats(feat_dict, feat_matrix)
 
-        feature_vec_thetasums = None
-        if theta is not None:
-            theta_sum0 = feat_mutation_steps.get_init_theta_sum(theta)
-            feature_vec_thetasums = [
-                { p : theta_sum0[p,] for p in range(seq_mut_order.obs_seq_mutation.seq_len)}
-            ] + [None] * num_steps
+        return obs_seq_mutation
 
-        no_feat_vec_pos = set()
-        for i, mutation_pos in enumerate(seq_mut_order.mutation_order[:-1]):
-            no_feat_vec_pos.add(mutation_pos)
-            seq_str, feat_dict, thetasum = self._update_mutation_step(
-                i,
+    def create_for_mutation_steps(self, seq_mut_order):
+        """
+        Calculate the feature values for the mutation steps
+        Only returns the deltas at each mutation step
+
+        @param seq_mut_order: ImputedSequenceMutations
+
+        @return list of FeatureMutationStep (correponding to after first mutation to before last mutation)
+        """
+        feat_mutation_steps = []
+
+        old_mutation_pos = None
+        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq_with_flanks
+        feat_dict_prev = dict()
+        already_mutated_pos = set()
+        for mutation_step, mutation_pos in enumerate(seq_mut_order.mutation_order):
+            mutating_pos_feat, feat_dict_curr, feat_dict_future = self._update_mutation_step(
+                mutation_step,
                 mutation_pos,
-                feat_mutation_steps,
-                feature_vec_thetasums,
+                old_mutation_pos,
                 seq_mut_order,
-                no_feat_vec_pos,
-                theta,
+                intermediate_seq,
+                already_mutated_pos,
             )
-            feat_mutation_steps.update(i + 1, seq_str, feat_dict)
-            if theta is not None:
-                feature_vec_thetasums[i + 1] = thetasum
+            feat_mutation_steps.append(FeatureMutationStep(
+                mutating_pos_feat,
+                feat_dict_prev,
+                feat_dict_curr,
+            ))
 
-        return feat_mutation_steps, feature_vec_thetasums
+            # Apply mutation
+            intermediate_seq = mutate_string(
+                intermediate_seq,
+                mutation_pos + self.half_motif_len,
+                seq_mut_order.obs_seq_mutation.end_seq[mutation_pos]
+            )
+            already_mutated_pos.add(mutation_pos)
+            feat_dict_prev = feat_dict_future
+            old_mutation_pos = mutation_pos
 
-    # TODO: make this a real feature generator (deal with ends properly)
-    def update_for_mutation_steps(
+        assert(len(feat_mutation_steps) == seq_mut_order.obs_seq_mutation.num_mutations)
+        return feat_mutation_steps
+
+    def create_remaining_mutation_steps(
         self,
         seq_mut_order,
-        update_steps,
-        base_feat_mutation_steps,
-        base_feature_vec_theta_sums=None,
-        theta=None
+        update_step_start,
     ):
-        num_steps = seq_mut_order.obs_seq_mutation.num_mutations
-        feat_mutation_steps = base_feat_mutation_steps.copy()
+        """
+        Calculate the feature values for the mutation steps starting the the `update_step_start`-th step
+        Only returns the deltas at each mutation step
 
-        feature_vec_thetasums = None
-        if theta is not None:
-            feature_vec_thetasums = list(base_feature_vec_theta_sums)
+        @param seq_mut_order: ImputedSequenceMutations
+        @param update_step_start: which mutation step to start calculating features for
 
-        no_feat_last_idx = 0
-        no_feat_vec_pos = set()
-        for i in update_steps:
-            if i >= num_steps - 1:
-                break
+        @return list of FeatureMutationStep (correponding to after `update_step_start`-th mutation
+                    to before last mutation)
+        """
+        feat_mutation_steps = []
 
-            mutation_pos = seq_mut_order.mutation_order[i]
-
-            no_feat_vec_pos.update(seq_mut_order.mutation_order[no_feat_last_idx:i + 1])
-            no_feat_last_idx = i + 1
-
-            seq_str, feat_dict, thetasum = self._update_mutation_step(
-                i,
+        old_mutation_pos = None
+        feat_dict_prev = dict()
+        flanked_seq = seq_mut_order.get_seq_at_step(update_step_start, flanked=True)
+        already_mutated_pos = set(seq_mut_order.mutation_order[:update_step_start])
+        for mutation_step in range(update_step_start, seq_mut_order.obs_seq_mutation.num_mutations):
+            mutation_pos = seq_mut_order.mutation_order[mutation_step]
+            mutating_pos_feat, feat_dict_curr, feat_dict_future = self._update_mutation_step(
+                mutation_step,
                 mutation_pos,
-                feat_mutation_steps,
-                feature_vec_thetasums,
+                old_mutation_pos,
                 seq_mut_order,
-                no_feat_vec_pos,
-                theta,
+                flanked_seq,
+                already_mutated_pos,
             )
-            feat_mutation_steps.update(i + 1, seq_str, feat_dict)
-            if theta is not None:
-                feature_vec_thetasums[i + 1] = thetasum
+            feat_mutation_steps.append(FeatureMutationStep(
+                mutating_pos_feat,
+                feat_dict_prev,
+                feat_dict_curr,
+            ))
 
-        return feat_mutation_steps, feature_vec_thetasums
+            # Apply mutation
+            flanked_seq = mutate_string(
+                flanked_seq,
+                mutation_pos + self.half_motif_len,
+                seq_mut_order.obs_seq_mutation.end_seq[mutation_pos]
+            )
+            already_mutated_pos.add(mutation_pos)
+            feat_dict_prev = feat_dict_future
+            old_mutation_pos = mutation_pos
+        return feat_mutation_steps
 
-    def _update_mutation_step(self, i, mutation_pos, feat_mutation_steps, feature_vec_thetasums, seq_mut_order, no_feat_vec_pos, theta=None):
+    def get_shuffled_mutation_steps_delta(
+        self,
+        seq_mut_order,
+        update_step,
+        flanked_seq,
+        already_mutated_pos,
+    ):
+        """
+        @param seq_mut_order: a list of the positions in the mutation order
+        @param update_step: the index of the mutation step being shuffled with the (`update_step` + 1)-th step
+        @param flanked_seq: must be a FLANKED sequence
+        @param already_mutated_pos: set of positions that already mutated - dont calculate feature vals for these
+
+        @return a tuple with the feature at this mutation step and the feature mutation step of the next mutation step
+        """
+        feat_mutation_steps = []
+        first_mutation_pos = seq_mut_order.mutation_order[update_step]
+        second_mutation_pos = seq_mut_order.mutation_order[update_step + 1]
+
+        first_mut_pos_feat, _, feat_dict_future = self._update_mutation_step(
+            update_step,
+            first_mutation_pos,
+            None,
+            seq_mut_order,
+            flanked_seq,
+            already_mutated_pos,
+        )
+
+        # Apply mutation
+        flanked_seq = mutate_string(
+            flanked_seq,
+            first_mutation_pos + self.half_motif_len,
+            seq_mut_order.obs_seq_mutation.end_seq[first_mutation_pos]
+        )
+
+        second_mut_pos_feat, feat_dict_curr, _ = self._update_mutation_step(
+            update_step + 1,
+            second_mutation_pos,
+            first_mutation_pos,
+            seq_mut_order,
+            flanked_seq,
+            already_mutated_pos,
+            calc_future_dict=False,
+        )
+
+        return first_mut_pos_feat, FeatureMutationStep(
+            second_mut_pos_feat,
+            feat_dict_future,
+            feat_dict_curr,
+        )
+
+    def _update_mutation_step(
+            self,
+            mutation_step,
+            mutation_pos,
+            old_mutation_pos,
+            seq_mut_order,
+            intermediate_seq,
+            already_mutated_pos,
+            calc_future_dict=True,
+        ):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
-        @param i: mutation step index
+        @param mutation_step: mutation step index
         @param mutation_pos: the position that is mutating
-        @param feat_mutation_steps: FeatureMutationSteps
-        @param feature_vec_thetasums: theta sums (should be None if theta is None)
-        @param seq_mut_order: the observed mutation order information (ObservedSequenceMutationsFeatures)
-        @param no_feat_vec_pos: the positions that mutated already and should not have calculations performed for them
-        @param theta: if passed in, calculate theta sum values too
+        @param old_mutation_pos: the position that mutated previously - None if this is first mutation
+        @param seq_mut_order: ImputedSequenceMutations
+        @param intermediate_seq: nucleotide sequence INCLUDING flanks - before the mutation step occurs
 
-        @return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
+        @return tuple with
+            1. the feature index of the position that mutated
+            2. a dict with the positions next to the previous mutation and their feature index
+            3. a dict with the positions next to the current mutation and their feature index
         """
-        # update to get the new sequence after the i-th mutation
-        new_intermediate_seq = mutate_string(
-            feat_mutation_steps.intermediate_seqs[i],
-            mutation_pos,
-            seq_mut_order.obs_seq_mutation.mutation_pos_dict[mutation_pos]
-        )
-        # Get the feature vectors for the positions that might be affected by the latest mutation
-        # Don't calculate feature vectors for positions that have mutated already
-        # Calculate feature vectors for positions that are close to the mutation
-        do_feat_vec_pos = set(range(
-            max(mutation_pos - self.half_motif_len, 0),
-            min(mutation_pos + self.half_motif_len + 1, seq_mut_order.obs_seq_mutation.seq_len),
-        ))
+        mutating_pos_motif = intermediate_seq[mutation_pos: mutation_pos + self.motif_len]
+        mutating_pos_feat = self.motif_dict[mutating_pos_motif]
 
-        # Generate features for the positions that need to be updated
-        # (don't make a function out of this -- python function call overhead is too high)
-        feat_vec_dict_update = dict()
-        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
-        # also the flanks don't change since we've trimmed them
-        for pos in do_feat_vec_pos - no_feat_vec_pos:
-            feat_vec_dict_update[pos] = self._create_feature_vec_for_pos(pos, new_intermediate_seq, seq_mut_order.obs_seq_mutation.seq_len, seq_mut_order.obs_seq_mutation.left_flank, seq_mut_order.obs_seq_mutation.right_flank)
+        feat_dict_curr = dict()
+        feat_dict_future = dict()
+        # Calculate features for positions in the risk group at the time of this mutation step
+        # Only requires updating feature values that were close to the previous mutation
+        # Get the feature vectors for the positions that might be affected by the previous mutation
+        if old_mutation_pos is not None:
+            feat_dict_curr = self._get_feature_dict_for_region(
+                old_mutation_pos,
+                intermediate_seq,
+                seq_mut_order.obs_seq_mutation.seq_len,
+                already_mutated_pos,
+            )
 
-        feat_vec_dict_next = feat_mutation_steps.feature_vec_dicts[i].copy() # shallow copy of dictionary
-        feat_vec_dict_next.pop(mutation_pos, None)
-        feat_vec_dict_next.update(feat_vec_dict_update)
+        # Calculate the features in these special positions for updating the next mutation step's risk group
+        # Get the feature vectors for the positions that will be affected by current mutation
+        if calc_future_dict:
+            feat_dict_future = self._get_feature_dict_for_region(
+                mutation_pos,
+                intermediate_seq,
+                seq_mut_order.obs_seq_mutation.seq_len,
+                already_mutated_pos,
+            )
+        return mutating_pos_feat, feat_dict_curr, feat_dict_future
 
-        feature_vec_thetasum_next = None
-        if theta is not None:
-            feature_vec_thetasum_next = feature_vec_thetasums[i].copy() # shallow copy of dictionary
-            feature_vec_thetasum_next.pop(mutation_pos, None)
-            for p, feat_vec in feat_vec_dict_update.iteritems():
-                feature_vec_thetasum_next[p] = theta[feat_vec,]
+    def _get_feature_dict_for_region(
+        self,
+        position,
+        intermediate_seq,
+        seq_len,
+        already_mutated_pos,
+    ):
+        """
+        @param position: the position around which to calculate the feature indices for
+        @param intermediate_seq: the nucleotide sequence
+        @param seq_len: the length of this sequence
+        @param already_mutated_pos: which positions already mutated - dont calculate features for these positions
 
-        return new_intermediate_seq, feat_vec_dict_next, feature_vec_thetasum_next
+        @return a dict with the positions next to the given position and their feature index
+        """
+        feat_dict = dict()
+        start_region_idx = max(position - self.half_motif_len, 0)
+        end_region_idx = min(position + self.half_motif_len, seq_len - 1)
+        update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx + 1)
+        for pos in update_positions:
+            if pos not in already_mutated_pos:
+                # Only update the positions that are in the risk group (the ones that haven't mutated yet)
+                submotif = intermediate_seq[pos: pos + self.motif_len]
+                feat_dict[pos] = self.motif_dict[submotif]
+        return feat_dict
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
         """
@@ -192,7 +290,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         Create features for subsequence using information from flanks.
         """
-
         # if motif length is one then submotifs will be single nucleotides and position remains unchanged
         if pos < self.half_motif_len:
             submotif = left_flank[pos:] + intermediate_seq[:self.half_motif_len + pos + 1]
@@ -201,13 +298,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         else:
             submotif = intermediate_seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
 
-        # generate random nucleotide if an "n" occurs in the middle of a sequence
-        if 'n' in submotif:
-            for match in re.compile('n').finditer(submotif):
-                submotif = submotif[:match.start()] + random.choice(NUCLEOTIDES) + submotif[(match.start()+1):]
-
-        idx = self.motif_dict[submotif]
-        return idx
+        return self.motif_dict[submotif]
 
     def get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))

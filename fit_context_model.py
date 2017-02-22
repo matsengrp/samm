@@ -25,6 +25,7 @@ from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from multinomial_solver import MultinomialSolver
 from common import *
+from read_data import *
 from matsen_grp_data import *
 
 def parse_args():
