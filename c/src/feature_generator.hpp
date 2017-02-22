@@ -46,8 +46,10 @@ class SubmotifFeatureGenerator {
       const pair<bool, vector<double> > &theta
     );
 
-    // The feature index of a position is the base 4 number corresponding to the motif
-    // at the position
+    /**
+     * The feature index of a position is the base 4 number corresponding to the motif
+     * at the position. This function will convert the base 4 number to a base 10 number.
+     */
     int GetFeatureIdxForPos(
       int position,
       const VectorNucleotide &nuc_vec,
@@ -58,16 +60,6 @@ class SubmotifFeatureGenerator {
   private:
     int motif_len_half;
 
-    /*
-    * Does the heavy lifting for calculating feature vectors at a given mutation step
-    * @param i: mutation step index
-    * @param mutated_pos: the position that is mutating
-    * @param ordered_mut_steps: the object that needs its i-th step updated
-    * @param obs_sample: the observed sample
-    * @param theta: if passed in, calculate theta sum values too
-    *
-    * @return the updated i-th mutation step
-    */
     shared_ptr<MutationStep> UpdateMutationStep(
       int i,
       int mutated_pos,

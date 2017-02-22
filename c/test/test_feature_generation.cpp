@@ -24,8 +24,8 @@ TEST_CASE("Feature Generator") {
   // Total of three mutations
   VectorNucleotide start_nucs = {{0,1,2,1,1,1,0,0,0}};
   VectorNucleotide end_nucs =   {{0,1,2,1,2,1,1,1,0}};
-  VectorNucleotide left_flank = {{0,0}};
-  VectorNucleotide right_flank = {{1,1}};
+  VectorNucleotide left_flank = {{0}};
+  VectorNucleotide right_flank = {{1}};
 
   vector<int> start_features_true = {1, 6, 25, 37, 21, 20, 16, 0, 1};
   vector<double> start_features_theta_sum = {1, 6, 25, 37, 21, 20, 16, 0, 1};

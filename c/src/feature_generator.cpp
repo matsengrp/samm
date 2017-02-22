@@ -130,15 +130,21 @@ int SubmotifFeatureGenerator::GetFeatureIdxForPos(
       nuc = nuc_vec.val[seq_pos];
     }
 
-    idx += nuc * base;
-    base = base << 2;
+    idx += nuc * base; // Add the contribution of this base 4 digit
+    base = base << 2; // Multiply base by 4
   }
   return idx;
 }
 
-/*
-* PRIVATE FUNCTIONS
-*/
+/**
+ * Does the heavy lifting for calculating feature vectors at a given mutation step
+ * @param  i                 mutation step index
+ * @param  mutated_pos       the position that is mutating
+ * @param  ordered_mut_steps the object that needs its i-th step updated
+ * @param  obs_sample        the observed sample
+ * @param  theta             if passed in, calculate theta sum values too
+ * @return                   the updated i-th mutation step
+ */
 shared_ptr<MutationStep> SubmotifFeatureGenerator::UpdateMutationStep(
   int i,
   int mutated_pos,
