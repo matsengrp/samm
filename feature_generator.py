@@ -50,7 +50,23 @@ class FeatureGenerator:
         raise NotImplementedError()
 
 class FeatureMutationStep:
+    """
+    Stores the deltas between each mutation step
+
+    This allows fast calculation of the likelihood of the mutation order.
+    Recall that the denominator = sum(exp(psi * theta)).
+    At the next mutation step, we know that
+    1. One of the terms must disappear because the risk group is smaller. One of the positions has mutated.
+    2. The nucleotides next to the position that mutated have new motifs; so we need to update the motif
+        indices for these positions. If we use the denominator from the previous step, we need to subtract
+        out the old exp(psi * theta)) and add in new exp(psi * theta)
+    """
     def __init__(self, mutating_pos_feat, neighbors_feat_old=dict(), neighbors_feat_new=dict()):
+        """
+        @param mutating_pos_feat: the feature index of the position that mutated
+        @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
+        @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
+        """
         self.mutating_pos_feat = mutating_pos_feat
         self.neighbors_feat_old = neighbors_feat_old
         self.neighbors_feat_new = neighbors_feat_new
