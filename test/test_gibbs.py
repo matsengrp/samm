@@ -11,7 +11,7 @@ from survival_model_simulator import SurvivalModelSimulator
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
-class MCMC_EM_TestCase(unittest.TestCase):
+class Gibbs_TestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(10)
