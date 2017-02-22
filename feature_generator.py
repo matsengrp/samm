@@ -21,7 +21,7 @@ class FeatureGenerator:
     def create_for_mutation_steps(self, seq_mut_order):
         """
         @param seq_mut_order: a ImputedSequenceMutations
-        @return: tuple of (FeatureMutationSteps, list of theta_sums)
+        @return: list of FeatureMutationStep
         """
         raise NotImplementedError()
 
