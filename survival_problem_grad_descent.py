@@ -78,26 +78,6 @@ class SurvivalProblemCustom(SurvivalProblem):
             ll = map(run_multiprocessing_worker, worker_list)
         return 1.0/self.num_samples * np.sum(ll)
 
-    @staticmethod
-    def calculate_per_sample_log_lik(theta, sample, feature_mutation_steps):
-        """
-        Calculate the log likelihood of this sample
-        """
-        # Get the components -- numerators and the denomiators
-        log_numerators = [np.asscalar(theta[mut_step.mutating_pos_feat]) for mut_step in feature_mutation_steps]
-        denominators = [
-            (np.exp(sample.obs_seq_mutation.feat_matrix_start * theta)).sum()
-        ]
-        for i, feat_mut_step in enumerate(feature_mutation_steps[1:]):
-            old_denominator = denominators[i]
-            old_log_numerator = log_numerators[i]
-            old_feat_theta_sums = [theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_theta_sums = [theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
-            new_denom = old_denominator - np.exp(old_log_numerator) - (np.exp(old_feat_theta_sums)).sum() + (np.exp(new_feat_theta_sums)).sum()
-            denominators.append(new_denom)
-        log_lik = sum(log_numerators) - np.sum(np.log(denominators))
-        return log_lik
-
     def _get_gradient_log_lik(self, theta):
         """
         Calculate the gradient - delegates to separate cpu threads if threads > 1
@@ -117,6 +97,26 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
+
+    @staticmethod
+    def calculate_per_sample_log_lik(theta, sample, feature_mutation_steps):
+        """
+        Calculate the log likelihood of this sample
+        """
+        # Get the components -- numerators and the denominators
+        log_numerators = [np.asscalar(theta[mut_step.mutating_pos_feat]) for mut_step in feature_mutation_steps]
+        denominators = [
+            (np.exp(sample.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        ]
+        for i, feat_mut_step in enumerate(feature_mutation_steps[1:]):
+            old_denominator = denominators[i]
+            old_log_numerator = log_numerators[i]
+            old_feat_theta_sums = theta[feat_mut_step.neighbors_feat_old.values()]
+            new_feat_theta_sums = theta[feat_mut_step.neighbors_feat_new.values()]
+            new_denom = old_denominator - np.exp(old_log_numerator) - (np.exp(old_feat_theta_sums)).sum() + (np.exp(new_feat_theta_sums)).sum()
+            denominators.append(new_denom)
+        log_lik = sum(log_numerators) - np.sum(np.log(denominators))
+        return log_lik
 
     @staticmethod
     def get_gradient_log_lik_per_sample(theta, sample, feature_mutation_steps):
@@ -146,19 +146,18 @@ class SurvivalProblemCustom(SurvivalProblem):
             grad_log_sum_exp[prev_feat_mut_step.mutating_pos_feat] -= old_numerator
 
             # Need to update the terms for positions near the previous mutation
-            old_exp_theta_sums = []
-            new_exp_theta_sums = []
-            for feat_idx in feat_mut_step.neighbors_feat_old.values():
-                exp_theta = np.exp(theta[feat_idx])
+            old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
+            old_exp_thetas = np.exp(theta[old_feat_idxs])
+            for feat_idx, exp_theta in zip(old_feat_idxs, old_exp_thetas):
                 grad_log_sum_exp[feat_idx] -= exp_theta
-                old_exp_theta_sums.append(exp_theta)
-            for feat_idx in feat_mut_step.neighbors_feat_new.values():
-                exp_theta = np.exp(theta[feat_idx])
+
+            new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
+            new_exp_thetas = np.exp(theta[new_feat_idxs])
+            for feat_idx, exp_theta in zip(new_feat_idxs, new_exp_thetas):
                 grad_log_sum_exp[feat_idx] += exp_theta
-                new_exp_theta_sums.append(exp_theta)
 
             # Now update the denominator
-            new_denom = old_denom - old_numerator - np.sum(old_exp_theta_sums) + np.sum(new_exp_theta_sums)
+            new_denom = old_denom - old_numerator - old_exp_thetas.sum() + new_exp_thetas.sum()
 
             # Finally update the gradient of psi * theta - log(sum(exp(theta * psi)))
             grad -= grad_log_sum_exp/new_denom
