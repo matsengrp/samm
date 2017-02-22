@@ -17,10 +17,8 @@ import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-# from submotif_feature_generator import SubmotifFeatureGenerator
-from submotif_feature_generator_fast import SubmotifFastFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
-from mutation_order_gibbs_fast import MutationOrderGibbsFastSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
@@ -131,7 +129,7 @@ def parse_args():
             args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     # Determine sampler
-    args.sampler_cls = MutationOrderGibbsFastSampler
+    args.sampler_cls = MutationOrderGibbsSampler
     if args.per_target_model:
         args.theta_num_col = NUM_NUCLEOTIDES
     else:
@@ -158,7 +156,7 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-    feat_generator = SubmotifFastFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
     if args.theta_file is not None:
