@@ -33,7 +33,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
         st_time = time.time()
         obs_seq_mutation = feat_generator.create_base_features(obs_seq_mutation)
-        print "time", time.time() - st_time
+        print "create_base_features time", time.time() - st_time
 
         my_order = obs_seq_mutation.mutation_pos_dict.keys()
         seq_mut_order = ImputedSequenceMutations(
@@ -42,7 +42,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
         st_time = time.time()
         mutation_steps = feat_generator.create_for_mutation_steps(seq_mut_order)
-        print "time", time.time() - st_time
+        print "create_for_mutation_steps time", time.time() - st_time
 
     def test_create(self):
         motif_len = 3
