@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import sys
 import re
+from Bio import SeqIO
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -25,7 +26,7 @@ NUCLEOTIDE_DICT = {
     "g": 2,
     "t": 3,
 }
-GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
+GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/h/ighv.fasta'
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
@@ -161,17 +162,22 @@ def soft_threshold(theta, thres):
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
 
-def read_bcr_hd5(path, remove_gap=True):
+def read_germline_file(fasta):
     """
-    read hdf5 parameter file and process
+    Read fasta file containing germlines
+
+    @return dataframe with column "gene" for the name of the germline gene and
+    "base" for the nucleotide content
     """
 
-    sites = pd.read_hdf(path, 'sites')
-
-    if remove_gap:
-        return sites.query('base != "-"')
-    else:
-        return sites
+    with open(fasta) as fasta_file:
+        genes = []
+        bases = []
+        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
+            genes.append(seq_record.id)
+            bases.append(seq_record.seq.lower())
+    
+    return pd.DataFrame({'base': bases}, index=genes)
 
 def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
@@ -184,10 +190,7 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
     @param use_np: use nonproductive sequences only
     @param inferred_gls: list of paths to partis-inferred germlines
 
-    TODO: do we want to output intermediate genes.csv/seqs.csv files?
-
-    TODO: do we want support for including multiple annotations files?
-    is this something people do, or is this done at the partis level?
+    TODO: convert to presto headers for presto...
 
     @return gene_dict, obs_data
     """

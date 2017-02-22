@@ -145,24 +145,21 @@ def simulate(args):
         os.makedirs(output_dir)
 
     # Read parameters from file
-    params = read_bcr_hd5(args.param_path)
+    params = read_germline_file(args.param_path)
 
     # Find genes with "N" and remove them so gctree is happy
-    genes_to_not_sample = params['gene'][[base not in 'ACGT' for base in params['base']]].unique()
-    genes_to_sample = [gene for gene in params['gene'].unique() if gene not in genes_to_not_sample]
+    genes_to_sample = [row.index for row in params if set(row) == NUCLEOTIDE_SET]
 
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
     # Select, with replacement, args.n_germlines germline genes from our
     # parameter file and place them into a numpy array.
-    germline_genes = np.random.choice(genes_to_sample,
-            size=args.n_germlines)
+    germline_genes = np.random.choice(genes_to_sample, size=args.n_germlines)
 
     # Put the nucleotide content of each selected germline gene into a
     # corresponding list.
-    germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
-            for gene in germline_genes]
+    germline_nucleotides = [row[gene] for gene in germline_genes]
 
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
