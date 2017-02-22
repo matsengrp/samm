@@ -1,4 +1,5 @@
 from common import mutate_string
+import numpy as np
 
 class ObservedSequenceMutations:
     def __init__(self, start_seq, end_seq, motif_len=1):
@@ -67,6 +68,7 @@ class ObservedSequenceMutations:
         self.feat_matrix_start = feat_matrix
         self.feat_matrix_startT = feat_matrix.T
         self.feat_dict_start = feat_dict
+        self.feat_dict_vals_start = np.array([feat_dict[p] for p in range(self.seq_len)])
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (

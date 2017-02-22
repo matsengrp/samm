@@ -129,8 +129,11 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param sample: ImputedSequenceMutations
         @param feature_mutation_steps: a list of FeatureMutationStep
         """
+        exp_theta = np.exp(theta)
+
         # Calculate the gradient associated with the first mutation step
-        exp_terms = np.exp(sample.obs_seq_mutation.feat_matrix_start * theta)
+        exp_terms = exp_theta[sample.obs_seq_mutation.feat_dict_vals_start,]
+
         old_denom = exp_terms.sum()
         grad_log_sum_exp = sample.obs_seq_mutation.feat_matrix_startT * exp_terms
 
@@ -140,18 +143,18 @@ class SurvivalProblemCustom(SurvivalProblem):
         # Calculate the gradients associated with the rest of the mutation steps
         prev_feat_mut_step = feature_mutation_steps[0]
         for i, feat_mut_step in enumerate(feature_mutation_steps[1:]):
-            old_numerator = np.exp(theta[prev_feat_mut_step.mutating_pos_feat])
+            old_numerator = exp_theta[prev_feat_mut_step.mutating_pos_feat]
             # Need to remove the previously mutated position from the risk group,
             # Also need to remove it from the gradient
             grad_log_sum_exp[prev_feat_mut_step.mutating_pos_feat] -= old_numerator
 
             # Need to update the terms for positions near the previous mutation
             old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
-            old_exp_thetas = np.exp(theta[old_feat_idxs])
+            old_exp_thetas = exp_theta[old_feat_idxs]
             grad_log_sum_exp[old_feat_idxs] -= old_exp_thetas
 
             new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
-            new_exp_thetas = np.exp(theta[new_feat_idxs])
+            new_exp_thetas = exp_theta[new_feat_idxs]
             grad_log_sum_exp[new_feat_idxs] += new_exp_thetas
 
             # Now update the denominator
@@ -164,7 +167,6 @@ class SurvivalProblemCustom(SurvivalProblem):
 
             old_denom = new_denom
             prev_feat_mut_step = feat_mut_step
-
         return grad
 
 class GradientWorker(ParallelWorker):
