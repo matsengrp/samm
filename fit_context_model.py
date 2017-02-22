@@ -190,12 +190,6 @@ def main(args=sys.argv[1:]):
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
 
-    fitted_prob_vector = None
-    if not args.per_target_model:
-        fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator)
-        log.info("=== Fitted Probability Vector ===")
-        log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
-
     em_algo = MCMC_EM(
         obs_seq_feat_base,
         feat_generator,
@@ -216,6 +210,13 @@ def main(args=sys.argv[1:]):
             penalty_param=penalty_param,
             max_em_iters=args.em_max_iters,
         )
+
+        fitted_prob_vector = None
+        if not args.per_target_model:
+            fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta)
+            log.info("=== Fitted Probability Vector ===")
+            log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
+
         results_list.append((penalty_param, theta, fitted_prob_vector))
 
         with open(args.out_file, "w") as f:
