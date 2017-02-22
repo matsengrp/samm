@@ -179,7 +179,7 @@ def read_germline_file(fasta):
     
     return pd.DataFrame({'base': bases}, index=genes)
 
-def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
+def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1, output_presto=False):
     """
     Function to read partis annotations csv
 
@@ -210,7 +210,11 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
         inferred_gls = [None] * len(annotations_file_names)
 
     gene_dict = {}
-    obs_data = []
+    if output_presto:
+        prestoheader = utils.presto_headers.values()
+        obs_data = pd.DataFrame(columns=prestoheader)
+    else:
+        obs_data = []
 
     seqs_col = 'v_qr_seqs' if use_v else 'seqs'
     gene_col = 'v_gl_seq' if use_v else 'naive_seq'
@@ -239,14 +243,18 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
                 good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
                 for end_seq in good_seqs:
                     # process sequences
-                    gl_seq, ch_seq = trim_degenerates_and_collapse(line[gene_col].lower(), end_seq.lower(), motif_len)
-                    obs_data.append(
-                        ObservedSequenceMutations(
-                            start_seq=gl_seq,
-                            end_seq=ch_seq,
-                            motif_len=motif_len,
+                    if output_presto:
+                        line = utils.convert_to_presto_headers(line)
+                        obs_data.append({k : v for k, v in line.items() if k in prestoheader}, ignore_index=True)
+                    else:
+                        gl_seq, ch_seq = trim_degenerates_and_collapse(line[gene_col].lower(), end_seq.lower(), motif_len)
+                        obs_data.append(
+                            ObservedSequenceMutations(
+                                start_seq=gl_seq,
+                                end_seq=ch_seq,
+                                motif_len=motif_len,
+                            )
                         )
-                    )
     return gene_dict, obs_data
 
 def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
