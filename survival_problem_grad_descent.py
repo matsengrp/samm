@@ -148,13 +148,11 @@ class SurvivalProblemCustom(SurvivalProblem):
             # Need to update the terms for positions near the previous mutation
             old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
             old_exp_thetas = np.exp(theta[old_feat_idxs])
-            for feat_idx, exp_theta in zip(old_feat_idxs, old_exp_thetas):
-                grad_log_sum_exp[feat_idx] -= exp_theta
+            grad_log_sum_exp[old_feat_idxs] -= old_exp_thetas
 
             new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
             new_exp_thetas = np.exp(theta[new_feat_idxs])
-            for feat_idx, exp_theta in zip(new_feat_idxs, new_exp_thetas):
-                grad_log_sum_exp[feat_idx] += exp_theta
+            grad_log_sum_exp[new_feat_idxs] += new_exp_thetas
 
             # Now update the denominator
             new_denom = old_denom - old_numerator - old_exp_thetas.sum() + new_exp_thetas.sum()
