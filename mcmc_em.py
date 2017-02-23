@@ -43,7 +43,6 @@ class MCMC_EM:
         st = time.time()
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
-        prev_pen_exp_log_lik = None
         all_traces = []
         for run in range(max_em_iters):
             lower_bound_is_negative = True
@@ -86,7 +85,8 @@ class MCMC_EM:
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
                 problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask, self.num_threads)
-                theta, pen_exp_log_lik = problem.solve(
+
+                theta, pen_exp_log_lik, log_lik_diff, lower_bound = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                 )
@@ -96,27 +96,16 @@ class MCMC_EM:
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
 
-                if prev_pen_exp_log_lik is not None:
-                    # Get statistics
-                    log_lik_vec = problem.calculate_log_lik_ratio_vec(theta, prev_theta)
-
-                    # Calculate lower bound to determine if we need to rerun
-                    # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
-                    ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_vec, ZSCORE, pen_exp_log_lik - prev_pen_exp_log_lik)
-
-                    lower_bound_is_negative = (lower_bound < 0)
-                    log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
-                else:
-                    lower_bound_is_negative = False
+                lower_bound_is_negative = (lower_bound < 0)
+                log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
 
             if lower_bound_is_negative:
                 # if penalized log likelihood is decreasing
                 break
-            elif prev_pen_exp_log_lik is not None and pen_exp_log_lik - prev_pen_exp_log_lik < diff_thres:
+            elif log_lik_diff < diff_thres:
                 # if penalized log likelihood is increasing but not by very much
                 break
 
-            prev_pen_exp_log_lik = pen_exp_log_lik
             log.info("official pen_exp_log_lik %f" % pen_exp_log_lik)
 
         return theta, all_traces
