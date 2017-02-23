@@ -148,7 +148,8 @@ class SurvivalProblemCustom(SurvivalProblem):
             for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.num_threads > 1:
-            l = MultiprocessingManager(self.pool, worker_list, self.num_threads * batch_factor)
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list, self.num_threads * batch_factor)
+            l = multiproc_manager.run()
         else:
             l = [worker.run() for worker in worker_list]
 
