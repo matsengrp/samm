@@ -63,9 +63,9 @@ class ObservedSequenceMutations:
         self.feat_matrix_start = feat_matrix
 
         num_feats = feat_matrix.shape[1]
-        self.feat_counts_flat = np.zeros(num_feats, dtype=int)
+        self.feat_counts = np.zeros((num_feats, 1), dtype=int)
         for pos, feat in feat_dict.iteritems():
-            self.feat_counts_flat[feat] += 1
+            self.feat_counts[feat] += 1
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (
