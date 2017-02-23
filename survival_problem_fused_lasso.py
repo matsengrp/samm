@@ -185,4 +185,4 @@ class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
         """
         @return negative penalized log likelihood
         """
-        return -1 * self._get_log_lik_parallel(theta) + self.get_value_addon(theta)
+        return -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) + self.get_value_addon(theta)

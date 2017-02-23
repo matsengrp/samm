@@ -53,16 +53,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         ])
         return 1.0/self.num_samples * log_lik
 
-    def calculate_log_lik_ratio_vec(self, theta, prev_theta):
-        llr_vec = np.zeros(self.num_samples)
-        for sample_id, (sample, feature_mut_steps) in enumerate(self.feature_mut_steps_pair):
-            llr_vec[sample_id] = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_mut_steps) - \
-                    SurvivalProblemCustom.calculate_per_sample_log_lik(prev_theta, sample, feature_mut_steps)
-        return llr_vec
-
     def _get_log_lik_parallel(self, theta):
         """
-        @return negative penalized log likelihood
+        @return vector of log likelihood values
         """
         if self.pool is None:
             raise ValueError("Pool has not been initialized")
@@ -76,7 +69,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             ll = self.pool.map(run_multiprocessing_worker, worker_list)
         else:
             ll = map(run_multiprocessing_worker, worker_list)
-        return 1.0/self.num_samples * np.sum(ll)
+        return ll
 
     def _get_gradient_log_lik(self, theta):
         """

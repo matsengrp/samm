@@ -46,4 +46,4 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         """
         @return negative penalized log likelihood
         """
-        return - (self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))
+        return - (1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))

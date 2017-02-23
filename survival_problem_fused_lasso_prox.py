@@ -103,4 +103,4 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
         """
         fused_lasso_pen = self.penalty_param_fused * np.linalg.norm(self.get_fused_lasso_theta(theta), ord=1)
         lasso_pen = self.penalty_param_lasso * np.linalg.norm(theta, ord=1)
-        return -self._get_log_lik_parallel(theta) + fused_lasso_pen + lasso_pen
+        return -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) + fused_lasso_pen + lasso_pen
