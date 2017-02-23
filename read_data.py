@@ -1,10 +1,20 @@
 import sys
+
+PARTIS_PATH = './partis'
+sys.path.insert(1, PARTIS_PATH + '/python')
+import utils
+import glutils
+
+import sys
 import csv
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
-from common import trim_degenerates_and_collapse
+from common import *
 from models import ObservedSequenceMutations
+
+SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
+
 
 def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
