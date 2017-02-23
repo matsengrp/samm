@@ -36,16 +36,16 @@
 
 ## Real data
 
-## Datasets
+### Datasets
 
 - Cui et al (2016)
 - Laura/Kate?
 - Example dataset from `shazam` package
-- website w/ publicly available datasets: [http://b-t.cr/t/publicly-available-airr-seq-data-sets/317](here)
+- other publicly available datasets: [http://b-t.cr/t/publicly-available-airr-seq-data-sets/317](here)
 
 1. Run all models
     - choosing best approach from simulations (random choice vs. imputed ancestors)
 2. Check vs. known hot/cold spots
-3. Predictive check??? TODO
-4. Compare between datasets for conserved/varying motifs
+3. Compare between datasets for conserved/varying motifs
+4. Predictive check??? TODO
 
