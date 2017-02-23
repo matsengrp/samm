@@ -16,6 +16,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         cls.motif_len = 3
         cls.BURN_IN = 10
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
+        cls.motif_list = cls.feat_gen.get_motif_list()
 
     def _compare_grad_calculation(self, theta_num_col):
         """
@@ -27,16 +28,17 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
             ObservedSequenceMutations("aggtgggttac", "aggagagttac", self.motif_len)
         )
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
+        theta_mask = get_possible_motifs_to_targets(self.motif_list, theta.shape)
+        prob_solver = SurvivalProblemCustom(self.feat_gen, [sample], 1, theta_mask)
+        sample_data = prob_solver.precalc_data[0]
 
         # Basic gradient calculation
         old_grad = self.calculate_grad_slow(theta, sample)
 
-        feat_mut_steps = self.feat_gen.create_for_mutation_steps(sample)
         # Fast gradient calculation
         fast_grad = SurvivalProblemCustom.get_gradient_log_lik_per_sample(
             theta,
-            sample,
-            feat_mut_steps,
+            sample_data,
         )
         self.assertTrue(np.allclose(fast_grad, old_grad))
 
@@ -53,12 +55,16 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
             ObservedSequenceMutations("aggatcgtgatcgagtc", "aaaatcaaaaacgatgc", self.motif_len)
         )
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
+        theta_mask = get_possible_motifs_to_targets(self.motif_list, theta.shape)
+        prob_solver = SurvivalProblemCustom(self.feat_gen, [sample], 1, theta_mask)
+        sample_data = prob_solver.precalc_data[0]
+
         feat_mut_steps = self.feat_gen.create_for_mutation_steps(sample)
 
         # Basic gradient calculation
         old_ll = self.calculate_log_likelihood_slow(theta, sample)
         # Fast log likelihood calculation
-        fast_ll = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feat_mut_steps)
+        fast_ll = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample_data)
         self.assertTrue(np.allclose(fast_ll, old_ll))
 
     def test_log_likelihood_calculation(self):

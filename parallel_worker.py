@@ -10,9 +10,7 @@ from common import DEBUG
 class ParallelWorker:
     """
     Stores the information for running something in parallel
-    This can be used in two ways:
-    1. Submit ParallelWorkers to a job submission system, e.g. slurm
-    2. Run ParallelWorkers on multiple CPUs on the same machine
+    These workers can be run throught the ParallelWorkerManager
     """
     def __init__(self, seed):
         """
@@ -21,18 +19,69 @@ class ParallelWorker:
         raise NotImplementedError()
 
     def run(self):
-        np.random.seed(self.seed)
-        return self._run()
-
-    def _run(self):
         """
+        Do not implement this function!
+        """
+        np.random.seed(self.seed)
+        return self.run_worker()
+
+    def run_worker(self):
+        """
+        Implement this function!
         Returns whatever value needed from this task
         """
         raise NotImplementedError()
 
-class BatchSubmissionManager:
+class ParallelWorkerManager:
     """
-    Handles submitting jobs to a cluster
+    Runs many ParallelWorkers
+    """
+    def run(self):
+        raise NotImplementedError()
+
+class MultiprocessingManager(ParallelWorkerManager):
+    """
+    Handles submitting jobs to a multiprocessing pool
+    So runs ParallelWorkers using multiple CPUs on the same machine
+    """
+    def __init__(self, pool, worker_list, num_approx_batches):
+        """
+        @param worker_list: List of ParallelWorkers
+        @param num_approx_batches: number of batches to split across processes (might be a bit more)
+        """
+        self.pool = pool
+
+        # Batch commands together
+        num_workers = len(worker_list)
+        num_per_batch = max(num_workers/num_approx_batches, 1)
+        self.batched_workers_list = []
+        for batch_idx, start_idx in enumerate(range(0, num_workers, num_per_batch)):
+            self.batched_workers_list.append(
+                worker_list[start_idx:start_idx + num_per_batch]
+            )
+
+    def run(self):
+        batched_results = self.pool.map(run_multiprocessing_worker, self.batched_workers_list)
+        results = []
+        for batch_r in batched_results:
+            results += batch_r
+        return results
+
+def run_multiprocessing_worker(worker_batch):
+    """
+    @param worker: Worker
+    Function called on each worker process, used by MultiprocessingManager
+    Note: this must be a global function
+    """
+    results = []
+    for worker in worker_batch:
+        results.append(worker.run())
+
+    return results
+
+class BatchSubmissionManager(ParallelWorkerManager):
+    """
+    Handles submitting jobs to a job submission system (e.g. slurm)
     """
     def __init__(self, worker_list, num_approx_batches, worker_folder):
         """
@@ -92,22 +141,3 @@ class BatchSubmissionManager:
                 res = pickle.load(output_f)
             worker_results += res
         return worker_results
-
-def run_multiprocessing_worker(worker):
-    """
-    @param worker: Worker
-    Function called by each worker process in the multiprocessing pool
-    Note: this must be a global function
-    """
-    np.random.seed(worker.seed)
-
-    result = None
-    try:
-        result = worker.run()
-    except Exception as e:
-        print "Exception caught: %s" % e
-        traceback.print_exc()
-        if DEBUG:
-            raise Exception
-
-    return result
