@@ -1,4 +1,5 @@
 import sys
+import random
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -14,7 +15,6 @@ from common import *
 from models import ObservedSequenceMutations
 
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
-
 
 def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
@@ -77,16 +77,16 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
                 key = 'clone{}-{}'.format(*[idx, line['v_gene']])
                 gene_dict[key] = line[gene_col].lower()
                 good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
-                for end_seq in good_seqs:
-                    # process sequences
-                    gl_seq, ch_seq = trim_degenerates_and_collapse(line[gene_col].lower(), end_seq.lower(), motif_len)
-                    obs_data.append(
-                        ObservedSequenceMutations(
-                            start_seq=gl_seq,
-                            end_seq=ch_seq,
-                            motif_len=motif_len,
-                        )
+                end_seq = random.choice(good_seqs)
+                # process sequences
+                gl_seq, ch_seq = process_degenerates_and_impute_nucleotides(line[gene_col].lower(), end_seq.lower(), motif_len)
+                obs_data.append(
+                    ObservedSequenceMutations(
+                        start_seq=gl_seq,
+                        end_seq=ch_seq,
+                        motif_len=motif_len,
                     )
+                )
     return gene_dict, obs_data
 
 
@@ -109,7 +109,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
         seq_reader.next()
         for row in seq_reader:
             # process sequences
-            start_seq, end_seq = trim_degenerates_and_collapse(gene_dict[row[0]], row[2].lower(), motif_len)
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(gene_dict[row[0]], row[2].lower(), motif_len)
             obs_data.append(
                 ObservedSequenceMutations(
                     start_seq=start_seq,
