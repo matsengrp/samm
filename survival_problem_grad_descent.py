@@ -2,7 +2,7 @@ import time
 from multiprocessing import Pool
 import numpy as np
 import scipy as sp
-from scipy.sparse import csr_matrix
+from scipy.sparse import csc_matrix
 
 import logging as log
 from survival_problem import SurvivalProblem
