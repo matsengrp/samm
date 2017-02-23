@@ -18,6 +18,15 @@ ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
+HOT_COLD_SPOT_REGS = [
+    ["RGYW - hot","[atcg][ga]g[ct][at]"],
+    ["WRCY - hot", "[at][ga]c[ct][atcg]"],
+    ["WA - hot", "[atcg][at]a[atcg][atcg]"],
+    ["TW - hot", "[atcg][atcg]t[at][atcg]"],
+    ["SYC - cold", "[cg][ct]c[atcg][atcg]"],
+    ["GRS - cold", "[atcg][atcg]g[ga][cg]"],
+]
+
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
         if nucleotide not in NUCLEOTIDE_SET:
@@ -34,11 +43,21 @@ def get_nonzero_theta_print_lines(theta, motif_list):
     """
     @return a string that summarizes the theta vector/matrix
     """
+    def is_match(regex, submotif):
+        match_res = re.match(regex, submotif)
+        return match_res is not None
+
     lines = []
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
-                lines.append("%d: %s (%s)" % (i, theta[i,], motif_list[i]))
+                motif = motif_list[i]
+                hot_cold_matches = ""
+                for spot_name, spot_regex in HOT_COLD_SPOT_REGS:
+                    if is_match(spot_regex, motif):
+                        hot_cold_matches = " -- " + spot_name
+                        break
+                lines.append("%d: %s (%s%s)" % (i, theta[i,], motif_list[i], hot_cold_matches))
                 break
     return "\n".join(lines)
 
