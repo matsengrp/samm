@@ -27,7 +27,7 @@ To get `shmulate` to fit an S5F model, install packages in `R` using:
 R --vanilla --slave -e 'install.packages(c("igraph", "seqinr", "R.utils", "chron", "plyr", "shazam"), repos="http://cran.rstudio.com/")'
 ```
 
-## Run tests
+## Run python tests
 Run all tests:
 ```
 python -m unittest discover
@@ -40,3 +40,6 @@ Run specific test method:
 ```
 python -m unittest test.test__YOUR_TEST__.__YOUR_TEST_CLASS__TestCase.__YOUR_TEST_METHOD__
 ```
+
+## Run C++ tests
+Run scons. Run `_build/test/test`

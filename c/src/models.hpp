@@ -7,7 +7,7 @@
 
 using namespace std;
 
-typedef int Nuc; // 0 = A, 1 = C, 2 = G, 3 = T
+typedef char Nuc; // 0 = A, 1 = C, 2 = G, 3 = T
 // Nucleotide sequence
 typedef struct {
   vector<Nuc> val;
@@ -15,7 +15,7 @@ typedef struct {
 
 // Position indices by observed mutation order
 typedef struct {
-  vector<int> val;
+  vector<unsigned int> val;
 } VectorOrder;
 
 // Indices of the feature at each position
@@ -35,12 +35,21 @@ class ObservedSample {
   public:
     VectorNucleotide start_nucs;
     VectorNucleotide end_nucs;
+
+    VectorNucleotide left_flank;
+    VectorNucleotide right_flank;
+
     VectorFeature start_features;
+    // positions are ordered just by position value
+    // the order does not mean anything about mutation order!
+    vector<unsigned int> mutated_postions;
     int num_pos;
 
     ObservedSample(
       VectorNucleotide s,
       VectorNucleotide e,
+      VectorNucleotide l,
+      VectorNucleotide r,
       VectorFeature f
     );
 };
@@ -64,10 +73,19 @@ class OrderedMutationSteps {
   public:
     int num_steps;
     VectorOrder order_vec;
-    vector<shared_ptr<MutationStep>> mut_steps;
+    vector<shared_ptr<MutationStep> > mut_steps;
 
     // Initialize with the observed sample and the order under consideration
     OrderedMutationSteps(VectorOrder ord_v);
+
+    OrderedMutationSteps(
+      int num_s,
+      VectorOrder order_v,
+      vector<shared_ptr<MutationStep> > m_vec
+    ): num_steps(num_s), order_vec(order_v), mut_steps(m_vec) {};
+
+    // Initialize with the observed sample and the order under consideration
+    shared_ptr<OrderedMutationSteps> copy(const shared_ptr<OrderedMutationSteps> &mut_order);
 
     // Update the mutation step with mut_step
     void set(
