@@ -169,8 +169,20 @@ def read_bcr_hd5(path, remove_gap=True):
     else:
         return sites
 
-def trim_degenerates_and_collapse(start_seq, end_seq, motif_len, threshold=0.1):
-    """ replace unknown characters with "n" and collapse runs of "n"s """
+def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
+    """
+    Process the degenerate characters in sequences:
+    1. Replace unknown characters with "n"
+    2. Remove padding "n"s at beginning and end of sequence
+    3. Collapse runs of "n"s into one of motif_len/2
+    4. Replace all interior "n"s with nonmutating random nucleotide
+    
+    @param start_seq: starting sequence
+    @param end_seq: ending sequence
+    @param motif_len: motif length; needed to determine length of collapsed "n" run
+    @param threshold: if proportion of "n"s in a sequence is larger than this then
+        throw a warning
+    """
 
     assert(len(start_seq) == len(end_seq))
 
