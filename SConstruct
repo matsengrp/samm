@@ -28,7 +28,24 @@ AddOption('--output_name',
 
 env = Environment(ENV=os.environ,
                   NREPS = GetOption('nreps'),
-                  OUTPUT_NAME = GetOption('output_name'))
+                  OUTPUT_NAME = GetOption('output_name'),
+                  CXX = 'clang++',
+                  CXXFLAGS = '-std=c++11 -stdlib=libc++',
+                  LINKFLAGS = '-stdlib=libc++')
+
+
+mobeef_cpp_env = env.Clone()
+mobeef_cpp_env.VariantDir('_build/mobeef', 'c/src', duplicate=0)
+mobeef_cpp_env.Library(target='_build/mobeef/mobeef',
+                      source=Glob('_build/mobeef/*.cpp'))
+
+test_env = env.Clone()
+test_env.VariantDir('_build/test', 'c/test', duplicate=0)
+test_env.Append(CPPPATH=['c/src'])
+test_env.Program(target='_build/test/test',
+                 LIBPATH=['_build/mobeef'],
+                 LIBS=['mobeef'],
+                 source=Glob('_build/test/*.cpp'))
 
 Export('env')
 
@@ -45,4 +62,3 @@ SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'run_on_partis'
 SConscript(flag + '/sconscript', exports=['flag'])
-

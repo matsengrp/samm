@@ -1,6 +1,6 @@
 import unittest
 
-from common import *
+from read_data import *
 from matsen_grp_data import *
 
 class Input_Data_TestCase(unittest.TestCase):
@@ -19,7 +19,7 @@ class Input_Data_TestCase(unittest.TestCase):
                     annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain, ig_class=igclass)
                     genes, seqs = read_partis_annotations(annotations, inferred_gls=germlines, chain=chain)
                     print chain, igclass, len(seqs)
-    
+
                     # check IgM
                     igclass = 'M'
                     annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain, ig_class=igclass)
@@ -31,4 +31,3 @@ class Input_Data_TestCase(unittest.TestCase):
                     annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain)
                     genes, seqs = read_partis_annotations(annotations, inferred_gls=germlines, chain=chain)
                     print chain, igclass, len(seqs)
-

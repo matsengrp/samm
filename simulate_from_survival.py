@@ -161,14 +161,13 @@ def main(args=sys.argv[1:]):
                 simulator.simulate(
                     start_seq=sequence.lower(),
                     censoring_time=args.min_censor_time + 0.1 * np.random.rand(), # censoring time at least 0.1
-                    motif_len=args.motif_len,
                     with_replacement=args.with_replacement,
                 ) for i in range(args.n_taxa)
             ]
 
             # write to file in csv format
             for i, sample in enumerate(full_data_samples):
-                seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.obs_seq_mutation.end_seq])
+                seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
 
 if __name__ == "__main__":
     main(sys.argv[1:])
