@@ -1,5 +1,11 @@
 import sys
 import csv
+
+PARTIS_PATH = './partis'
+sys.path.insert(1, PARTIS_PATH + '/python')
+import utils
+import glutils
+
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 

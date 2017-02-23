@@ -3,11 +3,6 @@ import pandas as pd
 import sys
 import re
 
-PARTIS_PATH = './partis'
-sys.path.insert(1, PARTIS_PATH + '/python')
-import utils
-import glutils
-
 DEBUG = False
 
 NUM_NUCLEOTIDES = 4
@@ -19,6 +14,7 @@ NUCLEOTIDE_DICT = {
     "g": 2,
     "t": 3,
 }
+PARTIS_PATH = './partis'
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 ZSCORE = 1.65
