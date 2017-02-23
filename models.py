@@ -59,22 +59,13 @@ class ObservedSequenceMutations:
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 
-        # Feature generators should fill in these fields!
-        self.feat_matrix_start = None
-        self.feat_matrix_startT = None
-        self.feat_dict_start = None
-
-    def set_start_feats(self, feat_dict, feat_matrix, num_feats=0):
+    def set_start_feats(self, feat_dict, feat_matrix):
         self.feat_matrix_start = feat_matrix
-        self.feat_matrix_startT = feat_matrix.T
 
         num_feats = feat_matrix.shape[1]
-        self.feat_counts = np.zeros(num_feats, dtype=int)
+        self.feat_counts_flat = np.zeros(num_feats, dtype=int)
         for pos, feat in feat_dict.iteritems():
-            self.feat_counts[feat] += 1
-
-        self.feat_dict_start = feat_dict
-        self.feat_dict_vals_start = np.array([feat_dict[p] for p in range(self.seq_len)])
+            self.feat_counts_flat[feat] += 1
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (
