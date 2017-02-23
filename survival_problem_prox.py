@@ -95,8 +95,6 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 diff = current_value - potential_value
                 current_value = potential_value
 
-                # If it doesn't look like the lower bound will ever get to zero, early exit as well
-
                 if lower_bound > 0 or diff < diff_thres:
                     # Stop if log likelihood ratio vector's lower bound is positive
                     # or difference in objective function is too small
