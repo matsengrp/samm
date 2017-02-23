@@ -4,6 +4,7 @@ import scipy as sp
 import logging as log
 from multiprocessing import Pool
 
+from common import *
 from survival_problem_grad_descent import SurvivalProblemCustom
 
 class SurvivalProblemProximal(SurvivalProblemCustom):
@@ -47,7 +48,14 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         st = time.time()
         theta = init_theta
         step_size = init_step_size
-        current_value = self._get_value_parallel(theta)
+        diff = None
+        lower_bound = None
+
+        # Calculate loglikelihood of current theta
+        log_lik_vec_init = np.array(self._get_log_lik_parallel(theta))
+        init_value = self._get_value_parallel(theta)
+        current_value = init_value
+
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("PROX iter %d, val %f, time %f" % (i, current_value, time.time() - st))
@@ -78,13 +86,23 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 # Stop if value is increasing
                 break
             else:
+                # Calculate lower bound to determine if we need to rerun
+                # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
+                log_lik_ratio_vec = np.array(self._get_log_lik_parallel(potential_theta)) - log_lik_vec_init
+                ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
+
                 theta = potential_theta
                 diff = current_value - potential_value
                 current_value = potential_value
-                if diff < diff_thres:
-                    # Stop if difference in objective function is too small
+
+                # If it doesn't look like the lower bound will ever get to zero, early exit as well
+
+                if lower_bound > 0 or diff < diff_thres:
+                    # Stop if log likelihood ratio vector's lower bound is positive
+                    # or difference in objective function is too small
                     break
+
 
         self.pool.close()
         log.info("final PROX iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        return theta, current_value, step_size
+        return theta, current_value, diff, lower_bound
