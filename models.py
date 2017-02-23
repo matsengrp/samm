@@ -1,3 +1,6 @@
+from common import mutate_string
+import numpy as np
+
 class ObservedSequenceMutations:
     def __init__(self, start_seq, end_seq, motif_len=1):
         """
@@ -50,9 +53,19 @@ class ObservedSequenceMutations:
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
         self.start_seq = start_seq
+        self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank
         self.end_seq = end_seq
+        self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
+
+    def set_start_feats(self, feat_dict, feat_matrix):
+        self.feat_matrix_start = feat_matrix
+
+        num_feats = feat_matrix.shape[1]
+        self.feat_counts_flat = np.zeros(num_feats, dtype=int)
+        for pos, feat in feat_dict.iteritems():
+            self.feat_counts_flat[feat] += 1
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (
@@ -70,6 +83,23 @@ class ImputedSequenceMutations:
         self.obs_seq_mutation = obs_seq_mutation
         self.mutation_order = mutation_order
 
+    def get_seq_at_step(self, step_idx, flanked=False):
+        """
+        @return the nucleotide sequence after the `step_idx`-th  mutation
+        """
+        intermediate_seq = self.obs_seq_mutation.start_seq
+        for i in range(step_idx):
+            mut_pos = self.mutation_order[i]
+            intermediate_seq = mutate_string(
+                intermediate_seq,
+                mut_pos,
+                self.obs_seq_mutation.end_seq[mut_pos]
+            )
+        if flanked:
+            return self.obs_seq_mutation.left_flank + intermediate_seq + self.obs_seq_mutation.right_flank
+        else:
+            return intermediate_seq
+
     def __str__(self):
         return "Seq %s, Mutation Order %s" % (
             self.obs_seq_mutation.start_seq,
@@ -77,12 +107,18 @@ class ImputedSequenceMutations:
         )
 
 class FullSequenceMutations:
-    def __init__(self, obs_seq_mutation, mutations):
+    def __init__(self, start_seq, end_seq, left_flank, right_flank, mutations):
         """
-        @param obs_seq_mutation: ObservedSequenceMutations
+        @param start_seq: processed start seq without flanks
+        @param end_seq: processed end seq without flanks
+        @param left_flank: left flank string
+        @param right_flank: right flank string
         @param mutations: an ordered list of MutationPosTime
         """
-        self.obs_seq_mutation = obs_seq_mutation
+        self.start_seq = start_seq
+        self.end_seq = end_seq
+        self.left_flank = left_flank
+        self.right_flank = right_flank
         self.mutations = mutations
 
     def get_mutation_order(self):

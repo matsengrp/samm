@@ -52,7 +52,7 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         """
         fused_lasso_pen = np.linalg.norm(self.get_fused_lasso_theta(theta), ord=1)
         lasso_pen = np.linalg.norm(theta, ord=1)
-        return -(self.get_log_lik(theta) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
+        return -(self._get_log_lik_parallel(theta) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
 
     def get_fused_lasso_theta(self, theta):
         """
@@ -151,7 +151,7 @@ class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
         """
         @return negative penalized log likelihood
         """
-        return -1 * self.get_log_lik(theta) + self.get_value_addon(theta)
+        return -1 * self._get_log_lik_parallel(theta) + self.get_value_addon(theta)
 
     def get_value_addon(self, theta):
         """

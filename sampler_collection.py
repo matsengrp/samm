@@ -51,7 +51,7 @@ class SamplerCollection:
             # TODO: what to do if fails?
             sampled_orders_list = batch_manager.run()
         else:
-            sampled_orders_list = map(run_multiprocessing_worker, worker_list)
+            sampled_orders_list = [worker.run() for worker in worker_list]
 
         return sampled_orders_list
 
@@ -66,8 +66,8 @@ class SamplerPoolWorker(ParallelWorker):
         self.burn_in_sweeps = burn_in_sweeps
         self.init_order = init_order
 
-    def _run(self):
-        sampler_res = self.sampler.run(self.init_order, self.num_samples, self.burn_in_sweeps)
+    def run_worker(self):
+        sampler_res = self.sampler.run(self.init_order, self.burn_in_sweeps, self.num_samples)
         return sampler_res
 
 class SamplerResult:
