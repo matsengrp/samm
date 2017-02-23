@@ -37,7 +37,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
 
         # Fast gradient calculation
         fast_grad = SurvivalProblemCustom.get_gradient_log_lik_per_sample(
-            theta,
+            np.exp(theta),
             sample_data,
         )
         self.assertTrue(np.allclose(fast_grad, old_grad))
@@ -64,7 +64,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         # Basic gradient calculation
         old_ll = self.calculate_log_likelihood_slow(theta, sample)
         # Fast log likelihood calculation
-        fast_ll = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample_data)
+        fast_ll = SurvivalProblemCustom.calculate_per_sample_log_lik(np.exp(theta), sample_data)
         self.assertTrue(np.allclose(fast_ll, old_ll))
 
     def test_log_likelihood_calculation(self):
