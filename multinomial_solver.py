@@ -13,6 +13,12 @@ class MultinomialSolver:
         When two motifs have similar theta values, we fuse them together and then fit the MLE of their combined
         data.
 
+        TODO: Motifs with theta = 0 will all be fused together - is this a reasonable approach?
+
+        TODO: Right now we just fuse motifs with theta values that are very very similar
+        We could be fancy in the future and only fuse motifs if there is a path in the fused
+        lasso penalty that connects them.
+
         @param obs_data: ObservedSequenceMutations, the observed start and end sequences
         @param feat_generator: FeatureGenerator
         @param theta: the fitted theta vector
@@ -38,18 +44,6 @@ class MultinomialSolver:
                     # Cannot be fused already
                     if motif_idx2 in already_fused_motifs:
                         continue
-
-                    # TODO: This a bit more complex! If they differ by one character and are fused
-                    # but if they differ by more than two characters but the other characters are fused,
-                    # You also want to fuse them...
-                    # Another option is just to fuse anything with close theta values.
-                    # This assumes that it is really unlikely to have theta values really close
-                    # if there is no connection between the theta values
-                    # And what about if theta is zero? Do we fuse them too??
-
-                    # Must differ by no more than one character
-                    # if get_idx_differ_by_one_character(m1, m2) is None:
-                    #     continue
 
                     # Must have similar theta values
                     if np.isclose(theta[motif_idx1], theta[motif_idx2]):
