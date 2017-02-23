@@ -45,13 +45,13 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     def get_log_lik(self, theta):
         """
-        @return negative penalized log likelihood
+        @return vector of log likelihood
         """
-        log_lik = np.sum([
+        log_lik = [
             SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample, feature_mut_steps)
             for sample, feature_mut_steps in self.feature_mut_steps_pair
-        ])
-        return 1.0/self.num_samples * log_lik
+        ]
+        return log_lik
 
     def _get_log_lik_parallel(self, theta):
         """
