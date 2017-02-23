@@ -15,6 +15,7 @@ class SamplePrecalcData:
     def __init__(self, init_feat_counts, features_per_step_matrix, init_grad_vector, mutating_pos_feat_vals):
         self.init_feat_counts = init_feat_counts
         self.features_per_step_matrix = features_per_step_matrix
+        self.features_per_step_matrixT = self.features_per_step_matrix.T
         self.init_grad_vector = init_grad_vector
         self.mutating_pos_feat_vals = mutating_pos_feat_vals
 
@@ -91,7 +92,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             precalc_data.append(
                 SamplePrecalcData(
                     sample.obs_seq_mutation.feat_counts,
-                    csr_matrix(features_per_step_matrix),
+                    csc_matrix(features_per_step_matrix),
                     base_grad,
                     np.array(mutating_pos_feat_vals, dtype=int),
                 )
@@ -165,10 +166,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         Calculate the log likelihood of this sample
         """
-        risk_groups_exp_thetas_deltas = sample_data.features_per_step_matrix.multiply(exp_theta)
-        risk_groups_exp_thetas_base = np.multiply(sample_data.init_feat_counts, exp_theta)
-        risk_groups_exp_thetas = risk_groups_exp_thetas_base + risk_groups_exp_thetas_deltas
-        denominators = risk_groups_exp_thetas.sum(axis=0)
+        risk_group_sum_base = np.dot(sample_data.init_feat_counts.T, exp_theta)
+        risk_group_sum_deltas = sample_data.features_per_step_matrixT.dot(exp_theta)
+        denominators = risk_group_sum_deltas + risk_group_sum_base
         numerators = exp_theta[sample_data.mutating_pos_feat_vals]
         log_lik = np.log(numerators).sum() - np.log(denominators).sum()
         return log_lik
@@ -183,7 +183,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param theta: the theta to evaluate the gradient at
         @param sample_data: SamplePrecalcData
         """
-        grad_log_sum_exps_deltas = sample_data.features_per_step_matrix.multiply(exp_theta)
+        features_per_step_matrix = sample_data.features_per_step_matrix.todense()
+        grad_log_sum_exps_deltas = np.multiply(features_per_step_matrix, exp_theta)
+
         grad_log_sum_exps_base = np.multiply(sample_data.init_feat_counts, exp_theta)
         grad_log_sum_exps = grad_log_sum_exps_base + grad_log_sum_exps_deltas
         denominators = grad_log_sum_exps.sum(axis=0)
