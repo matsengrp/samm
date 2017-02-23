@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import re
+import random
+import warnings
 
 DEBUG = False
 
@@ -167,8 +169,20 @@ def read_bcr_hd5(path, remove_gap=True):
     else:
         return sites
 
-def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
-    """ replace unknown characters with "n" and collapse runs of "n"s """
+def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
+    """
+    Process the degenerate characters in sequences:
+    1. Replace unknown characters with "n"
+    2. Remove padding "n"s at beginning and end of sequence
+    3. Collapse runs of "n"s into one of motif_len/2
+    4. Replace all interior "n"s with nonmutating random nucleotide
+    
+    @param start_seq: starting sequence
+    @param end_seq: ending sequence
+    @param motif_len: motif length; needed to determine length of collapsed "n" run
+    @param threshold: if proportion of "n"s in a sequence is larger than this then
+        throw a warning
+    """
 
     assert(len(start_seq) == len(end_seq))
 
@@ -194,9 +208,21 @@ def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
         processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
         processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
 
+        # ensure there are not too many internal "n"s
+        num_ns = processed_end_seq.count('n')
+        seq_len = len(processed_end_seq)
+        if num_ns > threshold * seq_len:
+            warnings.warn("Sequence of length {0} had {1} unknown bases".format(seq_len, num_ns))
+
         # now collapse interior "n"s
         processed_start_seq = re.sub(pattern, repl, processed_start_seq)
         processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+
+        # generate random nucleotide if an "n" occurs in the middle of a sequence
+        for match in re.compile('n').finditer(processed_start_seq):
+            random_nuc = random.choice(NUCLEOTIDES)
+            processed_start_seq = mutate_string(processed_start_seq, match.start(), random_nuc)
+            processed_end_seq = mutate_string(processed_end_seq, match.start(), random_nuc)
 
     return processed_start_seq, processed_end_seq
 
