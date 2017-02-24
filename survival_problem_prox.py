@@ -48,8 +48,6 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         st = time.time()
         theta = init_theta
         step_size = init_step_size
-        diff = None
-        lower_bound = None
 
         # Calculate loglikelihood of current theta
         log_lik_vec_init = np.array(self._get_log_lik_parallel(theta))
@@ -82,22 +80,24 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 potential_theta = self.solve_prox(potential_theta, step_size)
                 potential_value = self._get_value_parallel(potential_theta)
 
-            if potential_value > current_value:
+            # Calculate lower bound to determine if we need to rerun
+            # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
+            log_lik_ratio_vec = np.array(self._get_log_lik_parallel(potential_theta)) - log_lik_vec_init
+            _, lower_bound, _ = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
+
+            # Calculate difference in objective function
+            diff = potential_value - current_value
+
+            if diff > 0:
                 # Stop if value is increasing
                 break
             else:
-                # Calculate lower bound to determine if we need to rerun
-                # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
-                log_lik_ratio_vec = np.array(self._get_log_lik_parallel(potential_theta)) - log_lik_vec_init
-                ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
-
                 theta = potential_theta
-                diff = current_value - potential_value
                 current_value = potential_value
 
-                if lower_bound > 0 or diff < diff_thres:
+                if lower_bound > 0 or np.abs(diff) < diff_thres:
                     # Stop if log likelihood ratio vector's lower bound is positive
-                    # or difference in objective function is too small
+                    # or difference in objective function is small
                     break
 
 
