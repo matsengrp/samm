@@ -1,13 +1,12 @@
 import sys
 import random
+import csv
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 import utils
 import glutils
 
-import sys
-import csv
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
@@ -151,6 +150,9 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
         for row in seq_reader:
             # process sequences
             start_seq, end_seq = process_degenerates_and_impute_nucleotides(gene_dict[row[0]], row[2].lower(), motif_len)
+            if cmp(start_seq, end_seq) == 0:
+                # Sequences are the same therefore no mutations, so skip this entry
+                continue
             obs_data.append(
                 ObservedSequenceMutations(
                     start_seq=start_seq,
