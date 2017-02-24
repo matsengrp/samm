@@ -30,9 +30,8 @@ class Survival_Problem_TestCase(unittest.TestCase):
 
         feature_mut_steps = feat_gen.create_for_mutation_steps(sample)
         problem_custom = SurvivalProblemLasso(feat_gen, [sample], penalty_param, theta_mask)
-        ll_custom = problem_custom.calculate_per_sample_log_lik(theta, sample, feature_mut_steps)
+        ll_custom = problem_custom.calculate_per_sample_log_lik(np.exp(theta), problem_custom.precalc_data[0])
         value_custom = problem_custom.get_value(theta)
-
         self.assertTrue(np.isclose(ll_cvx.value, ll_custom))
         self.assertTrue(np.isclose(value_cvx.value, -value_custom))
 

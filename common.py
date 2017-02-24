@@ -29,6 +29,7 @@ HOT_COLD_SPOT_REGS = [
     ["SYC - cold", "[cg][ct]c[atcg][atcg]"],
     ["GRS - cold", "[atcg][atcg]g[ga][cg]"],
 ]
+INT8_MAX = 127
 
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
@@ -196,7 +197,7 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     2. Remove padding "n"s at beginning and end of sequence
     3. Collapse runs of "n"s into one of motif_len/2
     4. Replace all interior "n"s with nonmutating random nucleotide
-    
+
     @param start_seq: starting sequence
     @param end_seq: ending sequence
     @param motif_len: motif length; needed to determine length of collapsed "n" run
