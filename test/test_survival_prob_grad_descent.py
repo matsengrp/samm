@@ -37,7 +37,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
 
         # Fast gradient calculation
         fast_grad = SurvivalProblemCustom.get_gradient_log_lik_per_sample(
-            np.exp(theta),
+            np.exp(theta).T,
             sample_data,
         )
         self.assertTrue(np.allclose(fast_grad, old_grad))

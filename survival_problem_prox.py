@@ -3,6 +3,7 @@ import numpy as np
 import scipy as sp
 import logging as log
 from multiprocessing import Pool
+from profile_support import profile
 
 from survival_problem_grad_descent import SurvivalProblemCustom
 

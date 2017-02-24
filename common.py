@@ -18,6 +18,8 @@ ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
+INT8_MAX = 127
+
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
         if nucleotide not in NUCLEOTIDE_SET:

@@ -2,7 +2,7 @@ import time
 from multiprocessing import Pool
 import numpy as np
 import scipy as sp
-from scipy.sparse import csc_matrix
+from scipy.sparse import csr_matrix
 
 import logging as log
 from survival_problem import SurvivalProblem
@@ -12,10 +12,10 @@ from common import *
 from profile_support import profile
 
 class SamplePrecalcData:
-    def __init__(self, init_feat_counts, features_per_step_matrix, init_grad_vector, mutating_pos_feat_vals):
+    @profile
+    def __init__(self, init_feat_counts, features_per_step_matrixT, init_grad_vector, mutating_pos_feat_vals):
         self.init_feat_counts = init_feat_counts
-        self.features_per_step_matrix = features_per_step_matrix
-        self.features_per_step_matrixT = self.features_per_step_matrix.T
+        self.features_per_step_matrixT = features_per_step_matrixT
         self.init_grad_vector = init_grad_vector
         self.mutating_pos_feat_vals = mutating_pos_feat_vals
 
@@ -89,12 +89,16 @@ class SurvivalProblemCustom(SurvivalProblem):
 
                 prev_feat_mut_step = feat_mut_step
 
+            mat_type = np.int8
+            if np.max(np.abs(features_per_step_matrix)) > INT8_MAX:
+                mat_type = np.int16 # range is -32768 to 32767
+
             precalc_data.append(
                 SamplePrecalcData(
                     sample.obs_seq_mutation.feat_counts,
-                    csc_matrix(features_per_step_matrix),
+                    csr_matrix(features_per_step_matrix.T, dtype=mat_type),
                     base_grad,
-                    np.array(mutating_pos_feat_vals, dtype=int),
+                    np.array(mutating_pos_feat_vals, dtype=np.int16),
                 )
             )
         return precalc_data
@@ -146,10 +150,10 @@ class SurvivalProblemCustom(SurvivalProblem):
         if self.pool is None:
             raise ValueError("Pool has not been initialized")
 
-        exp_theta = np.exp(theta)
+        exp_thetaT = np.exp(theta).T
         rand_seed = get_randint()
         worker_list = [
-            GradientWorker(rand_seed + i, exp_theta, sample_data)
+            GradientWorker(rand_seed + i, exp_thetaT, sample_data)
             for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.num_threads > 1:
@@ -166,7 +170,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         Calculate the log likelihood of this sample
         """
-        risk_group_sum_base = np.dot(sample_data.init_feat_counts.T, exp_theta)
+        risk_group_sum_base = np.dot(sample_data.init_feat_counts, exp_theta)
         risk_group_sum_deltas = sample_data.features_per_step_matrixT.dot(exp_theta)
         denominators = risk_group_sum_deltas + risk_group_sum_base
         numerators = exp_theta[sample_data.mutating_pos_feat_vals]
@@ -174,7 +178,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         return log_lik
 
     @staticmethod
-    def get_gradient_log_lik_per_sample(exp_theta, sample_data):
+    def get_gradient_log_lik_per_sample(exp_thetaT, sample_data):
         """
         Calculate the gradient of the log likelihood of this sample
         All the gradients for each step are the gradient of psi * theta - log(sum(exp(theta * psi)))
@@ -183,35 +187,35 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param theta: the theta to evaluate the gradient at
         @param sample_data: SamplePrecalcData
         """
-        features_per_step_matrix = sample_data.features_per_step_matrix.todense()
-        grad_log_sum_exps_deltas = np.multiply(features_per_step_matrix, exp_theta)
+        features_per_step_matrixT = sample_data.features_per_step_matrixT.todense()
+        grad_log_sum_exps_deltasT = np.multiply(features_per_step_matrixT, exp_thetaT)
 
-        grad_log_sum_exps_base = np.multiply(sample_data.init_feat_counts, exp_theta)
-        grad_log_sum_exps = grad_log_sum_exps_base + grad_log_sum_exps_deltas
-        denominators = grad_log_sum_exps.sum(axis=0)
-        grad_components = np.divide(grad_log_sum_exps, denominators)
-        grad = sample_data.init_grad_vector - grad_components.sum(axis=1)
-        return np.reshape(grad, (grad.size, 1))
+        grad_log_sum_exps_baseT = np.multiply(sample_data.init_feat_counts, exp_thetaT)
+        grad_log_sum_expsT = grad_log_sum_exps_baseT + grad_log_sum_exps_deltasT
+        denominators = grad_log_sum_expsT.sum(axis=1)
+        grad_components = np.divide(grad_log_sum_expsT, denominators)
+        grad = sample_data.init_grad_vector.T - grad_components.sum(axis=0)
+        return grad.T
 
 class GradientWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, seed, exp_theta, sample_data):
+    def __init__(self, seed, exp_thetaT, sample_data):
         """
         @param exp_theta: theta is where to take the gradient of the total log likelihood, exp_theta is exp(theta)
         @param sample: class ImputedSequenceMutations
         @param feature_vecs: list of sparse feature vectors for all at-risk positions at every mutation step
         """
         self.seed = seed
-        self.exp_theta = exp_theta
+        self.exp_thetaT = exp_thetaT
         self.sample_data = sample_data
 
     def run_worker(self):
         """
         @return the gradient of the log likelihood for this sample
         """
-        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.exp_theta, self.sample_data)
+        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.exp_thetaT, self.sample_data)
 
 class ObjectiveValueWorker(ParallelWorker):
     """
