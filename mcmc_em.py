@@ -98,8 +98,6 @@ class MCMC_EM:
                 lower_bound_is_negative = (lower_bound < 0)
                 log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
 
-            # If both lower_bound and log_lik_diff are None, then M step exited early on its first
-            # iteration and we should resample
             if lower_bound_is_negative:
                 # if penalized log likelihood is decreasing
                 break

@@ -104,5 +104,6 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
 
         self.pool.close()
         log.info("final PROX iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        # We return -diff because we want to ensure if it's increasing then it's not by much
+        # We return -diff because we want to ensure if the loss is increasing then it's not by much
+        # by comparing later to -diff < some_threshold
         return theta, current_value, -diff, lower_bound
