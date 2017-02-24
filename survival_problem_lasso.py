@@ -18,7 +18,7 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         """
         @return negative penalized log likelihood
         """
-        return -(self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))
+        return -(1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))
 
     def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
         """
@@ -33,8 +33,8 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, step_size = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
-        return theta, -current_value
+        theta, current_value, diff, lower_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, diff, lower_bound
 
     def solve_prox(self, theta, step_size):
         """
@@ -46,4 +46,4 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         """
         @return negative penalized log likelihood
         """
-        return - (self._get_log_lik_parallel(theta) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))
+        return - (1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))

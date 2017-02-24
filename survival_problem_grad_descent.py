@@ -64,6 +64,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             precalc_data = multiproc_manager.run()
         else:
             precalc_data = [worker.run() for worker in worker_list]
+
         return precalc_data
 
     def get_value(self, theta):
@@ -72,19 +73,12 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         raise NotImplementedError()
 
-    def calculate_log_lik_ratio_vec(self, theta, prev_theta):
-        llr_vec = np.zeros(self.num_samples)
-        for sample_id, sample_data in enumerate(self.precalc_data):
-            llr_vec[sample_id] = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample_data) - \
-                    SurvivalProblemCustom.calculate_per_sample_log_lik(prev_theta, sample_data)
-        return llr_vec
-
     def _get_log_lik_parallel(self, theta, batch_factor=1):
         """
         @param theta: the theta to calculate the likelihood for
         @param batch_factor: When using multiprocessing, we batch the samples together for speed
                             We make `num_threads` * `batch_factor` batches
-        @return negative log likelihood
+        @return vector of log likelihood values
         """
         if self.pool is None:
             raise ValueError("Pool has not been initialized")
@@ -100,7 +94,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             ll = multiproc_manager.run()
         else:
             ll = [worker.run() for worker in worker_list]
-        return 1.0/self.num_samples * np.sum(ll)
+        return np.array(ll)
 
     def _get_gradient_log_lik(self, theta, batch_factor=2):
         """

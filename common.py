@@ -15,6 +15,7 @@ NUCLEOTIDE_DICT = {
     "g": 2,
     "t": 3,
 }
+
 GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6

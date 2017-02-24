@@ -5,6 +5,7 @@ import logging as log
 from multiprocessing import Pool
 from profile_support import profile
 
+from common import *
 from survival_problem_grad_descent import SurvivalProblemCustom
 
 class SurvivalProblemProximal(SurvivalProblemCustom):
@@ -29,8 +30,8 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, step_size = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
-        return theta, -current_value
+        theta, current_value, diff, lower_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, diff, lower_bound
 
     def _get_value_parallel(self, theta):
         """
@@ -46,7 +47,14 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         st = time.time()
         theta = init_theta
         step_size = init_step_size
-        current_value = self._get_value_parallel(theta)
+        diff = 0
+        lower_bound = 0
+
+        # Calculate loglikelihood of current theta
+        log_lik_vec_init = self._get_log_lik_parallel(theta)
+        init_value = self._get_value_parallel(theta)
+        current_value = init_value
+
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("PROX iter %d, val %f, time %f" % (i, current_value, time.time() - st))
@@ -77,13 +85,24 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 # Stop if value is increasing
                 break
             else:
+                # Calculate lower bound to determine if we need to rerun
+                # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
+                log_lik_ratio_vec = self._get_log_lik_parallel(potential_theta) - log_lik_vec_init
+                _, lower_bound, _ = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
+
+                # Calculate difference in objective function
                 theta = potential_theta
-                diff = current_value - potential_value
                 current_value = potential_value
-                if diff < diff_thres:
-                    # Stop if difference in objective function is too small
+                diff = current_value - potential_value
+
+                if lower_bound > 0 or diff < diff_thres:
+                    # Stop if log likelihood ratio vector's lower bound is positive
+                    # or difference in objective function is small
                     break
+
 
         self.pool.close()
         log.info("final PROX iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        return theta, current_value, step_size
+        # We return -diff because we want to ensure if the loss is increasing then it's not by much
+        # by comparing later to -diff < some_threshold
+        return theta, current_value, -diff, lower_bound
