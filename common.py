@@ -190,7 +190,7 @@ def read_germline_file(fasta):
         bases = []
         for seq_record in SeqIO.parse(fasta_file, 'fasta'):
             genes.append(seq_record.id)
-            bases.append(seq_record.seq.lower())
+            bases.append(str(seq_record.seq))
     
     return pd.DataFrame({'base': bases}, index=genes)
 
