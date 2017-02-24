@@ -178,8 +178,8 @@ class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
         @return final fitted value of theta and penalized log likelihood
         """
 
-        theta, current_value, step_size = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
-        return theta, -current_value, step_size
+        theta, current_value, diff, lower_bound = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, diff, lower_bound
 
     def _get_value_parallel(self, theta):
         """

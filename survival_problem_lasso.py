@@ -33,8 +33,8 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, step_size = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
-        return theta, -current_value
+        theta, current_value, diff, lower_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, diff, lower_bound
 
     def solve_prox(self, theta, step_size):
         """
