@@ -5,8 +5,6 @@
 
 '''
 
-from __future__ import print_function
-
 import subprocess
 import sys
 import argparse
@@ -18,6 +16,7 @@ import csv
 import pickle
 
 from common import *
+from read_data import *
 from Bio import SeqIO
 from submotif_feature_generator import SubmotifFeatureGenerator
 
@@ -99,6 +98,9 @@ def parse_args():
         type=int,
         default=None,
         help='codon frame')
+    parser_simulate.add_argument('--output-ancestors',
+        action='store_true',
+        help='use intermediate ancestors as "germline"')
     parser_simulate.set_defaults(func=simulate)
 
     parser_simulate.set_defaults(subcommand=simulate)
@@ -148,7 +150,7 @@ def simulate(args):
     params = read_germline_file(args.param_path)
 
     # Find genes with "N" and remove them so gctree is happy
-    genes_to_sample = [row.index for row in params if set(row) == NUCLEOTIDE_SET]
+    genes_to_sample = [idx for idx, row in params.iterrows() if set(row['base'].lower()) == NUCLEOTIDE_SET]
 
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
@@ -159,20 +161,16 @@ def simulate(args):
 
     # Put the nucleotide content of each selected germline gene into a
     # corresponding list.
-    germline_nucleotides = [row[gene] for gene in germline_genes]
+    germline_nucleotides = [params.loc[gene]['base'] for gene in germline_genes]
 
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
-    with open(args.output_genes, 'w') as outgermlines:
-        germline_file = csv.writer(outgermlines)
-        germline_file.writerow(['germline_name','germline_sequence'])
-        for gene, sequence in zip(germline_genes, germline_nucleotides):
-            germline_file.writerow([gene,sequence])
-
     # For each germline gene, run shmulate to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
     # used, name of simulated sequence and corresponding sequence.
-    with open(args.output_file, 'w') as outseqs:
+    with open(args.output_file, 'w') as outseqs, open(args.output_genes, 'w') as outgermlines:
+        germline_file = csv.writer(outgermlines)
+        germline_file.writerow(['germline_name','germline_sequence'])
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
         for run, (gene, sequence) in \
@@ -180,12 +178,20 @@ def simulate(args):
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
+            if not args.output_ancestors:
+                germline_file.writerow([gene,sequence])
             tree = run_gctree(args, sequence)
+            root = tree.get_tree_root()
             i = 0
-            for leaf in tree.iter_leaves():
+            for leaf in root:
                 if leaf.frequency != 0:
                     i += 1
-                    seq_file.writerow([gene, 'Run{0}-Sequence{1}'.format(run, i), str(leaf.sequence).lower()])
+                    seq_name = 'Run{0}-Sequence{1}'.format(run, i)
+                    if args.output_ancestors:
+                        # This will be a little redundant since two sequences will share same ancestor
+                        gene = '-'.join(['Parent', seq_name])
+                        germline_file.writerow([gene,leaf.up.sequence.lower()])
+                    seq_file.writerow([gene, seq_name, leaf.sequence.lower()])
 
     # Dump the true "thetas," which are mutability * substitution
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
