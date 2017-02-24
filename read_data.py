@@ -84,22 +84,26 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
                         continue
                     filtered_line = line.copy()
                     if impute_ancestors:
+                        # TODO: for now just return all sequences
+                        
                         # dress each sequence with its ancestor and put into column gene_col using all seqs
                         # then filter based on good_seq()
-                        filtered_line = compute_ancestors(filtered_line, gene_col, seqs_col)
-                        for col in [gene_col, seqs_col, 'unique_ids']:
-                            filtered_line[col] = []
-                            for good_idx in good_seq_idx:
-                                filtered_line[col].append(line[col][good_idx])
-                        # TODO: this will repeat some germlines since they're shared between sequences... oh well
-                    else:
-                        # otherwise pick a random good_seq()
-                        random_idx = random.choice(good_seq_idx)
-                        for col in [seqs_col, 'unique_ids']:
-                            filtered_line[col] = line[col][random_idx]
+                        #filtered_line = compute_ancestors(filtered_line, gene_col, seqs_col)
                         gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, line['v_gene']])
                         gene_writer.writerow({'germline_name': gl_name,
                             'germline_sequence': filtered_line[gene_col].lower()})
+                        for good_idx in good_seq_idx:
+                            for col in [seqs_col, 'unique_ids']:
+                                filtered_line[col] = line[col][good_idx]
+                            seq_writer.writerow(get_seq_line(filtered_line, seqs_col, gl_name, output_presto))
+                    else:
+                        # otherwise pick a random good_seq()
+                        random_idx = random.choice(good_seq_idx)
+                        gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, line['v_gene']])
+                        gene_writer.writerow({'germline_name': gl_name,
+                            'germline_sequence': filtered_line[gene_col].lower()})
+                        for col in [seqs_col, 'unique_ids']:
+                            filtered_line[col] = line[col][random_idx]
                         seq_writer.writerow(get_seq_line(filtered_line, seqs_col, gl_name, output_presto))
 
 def get_seq_line(line, seqs_col, gl_name, output_presto):
