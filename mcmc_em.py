@@ -45,7 +45,6 @@ class MCMC_EM:
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         all_traces = []
         for run in range(max_em_iters):
-            lower_bound_is_negative = True
             prev_theta = theta
             num_e_samples = self.base_num_e_samples
             burn_in = self.burn_in
@@ -60,7 +59,7 @@ class MCMC_EM:
             )
 
             e_step_samples = []
-            while lower_bound_is_negative and len(e_step_samples) < max_e_samples:
+            while len(e_step_samples) < max_e_samples:
                 ## Keep grabbing samples until it is highly likely we have increased the penalized log likelihood
 
                 # do E-step
@@ -101,10 +100,10 @@ class MCMC_EM:
 
             # If both lower_bound and log_lik_diff are None, then M step exited early on its first
             # iteration and we should resample
-            if lower_bound_is_negative and lower_bound is not None:
+            if lower_bound_is_negative:
                 # if penalized log likelihood is decreasing
                 break
-            elif log_lik_diff < diff_thres and log_lik_diff is not None:
+            elif log_lik_diff < diff_thres:
                 # if penalized log likelihood is increasing but not by very much
                 break
 
