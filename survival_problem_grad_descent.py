@@ -70,17 +70,6 @@ class SurvivalProblemCustom(SurvivalProblem):
                 sample.obs_seq_mutation.num_mutations
             ))
 
-            if sample.obs_seq_mutation.num_mutations == 0:
-                # No mutations, features_per_step_matrix will be empty
-                precalc_data.append(
-                    SamplePrecalcData(
-                        features_per_step_matrix,
-                        base_grad,
-                        np.array(mutating_pos_feat_vals, dtype=int),
-                    )
-                )
-                continue
-
             features_per_step_matrix[:,0] = sample.obs_seq_mutation.feat_counts_flat
             prev_feat_mut_step = feat_mut_steps[0]
             for i, feat_mut_step in enumerate(feat_mut_steps[1:]):
