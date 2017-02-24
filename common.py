@@ -1,6 +1,8 @@
 import numpy as np
 import pandas as pd
 import re
+import random
+import warnings
 
 DEBUG = False
 
@@ -19,6 +21,15 @@ ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
+HOT_COLD_SPOT_REGS = [
+    ["RGYW - hot","[atcg][ga]g[ct][at]"],
+    ["WRCY - hot", "[at][ga]c[ct][atcg]"],
+    ["WA - hot", "[atcg][at]a[atcg][atcg]"],
+    ["TW - hot", "[atcg][atcg]t[at][atcg]"],
+    ["SYC - cold", "[cg][ct]c[atcg][atcg]"],
+    ["GRS - cold", "[atcg][atcg]g[ga][cg]"],
+]
+
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
         if nucleotide not in NUCLEOTIDE_SET:
@@ -35,11 +46,21 @@ def get_nonzero_theta_print_lines(theta, motif_list):
     """
     @return a string that summarizes the theta vector/matrix
     """
+    def is_match(regex, submotif):
+        match_res = re.match(regex, submotif)
+        return match_res is not None
+
     lines = []
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
-                lines.append("%d: %s (%s)" % (i, theta[i,], motif_list[i]))
+                motif = motif_list[i]
+                hot_cold_matches = ""
+                for spot_name, spot_regex in HOT_COLD_SPOT_REGS:
+                    if is_match(spot_regex, motif):
+                        hot_cold_matches = " -- " + spot_name
+                        break
+                lines.append("%d: %s (%s%s)" % (i, theta[i,], motif_list[i], hot_cold_matches))
                 break
     return "\n".join(lines)
 
@@ -168,8 +189,20 @@ def read_bcr_hd5(path, remove_gap=True):
     else:
         return sites
 
-def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
-    """ replace unknown characters with "n" and collapse runs of "n"s """
+def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
+    """
+    Process the degenerate characters in sequences:
+    1. Replace unknown characters with "n"
+    2. Remove padding "n"s at beginning and end of sequence
+    3. Collapse runs of "n"s into one of motif_len/2
+    4. Replace all interior "n"s with nonmutating random nucleotide
+    
+    @param start_seq: starting sequence
+    @param end_seq: ending sequence
+    @param motif_len: motif length; needed to determine length of collapsed "n" run
+    @param threshold: if proportion of "n"s in a sequence is larger than this then
+        throw a warning
+    """
 
     assert(len(start_seq) == len(end_seq))
 
@@ -195,9 +228,21 @@ def trim_degenerates_and_collapse(start_seq, end_seq, motif_len):
         processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
         processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
 
+        # ensure there are not too many internal "n"s
+        num_ns = processed_end_seq.count('n')
+        seq_len = len(processed_end_seq)
+        if num_ns > threshold * seq_len:
+            warnings.warn("Sequence of length {0} had {1} unknown bases".format(seq_len, num_ns))
+
         # now collapse interior "n"s
         processed_start_seq = re.sub(pattern, repl, processed_start_seq)
         processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+
+        # generate random nucleotide if an "n" occurs in the middle of a sequence
+        for match in re.compile('n').finditer(processed_start_seq):
+            random_nuc = random.choice(NUCLEOTIDES)
+            processed_start_seq = mutate_string(processed_start_seq, match.start(), random_nuc)
+            processed_end_seq = mutate_string(processed_end_seq, match.start(), random_nuc)
 
     return processed_start_seq, processed_end_seq
 

@@ -3,7 +3,6 @@ import numpy as np
 import itertools
 import scipy.sparse
 import re
-import random
 
 from common import *
 from feature_generator import *
