@@ -12,7 +12,6 @@ from common import *
 from profile_support import profile
 
 class SamplePrecalcData:
-    @profile
     def __init__(self, init_feat_counts, features_per_step_matrixT, init_grad_vector, mutating_pos_feat_vals):
         self.init_feat_counts = init_feat_counts
         self.features_per_step_matrixT = features_per_step_matrixT
