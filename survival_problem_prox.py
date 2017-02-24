@@ -50,7 +50,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         step_size = init_step_size
 
         # Calculate loglikelihood of current theta
-        log_lik_vec_init = array(self._get_log_lik_parallel(theta)
+        log_lik_vec_init = self._get_log_lik_parallel(theta)
         init_value = self._get_value_parallel(theta)
         current_value = init_value
 
