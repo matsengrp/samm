@@ -43,8 +43,6 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         Runs proximal gradient descent to minimize the negative penalized log likelihood
         @return final fitted value of theta and penalized negative log likelihood and step size
         """
-        self.pool = Pool(self.num_threads)
-
         st = time.time()
         theta = init_theta
         step_size = init_step_size
