@@ -50,7 +50,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         step_size = init_step_size
 
         # Calculate loglikelihood of current theta
-        log_lik_vec_init = np.array(self._get_log_lik_parallel(theta))
+        log_lik_vec_init = array(self._get_log_lik_parallel(theta)
         init_value = self._get_value_parallel(theta)
         current_value = init_value
 
@@ -82,7 +82,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
 
             # Calculate lower bound to determine if we need to rerun
             # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
-            log_lik_ratio_vec = np.array(self._get_log_lik_parallel(potential_theta)) - log_lik_vec_init
+            log_lik_ratio_vec = self._get_log_lik_parallel(potential_theta) - log_lik_vec_init
             _, lower_bound, _ = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
 
             # Calculate difference in objective function

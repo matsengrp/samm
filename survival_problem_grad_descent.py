@@ -122,7 +122,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             ll = multiproc_manager.run()
         else:
             ll = [worker.run() for worker in worker_list]
-        return ll
+        return np.array(ll)
 
     def _get_gradient_log_lik(self, theta, batch_factor=2):
         """
