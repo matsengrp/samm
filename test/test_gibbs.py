@@ -173,5 +173,5 @@ class Gibbs_TestCase(unittest.TestCase):
         """
         rho, pval = self._test_joint_distribution(self.multi_theta, self.multi_theta)
 
-        self.assertTrue(rho > 0.98)
-        self.assertTrue(pval < 1e-37)
+        self.assertTrue(rho > 0.94)
+        self.assertTrue(pval < 1e-31)

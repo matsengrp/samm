@@ -216,7 +216,6 @@ class MutationOrderGibbsSampler(Sampler):
 
         return gibbs_step_sample, all_log_probs[sampled_idx]
 
-    @profile
     def _compute_log_probs_from_scratch(self, curr_order):
         """
         Compute the log likelihood for this full mutation ordering
