@@ -92,8 +92,8 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
 
                 # Calculate difference in objective function
                 theta = potential_theta
-                current_value = potential_value
                 diff = current_value - potential_value
+                current_value = potential_value
 
                 if lower_bound > 0 or diff < diff_thres:
                     # Stop if log likelihood ratio vector's lower bound is positive
