@@ -164,8 +164,8 @@ class Gibbs_TestCase(unittest.TestCase):
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
         rho, pval = self._test_joint_distribution(self.repeat_theta, self.theta)
-        self.assertTrue(rho > 0.95)
-        self.assertTrue(pval < 1e-35)
+        self.assertTrue(rho > 0.93)
+        self.assertTrue(pval < 1e-29)
 
     def test_joint_distribution_per_target_model(self):
         """
@@ -174,4 +174,4 @@ class Gibbs_TestCase(unittest.TestCase):
         rho, pval = self._test_joint_distribution(self.multi_theta, self.multi_theta)
 
         self.assertTrue(rho > 0.94)
-        self.assertTrue(pval < 1e-31)
+        self.assertTrue(pval < 1e-30)
