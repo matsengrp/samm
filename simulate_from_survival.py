@@ -88,20 +88,19 @@ def _generate_true_parameters(feature_vec_len, motif_list, args):
     num_theta_col = NUM_NUCLEOTIDES if args.per_target_model else 1
     true_thetas = np.zeros((feature_vec_len, num_theta_col))
     probability_matrix = None
+
+    possible_motif_mask = get_possible_motifs_to_targets(motif_list, (feature_vec_len, NUM_NUCLEOTIDES))
+    impossible_motif_mask = ~possible_motif_mask
+
     if args.per_target_model:
         # Set the impossible thetas to -inf
-        for i in range(len(motif_list)):
-            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][args.motif_len/2]]
-            true_thetas[i, center_nucleotide_idx] = -np.inf
+        true_thetas[impossible_motif_mask] = -np.inf
     else:
         # True probabilities of mutating to a certain target nucleotide
         # Only relevant when we deal with a single theta column
         # Suppose equal probability to all target nucleotides for zero motifs
         probability_matrix = np.ones((feature_vec_len, NUM_NUCLEOTIDES))/3.0
-        for i in range(len(motif_list)):
-            # Set impossible target nucleotides to probability zero
-            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][args.motif_len/2]]
-            probability_matrix[i, center_nucleotide_idx] = 0
+        probability_matrix[impossible_motif_mask] = 0
 
     some_num_nonzero_motifs = int(true_thetas.shape[0] * args.ratio_nonzero/2.0)
     # Remove edge motifs from random choices

@@ -84,7 +84,6 @@ class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
         mutate_positions = []
         for p in pos_to_mutate:
             motif_idx = feature_vec_dict[p]
-            nucleotide_to_mutate = intermediate_seq[p]
             hazard_weights.append(np.exp(self.thetas[motif_idx,0]))
             mutate_positions.append(p)
 
