@@ -22,11 +22,12 @@
 
 ### simulated from survival model
 
-1. Run all models
+1. Simulate survival model from random DNA sequences using a
     - star tree 1-column
     - star tree 4-column
-2. Check differences in parameters
-3. Compare results to truth
+2. Fit all models (see above)
+3. Check differences in parameters
+4. Compare results to truth
 
 ### parsimony survival model
 
@@ -48,4 +49,3 @@
 2. Check vs. known hot/cold spots
 3. Compare between datasets for conserved/varying motifs
 4. Predictive check??? TODO
-
