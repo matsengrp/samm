@@ -25,15 +25,12 @@ class Gibbs_TestCase(unittest.TestCase):
         cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("attcgtatac", "ataagttatc", cls.motif_len))
 
         # This generates a theta where columns are repeated
-        cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1) * 3
-        cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,]
-        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.repeat_theta.shape)
-        cls.repeat_theta[~theta_mask] = -np.inf
-        cls.theta = np.matrix(np.max(cls.repeat_theta, axis=1)).T
+        cls.theta = np.random.rand(cls.feat_gen.feature_vec_len, 1) * 2
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
         # This generates a theta with random entries
         cls.multi_theta = np.random.rand(cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
+        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.multi_theta.shape)
         cls.multi_theta[~theta_mask] = -np.inf
         cls.multi_gibbs_sampler = MutationOrderGibbsSampler(cls.multi_theta, cls.feat_gen, cls.obs_seq_m)
 
@@ -116,14 +113,15 @@ class Gibbs_TestCase(unittest.TestCase):
         from the survival model vs. when we generate mutation orders given the mutation positions from the
         gibbs sampler
         """
-        START_SEQ = "attcc" # MUST BE LESS THAN TEN, Includes flanks!
+        START_SEQ = "attcgc" # MUST BE LESS THAN TEN, Includes flanks!
         NUM_OBS_SAMPLES = 8000
         BURN_IN = 15
         CENSORING_TIME = 2.0
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
 
-        if theta.shape[1] == 1:
+        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
+        if not per_target_model:
             surv_simulator = SurvivalModelSimulatorSingleColumn(theta, self.probability_matrix, self.feat_gen, lambda0=LAMBDA0)
         else:
             surv_simulator = SurvivalModelSimulatorMultiColumn(theta, self.feat_gen, lambda0=LAMBDA0)
@@ -163,7 +161,7 @@ class Gibbs_TestCase(unittest.TestCase):
 
         # Calculate the spearman correlation. Should be high!
         rho, pval = spearmanr(true_counter_order_vec, gibbs_counter_order_vec)
-        print "rho, pval", rho, pval
+        print "rho, pval", rho, pval, per_target_model
 
         for t, g in zip(true_counter.most_common(NUM_TOP_COMMON), gibbs_counter.most_common(NUM_TOP_COMMON)):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
@@ -174,8 +172,8 @@ class Gibbs_TestCase(unittest.TestCase):
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
         rho, pval = self._test_joint_distribution(self.theta)
-        self.assertTrue(rho > 0.97)
-        self.assertTrue(pval < 1e-09)
+        self.assertTrue(rho > 0.95)
+        self.assertTrue(pval < 1e-33)
 
     def test_joint_distribution_per_target_model(self):
         """
@@ -183,5 +181,5 @@ class Gibbs_TestCase(unittest.TestCase):
         """
         rho, pval = self._test_joint_distribution(self.multi_theta)
 
-        self.assertTrue(rho > 0.94)
-        self.assertTrue(pval < 1e-30)
+        self.assertTrue(rho > 0.96)
+        self.assertTrue(pval < 1e-37)
