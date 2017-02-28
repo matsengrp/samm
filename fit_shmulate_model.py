@@ -66,9 +66,9 @@ def main(args=sys.argv[1:]):
     command = 'Rscript'
     script_file = 'R/fit_shmulate_model.R'
 
-    # cmd = [command, script_file, args.input_file, args.input_genes, args.model_pkl.replace(".pkl", "")]
-    # print "Calling:", " ".join(cmd)
-    # res = subprocess.call(cmd)
+    cmd = [command, script_file, args.input_file, args.input_genes, args.model_pkl.replace(".pkl", "")]
+    print "Calling:", " ".join(cmd)
+    res = subprocess.call(cmd)
 
     # Read in the results from the shmulate model-fitter
     feat_gen = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
