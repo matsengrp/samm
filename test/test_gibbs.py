@@ -7,7 +7,8 @@ from collections import Counter
 
 from common import *
 from models import ObservedSequenceMutations
-from survival_model_simulator import SurvivalModelSimulator
+from survival_model_simulator import SurvivalModelSimulatorSingleColumn
+from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
@@ -21,13 +22,18 @@ class Gibbs_TestCase(unittest.TestCase):
         motif_list = cls.feat_gen.get_motif_list()
         motif_list_len = len(motif_list)
         # This generates a theta where columns are repeated
-        cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1)
+        cls.repeat_theta = np.repeat(np.random.rand(cls.feat_gen.feature_vec_len, 1), NUM_NUCLEOTIDES, axis=1) * 3
         cls.repeat_theta[:motif_list_len,] = cls.repeat_theta[:motif_list_len,]
         theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.repeat_theta.shape)
         cls.repeat_theta[~theta_mask] = -np.inf
         cls.theta = np.matrix(np.max(cls.repeat_theta, axis=1)).T
         cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("attcgtatac", "ataagttatc", cls.motif_len))
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
+
+        cls.probability_matrix = np.ones((cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES))/3.0
+        possible_motif_mask = get_possible_motifs_to_targets(motif_list, (cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
+        impossible_motif_mask = ~possible_motif_mask
+        cls.probability_matrix[impossible_motif_mask] = 0
 
     def test_compute_log_probs(self):
         order = self.obs_seq_m.mutation_pos_dict.keys()
@@ -86,20 +92,24 @@ class Gibbs_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(curr_denominators, fast_denominators))
         self.assertTrue(np.allclose(curr_log_numerators, fast_log_numerators))
 
-    def _test_joint_distribution(self, simulator_theta, gibbs_theta):
+    def _test_joint_distribution(self, theta):
         """
         Check that the distribution of mutation orders is similar when we generate mutation orders directly
         from the survival model vs. when we generate mutation orders given the mutation positions from the
         gibbs sampler
         """
-        START_SEQ = "attcgc" # MUST BE LESS THAN TEN
-        NUM_OBS_SAMPLES = 5500
+        START_SEQ = "attcc" # MUST BE LESS THAN TEN, Includes flanks!
+        NUM_OBS_SAMPLES = 8000
         BURN_IN = 15
         CENSORING_TIME = 2.0
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
 
-        surv_simulator = SurvivalModelSimulator(simulator_theta, self.feat_gen, lambda0=LAMBDA0)
+        if theta.shape[1] == 1:
+            surv_simulator = SurvivalModelSimulatorSingleColumn(theta, self.probability_matrix, self.feat_gen, lambda0=LAMBDA0)
+        else:
+            surv_simulator = SurvivalModelSimulatorMultiColumn(theta, self.feat_gen, lambda0=LAMBDA0)
+
         # Simulate some data from the same starting sequence
         # Get the distribution of mutation orders from our survival model
         full_seq_muts = [surv_simulator.simulate(START_SEQ, censoring_time=CENSORING_TIME) for i in range(NUM_OBS_SAMPLES)]
@@ -119,7 +129,7 @@ class Gibbs_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(gibbs_theta, self.feat_gen, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(theta, self.feat_gen, obs_seq_m)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
             order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
@@ -145,9 +155,9 @@ class Gibbs_TestCase(unittest.TestCase):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
-        rho, pval = self._test_joint_distribution(self.repeat_theta, self.theta)
-        self.assertTrue(rho > 0.95)
-        self.assertTrue(pval < 1e-35)
+        rho, pval = self._test_joint_distribution(self.theta)
+        self.assertTrue(rho > 0.97)
+        self.assertTrue(pval < 1e-09)
 
     @unittest.skip("doesnt work right now")
     def test_joint_distribution_per_target_model(self):
