@@ -75,7 +75,7 @@ def parse_args():
         action="store_true",
         help='Allow same position to mutate multiple times')
 
-    parser.set_defaults(per_target_model=False, with_replacement=False)
+    parser.set_defaults(guarantee_motifs_showup=False, per_target_model=False, with_replacement=False)
     args = parser.parse_args()
     # Only even random gene lengths allowed
     assert(args.random_gene_len % 2 == 0)

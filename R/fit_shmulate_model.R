@@ -43,6 +43,18 @@ target_model <- createTargetingMatrix(sub_model, mut_model)
 
 write.csv(
     t(target_model),
-    file=output.file,
+    file=paste(output.file, "_target.csv", sep=""),
+    quote=FALSE
+)
+
+write.csv(
+    t(sub_model),
+    file=paste(output.file, "_sub.csv", sep=""),
+    quote=FALSE
+)
+
+write.csv(
+    t(mut_model),
+    file=paste(output.file, "_mut.csv", sep=""),
     quote=FALSE
 )

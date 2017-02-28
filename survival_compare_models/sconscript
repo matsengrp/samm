@@ -1,0 +1,163 @@
+## Test model fits against one another - data generated from a survival model
+
+import os
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {'nreps': localenv['NREPS'],
+        'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+# Nest for simulation methods
+sim_models = [
+    # 'is_per_target',
+    'is_single',
+]
+
+nest.add(
+    'per_target_model',
+    sim_models)
+
+nest.add(
+    'simulation_options',
+    lambda c: ['python simulate_from_survival.py --motif-len 5 %s' % (
+        "" if c["per_target_model"] == "is_single" else "--per-target-model"
+    )],
+    create_dir=False)
+
+sim_size_dict = [
+    {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 1, 'ratio_nonzero': .2},
+    # {'size': 'big', 'n_taxa': 10, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1, 'ratio_nonzero': .2},
+]
+
+nest.add(
+    'simulation_size',
+    sim_size_dict,
+    label_func=lambda c: c['size'])
+
+# Nest for replicates
+nest.add(
+    'replicate',
+    range(localenv['NREPS']),
+    label_func='{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
+    create_dir=False)
+
+# Targets for simulating fake data
+# TODO: put this all in one driver function so sources/targets jibe with one another
+@nest.add_target_with_env(localenv)
+def generate(env, outdir, c):
+    cmd = [c['simulation_options']] + ['--seed',
+                c['seed'],
+                '--n-taxa',
+                c['simulation_size']['n_taxa'],
+                '--n-germlines',
+                c['simulation_size']['n_germlines'],
+                '--output-true-theta ${TARGETS[0]}',
+                '--output-file ${TARGETS[1]}',
+                '--output-genes ${TARGETS[2]}',
+                '--random-gene-len',
+               c['simulation_size']['random_gene_len'],
+               '--min-censor-time',
+               c['simulation_size']['min_censor_time'],
+               '--ratio-nonzero',
+               c['simulation_size']['ratio_nonzero'],
+        ]
+
+    return env.Command(
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# Nest for fitting models
+model_options = [
+    'survival_L',
+    # 'survival_L4',
+    # 'survival_FL',
+    'basic',
+    'basic_4',
+    'shmulate'
+]
+
+nest.add(
+    'model_options',
+    model_options)
+
+# Nest for model fitting
+# TODO: put this all in one driver function so sources/targets jibe with one another
+@nest.add_target_with_env(localenv)
+def fit_context_model(env, outdir, c):
+    cmd = []
+    if c["model_options"].startswith("survival"):
+        model_option = c["model_options"].replace("survival_", "")
+        per_target_model_str = ""
+        if model_option == "L4":
+            model_option = "L"
+            per_target_model_str = "--per-target-model"
+
+        cmd = ['python fit_context_model.py',
+               '--seed',
+               c['seed'],
+               '--motif-len',
+               5,
+               '--penalty-params',
+               "0.01",
+               '--num-cpu-threads',
+               10,
+               '--num-jobs',
+               30,
+               '--burn-in',
+               2,
+               '--num-e-samples',
+               4,
+               '--solver',
+               model_option,
+               per_target_model_str,
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
+               '--out-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+    elif c["model_options"] == "shmulate":
+        cmd = ['python fit_shmulate_model.py',
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
+               '--model-pkl ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+    elif c["model_options"].startswith("basic"):
+        per_target_model_str = c["model_options"].replace("basic_", "")
+        per_target_model_str = "--per-target-model" if per_target_model_str == "4" else ""
+        cmd = ['python fit_basic_model.py',
+               '--seed',
+               c['seed'],
+               '--motif-len',
+               5,
+               per_target_model_str,
+               '--theta-file ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--input-genes ${SOURCES[2]}',
+               '--prop-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+
+# Aggregate over different fitting methods
+
+# Aggregate over all replicates
+
+# Plot results

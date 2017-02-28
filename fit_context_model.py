@@ -146,7 +146,7 @@ def load_true_theta(theta_file, per_target_model):
 
     @return the true theta vector/matrix
     """
-    true_theta = pickle.load(open(theta_file, 'rb'))
+    true_theta, probability_matrix = pickle.load(open(theta_file, 'rb'))
     if per_target_model:
         return true_theta
     else:
