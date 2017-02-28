@@ -261,3 +261,10 @@ def get_idx_differ_by_one_character(s1, s2):
             count_diffs += 1
             idx_differ = i
     return idx_differ
+
+def get_target_col(sample, mutation_pos):
+    """
+    @param sample: ObservedSequenceMutations
+    @returns the index of the column in the hazard rate matrix for the target nucleotide
+    """
+    return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]]

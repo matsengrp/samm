@@ -150,9 +150,12 @@ class MutationOrderGibbsSampler(Sampler):
             # correct the full ordering probability by taking away the old terms
             full_ordering_log_prob += -log_numerators[i] - log_numerators[i + 1] + np.log(denominators[i + 1])
 
-            log_numerators[i] = np.asscalar(self.theta[first_mutation_feat])
-            log_numerators[i + 1] = np.asscalar(self.theta[second_feat_mut_step.mutating_pos_feat])
-            denominators[i + 1] = self._get_denom_update(denominators[i], log_numerators[i], second_feat_mut_step)
+            col_idx_earlier = get_target_col(self.obs_seq_mutation, position) if self.per_target_model else 0
+            log_numerators[i] = np.asscalar(self.theta[first_mutation_feat, col_idx_earlier])
+
+            col_idx_later = get_target_col(self.obs_seq_mutation, shuffled_position) if self.per_target_model else 0
+            log_numerators[i + 1] = np.asscalar(self.theta[second_feat_mut_step.mutating_pos_feat, col_idx_later])
+            denominators[i + 1] = self._get_denom_update(denominators[i], first_mutation_feat, second_feat_mut_step)
 
             # correct the full ordering probability by adding back the new terms
             full_ordering_log_prob += log_numerators[i] + log_numerators[i + 1] - np.log(denominators[i + 1])
@@ -213,48 +216,6 @@ class MutationOrderGibbsSampler(Sampler):
 
         return gibbs_step_sample, all_log_probs[sampled_idx]
 
-    def _update_log_prob_from_shuffle(self, i, old_log_probs, order, prev_order, feature_vec_theta_sums, prev_feature_vec_theta_sums):
-        """
-        Calculate multinomial probs - only need to update 2 values (the one where this position mutates and
-        the position that mutates right after it), rest are the same
-        @param i: the index of the positions in the `order` and `prev_order` that are being shuffled in the mutation order
-        @param old_log_probs: the previous log probabilities - most of these are correct. only corrections need to occur in i and i + 1
-        @param order: the order after the shuffle
-        @param prev_order: the order before the shuffle
-        @param feature_vec_theta_sums: the theta sum values for each position after the shuffle
-        @param prev_feature_vec_theta_sums: the theta sum values for each position before the shuffle
-        """
-        log_probs = np.copy(old_log_probs)
-        pos_mutate_earlier = order[i]
-        pos_mutate_later = prev_order[i]
-
-        # Term at `i` is easy to update: just change out the numerator from the multinomial (but log it)
-        col_idx_earlier = self._get_target_col(pos_mutate_earlier) if self.per_target_model else 0
-        col_idx_later = self._get_target_col(pos_mutate_later) if self.per_target_model else 0
-        log_probs[i] += feature_vec_theta_sums[i][pos_mutate_earlier][col_idx_earlier] - feature_vec_theta_sums[i][pos_mutate_later][col_idx_later]
-
-        # Term at `i + 1` is complicated: we need to change out the numerator and some terms in the denominator
-        # Remember that the denominator is the sum of exp thetas - some of the thetas are have the wrong value if the mutation order is shuffled
-        # We only chose the theta value that are potentially wrong.
-        # We are making the assumption that the features only change for positions close to the positions that got shuffled.
-        changed_feature_positions = set(
-            range(max(pos_mutate_earlier - self.motif_len/2, 0), min(pos_mutate_earlier + self.motif_len/2 + 1, self.seq_len))
-            + range(max(pos_mutate_later - self.motif_len/2, 0), min(pos_mutate_later + self.motif_len/2 + 1, self.seq_len))
-        ) - set(order[:i])
-
-        old_sumexp = np.exp(prev_feature_vec_theta_sums[i + 1][pos_mutate_earlier][col_idx_earlier] - log_probs[i + 1])
-
-        old_sumexp_terms = np.exp([
-            prev_feature_vec_theta_sums[i + 1][p] for p in changed_feature_positions if p != pos_mutate_later
-        ])
-        new_sumexp_terms = np.exp([feature_vec_theta_sums[i + 1][p] for p in changed_feature_positions if p != pos_mutate_earlier])
-
-        log_probs[i + 1] = feature_vec_theta_sums[i + 1][pos_mutate_later][col_idx_later] - np.log(
-            old_sumexp + new_sumexp_terms.sum() - old_sumexp_terms.sum()
-        )
-
-        return log_probs
-
     def _compute_log_probs_from_scratch(self, curr_order):
         """
         Compute the log likelihood for this full mutation ordering
@@ -273,15 +234,20 @@ class MutationOrderGibbsSampler(Sampler):
             )
         )
 
-        # Get the components -- numerators and the denomiators
-        log_numerators = [np.asscalar(self.theta[mut_step.mutating_pos_feat]) for mut_step in feat_mutation_steps]
+        # Get the components -- numerators and the denominators
+        log_numerators = []
+        for i, mut_step in enumerate(feat_mutation_steps):
+            col_idx = get_target_col(self.obs_seq_mutation, curr_order[i]) if self.per_target_model else 0
+            log_numerators.append(np.asscalar(self.theta[mut_step.mutating_pos_feat, col_idx]))
+
         denominators = [
             (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
         ]
+        prev_feat_mut_step = feat_mutation_steps[0]
         for i, feat_mut_step in enumerate(feat_mutation_steps[1:]):
-            new_denom = self._get_denom_update(denominators[i], log_numerators[i], feat_mut_step)
+            new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feat, feat_mut_step)
+            prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
-
         return feat_mutation_steps, log_numerators, denominators
 
     def _compute_log_probs_with_reference(self, curr_order, gibbs_step_base, update_step_start=0):
@@ -303,19 +269,22 @@ class MutationOrderGibbsSampler(Sampler):
             update_step_start=update_step_start,
         )
         # Use gibbs_step_base to update denoms and numerators
-        log_numerators = (
-            gibbs_step_base.log_numerators[:update_step_start]
-            + [np.asscalar(self.theta[mut_step.mutating_pos_feat]) for mut_step in feat_mutation_steps]
-        )
+        log_numerators = gibbs_step_base.log_numerators[:update_step_start]
+        for i, mut_step in enumerate(feat_mutation_steps):
+            col_idx = get_target_col(self.obs_seq_mutation, curr_order[update_step_start + i]) if self.per_target_model else 0
+            log_numerators.append(np.asscalar(self.theta[mut_step.mutating_pos_feat, col_idx]))
+
         denominators = gibbs_step_base.denominators[:update_step_start + 1]
+        prev_feat_mut_step = feat_mutation_steps[0]
         for i in range(update_step_start, self.num_mutations - 1):
             feat_mut_step = feat_mutation_steps[i - update_step_start + 1]
-            new_denom = self._get_denom_update(denominators[i], log_numerators[i], feat_mut_step)
+            new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feat, feat_mut_step)
+            prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
 
         return feat_mutation_steps, log_numerators, denominators
 
-    def _get_denom_update(self, old_denominator, old_log_numerator, feat_mut_step):
+    def _get_denom_update(self, old_denominator, prev_feat_idx, feat_mut_step):
         """
         Calculate the denominator of the next mutation step quickly by reusing past computations
         and incorporating the deltas appropriately
@@ -324,26 +293,6 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        old_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
-        new_feat_theta_sums = [self.theta[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
-        return old_denominator - np.exp(old_log_numerator) - (np.exp(old_feat_theta_sums)).sum() + (np.exp(new_feat_theta_sums)).sum()
-
-    def _get_multinomial_log_prob(self, numerator_pos, feature_vec_theta_sum):
-        """
-        This is for the case where theta is 1-dimensional!
-        a single term in {eq:full_ordering}
-        """
-        # TODO: TAKE THIS OUT - this can get slow! we need to use previous computations
-        theta_sums = feature_vec_theta_sum.values()
-        col_idx = self._get_target_col(numerator_pos) if self.per_target_model else 0
-        multinomial_prob = feature_vec_theta_sum[numerator_pos][col_idx] - scipy.misc.logsumexp(theta_sums)
-        return multinomial_prob
-
-    def _get_target_col(self, mutation_pos):
-        """
-        ONLY call this if self.per_target_model is True
-        Determine which column to read out corresponding to the target nucleotide
-        """
-        # TODO: switch dna sequences to numerical
-        target_nucleotide = self.obs_seq_mutation.mutation_pos_dict[mutation_pos]
-        return NUCLEOTIDE_DICT[target_nucleotide]
+        old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+        new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
+        return old_denominator - self.exp_theta_sum[prev_feat_idx] - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)
