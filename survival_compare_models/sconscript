@@ -109,6 +109,11 @@ def fit_context_model(env, outdir, c):
         if model_option == "L4":
             model_option = "L"
             per_target_model_str = "--per-target-model"
+            penalty_params = [0.1,0.01]
+        elif model_option == "L":
+            penalty_params = [0.1,0.01]
+        elif model_option == "FL":
+            penalty_params = [0.005,0.0005]
 
         cmd = ['python fit_context_model.py',
                '--seed',
@@ -118,7 +123,7 @@ def fit_context_model(env, outdir, c):
                '--em-max-iters',
                5,
                '--penalty-params',
-               "0.1,0.01,0.001",
+               ",".join(map(str, penalty_params)),
                '--num-cpu-threads',
                4,
                '--num-jobs',
