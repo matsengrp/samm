@@ -1,0 +1,102 @@
+## Test model fits against one another
+
+import os
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {'nreps': localenv['NREPS'],
+        'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+sim_size_dict = [{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50},
+                 {'size': 'big', 'n_taxa': 10, 'n_germlines': 100, 'germline_size': 200}]
+
+nest.add(
+    'simulation_size',
+    sim_size_dict,
+    label_func=lambda c: c['size'])
+
+# Nest for replicates
+nest.add(
+    'replicate',
+    range(localenv['NREPS']),
+    label_func='{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
+    create_dir=False)
+
+# Targets for simulating fake data
+@nest.add_target_with_env(localenv)
+def generate(env, outdir, c):
+    cmd = ['python simulate_from_sampled_gls.py simulate'] + ['--seed',
+                c['seed'],
+                '--n-taxa',
+                c['simulation_size']['n_taxa'],
+                '--n-germlines',
+                c['simulation_size']['n_germlines'],
+                '--output-true-theta ${TARGETS[0]}',
+                '--output-file ${TARGETS[1]}',
+                '--output-genes ${TARGETS[2]}']
+
+    return env.Command(
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# Nest for fitting models
+model_options = [
+    'basic',
+]
+
+nest.add(
+    'model_options',
+    model_options)
+
+data_options = [
+    'all_data',
+    'sample_one',
+    'impute_ancestors'
+]
+
+nest.add(
+    'data_options',
+    data_options)
+
+# Nest for model fitting
+@nest.add_target_with_env(localenv)
+def fit_model(env, outdir, c):
+    cmd = ['python fit_basic_model.py',
+           '--seed',
+           c['seed'],
+           '--motif-len',
+           5,
+           '--theta-file ${SOURCES[0]}',
+           '--input-file ${SOURCES[1]}',
+           '--input-genes ${SOURCES[2]}',
+           '--prop-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    if c['data_options'] == 'sample_one':
+        cmd += ['--sample-seq']
+    if c['data_options'] == 'impute_ancestors':
+        cmd += ['--impute-ancestors']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+
+# Aggregate over different fitting methods
+
+# Aggregate over all replicates
+
+# Plot results
