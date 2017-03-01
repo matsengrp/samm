@@ -65,7 +65,7 @@ def parse_args():
         type=str,
         help='file with pickled true context model (default: None, for no truth)',
         default=None)
-    parser.add_argument('--prop-file',
+    parser.add_argument('--out-file',
         type=str,
         help='file to output fitted proportions',
         default='_output/prop_file.pkl')
@@ -123,7 +123,7 @@ def main(args=sys.argv[1:]):
                 proportions[key][nucleotide] = 1. * mutations[key][nucleotide] / appearances[key]
 
     prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in 'acgt'] for i in range(len(motif_list))])
-    pickle.dump(prop_list, open(args.prop_file, 'w'))
+    pickle.dump(prop_list, open(args.out_file, 'w'))
 
     # Print the motifs with the highest and lowest proportions
     if args.theta_file is not None:
