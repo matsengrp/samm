@@ -118,7 +118,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, gl_name='germline'):
         aln.append(SeqRecord(Seq(seq), id=str(99999999-idx)))
 
     # dnapars uses the name "infile" as default input phylip file
-    with open('_output/infile', 'r') as phylip_file:
+    with open('_output/infile', 'w') as phylip_file:
         phylip_file.write(aln.format('phylip'))
 
     # and we need to tell it the line where the root sequence occurs
