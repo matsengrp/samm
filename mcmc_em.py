@@ -99,6 +99,9 @@ class MCMC_EM:
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < 0)
                 log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
+                if np.allclose(theta, 0):
+                    # It's all zero - just stop and consider a different penalty parameter
+                    break
 
             if lower_bound_is_negative:
                 # if penalized log likelihood is decreasing
