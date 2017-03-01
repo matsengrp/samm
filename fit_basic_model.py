@@ -20,6 +20,7 @@ from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from common import *
+from read_data import *
 from matsen_grp_data import *
 
 def parse_args():
@@ -39,6 +40,12 @@ def parse_args():
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
+    parser.add_argument('--sample-seq',
+        action='store_true',
+        help='sample sequence from cluster or take them all?')
+    parser.add_argument('--impute-ancestors',
+        action='store_true',
+        help='impute ancestors in each cluster?')
     parser.add_argument('--input-partis',
         type=str,
         help='partis annotations file',
@@ -91,9 +98,9 @@ def main(args=sys.argv[1:]):
 
     if args.use_partis:
         annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain, motif_len=args.motif_len)
-    else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len)
+        write_partis_data_from_annotations(args.input_genes, args.input_file, annotations, inferred_gls=germlines, chain=args.chain)
+
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len, impute_ancestors=args.impute_ancestors, sample_seq=args.sample_seq)
 
     motif_list = feat_generator.get_motif_list()
 
