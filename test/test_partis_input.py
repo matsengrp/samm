@@ -22,19 +22,19 @@ class Input_Data_TestCase(unittest.TestCase):
                     igclass = 'G'
                     annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain, ig_class=igclass)
                     write_partis_data_from_annotations(temp_genes, temp_seqs, annotations, inferred_gls=germlines, chain=chain)
-                    genes, seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
+                    seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
                     print chain, igclass, len(seqs)
 
                     # check IgM
                     igclass = 'M'
                     annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain, ig_class=igclass)
                     write_partis_data_from_annotations(temp_genes, temp_seqs, annotations, inferred_gls=germlines, chain=chain)
-                    genes, seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
+                    seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
                     print chain, igclass, len(seqs)
                 else:
                     # check light chain
                     igclass = chain.upper()
                     annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain)
                     write_partis_data_from_annotations(temp_genes, temp_seqs, annotations, inferred_gls=germlines, chain=chain)
-                    genes, seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
+                    seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
                     print chain, igclass, len(seqs)
