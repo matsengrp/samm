@@ -72,7 +72,13 @@ nest.add(
 
 nest.add(
     'model_call',
-    lambda c: ['python fit_basic_model' if c['model_options']=='basic' else 'python fit_context_model'],
+    lambda c: ['python fit_basic_model.py' if c['model_options']=='basic' else 'python fit_context_model.py'],
+    create_dir=False)
+
+nest.add(
+    'model_extra_options',
+    lambda c: ['' if c['model_options']=='basic' else \
+        '--penalty-params "0.01,0.001,0.0001" --num-cpu-threads 1 --num-jobs 20 --burn-in 2 --num-e-samples 4'],
     create_dir=False)
 
 data_options = [
@@ -98,8 +104,8 @@ def fit_model(env, outdir, c):
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
-               '--prop-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+               '--out-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
     elif c['data_options'] != 'true_ancestors' and c['generate_ancestors'] != 'ancestors':
         cmd = [c['model_call']] + ['--seed',
                c['seed'],
@@ -108,8 +114,8 @@ def fit_model(env, outdir, c):
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
-               '--prop-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+               '--out-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
         if c['data_options'] == 'sample_one':
             cmd += ['--sample-seq']
         if c['data_options'] == 'impute_ancestors':
