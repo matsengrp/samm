@@ -39,7 +39,7 @@ def parse_args():
         default='_output/genes.csv')
     parser.add_argument('--lambda0',
         type=float,
-        help='base hazard rate in cox proportional hazards model',
+        help='base hazard rate in cox proportional hazards model for a single motif (summing over targets)',
         default=0.1)
     parser.add_argument('--n-taxa',
         type=int,
@@ -81,6 +81,10 @@ def parse_args():
     assert(args.random_gene_len % 2 == 0)
     # Only odd motif lengths allowed
     assert(args.motif_len % 2 == 1)
+
+    if args.per_target_model:
+        args.lambda0 /= 3
+
     return args
 
 def _generate_true_parameters(feature_vec_len, motif_list, args):

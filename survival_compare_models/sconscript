@@ -18,7 +18,7 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 sim_models = [
-    # 'is_per_target',
+    'is_per_target',
     'is_single',
 ]
 
@@ -34,8 +34,9 @@ nest.add(
     create_dir=False)
 
 sim_size_dict = [
-    {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 1, 'ratio_nonzero': .2},
-    # {'size': 'big', 'n_taxa': 10, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1, 'ratio_nonzero': .2},
+    # about 10% of sequence gets mutated
+    {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0, 'ratio_nonzero': .05},
+    {'size': 'big', 'n_taxa': 10, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1.25, 'ratio_nonzero': .05},
 ]
 
 nest.add(
@@ -59,22 +60,24 @@ nest.add(
 # TODO: put this all in one driver function so sources/targets jibe with one another
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    cmd = [c['simulation_options']] + ['--seed',
-                c['seed'],
-                '--n-taxa',
-                c['simulation_size']['n_taxa'],
-                '--n-germlines',
-                c['simulation_size']['n_germlines'],
-                '--output-true-theta ${TARGETS[0]}',
-                '--output-file ${TARGETS[1]}',
-                '--output-genes ${TARGETS[2]}',
-                '--random-gene-len',
-               c['simulation_size']['random_gene_len'],
-               '--min-censor-time',
-               c['simulation_size']['min_censor_time'],
-               '--ratio-nonzero',
-               c['simulation_size']['ratio_nonzero'],
-        ]
+    cmd = [
+        c['simulation_options'],
+        '--seed',
+        c['seed'],
+        '--n-taxa',
+        c['simulation_size']['n_taxa'],
+        '--n-germlines',
+        c['simulation_size']['n_germlines'],
+        '--output-true-theta ${TARGETS[0]}',
+        '--output-file ${TARGETS[1]}',
+        '--output-genes ${TARGETS[2]}',
+        '--random-gene-len',
+       c['simulation_size']['random_gene_len'],
+       '--min-censor-time',
+       c['simulation_size']['min_censor_time'],
+       '--ratio-nonzero',
+       c['simulation_size']['ratio_nonzero'],
+    ]
 
     return env.Command(
         [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
@@ -84,8 +87,8 @@ def generate(env, outdir, c):
 # Nest for fitting models
 model_options = [
     'survival_L',
-    # 'survival_L4',
-    # 'survival_FL',
+    'survival_L4',
+    'survival_FL',
     'basic',
     'basic_4',
     'shmulate'
