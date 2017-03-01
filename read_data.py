@@ -209,16 +209,15 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, impute_an
         for start_seq, end_seq in zip(start_seqs, end_seqs):
             # process sequences
             start_seq, end_seq = process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len)
-            if cmp(start_seq, end_seq) == 0:
-                # Sequences are the same therefore no mutations, so skip this entry
-                continue
 
-            obs_data.append(
-                ObservedSequenceMutations(
+            obs_seq_mutation = ObservedSequenceMutations(
                     start_seq=start_seq,
                     end_seq=end_seq,
                     motif_len=motif_len,
-                )
             )
+
+            if obs_seq_mutation.num_mutations > 0:
+                # mutations in nonflanking region, so don't skip
+                obs_data.append(obs_seq_mutation)
 
     return obs_data
