@@ -21,6 +21,7 @@ class MCMC_EM:
         @param num_threads: number of threads to use for M-step
         """
         self.observed_data = observed_data
+        self.num_data = len(observed_data)
         self.feat_generator = feat_generator
         self.motif_list = self.feat_generator.get_motif_list()
         self.base_num_e_samples = base_num_e_samples
@@ -33,12 +34,13 @@ class MCMC_EM:
         self.theta_mask = theta_mask
         self.approx = approx
 
-    def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
+    def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=20):
         """
         @param theta: initial value for theta in MCMC-EM
         @param penalty_param: the coefficient for the penalty function
         @param max_em_iters: the maximum number of iterations of MCMC-EM
         @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
+        @param max_e_samples: maximum number of e-samples to grab per observed sequence
         """
         st = time.time()
         # stores the initialization for the gibbs samplers for the next iteration's e-step
@@ -59,7 +61,8 @@ class MCMC_EM:
             )
 
             e_step_samples = []
-            while len(e_step_samples) < max_e_samples:
+            lower_bound_is_negative = True
+            while len(e_step_samples)/self.num_data < max_e_samples and lower_bound_is_negative:
                 ## Keep grabbing samples until it is highly likely we have increased the penalized log likelihood
 
                 # do E-step
@@ -94,7 +97,6 @@ class MCMC_EM:
                     get_nonzero_theta_print_lines(theta, self.motif_list)
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
-
                 lower_bound_is_negative = (lower_bound < 0)
                 log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
 
