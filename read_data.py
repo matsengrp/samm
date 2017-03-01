@@ -1,6 +1,7 @@
 import sys
 import random
 import csv
+import subprocess
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -10,14 +11,22 @@ import glutils
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
+sys.path.append('./gctree/bin')
+from gctree import phylip_parse
+
 from common import *
 from models import ObservedSequenceMutations
+from Bio.Seq import Seq
+from Bio.SeqIO import SeqRecord
+from Bio.AlignIO import MultipleSeqAlignment
+from Bio.Phylo.TreeConstruction import ParsimonyScorer, NNITreeSearcher, ParsimonyTreeConstructor
+from ete3 import Tree
 
 GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/h/ighv.fasta'
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1, output_presto=False, impute_ancestors=False):
+def write_partis_data_from_annotations(output_genes, output_seqs, annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -45,10 +54,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
         glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
         inferred_gls = [None] * len(annotations_file_names)
 
-    if output_presto:
-        seq_header = utils.presto_headers.values()
-    else:
-        seq_header = ['germline_name', 'sequence_name', 'sequence']
+    seq_header = ['germline_name', 'sequence_name', 'sequence']
 
     obs_data = pd.DataFrame(columns=seq_header)
 
@@ -82,81 +88,131 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
                     if not good_seq_idx:
                         # no nonproductive sequences... skip
                         continue
-                    filtered_line = line.copy()
-                    if impute_ancestors:
-                        # TODO: for now just return all sequences
-                        
-                        # dress each sequence with its ancestor and put into column gene_col using all seqs
-                        # then filter based on good_seq()
-                        #filtered_line = compute_ancestors(filtered_line, gene_col, seqs_col)
-                        gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, line['v_gene']])
-                        gene_writer.writerow({'germline_name': gl_name,
-                            'germline_sequence': filtered_line[gene_col].lower()})
-                        for good_idx in good_seq_idx:
-                            for col in [seqs_col, 'unique_ids']:
-                                filtered_line[col] = line[col][good_idx]
-                            seq_writer.writerow(get_seq_line(filtered_line, seqs_col, gl_name, output_presto))
-                    else:
-                        # otherwise pick a random good_seq()
-                        random_idx = random.choice(good_seq_idx)
-                        gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, line['v_gene']])
-                        gene_writer.writerow({'germline_name': gl_name,
-                            'germline_sequence': filtered_line[gene_col].lower()})
-                        for col in [seqs_col, 'unique_ids']:
-                            filtered_line[col] = line[col][random_idx]
-                        seq_writer.writerow(get_seq_line(filtered_line, seqs_col, gl_name, output_presto))
 
-def get_seq_line(line, seqs_col, gl_name, output_presto):
-    """
-    @param lines: partis sequence/germline data
-    @param output_presto: whether to output presto data
-    @param gene_col: column of lines where germline gene sits
-    @param seqs_col: column of lines where sequence sits
+                    gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, line['v_gene']])
+                    gene_writer.writerow({'germline_name': gl_name,
+                        'germline_sequence': line[gene_col].lower()})
 
-    @return list of dicts containing sequences and ancestors
-    """
+                    for good_idx in good_seq_idx:
+                        seq_writer.writerow({'germline_name': gl_name,
+                            'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
+                            'sequence': line[seqs_col][good_idx].lower()})
 
-    if output_presto:
-        # output with presto data/headers
-        datum = utils.convert_to_presto_headers(line)
-    else:
-        # output with our data/headers
-        datum = {'germline_name': gl_name,
-            'sequence_name': '-'.join([gl_name, line['unique_ids']]),
-            'sequence': line[seqs_col].lower()}
-
-    return datum
-
-def compute_ancestors(line, gene_col, seqs_col):
+def impute_ancestors_dnapars(seqs, gl_seq, gl_name='germline'):
     """
     Compute ancestral states via maximum parsimony
+
+    @param seqs: list of sequences
+    @param gl_seq: germline sequence
+    @param gl_name: name of germline (must be less than 10 characters long)
     """
 
-    return line
+    assert(len(gl_name) < 10)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
+    aln = MultipleSeqAlignment([SeqRecord(Seq(gl_seq), id=gl_name)])
+
+    # sequence ID must be less than ten characters, but also dnapars sets internal node
+    # names to 1, 2, 3, ..., so name them numbers descending from 100 million, hoping
+    # we won't ever have a clone that big...
+    for idx, seq in enumerate(seqs):
+        aln.append(SeqRecord(Seq(seq), id=str(99999999-idx)))
+
+    # dnapars uses the name "infile" as default input phylip file
+    with open('_output/infile', 'r') as phylip_file:
+        phylip_file.write(aln.format('phylip'))
+
+    # and we need to tell it the line where the root sequence occurs
+    with open('_output/infile', 'r') as phylip_file:
+        for lineno, line in enumerate(phylip_file):
+            if line.startswith(gl_name):
+                naive_idx = str(lineno)
+
+    # arcane user options for dnapars
+    with open('_output/dnapars.config', 'w') as cfg_file:
+        cfg_file.write('\n'.join(['O', naive_idx, 'S', 'Y', 'J', '13', '10', '4', '5', '.', 'Y']))
+
+    # dnapars has weird behavior if outfile and outtree already exist o_O
+    cmd = ['rm -f _output/outfile _output/outtree']
+    print "Calling:", " ".join(cmd)
+    res = subprocess.call(cmd, shell=True)
+
+    # defer to command line to construct parsimony trees and ancestral states
+    cmd = ['cd _output && dnapars < dnapars.cfg > dnapars.log']
+    print "Calling:", " ".join(cmd)
+    res = subprocess.call(cmd, shell=True)
+
+    # phew, finally got some trees
+    trees = phylip_parse('_output/outfile', gl_name)
+
+    # take first parsimony tree
+    root = trees[0].get_tree_root()
+    start_seqs = []
+    end_seqs = []
+    for leaf in root:
+        end_seqs.append(leaf.sequence.lower())
+        start_seqs.append(leaf.up.sequence.lower())
+
+    return start_seqs, end_seqs
+
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, impute_ancestors=False, sample_seq=False):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
+    @param impute_ancestors: impute ancestors using parsimony
+    @param sample_seq: sample one sequence from cluster
     """
-    gene_dict = {}
-    with open(gene_file_name, "r") as gene_csv:
-        gene_reader = csv.reader(gene_csv, delimiter=',')
-        gene_reader.next()
-        for row in gene_reader:
-            gene_dict[row[0]] = row[1].lower()
+
+    genes = pd.read_csv(gene_file_name)
+    seqs = pd.read_csv(seq_file_name)
+
+    full_data = pd.merge(genes, seqs, on='germline_name')
 
     obs_data = []
-    with open(seq_file_name, "r") as seq_csv:
-        seq_reader = csv.reader(seq_csv, delimiter=",")
-        seq_reader.next()
-        for row in seq_reader:
+    for germline, cluster in full_data.groupby(['germline_name']):
+        gl_seq = cluster['germline_sequence'].values[0].lower()
+        if impute_ancestors:
+            # get parsimony seqs
+            proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
+            proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
+            seqs_in_cluster = []
+            for idx, elt in cluster.iterrows():
+                proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'])
+                proc_seq = re.sub('^n+|n+$', '', proc_seq)
+                if 'n' in proc_seq or len(proc_seq) != len(proc_gl_seq):
+                    # for now just ignore sequences with internal "n"s... we'd need
+                    # to process all sequences at once (and possibly throw away a lot of
+                    # data) if we imputed them for every sequence
+                    continue
+                seqs_in_cluster.append(proc_seq)
+
+            if not seqs_in_cluster:
+                # no sequences after processing
+                continue
+
+            start_seqs, end_seqs = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq)
+        else:
+            start_seqs = []
+            end_seqs = []
+            if sample_seq:
+                # choose random sequence
+                sampled_index = random.choice(cluster.index)
+                row = cluster.loc[sampled_index]
+                start_seqs.append(row['germline_sequence'].lower())
+                end_seqs.append(row['sequence'].lower())
+            else:
+                # sample all sequences
+                for idx, elt in cluster.iterrows():
+                    start_seqs.append(gl_seq)
+                    end_seqs.append(elt['sequence'].lower())
+
+        for start_seq, end_seq in zip(start_seqs, end_seqs):
             # process sequences
-            start_seq, end_seq = process_degenerates_and_impute_nucleotides(gene_dict[row[0]], row[2].lower(), motif_len)
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len)
             if cmp(start_seq, end_seq) == 0:
                 # Sequences are the same therefore no mutations, so skip this entry
                 continue
+
             obs_data.append(
                 ObservedSequenceMutations(
                     start_seq=start_seq,
@@ -164,4 +220,5 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1):
                     motif_len=motif_len,
                 )
             )
-    return gene_dict, obs_data
+
+    return obs_data
