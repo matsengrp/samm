@@ -46,10 +46,11 @@ class MCMC_EM:
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
         all_traces = []
+        # burn in only at the very beginning
+        burn_in = self.burn_in
         for run in range(max_em_iters):
             prev_theta = theta
             num_e_samples = self.base_num_e_samples
-            burn_in = self.burn_in
 
             sampler_collection = SamplerCollection(
                 self.observed_data,
@@ -72,7 +73,7 @@ class MCMC_EM:
                     num_e_samples,
                     burn_in,
                 )
-                # Don't use burn-in if we are repeating the sampling due to a negative lower bound
+                # Don't use burn-in from now on
                 burn_in = 0
                 all_traces.append([res.trace for res in sampler_results])
                 sampled_orders_list = [res.samples for res in sampler_results]
