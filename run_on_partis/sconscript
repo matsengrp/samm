@@ -90,4 +90,3 @@ def fit_models(env, outdir, c):
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         [],
         ' '.join(map(str, cmd)))
-

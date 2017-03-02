@@ -83,6 +83,8 @@ def read_partis_annotations(annotations_file_names, chain='h', use_v=True, speci
                 key = 'clone{}-{}'.format(*[idx, line['v_gene']])
                 gene_dict[key] = line[gene_col].lower()
                 good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
+                if len(good_seqs) == 0:
+                    continue
                 end_seq = random.choice(good_seqs)
                 # process sequences
                 gl_seq, ch_seq = process_degenerates_and_impute_nucleotides(line[gene_col].lower(), end_seq.lower(), motif_len)

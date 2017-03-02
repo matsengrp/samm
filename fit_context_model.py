@@ -146,7 +146,7 @@ def load_true_theta(theta_file, per_target_model):
 
     @return the true theta vector/matrix
     """
-    true_theta = pickle.load(open(theta_file, 'rb'))
+    true_theta, probability_matrix = pickle.load(open(theta_file, 'rb'))
     if per_target_model:
         return true_theta
     else:
@@ -185,7 +185,7 @@ def main(args=sys.argv[1:]):
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
     results_list = []
 
-    theta = np.random.randn(feat_generator.feature_vec_len, args.theta_num_col)
+    theta = np.zeros((feat_generator.feature_vec_len, args.theta_num_col))
     # Set the impossible thetas to -inf
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf

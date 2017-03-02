@@ -23,11 +23,12 @@
 
 ### simulated from survival model
 
-1. Run all models
+1. Simulate survival model from random DNA sequences using a
     - star tree 1-column
     - star tree 4-column
-2. Check differences in parameters
-3. Compare results to truth
+2. Fit all models (see above)
+3. Check differences in parameters
+4. Compare results to truth
 
 ### parsimony survival model
 
@@ -52,4 +53,3 @@
     - per-site mutability of known germline sequences, then also nucleotide content
     - motif content of observed sequences and simulated sequences
     - Vladimir rate idea
-

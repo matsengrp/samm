@@ -99,8 +99,9 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
 
     def _get_value_parallel(self, theta):
         """
-        @return negative penalized log likelihood
+        @return tuple: negative penalized log likelihood and array of log likelihoods
         """
         fused_lasso_pen = self.penalty_param_fused * np.linalg.norm(self.get_fused_lasso_theta(theta), ord=1)
         lasso_pen = self.penalty_param_lasso * np.linalg.norm(theta, ord=1)
-        return -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) + fused_lasso_pen + lasso_pen
+        log_likelihoods = self._get_log_lik_parallel(theta)
+        return -1.0/self.num_samples * log_likelihoods.sum() + fused_lasso_pen + lasso_pen, log_likelihoods

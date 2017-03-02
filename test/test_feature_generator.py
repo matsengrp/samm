@@ -2,7 +2,6 @@ import unittest
 import time
 
 from submotif_feature_generator import SubmotifFeatureGenerator
-from submotif_feature_generator_fast import SubmotifFastFeatureGenerator
 from models import *
 from common import *
 
@@ -17,7 +16,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         seq_length = 400
         mut_per_length = 10
 
-        feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
+        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
 
         start_seq = get_random_dna_seq(seq_length)
         # Mutate a 10th of the sequence
@@ -46,7 +45,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
     def test_create(self):
         motif_len = 3
-        feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
+        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
@@ -54,8 +53,6 @@ class FeatureGeneratorTestCase(unittest.TestCase):
                 motif_len=3,
             )
         )
-        self.assertEqual(obs_seq_mut.feat_dict_start[0], 3)
-        self.assertEqual(obs_seq_mut.feat_dict_start[1], 4 * 3 + 3)
         ordered_seq_mut = ImputedSequenceMutations(
             obs_seq_mut,
             obs_seq_mut.mutation_pos_dict.keys()
@@ -77,7 +74,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
     def test_update(self):
         motif_len = 3
-        feat_generator = SubmotifFastFeatureGenerator(motif_len=motif_len)
+        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
