@@ -30,12 +30,13 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, diff, lower_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
-        return theta, -current_value, diff, lower_bound
+        theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, -diff, -upper_bound
 
     def _get_value_parallel(self, theta):
         """
         Calculate the penalized loss value in parallel
+        @return tuple: negative penalized log likelihood and the vector of log likelihoods
         """
         raise NotImplementedError()
 
@@ -51,8 +52,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         lower_bound = 0
 
         # Calculate loglikelihood of current theta
-        log_lik_vec_init = self._get_log_lik_parallel(theta)
-        init_value = self._get_value_parallel(theta)
+        init_value, log_lik_vec_init = self._get_value_parallel(theta)
         current_value = init_value
 
         for i in range(max_iters):
@@ -64,7 +64,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
             potential_theta = theta - step_size * grad
             # Do proximal gradient step
             potential_theta = self.solve_prox(potential_theta, step_size)
-            potential_value = self._get_value_parallel(potential_theta)
+            potential_value, potential_log_lik_vec = self._get_value_parallel(potential_theta)
 
             # Do backtracking line search
             expected_decrease = backtrack_alpha * np.power(np.linalg.norm(grad), 2)
@@ -79,7 +79,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 potential_theta = theta - step_size * grad
                 # Do proximal gradient step
                 potential_theta = self.solve_prox(potential_theta, step_size)
-                potential_value = self._get_value_parallel(potential_theta)
+                potential_value, potential_log_lik_vec = self._get_value_parallel(potential_theta)
 
             if potential_value > current_value:
                 # Stop if value is increasing
@@ -87,22 +87,23 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
             else:
                 # Calculate lower bound to determine if we need to rerun
                 # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
-                log_lik_ratio_vec = self._get_log_lik_parallel(potential_theta) - log_lik_vec_init
-                _, lower_bound, _ = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
+                log_lik_ratio_vec = potential_log_lik_vec - log_lik_vec_init
+                # Upper bound becomes the lower bound when we consider the negative of this!
+                _, _, upper_bound = get_standard_error_ci_corrected(log_lik_ratio_vec, ZSCORE, potential_value - init_value)
 
                 # Calculate difference in objective function
                 theta = potential_theta
                 diff = current_value - potential_value
                 current_value = potential_value
 
-                if lower_bound > 0 or diff < diff_thres:
-                    # Stop if log likelihood ratio vector's lower bound is positive
+                if upper_bound < 0 or diff < diff_thres:
+                    # Stop if negative penalized log likelihood has significantly decreased
                     # or difference in objective function is small
                     break
 
 
         self.pool.close()
         log.info("final PROX iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        # We return -diff because we want to ensure if the loss is increasing then it's not by much
+        # We return diff because we want to ensure if the loss is increasing then it's not by much
         # by comparing later to -diff < some_threshold
-        return theta, current_value, -diff, lower_bound
+        return theta, current_value, diff, upper_bound

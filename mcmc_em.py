@@ -67,7 +67,7 @@ class MCMC_EM:
                 ## Keep grabbing samples until it is highly likely we have increased the penalized log likelihood
 
                 # do E-step
-                log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples) + num_e_samples, time.time() - st))
+                log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples)/self.num_data + num_e_samples, time.time() - st))
                 sampler_results = sampler_collection.get_samples(
                     init_orders,
                     num_e_samples,
@@ -107,7 +107,7 @@ class MCMC_EM:
                     break
 
             if lower_bound_is_negative:
-                # if penalized log likelihood is decreasing
+                # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
             elif log_lik_diff < diff_thres:
                 # if penalized log likelihood is increasing but not by very much

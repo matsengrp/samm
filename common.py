@@ -124,7 +124,7 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     """
     @param values: the values that are correlated
     @param zscore: the zscore to form the confidence interval
-    @param pen_val_diff: the total penalized value (so it should be the average of the values plus some penalty)
+    @param pen_val_diff: difference of the total penalized values (the negative log likelihood plus some penalty)
 
     @returns
         the standard error of the values correcting for auto-correlation between the values

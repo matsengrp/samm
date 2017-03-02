@@ -185,7 +185,7 @@ def main(args=sys.argv[1:]):
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
     results_list = []
 
-    theta = np.random.zeros((feat_generator.feature_vec_len, args.theta_num_col))
+    theta = np.zeros((feat_generator.feature_vec_len, args.theta_num_col))
     # Set the impossible thetas to -inf
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
