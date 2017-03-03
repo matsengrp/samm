@@ -11,6 +11,7 @@ import os.path
 import csv
 import pickle
 import logging as log
+import time
 
 import numpy as np
 import scipy.stats
@@ -41,6 +42,14 @@ def parse_args():
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
+    parser.add_argument('--sample-or-impute',
+        default=None,
+        choices=('sample-random', 'sample-highly-mutated', 'impute-ancestors'),
+        help='sample sequence from cluster or impute ancestors?')
+    parser.add_argument('--scratch-directory',
+        type=str,
+        help='where to write dnapars files, if necessary',
+        default='_output')
     parser.add_argument('--input-partis',
         type=str,
         help='partis annotations file',
@@ -60,7 +69,7 @@ def parse_args():
         type=str,
         help='file with pickled true context model (default: None, for no truth)',
         default=None)
-    parser.add_argument('--prop-file',
+    parser.add_argument('--out-file',
         type=str,
         help='file to output fitted proportions',
         default='_output/prop_file.pkl')
@@ -91,14 +100,18 @@ def main(args=sys.argv[1:]):
 
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
+    scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    if not os.path.exists(scratch_dir):
+        os.makedirs(scratch_dir)
+
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     if args.use_partis:
         annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain, motif_len=args.motif_len)
-    else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len)
+        write_partis_data_from_annotations(args.input_genes, args.input_file, annotations, inferred_gls=germlines, chain=args.chain)
+
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len, sample_or_impute=args.sample_or_impute, scratch_dir=scratch_dir)
 
     motif_list = feat_generator.get_motif_list()
 
@@ -133,7 +146,7 @@ def main(args=sys.argv[1:]):
                     probability_matrix[key][nucleotide] = 1. * mutations[key][nucleotide] / num_mutations
         prop_list = np.array([proportions[motif_list[i]] for i in range(len(motif_list))])
 
-    pickle.dump((prop_list, probability_matrix), open(args.prop_file, 'w'))
+    pickle.dump((prop_list, probability_matrix), open(args.out_file, 'w'))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

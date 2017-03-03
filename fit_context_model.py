@@ -11,6 +11,7 @@ import os.path
 import csv
 import pickle
 import logging as log
+import time
 
 import numpy as np
 import scipy.stats
@@ -45,6 +46,14 @@ def parse_args():
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
+    parser.add_argument('--sample-or-impute',
+        default=None,
+        choices=('sample-random', 'sample-highly-mutated', 'impute-ancestors'),
+        help='sample sequence from cluster or impute ancestors?')
+    parser.add_argument('--scratch-directory',
+        type=str,
+        help='where to write gibbs workers and dnapars files, if necessary',
+        default='_output')
     parser.add_argument('--num-cpu-threads',
         type=int,
         help='number of threads to use during M-step',
@@ -156,6 +165,11 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
+
+    scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    if not os.path.exists(scratch_dir):
+        os.makedirs(scratch_dir)
+
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     # Load true theta for comparison
@@ -167,9 +181,9 @@ def main(args=sys.argv[1:]):
     log.info("Reading data")
     if args.use_partis:
         annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain, motif_len=args.motif_len)
-    else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len)
+        write_partis_data_from_annotations(args.input_genes, args.input_file, annotations, inferred_gls=germlines, chain=args.chain)
+
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len, sample_or_impute=args.sample_or_impute, scratch_dir=scratch_dir)
 
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
@@ -201,6 +215,7 @@ def main(args=sys.argv[1:]):
         num_jobs=args.num_jobs,
         num_threads=args.num_cpu_threads,
         approx='none',
+        scratch_dir=scratch_dir,
     )
 
     for penalty_param in sorted(penalty_params, reverse=True):

@@ -65,3 +65,7 @@ SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'run_on_partis'
 SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'imputed_ancestors_comparison'
+SConscript(flag + '/sconscript', exports=['flag'])
+

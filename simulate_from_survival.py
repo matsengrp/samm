@@ -25,6 +25,10 @@ def parse_args():
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=24)
+    parser.add_argument('--param-path',
+        type=str,
+        help='parameter file path',
+        default=GERMLINE_PARAM_FILE)
     parser.add_argument('--output-true-theta',
         type=str,
         help='true theta pickle file',
@@ -148,19 +152,17 @@ def _get_germline_nucleotides(args):
             # If there are very many germlines, just generate random DNA sequences
             germline_nucleotides = [get_random_dna_seq(args.random_gene_len + args.motif_len) for i in range(args.n_germlines)]
     else:
-        # Read germline genes from this file
-        params = read_bcr_hd5(GERMLINE_PARAM_FILE)
+        # Read parameters from file
+        params = read_germline_file(args.param_path)
 
         # Select, with replacement, args.n_germlines germline genes from our
         # parameter file and place them into a numpy array.
-        # Here 'germline_gene' is something like IGHV1-2*01.
-        germline_genes = np.random.choice(params['gene'].unique(),
-                size=args.n_germlines)
+        germline_genes = np.random.choice(params.index.values, size=args.n_germlines)
 
         # Put the nucleotide content of each selected germline gene into a
         # corresponding list.
-        germline_nucleotides = [''.join(list(params[params['gene'] == gene]['base'])) \
-                for gene in germline_genes]
+        germline_nucleotides = [row[gene] for gene in germline_genes]
+
     return germline_nucleotides, germline_genes
 
 def dump_parameters(true_thetas, probability_matrix, args, motif_list):

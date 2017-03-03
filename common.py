@@ -4,6 +4,8 @@ import re
 import random
 import warnings
 
+from Bio import SeqIO
+
 DEBUG = False
 
 NUM_NUCLEOTIDES = 4
@@ -15,8 +17,6 @@ NUCLEOTIDE_DICT = {
     "g": 2,
     "t": 3,
 }
-
-GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
@@ -184,17 +184,22 @@ def soft_threshold(theta, thres):
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
 
-def read_bcr_hd5(path, remove_gap=True):
+def read_germline_file(fasta):
     """
-    read hdf5 parameter file and process
+    Read fasta file containing germlines
+
+    @return dataframe with column "gene" for the name of the germline gene and
+    "base" for the nucleotide content
     """
 
-    sites = pd.read_hdf(path, 'sites')
-
-    if remove_gap:
-        return sites.query('base != "-"')
-    else:
-        return sites
+    with open(fasta) as fasta_file:
+        genes = []
+        bases = []
+        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
+            genes.append(seq_record.id)
+            bases.append(str(seq_record.seq))
+    
+    return pd.DataFrame({'base': bases}, index=genes)
 
 def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
     """
