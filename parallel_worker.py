@@ -112,8 +112,10 @@ class BatchSubmissionManager(ParallelWorkerManager):
         self.create_batch_worker_cmds(worker_list, num_approx_batches, worker_folder)
 
     def run(self):
+        self.clean_outputs()
         custom_utils.run_cmds(self.batch_worker_cmds)
         res = self.read_batch_worker_results()
+        self.clean_outputs()
         return res
 
     def create_batch_worker_cmds(self, worker_list, num_approx_batches, worker_folder):
@@ -162,6 +164,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
             except Exception as e:
                 # Probably the file doesn't exist and the job failed?
                 traceback.print_exc()
+                print "Rerunning locally -- could not load pickle files %s" % f
                 # Now let's try to recover by running the worker
                 res = [w.run() for w in self.batched_workers[i]]
 
@@ -172,3 +175,8 @@ class BatchSubmissionManager(ParallelWorkerManager):
                     worker_results.append(r)
 
         return worker_results
+
+    def clean_outputs(self):
+        for fname in self.output_files:
+            if os.path.exists(fname):
+                os.remove(fname)
