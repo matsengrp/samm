@@ -83,6 +83,8 @@ def run_cmd(cmdfo, batch_system=None, batch_options=None):
 def run_cmds(cmdfos, sleep=True, batch_system="slurm", batch_options=None, debug=None):
     """
     Kick off processes to the batch system
+    NOTE: This will try a number of times, and if that fails, this function will NOT throw an error. Instead, if the output file is not there,
+    it is up to you to figure out what to do!
 
     @param cmdfos: list of CustomCommands
     @param sleep: Whether to sleep between adding processes. Set sleep to False if you're commands are going to run really really really quickly
@@ -106,7 +108,7 @@ def run_cmds(cmdfos, sleep=True, batch_system="slurm", batch_options=None, debug
         if sleep:
             time.sleep(0.01)
 
-def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_options=None, debug=None):
+def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_options=None, debug=None, max_num_tries=2):
     """
     Deal with a process once it's finished (i.e. check if it failed, and restart if so)
     """
@@ -114,17 +116,18 @@ def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_option
     if procs[iproc].returncode == 0:
         if not os.path.exists(cmdfo.outfname):
             print '      proc %d succeded but its output isn\'t there, so sleeping for a bit...' % iproc
-            time.sleep(0.5)
+            time.sleep(1.0)
         if os.path.exists(cmdfo.outfname):
             process_out_err('', '', extra_str='' if len(procs) == 1 else str(iproc), logdir=cmdfo.logdir, debug=debug)
             procs[iproc] = None  # job succeeded
             return
 
     # handle failure
-    if n_tries[iproc] > 5:
-        failstr = 'exceeded max number of tries for cmd\n    %s\nlook for output in %s' % (cmdfo.cmd_str, cmdfo.logdir)
-        print failstr
-        raise Exception(failstr)
+    if n_tries[iproc] > max_num_tries:
+        # Time to give up!
+        print 'exceeded max number of tries for cmd\n    %s\nlook for output in %s' % (cmdfo.cmd_str, cmdfo.logdir)
+        procs[iproc] = None  # job failed but we gave up
+        return
     else:
         print '    proc %d try %d' % (iproc, n_tries[iproc]),
         if procs[iproc].returncode == 0 and not os.path.exists(cmdfo.outfname):  # don't really need both the clauses
@@ -160,10 +163,14 @@ def process_out_err(out, err, extra_str='', logdir=None, debug=None):
     """
     if logdir is not None:
         def readfile(fname):
-            ftmp = open(fname)
-            fstr = ''.join(ftmp.readlines())
-            ftmp.close()
-            os.remove(fname)
+            try:
+                ftmp = open(fname)
+                fstr = ''.join(ftmp.readlines())
+                ftmp.close()
+                os.remove(fname)
+            except Exception as e:
+                print "Warning process_out_err %s" % e
+                fstr = ''
             return fstr
         out = readfile(logdir + '/out.txt')
         err = readfile(logdir + '/err.txt')

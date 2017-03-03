@@ -32,12 +32,12 @@ def main(args=sys.argv[1:]):
     with open(args.input_file, "r") as input_file:
         workers = pickle.load(input_file)
 
-    res = []
+    results = []
     for i, worker in enumerate(workers):
-        res.append(worker.run())
+        results.append(worker.run())
 
     with open(args.output_file, "w") as output_file:
-        pickle.dump(res, output_file)
+        pickle.dump(results, output_file)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

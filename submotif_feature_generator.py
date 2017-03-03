@@ -102,7 +102,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feat_dict_prev = feat_dict_future
             old_mutation_pos = mutation_pos
 
-        assert(len(feat_mutation_steps) == seq_mut_order.obs_seq_mutation.num_mutations)
+        if len(feat_mutation_steps) != seq_mut_order.obs_seq_mutation.num_mutations:
+            raise AssertionError("%d vs %d" % (len(feat_mutation_steps), seq_mut_order.obs_seq_mutation.num_mutations))
         return feat_mutation_steps
 
     def create_remaining_mutation_steps(

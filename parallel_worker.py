@@ -1,3 +1,4 @@
+import sys
 import os
 import traceback
 import pickle
@@ -23,12 +24,25 @@ class ParallelWorker:
         Do not implement this function!
         """
         np.random.seed(self.seed)
-        return self.run_worker()
+
+        result = None
+        try:
+            result = self.run_worker()
+        except Exception as e:
+            print "Exception caught in parallel worker: %s" % e
+            traceback.print_exc()
+        return result
 
     def run_worker(self):
         """
         Implement this function!
         Returns whatever value needed from this task
+        """
+        raise NotImplementedError()
+
+    def  __str__(self):
+        """
+        @return: string for identifying this worker in an error
         """
         raise NotImplementedError()
 
@@ -63,8 +77,12 @@ class MultiprocessingManager(ParallelWorkerManager):
     def run(self):
         batched_results = self.pool.map(run_multiprocessing_worker, self.batched_workers_list)
         results = []
-        for batch_r in batched_results:
-            results += batch_r
+        for i, batch_r in enumerate(batched_results):
+            for j, r in enumerate(batch_r):
+                if r is None:
+                    print "WARNING: multiprocessing worker for this worker failed %s" % self.batched_workers_list[i][j]
+                else:
+                    results.append(r)
         return results
 
 def run_multiprocessing_worker(worker_batch):
@@ -76,7 +94,6 @@ def run_multiprocessing_worker(worker_batch):
     results = []
     for worker in worker_batch:
         results.append(worker.run())
-
     return results
 
 class BatchSubmissionManager(ParallelWorkerManager):
@@ -90,12 +107,15 @@ class BatchSubmissionManager(ParallelWorkerManager):
         @param worker_folder: the folder to make all the results from the workers
         """
         self.batch_worker_cmds = []
+        self.batched_workers = [] # Tracks the batched workers if something fails
         self.output_files = []
         self.create_batch_worker_cmds(worker_list, num_approx_batches, worker_folder)
 
     def run(self):
+        self.clean_outputs()
         custom_utils.run_cmds(self.batch_worker_cmds)
         res = self.read_batch_worker_results()
+        self.clean_outputs()
         return res
 
     def create_batch_worker_cmds(self, worker_list, num_approx_batches, worker_folder):
@@ -109,6 +129,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
         num_per_batch = max(num_workers/num_approx_batches, 1)
         for batch_idx, start_idx in enumerate(range(0, num_workers, num_per_batch)):
             batched_workers = worker_list[start_idx:start_idx + num_per_batch]
+            self.batched_workers.append(batched_workers)
 
             # Create the folder for the output from this batch worker
             worker_batch_folder = "%s/batch_%d" % (worker_folder, batch_idx)
@@ -136,8 +157,26 @@ class BatchSubmissionManager(ParallelWorkerManager):
         Read the output (pickle) files from the batched workers
         """
         worker_results = []
-        for f in self.output_files:
-            with open(f, "r") as output_f:
-                res = pickle.load(output_f)
-            worker_results += res
+        for i, f in enumerate(self.output_files):
+            try:
+                with open(f, "r") as output_f:
+                    res = pickle.load(output_f)
+            except Exception as e:
+                # Probably the file doesn't exist and the job failed?
+                traceback.print_exc()
+                print "Rerunning locally -- could not load pickle files %s" % f
+                # Now let's try to recover by running the worker
+                res = [w.run() for w in self.batched_workers[i]]
+
+            for j, r in enumerate(res):
+                if r is None:
+                    print "WARNING: multiprocessing worker for this worker failed %s" % self.batched_workers[i][j]
+                else:
+                    worker_results.append(r)
+
         return worker_results
+
+    def clean_outputs(self):
+        for fname in self.output_files:
+            if os.path.exists(fname):
+                os.remove(fname)
