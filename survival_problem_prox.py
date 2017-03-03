@@ -17,7 +17,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         """
         raise NotImplementedError()
 
-    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
+    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, min_iters=10, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
 
@@ -30,7 +30,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, min_iters, verbose)
         return theta, -current_value, diff, -upper_bound
 
     def _get_value_parallel(self, theta):
@@ -40,7 +40,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         """
         raise NotImplementedError()
 
-    def _solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, verbose=False):
+    def _solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, min_iters=10, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
         @return final fitted value of theta and penalized negative log likelihood and step size
@@ -96,9 +96,9 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 diff = current_value - potential_value
                 current_value = potential_value
 
-                if upper_bound < 0 or diff < diff_thres:
-                    # Stop if negative penalized log likelihood has significantly decreased
-                    # or difference in objective function is small
+                if (upper_bound < 0 and i > min_iters) or diff < diff_thres:
+                    # Stop if negative penalized log likelihood has significantly decreased and the minimum number of iters
+                    # has been run or difference in objective function is small
                     break
 
 
