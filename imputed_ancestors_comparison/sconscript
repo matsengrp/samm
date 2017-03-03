@@ -53,7 +53,7 @@ def generate(env, outdir, c):
                 '--output-file ${TARGETS[1]}',
                 '--output-genes ${TARGETS[2]}']
     if c['generate_ancestors'] == 'ancestors':
-        cmd += ['--output-ancestors']
+        cmd += ['--output-separate-branches']
 
     return env.Command(
         [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
@@ -84,7 +84,8 @@ nest.add(
 data_options = [
     'true_ancestors',
     'all_data',
-    'sample_one',
+    'sample_random',
+    'sample_highly_mutated',
     'impute_ancestors'
 ]
 
@@ -116,10 +117,12 @@ def fit_model(env, outdir, c):
                '--input-genes ${SOURCES[2]}',
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
-        if c['data_options'] == 'sample_one':
-            cmd += ['--sample-seq']
+        if c['data_options'] == 'sample_random':
+            cmd += ['--sample-or-impute sample-random']
+        if c['data_options'] == 'sample_highly_mutated':
+            cmd += ['--sample-or-impute sample-highly-mutated']
         if c['data_options'] == 'impute_ancestors':
-            cmd += ['--impute-ancestors']
+            cmd += ['--sample-or-impute impute-ancestors']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['generate'],
