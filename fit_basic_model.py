@@ -43,7 +43,7 @@ def parse_args():
         default='_output/genes.csv')
     parser.add_argument('--sample-or-impute',
         default=None,
-        choices=('sample-random', 'sample-highly-mutated', 'imupte-ancestors'),
+        choices=('sample-random', 'sample-highly-mutated', 'impute-ancestors'),
         help='sample sequence from cluster or impute ancestors?')
     parser.add_argument('--scratch-directory',
         type=str,
@@ -97,6 +97,8 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
     scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    if not os.path.exists(scratch_dir):
+        os.makedirs(scratch_dir)
 
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
