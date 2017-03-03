@@ -93,6 +93,8 @@ class Sampler:
         @param approx: level of approximation to use to speed up Gibbs sampling (none, faster)
         """
         self.theta = theta
+        self.exp_theta = np.exp(theta)
+        self.exp_theta_sum = np.exp(theta).sum(axis=1)
         self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES
         self.feature_generator = feature_generator
         self.motif_len = self.feature_generator.motif_len

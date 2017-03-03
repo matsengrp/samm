@@ -21,7 +21,8 @@ from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from common import *
-from read_data import *
+from read_data import read_gene_seq_csv_data
+from read_data import SAMPLE_PARTIS_ANNOTATIONS
 from matsen_grp_data import *
 
 def parse_args():
@@ -84,6 +85,9 @@ def parse_args():
         default='G',
         choices=('G', 'M', 'K', 'L'),
         help='immunoglobulin class')
+    parser.add_argument('--per-target-model',
+        action='store_true',
+        help='Fit per target model')
 
     args = parser.parse_args()
 
@@ -111,8 +115,7 @@ def main(args=sys.argv[1:]):
 
     motif_list = feat_generator.get_motif_list()
 
-    mutations = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
-    proportions = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
+    mutations = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
     appearances = {motif: 0. for motif in motif_list}
 
     for obs_seq in obs_data:
@@ -124,36 +127,26 @@ def main(args=sys.argv[1:]):
         for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
             mutations[motif_list[germline_motifs[mut_pos]]][mut_nuc] += 1
 
-    for key in motif_list:
-        for nucleotide in 'acgt':
-            if appearances[key] > 0:
-                proportions[key][nucleotide] = 1. * mutations[key][nucleotide] / appearances[key]
+    if args.per_target_model:
+        proportions = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
+        probability_matrix = None
+        for key in motif_list:
+            for nucleotide in NUCLEOTIDES:
+                if appearances[key] > 0:
+                    proportions[key][nucleotide] = 1. * mutations[key][nucleotide] / appearances[key]
+        prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
+    else:
+        proportions = {motif: 0 for motif in motif_list}
+        probability_matrix = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
+        for key in motif_list:
+            num_mutations = sum(mutations[key].values())
+            if num_mutations > 0:
+                proportions[key] = 1. * num_mutations / appearances[key]
+                for nucleotide in NUCLEOTIDES:
+                    probability_matrix[key][nucleotide] = 1. * mutations[key][nucleotide] / num_mutations
+        prop_list = np.array([proportions[motif_list[i]] for i in range(len(motif_list))])
 
-    prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in 'acgt'] for i in range(len(motif_list))])
-    pickle.dump(prop_list, open(args.out_file, 'w'))
-
-    # Print the motifs with the highest and lowest proportions
-    if args.theta_file is not None:
-        theta = pickle.load(open(args.theta_file, 'rb'))
-        threshold_prop_list = np.zeros(prop_list.shape)
-        mean_prop = np.mean(prop_list, axis=0)
-        sd_prop = np.sqrt(np.var(prop_list, axis=0))
-        for i in range(theta.shape[0]):
-            for idx, nucleotide in enumerate('acgt'):
-                if np.abs(proportions[motif_list[i]][nucleotide] - mean_prop[idx]) > 0.5 * sd_prop[idx]:
-                    log.info("%d: %f, %s, %f" % (i, np.max(theta[i,idx]), motif_list[i], proportions[motif_list[i]][nucleotide]))
-                    threshold_prop_list[i][idx] = proportions[motif_list[i]][nucleotide]
-    
-        theta_flat = np.ravel(theta)
-        prop_flat = np.ravel(prop_list)
-        thresh_flat = np.ravel(threshold_prop_list)
-        log.info("THETA")
-        log.info(scipy.stats.spearmanr(theta_flat, prop_flat))
-        log.info(scipy.stats.kendalltau(theta_flat, prop_flat))
-    
-        log.info("THRESHOLDED THETA")
-        log.info(scipy.stats.spearmanr(theta_flat, thresh_flat))
-        log.info(scipy.stats.kendalltau(theta_flat, thresh_flat))
+    pickle.dump((prop_list, probability_matrix), open(args.out_file, 'w'))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

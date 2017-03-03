@@ -66,15 +66,16 @@ def main(args=sys.argv[1:]):
     command = 'Rscript'
     script_file = 'R/fit_shmulate_model.R'
 
-    cmd = [command, script_file, args.input_file, args.input_genes, args.model_pkl.replace(".pkl", ".csv")]
+    cmd = [command, script_file, args.input_file, args.input_genes, args.model_pkl.replace(".pkl", "")]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
     # Read in the results from the shmulate model-fitter
     feat_gen = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
     motif_list = feat_gen.get_motif_list()
-    motif_dict = dict()
-    with open(args.model_pkl.replace(".pkl", ".csv"), "r") as model_file:
+    # Read target matrix
+    target_motif_dict = dict()
+    with open(args.model_pkl.replace(".pkl", "_target.csv"), "r") as model_file:
         csv_reader = csv.reader(model_file)
         # Assume header is ACGT
         header = csv_reader.next()
@@ -86,36 +87,47 @@ def main(args=sys.argv[1:]):
             mutate_to_prop = {}
             for i in range(NUM_NUCLEOTIDES):
                 mutate_to_prop[header[i + 1]] = line[i + 1]
-            motif_dict[motif] = mutate_to_prop
+            target_motif_dict[motif] = mutate_to_prop
+
+    # Read mutability matrix
+    mut_motif_dict = dict()
+    with open(args.model_pkl.replace(".pkl", "_mut.csv"), "r") as model_file:
+        csv_reader = csv.reader(model_file)
+        motifs = csv_reader.next()[1:]
+        motif_vals = csv_reader.next()[1:]
+        for motif, motif_val in zip(motifs, motif_vals):
+            mut_motif_dict[motif.lower()] = motif_val
+
+    # Read substitution matrix
+    sub_motif_dict = dict()
+    with open(args.model_pkl.replace(".pkl", "_sub.csv"), "r") as model_file:
+        csv_reader = csv.reader(model_file)
+        # Assume header is ACGT
+        header = csv_reader.next()
+        for i in range(NUM_NUCLEOTIDES):
+            header[i + 1] = header[i + 1].lower()
+
+        for line in csv_reader:
+            motif = line[0].lower()
+            mutate_to_prop = {}
+            for i in range(NUM_NUCLEOTIDES):
+                mutate_to_prop[header[i + 1]] = line[i + 1]
+            sub_motif_dict[motif] = mutate_to_prop
 
     # Reconstruct theta in the right order
     # TODO: How do we compare the edge motifs?? What does shmulate even do with them?
-    model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
+    target_model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
+    mut_model_array = np.zeros((feat_gen.feature_vec_len, 1))
+    sub_model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
     for motif_idx, motif in enumerate(motif_list):
         for nuc in NUCLEOTIDES:
-            val = motif_dict[motif][nuc]
-            if val == "NA":
-                val = -np.inf
-            model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = val
-    pickle.dump(model_array, open(args.model_pkl, 'w'))
+            target_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(target_motif_dict[motif][nuc])
+            mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
+            sub_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(sub_motif_dict[motif][nuc])
+    pickle.dump((target_model_array, mut_model_array, sub_model_array), open(args.model_pkl, 'w'))
 
-    # Let's compare the true vs. fitted models
-    if args.theta_file is not None:
-        true_theta = pickle.load(open(args.theta_file, 'rb'))
-        theta_mask = get_possible_motifs_to_targets(motif_list, true_theta.shape)
-    
-        theta_shape = (theta_mask.sum(), 1)
-        flat_model = model_array[theta_mask].reshape(theta_shape)
-        # Convert the true model (parameterized in theta) to the the same scale as shmulate
-        flat_true_model = np.exp(true_theta[theta_mask].reshape(theta_shape))
-    
-        log.info("THETA")
-        log.info(scipy.stats.spearmanr(flat_model, flat_true_model))
-        log.info(scipy.stats.kendalltau(flat_model, flat_true_model))
-    
-        log.info("THRESHOLDED THETA")
-        log.info(scipy.stats.spearmanr(flat_model, flat_true_model))
-        log.info(scipy.stats.kendalltau(flat_model, flat_true_model))
+def _read_shmulate_val(shmulate_value):
+    return -np.inf if shmulate_value == "NA" else float(shmulate_value)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
