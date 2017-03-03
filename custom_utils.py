@@ -80,7 +80,7 @@ def run_cmd(cmdfo, batch_system=None, batch_options=None):
     print "Running process:", cmd_str
     return proc
 
-def run_cmds(cmdfos, sleep=False, batch_system="slurm", batch_options=None, debug=None):
+def run_cmds(cmdfos, sleep=True, batch_system="slurm", batch_options=None, debug=None):
     """
     Kick off processes to the batch system
     NOTE: This will try a number of times, and if that fails, this function will NOT throw an error. Instead, if the output file is not there,
