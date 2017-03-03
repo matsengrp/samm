@@ -19,7 +19,7 @@ class MCMC_EM_TestCase(unittest.TestCase):
         MOTIF_LEN = 3
 
         feat_generator = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
-        gene_dict, obs_data_raw = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len=MOTIF_LEN)
+        obs_data_raw = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len=MOTIF_LEN)
         obs_data = []
         for obs_seq_mutation in obs_data_raw:
             obs_data.append(feat_generator.create_base_features(obs_seq_mutation))

@@ -17,9 +17,12 @@ class Input_Data_TestCase(unittest.TestCase):
         seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_seq=True)
+        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_or_impute='impute-ancestors')
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, impute_ancestors=True)
+        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_or_impute='sample-random')
+        print len(seqs)
+
+        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_or_impute='sample-highly-mutated')
         print len(seqs)
 
