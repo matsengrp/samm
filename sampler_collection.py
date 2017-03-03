@@ -1,6 +1,7 @@
 import sys
 import numpy as np
 import traceback
+import os.path
 from multiprocessing import Pool
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker, BatchSubmissionManager, run_multiprocessing_worker
@@ -12,7 +13,7 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs, approx):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs, approx, scratch_dir):
         """
         @param observed_data: list of ObservedSequenceMutationsFeatures objects
         @param theta: numpy vector
@@ -33,6 +34,8 @@ class SamplerCollection:
             for obs_seq in observed_data
         ]
 
+        self.scratch_dir = scratch_dir
+
     def get_samples(self, init_orders_for_iter, num_samples, burn_in_sweeps=0):
         """
         @param init_orders_for_iter: what order to initialize each gibbs sampler
@@ -47,7 +50,7 @@ class SamplerCollection:
             for i, (sampler, init_order) in enumerate(zip(self.samplers, init_orders_for_iter))
         ]
         if self.num_jobs > 1:
-            batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, "_output/gibbs_workers")
+            batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, os.path.join(self.scratch_dir, "gibbs_workers"))
             # TODO: what to do if fails?
             sampled_orders_list = batch_manager.run()
         else:
