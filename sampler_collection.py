@@ -70,6 +70,9 @@ class SamplerPoolWorker(ParallelWorker):
         sampler_res = self.sampler.run(self.init_order, self.burn_in_sweeps, self.num_samples)
         return sampler_res
 
+    def __str__(self):
+        return "SamplerPoolWorker %s" % self.sampler.obs_seq_mutation
+
 class SamplerResult:
     def __init__(self, samples, trace):
         """
