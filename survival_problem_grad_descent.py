@@ -287,6 +287,9 @@ class GradientWorker(ParallelWorker):
         """
         return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.exp_thetaT, self.sample_data)
 
+    def __str__(self):
+        return "GradientWorker %s" % self.sample_data.init_feat_counts
+
 class ObjectiveValueWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
@@ -305,3 +308,6 @@ class ObjectiveValueWorker(ParallelWorker):
         @return the log likelihood for this sample
         """
         return SurvivalProblemCustom.calculate_per_sample_log_lik(self.exp_theta, self.sample_data)
+
+    def __str__(self):
+        return "ObjectiveValueWorker %s" % self.sample_data.init_feat_counts
