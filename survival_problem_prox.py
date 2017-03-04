@@ -31,6 +31,12 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @return final fitted value of theta and penalized log likelihood
         """
         theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, min_iters, verbose)
+        # Ensure no more new jobs submitted to the pool
+        self.pool.close()
+        # Wait for the worker processes to exit -- make sure we don't keep these processes open!
+        # Otherwise memory usage goes crazy
+        self.pool.join()
+
         return theta, -current_value, diff, -upper_bound
 
     def _get_value_parallel(self, theta):
@@ -101,8 +107,6 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                     # has been run or difference in objective function is small
                     break
 
-
-        self.pool.close()
         log.info("final PROX iter %d, val %f, time %d" % (i, current_value, time.time() - st))
         # We return diff because we want to ensure if the loss is increasing then it's not by much
         # by comparing later to -diff < some_threshold
