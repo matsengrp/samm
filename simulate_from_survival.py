@@ -11,6 +11,7 @@ from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from submotif_feature_generator import SubmotifFeatureGenerator
 from common import *
+from read_data import GERMLINE_PARAM_FILE
 
 def parse_args():
     ''' parse command line arguments '''

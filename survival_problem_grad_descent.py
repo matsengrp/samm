@@ -47,6 +47,12 @@ class SurvivalProblemCustom(SurvivalProblem):
     def post_init(self):
         return
 
+    def solve(self):
+        """
+        Solve the problem and return the solution. Make sure to call self.pool.close()!!!
+        """
+        raise NotImplementedError()
+
     def _create_precalc_data_parallel(self, samples, batch_factor=10):
         """
         calculate the precalculated data for each sample in parallel
@@ -65,7 +71,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             ) for i, sample in enumerate(samples)
         ]
         if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list, self.num_threads * batch_factor)
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list)
             precalc_data = multiproc_manager.run()
         else:
             precalc_data = [worker.run() for worker in worker_list]
@@ -94,7 +100,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list, self.num_threads * batch_factor)
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list)
             ll = multiproc_manager.run()
         else:
             ll = [worker.run() for worker in worker_list]
@@ -118,7 +124,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list, self.num_threads * batch_factor)
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list)
             l = multiproc_manager.run()
         else:
             l = [worker.run() for worker in worker_list]

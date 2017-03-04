@@ -58,43 +58,37 @@ class MultiprocessingManager(ParallelWorkerManager):
     Handles submitting jobs to a multiprocessing pool
     So runs ParallelWorkers using multiple CPUs on the same machine
     """
-    def __init__(self, pool, worker_list, num_approx_batches):
+    def __init__(self, pool, worker_list):
         """
         @param worker_list: List of ParallelWorkers
-        @param num_approx_batches: number of batches to split across processes (might be a bit more)
         """
         self.pool = pool
-
-        # Batch commands together
-        num_workers = len(worker_list)
-        num_per_batch = max(num_workers/num_approx_batches, 1)
-        self.batched_workers_list = []
-        for batch_idx, start_idx in enumerate(range(0, num_workers, num_per_batch)):
-            self.batched_workers_list.append(
-                worker_list[start_idx:start_idx + num_per_batch]
-            )
+        self.worker_list = worker_list
 
     def run(self):
-        batched_results = self.pool.map(run_multiprocessing_worker, self.batched_workers_list)
+        try:
+            # Note that multiprocessing pool will already batch things for you
+            results_raw = self.pool.map(run_multiprocessing_worker, self.worker_list)
+        except Exception as e:
+            print "Error occured when trying to process workers in parallel %s" % e
+            # Just do it all one at a time instead
+            results_raw = map(run_multiprocessing_worker, self.worker_list)
+
         results = []
-        for i, batch_r in enumerate(batched_results):
-            for j, r in enumerate(batch_r):
-                if r is None:
-                    print "WARNING: multiprocessing worker for this worker failed %s" % self.batched_workers_list[i][j]
-                else:
-                    results.append(r)
+        for i, r in enumerate(results_raw):
+            if r is None:
+                print "WARNING: multiprocessing worker for this worker failed %s" % self.worker_list[i]
+            else:
+                results.append(r)
         return results
 
-def run_multiprocessing_worker(worker_batch):
+def run_multiprocessing_worker(worker):
     """
     @param worker: Worker
     Function called on each worker process, used by MultiprocessingManager
     Note: this must be a global function
     """
-    results = []
-    for worker in worker_batch:
-        results.append(worker.run())
-    return results
+    return worker.run()
 
 class BatchSubmissionManager(ParallelWorkerManager):
     """
