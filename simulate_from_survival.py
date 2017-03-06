@@ -116,8 +116,7 @@ def _generate_true_parameters(feature_vec_len, motif_list, args):
     # Also cannot pick the last motif
     some_nonzero_motifs = np.random.choice(true_thetas.shape[0] - 1, some_num_nonzero_motifs)
     # Also make some neighbor motifs nonzero
-    nonzero_motifs = np.unique(np.vstack((some_nonzero_motifs, some_nonzero_motifs + 1)))
-    num_nonzero_motifs = nonzero_motifs.size
+    nonzero_motifs = []
     for idx in some_nonzero_motifs:
         center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[idx][args.motif_len/2]]
         if not args.per_target_model:
@@ -126,28 +125,44 @@ def _generate_true_parameters(feature_vec_len, motif_list, args):
             probability_matrix[idx, center_nucleotide_idx] = 0
             probability_matrix[idx,:] /= np.sum(probability_matrix[idx,:])
 
-            # neighboring values also have same value (may get overridden if that motif was originally
-            # set to be nonzero too)
-            true_thetas[idx + 1, :] = true_thetas[idx, :]
-            probability_matrix[idx + 1, :] = probability_matrix[idx, :]
+            nonzero_motifs.append(motif_list[idx])
+
+            center_nucleotide_idx_next = NUCLEOTIDE_DICT[motif_list[idx + 1][args.motif_len/2]]
+            if center_nucleotide_idx_next == center_nucleotide_idx:
+                # neighboring values also have same value (may get overridden if that motif was originally
+                # set to be nonzero too)
+                true_thetas[idx + 1, :] = true_thetas[idx, :]
+                probability_matrix[idx + 1, :] = probability_matrix[idx, :]
+                nonzero_motifs.append(motif_list[idx + 1])
+                assert(probability_matrix[idx + 1, center_nucleotide_idx_next] == 0)
         else:
             true_thetas[idx, :] = (np.random.rand(NUM_NUCLEOTIDES) - 0.5) * args.theta_sampling_range * 2
             # Cannot mutate motif to a target nucleotide with the same center nucleotide.
             true_thetas[idx, center_nucleotide_idx] = -np.inf
 
-            # neighboring values also have same value (may get overridden if that motif was originally
-            # set to be nonzero too)
-            true_thetas[idx + 1, :] = true_thetas[idx, :]
-    return true_thetas, probability_matrix
+            nonzero_motifs.append(motif_list[idx])
 
-def _get_germline_nucleotides(args):
+            center_nucleotide_idx_next = NUCLEOTIDE_DICT[motif_list[idx + 1][args.motif_len/2]]
+            if center_nucleotide_idx_next == center_nucleotide_idx:
+                # Only have same neighboring values if center nucleotides are the same
+
+                # neighboring values also have same value (may get overridden if that motif was originally
+                # set to be nonzero too)
+                true_thetas[idx + 1, :] = true_thetas[idx, :]
+                nonzero_motifs.append(motif_list[idx + 1])
+                assert(true_thetas[idx + 1, center_nucleotide_idx_next] == -np.inf)
+
+    return true_thetas, probability_matrix, nonzero_motifs
+
+def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.random_gene_len > 0:
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
         if args.guarantee_motifs_showup:
+            num_nonzero_motifs = len(nonzero_motifs)
             germline_nucleotides = [get_random_dna_seq(args.random_gene_len + args.motif_len) for i in range(args.n_germlines - num_nonzero_motifs)]
             # Let's make sure that our nonzero motifs show up in a germline sequence at least once
-            for motif_idx in nonzero_motifs:
-                new_str = get_random_dna_seq(args.random_gene_len/2) + motif_list[motif_idx] + get_random_dna_seq(args.random_gene_len/2)
+            for motif in nonzero_motifs:
+                new_str = get_random_dna_seq(args.random_gene_len/2) + motif + get_random_dna_seq(args.random_gene_len/2)
                 germline_nucleotides.append(new_str)
         else:
             # If there are very many germlines, just generate random DNA sequences
@@ -194,9 +209,9 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
 
-    true_thetas, probability_matrix = _generate_true_parameters(feat_generator.feature_vec_len, motif_list, args)
+    true_thetas, probability_matrix, nonzero_motifs = _generate_true_parameters(feat_generator.feature_vec_len, motif_list, args)
 
-    germline_nucleotides, germline_genes = _get_germline_nucleotides(args)
+    germline_nucleotides, germline_genes = _get_germline_nucleotides(args, nonzero_motifs)
 
     if args.per_target_model:
         simulator = SurvivalModelSimulatorMultiColumn(true_thetas, feat_generator, lambda0=args.lambda0)
