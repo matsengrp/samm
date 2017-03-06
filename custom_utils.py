@@ -124,14 +124,18 @@ def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_option
     """
     procs[iproc].communicate() # send data to stdin, read data from stdout and stderr, wait for process to terminate
     if procs[iproc].returncode == 0:
-        if not os.path.exists(cmdfo.outfname):
-            print '      proc %d succeded but its output isn\'t there, so sleeping for a bit...' % iproc
-            time.sleep(1.0)
         if os.path.exists(cmdfo.outfname):
             process_out_err('', '', extra_str='' if len(procs) == 1 else str(iproc), logdir=cmdfo.logdir, debug=debug)
             procs[iproc] = None  # job succeeded
             return
-
+        else:
+            print '      proc %d succeded but its output isn\'t there, so sleeping for a bit...' % iproc
+            for i in range(30):
+                if os.path.exists(cmdfo.outfname):
+                    process_out_err('', '', extra_str='' if len(procs) == 1 else str(iproc), logdir=cmdfo.logdir, debug=debug)
+                    procs[iproc] = None  # job succeeded
+                    return
+                time.sleep(1)
     # handle failure
     if n_tries[iproc] > max_num_tries:
         # Time to give up!
