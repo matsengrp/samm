@@ -72,10 +72,20 @@ def run_cmd(cmdfo, batch_system=None, batch_options=None):
     if not os.path.exists(cmdfo.logdir):
         os.makedirs(cmdfo.logdir)
 
-    proc = Popen(cmd_str.split(),
-                 stdout=None if fout is None else open(fout, 'w'),
-                 stderr=None if ferr is None else open(ferr, 'w'),
-                 env=cmdfo.env)
+    if fout is not None and ferr is not None:
+        fout_f = open(fout, 'w')
+        ferr_f = open(ferr, 'w')
+        proc = Popen(cmd_str.split(),
+                     stdout=fout_f,
+                     stderr=ferr_f,
+                     env=cmdfo.env)
+        fout_f.close()
+        ferr_f.close()
+    else:
+        proc = Popen(cmd_str.split(),
+                     stdout=None,
+                     stderr=None,
+                     env=cmdfo.env)
 
     print "Running process:", cmd_str
     return proc
@@ -134,15 +144,15 @@ def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_option
             print 'succeded but output is missing'
         else:
             print 'failed with %d (output %s)' % (procs[iproc].returncode, 'exists' if os.path.exists(cmdfo.outfname) else 'is missing')
-        for strtype in ['out', 'err']:
+        for strtype in ['out.txt', 'err.txt']:
             if os.path.exists(cmdfo.logdir + '/' + strtype) and os.stat(cmdfo.logdir + '/' + strtype).st_size > 0:
                 print '        %s tail:' % strtype
                 logstr = check_output(['tail', cmdfo.logdir + '/' + strtype])
                 print '\n'.join(['            ' + l for l in logstr.split('\n')])
-        if batch_system is not None and os.path.exists(cmdfo.logdir + '/err'):  # cmdfo.cmd_str.split()[0] == 'srun' and
+        if batch_system is not None and os.path.exists(cmdfo.logdir + '/err.txt'):  # cmdfo.cmd_str.split()[0] == 'srun' and
             jobid = ''
             try:
-                jobid = check_output(['head', '-n1', cmdfo.logdir + '/err']).split()[2]
+                jobid = check_output(['head', '-n1', cmdfo.logdir + '/err.txt']).split()[2]
                 nodelist = check_output(['squeue', '--job', jobid, '--states=all', '--format', '%N']).split()[1]
             except:
                 print '      couldn\'t get node list for jobid \'%s\'' % jobid
