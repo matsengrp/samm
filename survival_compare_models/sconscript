@@ -169,7 +169,7 @@ def fit_context_model(env, outdir, c):
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
-               '--prop-file ${TARGETS[0]}',
+               '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
