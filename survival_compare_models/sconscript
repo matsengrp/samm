@@ -87,6 +87,7 @@ def generate(env, outdir, c):
 # Nest for fitting models
 model_options = [
     'survival_none', # No penalty parameters - one column
+    'survival_none4', # No penalty parameters - one column
     'survival_L',
     'survival_L4',
     'survival_FL',
@@ -110,6 +111,11 @@ def fit_context_model(env, outdir, c):
         if model_option == "none":
             # Do a one-column lasso with penalty parameter zero
             model_option = "L"
+            penalty_params = [0]
+        elif model_option == "none4":
+            # Do a one-column lasso with penalty parameter zero
+            model_option = "L"
+            per_target_model_str = "--per-target-model"
             penalty_params = [0]
         elif model_option == "L4":
             model_option = "L"
