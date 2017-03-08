@@ -42,10 +42,10 @@ def parse_args():
         type=str,
         help='sequence data in csv',
         default='_output/seqs.csv')
-    parser.add_argument('--sample',
-        default=None,
-        choices=('sample-random', 'sample-highly-mutated'),
-        help='sample random sequence from cluster or choose most highly mutated?')
+    parser.add_argument('--sample-regime',
+        default=1,
+        choices=(1, 2, 3),
+        help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
     parser.add_argument('--scratch-directory',
         type=str,
         help='where to write dnapars files, if necessary',
@@ -88,7 +88,7 @@ def main(args=sys.argv[1:]):
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample)
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
 
     motif_list = feat_generator.get_motif_list()
 
