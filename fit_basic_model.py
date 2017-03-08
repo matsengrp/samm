@@ -85,14 +85,10 @@ def main(args=sys.argv[1:]):
 
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
-    scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
-    if not os.path.exists(scratch_dir):
-        os.makedirs(scratch_dir)
-
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample, scratch_dir=scratch_dir)
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample)
 
     motif_list = feat_generator.get_motif_list()
 

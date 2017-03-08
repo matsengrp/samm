@@ -164,7 +164,7 @@ def main(args=sys.argv[1:]):
         assert(true_theta.shape[0] == feat_generator.feature_vec_len)
 
     log.info("Reading data")
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample, scratch_dir=scratch_dir)
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample)
 
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
