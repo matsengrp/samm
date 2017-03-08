@@ -248,18 +248,17 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer = csv.writer(outs)
         seq_writer.writerows(out_seqs)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=None):
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
-    @param sample: one of 'impute-ancestors', 'sample-random', 'sample-highly-mutated' (default: None);
-        whether to sample sequences from clusters or impute ancestors
+    @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
 
     @return ObservedSequenceMutations from processed data
     """
 
-    assert(sample in [None, 'sample-random', 'sample-highly-mutated'])
+    assert(sample in range(1, 4))
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
@@ -269,7 +268,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=No
     obs_data = []
     for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
         gl_seq = cluster['germline_sequence'].values[0].lower()
-        if sample == 'sample-random':
+        if sample == 2:
             # Sample a single sequence from a clonal family randomly
             sampled_index = random.choice(cluster.index)
             row = cluster.loc[sampled_index]
@@ -296,7 +295,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=No
                         motif_len=motif_len,
                 )
 
-                if sample is None and obs_seq_mutation.num_mutations > 0:
+                if sample == 1 and obs_seq_mutation.num_mutations > 0:
                     # don't consider pairs where mutations occur in flanking regions
                     obs_data.append(obs_seq_mutation)
                 elif obs_seq_mutation.num_mutations > n_mutes:
