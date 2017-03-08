@@ -230,8 +230,8 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
 
             if cmp(seqs_in_cluster[0], proc_gl_seq):
                 # There are mutations so add to output
-                genes_line = [gl_name, proc_gl_seq]
-                seqs_line = [gl_name, names_in_cluster[0], seqs_in_cluster[0]]
+                genes_line = [[gl_name, proc_gl_seq]]
+                seqs_line = [[gl_name, names_in_cluster[0], seqs_in_cluster[0]]]
             else:
                 # No mutations, skip
                 continue
