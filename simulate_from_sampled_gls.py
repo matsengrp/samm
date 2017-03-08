@@ -47,7 +47,7 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser_simulate.add_argument('--output-file',
+    parser_simulate.add_argument('--output-seqs',
         type=str,
         help='simulated data destination file',
         default='_output/seqs.csv')
@@ -98,9 +98,14 @@ def parse_args():
         type=int,
         default=None,
         help='codon frame')
-    parser_simulate.add_argument('--output-separate-branches',
-        action='store_true',
-        help='output single branches with intermediate ancestors instead of leaves from germline')
+    parser_simulate.add_argument('--output-per-branch-genes',
+        type=str,
+        default=None,
+        help='additionally output genes from single branches with intermediate ancestors instead of leaves from germline')
+    parser_simulate.add_argument('--output-per-branch-seqs',
+        type=str,
+        default=None,
+        help='additionally output genes from single branches with intermediate ancestors instead of leaves from germline')
     parser_simulate.set_defaults(func=simulate)
 
     parser_simulate.set_defaults(subcommand=simulate)
@@ -131,7 +136,8 @@ def run_gctree(args, germline_seq):
             collapsed_tree = CollapsedTree(tree=tree, frame=args.frame) # <-- this will fail if backmutations
             break
         except RuntimeError as e:
-            print('{}, trying again'.format(e))
+            if args.verbose:
+                print('{}, trying again'.format(e))
         else:
             raise
 
@@ -142,7 +148,7 @@ def simulate(args):
     ''' simulate submodule '''
 
     # write empty sequence file before appending
-    output_dir, _ = os.path.split(args.output_file)
+    output_dir, _ = os.path.split(args.output_seqs)
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -168,37 +174,40 @@ def simulate(args):
     # For each germline gene, run shmulate to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
     # used, name of simulated sequence and corresponding sequence.
-    with open(args.output_file, 'w') as outseqs, open(args.output_genes, 'w') as outgermlines:
-        germline_file = csv.writer(outgermlines)
-        germline_file.writerow(['germline_name','germline_sequence'])
+    with open(args.output_seqs, 'w') as outseqs, open(args.output_genes, 'w') as outgermlines, \
+         open(args.output_per_branch_seqs, 'w') as outseqswithanc, \
+         open(args.output_per_branch_genes, 'w') as outgermlineswithanc:
+        gl_file = csv.writer(outgermlines)
+        gl_file.writerow(['germline_name','germline_sequence'])
+        gl_anc_file = csv.writer(outgermlineswithanc)
+        gl_anc_file.writerow(['germline_name','germline_sequence'])
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
+        seq_anc_file = csv.writer(outseqswithanc)
+        seq_anc_file.writerow(['germline_name','sequence_name','sequence'])
         for run, (gene, sequence) in \
                 enumerate(zip(germline_genes, germline_nucleotides)):
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
-            if not args.output_separate_branches:
-                germline_file.writerow([gene,sequence])
+            gl_file.writerow([gene,sequence])
             tree = run_gctree(args, sequence)
             i = 0
             for descendant in tree.traverse('preorder'):
                 if descendant.frequency != 0:
                     i += 1
                     seq_name = 'Run{0}-Sequence{1}'.format(run, i)
-                    if args.output_separate_branches:
-                        # This will be a little redundant since two sequences will share same ancestor
-                        if not descendant.is_root():
-                            descendant.name = '-'.join([descendant.up.name, seq_name])
-                            germline_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
-                            if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
-                                seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
-                        else:
-                            descendant.name = gene
-                            germline_file.writerow([descendant.name,descendant.sequence.lower()])
-                    elif descendant.is_leaf():
-                        if cmp(descendant.sequence.lower(), sequence) != 0:
+                    # This will be a little redundant since two sequences will share same ancestor
+                    if not descendant.is_root():
+                        descendant.name = '-'.join([descendant.up.name, seq_name])
+                        gl_anc_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
+                        if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
+                            seq_anc_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                        if descendant.is_leaf() and cmp(descendant.sequence.lower(), sequence) != 0:
                             seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                    else:
+                        descendant.name = gene
+                        gl_anc_file.writerow([descendant.name,descendant.sequence.lower()])
 
     # Dump the true "thetas," which are mutability * substitution
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
