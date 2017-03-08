@@ -199,6 +199,7 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
     out_seqs = [['germline_name', 'sequence_name', 'sequence']]
     for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
         gl_seq = cluster['germline_sequence'].values[0].lower()
+        gl_name = cluster['germline_name'].values[0]
         # Use dnapars to impute nucleotides at intermediate sequences
 
         # First process sequences to remove unknown nucleotides at the
@@ -206,6 +207,7 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
         proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
         seqs_in_cluster = []
+        names_in_cluster = []
         for idx, elt in cluster.iterrows():
             proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'])
             proc_seq = re.sub('^n+|n+$', '', proc_seq)
@@ -216,13 +218,27 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
                 # Instead throw away that sequence...
                 continue
             seqs_in_cluster.append(proc_seq)
+            names_in_cluster.append(elt['sequence_name'])
 
         if not seqs_in_cluster:
-            # If there are no sequences after processing then dnapars
-            # won't do anything, so move on
+            # No sequences, so dnapars won't do anything, so move on
             continue
 
-        genes_line, seqs_line = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq, scratch_dir, gl_name='gene'+str(gl_idx), verbose=verbose)
+        if len(seqs_in_cluster) == 1:
+            # If there is only one sequence, dnapars still won't do anything,
+            # but there might be information if there are mutations
+
+            if cmp(seqs_in_cluster[0], proc_gl_seq):
+                # There are mutations so add to output
+                genes_line = [gl_name, proc_gl_seq]
+                seqs_line = [gl_name, names_in_cluster[0], seqs_in_cluster[0]]
+            else:
+                # No mutations, skip
+                continue
+        else:
+            # otherwise, take it away dnapars
+            genes_line, seqs_line = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq, scratch_dir, gl_name='gene'+str(gl_idx), verbose=verbose)
+
         out_genes += genes_line
         out_seqs += seqs_line 
 
