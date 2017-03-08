@@ -86,6 +86,8 @@ def generate(env, outdir, c):
 
 # Nest for fitting models
 model_options = [
+    'survival_none', # No penalty parameters - one column
+    'survival_none4', # No penalty parameters - one column
     'survival_L',
     'survival_L4',
     'survival_FL',
@@ -106,14 +108,28 @@ def fit_context_model(env, outdir, c):
     if c["model_options"].startswith("survival"):
         model_option = c["model_options"].replace("survival_", "")
         per_target_model_str = ""
-        if model_option == "L4":
+        if model_option == "none":
+            # Do a one-column lasso with penalty parameter zero
+            model_option = "L"
+            penalty_params = [0]
+        elif model_option == "none4":
+            # Do a one-column lasso with penalty parameter zero
             model_option = "L"
             per_target_model_str = "--per-target-model"
-            penalty_params = [0.1,0.01]
+            penalty_params = [0]
+        elif model_option == "L4":
+            model_option = "L"
+            per_target_model_str = "--per-target-model"
+            penalty_params = [0.008]
         elif model_option == "L":
-            penalty_params = [0.1,0.01]
+            penalty_params = [0.008]
         elif model_option == "FL":
-            penalty_params = [0.005,0.0005]
+            penalty_params = [0.0005]
+
+        if c["per_target_model"] == "is_per_target" and per_target_model_str == "":
+            # If true model is per target and we assume a single hazard rate,
+            # then don't fit the model. Skip this.
+            return
 
         cmd = ['python fit_context_model.py',
                '--seed',
@@ -159,7 +175,7 @@ def fit_context_model(env, outdir, c):
                '--theta-file ${SOURCES[0]}',
                '--input-file ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
-               '--prop-file ${TARGETS[0]}',
+               '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],

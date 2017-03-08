@@ -240,10 +240,10 @@ def main(args=sys.argv[1:]):
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        if args.theta_file is not None:
+        if args.theta_file is not None and true_theta.shape == theta.shape:
             theta_shape = (theta_mask.sum(), 1)
-            flat_theta = theta[theta_mask].reshape(theta_shape)
-            flat_true_theta = true_theta[theta_mask].reshape(theta_shape)
+            flat_theta = theta[theta_mask]
+            flat_true_theta = true_theta[theta_mask]
             log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
             log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
             log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
