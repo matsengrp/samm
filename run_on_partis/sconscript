@@ -7,7 +7,9 @@ from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
 from random import randint
-from matsen_grp_data import *
+from matsen_grp_data import CUI_DATA_PATH
+
+MOTIF_LEN = 5
 
 Import('env')
 localenv = env.Clone()
@@ -20,21 +22,57 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 # Nest for datasets
 nest.add(
     'datasets',
-    ['laura', 'kate'])
+    ['cui'])
 
+# TODO: eventually add jason-mg data, once processed
 nest.add(
     'data_path',
-    lambda c: [LAURA_DATA_PATH if c['datasets'] == 'laura' else KATE_DATA_PATH],
+    [CUI_DATA_PATH],
     create_dir=False)
 
 # Chains and classes
 nest.add(
     'chain',
-    ['h', 'k', 'l'])
+    ['k', 'l']) # no heavy chain in cui data
 
 nest.add(
     'igclass',
     lambda c: 'G' if c['chain'] == 'h' else c['chain'].upper(),
+    create_dir=False)
+
+nest.add(
+    'data_processing',
+    ['raw_data', 'impute_ancestors'])
+
+# Nest for processing data
+@nest.add_target_with_env(localenv)
+def process_data(env, outdir, c):
+    cmd = ['python preprocess_data.py',
+               '--data-path',
+               c['data_path'],
+               '--chain',
+               c['chain'],
+               '--motif-len',
+               MOTIF_LEN,
+               '--output-genes ${TARGETS[0]}',
+               '--output-seqs ${TARGETS[1]}']
+    if c['data_processing'] == 'impute_ancestors':
+        cmd += ['--impute-ancestors']
+
+    return env.Command(
+        [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+nest.add(
+    'replicate',
+    range(localenv['NREPS']),
+    label_func='{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
     create_dir=False)
 
 # Targets
@@ -48,45 +86,36 @@ def fit_models(env, outdir, c):
     cmd = []
     if c["model_options"] == "survival":
         cmd = ['python fit_context_model.py',
+               '--input-genes ${SOURCES[0]}',
+               '--input-seqs ${SOURCES[1]}',
                '--seed',
-               randint(1000, 9999),
+               c['seed'],
                '--motif-len',
-               5,
+               MOTIF_LEN,
                '--penalty-params',
                "0.01,0.001,0.0001",
                '--num-cpu-threads',
                10,
                '--num-jobs',
-               20,
+               40,
                '--burn-in',
                2,
                '--num-e-samples',
                4,
-               '--use-partis',
-               '--input-partis',
-               c['data_path'],
-               '--chain',
-               c['chain'],
-               '--igclass',
-               c['igclass'],
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     elif c["model_options"] == "basic":
         cmd = ['python fit_basic_model.py',
+               '--input-genes ${SOURCES[0]}',
+               '--input-seqs ${SOURCES[1]}',
                '--seed',
-               randint(1000, 9999),
+               c['seed'],
                '--motif-len',
-               5,
-               '--use-partis',
-               '--input-partis',
-               c['data_path'],
-               '--chain',
-               c['chain'],
-               '--igclass',
-               c['igclass'],
-               '--prop-file ${TARGETS[0]}',
+               MOTIF_LEN,
+               '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
-        [],
+        c['process_data'],
         ' '.join(map(str, cmd)))
+

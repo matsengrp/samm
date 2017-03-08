@@ -34,29 +34,22 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--input-file',
-        type=str,
-        help='sequence data in csv',
-        default='_output/seqs.csv')
     parser.add_argument('--input-genes',
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
-    parser.add_argument('--sample-or-impute',
-        default=None,
-        choices=('sample-random', 'sample-highly-mutated', 'impute-ancestors'),
-        help='sample sequence from cluster or impute ancestors?')
+    parser.add_argument('--input-seqs',
+        type=str,
+        help='sequence data in csv',
+        default='_output/seqs.csv')
+    parser.add_argument('--sample-regime',
+        default=1,
+        choices=(1, 2, 3),
+        help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
     parser.add_argument('--scratch-directory',
         type=str,
         help='where to write dnapars files, if necessary',
         default='_output')
-    parser.add_argument('--input-partis',
-        type=str,
-        help='partis annotations file',
-        default=SAMPLE_PARTIS_ANNOTATIONS)
-    parser.add_argument('--use-partis',
-        action='store_true',
-        help='use partis annotations file')
     parser.add_argument('--num-threads',
         type=str,
         help='number of threads to use during E-step',
@@ -77,14 +70,6 @@ def parse_args():
         type=str,
         help='file to output logs',
         default='_output/basic_log.txt')
-    parser.add_argument('--chain',
-        default='h',
-        choices=('h', 'k', 'l'),
-        help='heavy chain or kappa/lambda light chain')
-    parser.add_argument('--igclass',
-        default='G',
-        choices=('G', 'M', 'K', 'L'),
-        help='immunoglobulin class')
     parser.add_argument('--per-target-model',
         action='store_true',
         help='Fit per target model')
@@ -100,18 +85,10 @@ def main(args=sys.argv[1:]):
 
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
-    scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
-    if not os.path.exists(scratch_dir):
-        os.makedirs(scratch_dir)
-
     np.random.seed(args.seed)
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
-    if args.use_partis:
-        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        write_partis_data_from_annotations(args.input_genes, args.input_file, annotations, inferred_gls=germlines, chain=args.chain)
-
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len, sample_or_impute=args.sample_or_impute, scratch_dir=scratch_dir)
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
 
     motif_list = feat_generator.get_motif_list()
 

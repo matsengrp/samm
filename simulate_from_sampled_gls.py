@@ -181,18 +181,21 @@ def simulate(args):
             if not args.output_separate_branches:
                 germline_file.writerow([gene,sequence])
             tree = run_gctree(args, sequence)
-            root = tree.get_tree_root()
             i = 0
-            for descendant in root:
+            for descendant in tree.traverse('preorder'):
                 if descendant.frequency != 0:
                     i += 1
                     seq_name = 'Run{0}-Sequence{1}'.format(run, i)
                     if args.output_separate_branches:
                         # This will be a little redundant since two sequences will share same ancestor
-                        gene = '-'.join(['Parent', seq_name])
-                        germline_file.writerow([gene,descendant.up.sequence.lower()])
-                        if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
-                            seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                        if not descendant.is_root():
+                            descendant.name = '-'.join([descendant.up.name, seq_name])
+                            germline_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
+                            if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
+                                seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                        else:
+                            descendant.name = gene
+                            germline_file.writerow([descendant.name,descendant.sequence.lower()])
                     elif descendant.is_leaf():
                         if cmp(descendant.sequence.lower(), sequence) != 0:
                             seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
