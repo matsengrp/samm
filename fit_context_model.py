@@ -38,18 +38,18 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--input-file',
-        type=str,
-        help='sequence data in csv',
-        default='_output/seqs.csv')
     parser.add_argument('--input-genes',
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
-    parser.add_argument('--sample-or-impute',
+    parser.add_argument('--input-seqs',
+        type=str,
+        help='sequence data in csv',
+        default='_output/seqs.csv')
+    parser.add_argument('--sample',
         default=None,
-        choices=('sample-random', 'sample-highly-mutated', 'impute-ancestors'),
-        help='sample sequence from cluster or impute ancestors?')
+        choices=('sample-random', 'sample-highly-mutated'),
+        help='sample random sequence from cluster or choose most highly mutated?')
     parser.add_argument('--scratch-directory',
         type=str,
         help='where to write gibbs workers and dnapars files, if necessary',
@@ -99,23 +99,8 @@ def parse_args():
         type=str,
         help='file with pickled true context model (default: None, for no truth)',
         default=None)
-    parser.add_argument('--input-partis',
-        type=str,
-        help='partis annotations file',
-        default=SAMPLE_PARTIS_ANNOTATIONS)
-    parser.add_argument('--use-partis',
-        action='store_true',
-        help='use partis annotations file')
     parser.add_argument('--per-target-model',
         action='store_true')
-    parser.add_argument('--chain',
-        default='h',
-        choices=('h', 'k', 'l'),
-        help='heavy chain or kappa/lambda light chain')
-    parser.add_argument('--igclass',
-        default='G',
-        choices=('G', 'M', 'K', 'L'),
-        help='immunoglobulin class')
 
     parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
@@ -179,11 +164,7 @@ def main(args=sys.argv[1:]):
         assert(true_theta.shape[0] == feat_generator.feature_vec_len)
 
     log.info("Reading data")
-    if args.use_partis:
-        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        write_partis_data_from_annotations(args.input_genes, args.input_file, annotations, inferred_gls=germlines, chain=args.chain)
-
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file, motif_len=args.motif_len, sample_or_impute=args.sample_or_impute, scratch_dir=scratch_dir)
+    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample, scratch_dir=scratch_dir)
 
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
