@@ -4,6 +4,7 @@ import csv
 import subprocess
 import os.path
 import pickle
+import pandas as pd
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -52,14 +53,12 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
             inferred_gls = [inferred_gls]
         germlines = {}
         for germline_file in set(inferred_gls):
-            germlines[germline_file] = glutils.read_glfo(germline_file, chain=chain)
+            germlines[germline_file] = glutils.read_glfo(germline_file, locus='ig'+chain)
     else:
-        glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
+        glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, locus='ig'+chain)
         inferred_gls = [None] * len(annotations_file_names)
 
     seq_header = ['germline_name', 'sequence_name', 'sequence']
-
-    obs_data = pd.DataFrame(columns=seq_header)
 
     seqs_col = 'v_qr_seqs' if use_v else 'seqs'
     gene_col = 'v_gl_seq' if use_v else 'naive_seq'
@@ -85,6 +84,9 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
                 reader = csv.DictReader(csvfile)
                 for idx, line in enumerate(reader):
                     # add goodies from partis
+                    if len(line['input_seqs']) == 0:
+                        # sometimes data will have empty clusters
+                        continue
                     utils.process_input_line(line)
                     utils.add_implicit_info(glfo, line)
                     good_seq_idx = [i for i, is_good in enumerate(good_seq(line)) if is_good]
@@ -101,13 +103,17 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
                             'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
                             'sequence': line[seqs_col][good_idx].lower()})
 
-def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline'):
+def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verbose=True):
     """
     Compute ancestral states via maximum parsimony
 
     @param seqs: list of sequences
     @param gl_seq: germline sequence
+    @param scratch_dir: where to write intermediate dnapars files
     @param gl_name: name of germline (must be less than 10 characters long)
+
+    @return genes_line: information needed to output imputed germline data
+    @return seqs_line: information needed to output imputed sequence data
     """
 
     assert(len(gl_name) < 10)
@@ -139,38 +145,105 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline'):
                 naive_idx = str(lineno)
 
     # arcane user options for dnapars
+    # 'O', naive_idx: the location of the outgroup root
+    # 'S', 'Y': less thorough search; runs much faster but output is less exhaustive
+    # 'J', 13, 10: randomize input ("jumble") using seed 13 and jumbling 10 times
+    # 4: print out steps in each site (to get all nucleotide info)
+    # 5: print sequences in at all nodes (to get ancestors)
+    # '.': use dot-differencing for display
+    # 'Y': accept these options
     with open(config, 'w') as cfg_file:
-        cfg_file.write('\n'.join(['O', naive_idx, 'J', '13', '10', '4', '5', '.', 'Y']))
+        cfg_file.write('\n'.join(['O', naive_idx, 'S', 'Y', 'J', '13', '10', '4', '5', '.', 'Y']))
 
     # defer to command line to construct parsimony trees and ancestral states
     # dnapars has weird behavior if outfile and outtree already exist o_O
     cmd = ['cd', scratch_dir, '&& rm -f outfile outtree && dnapars <', os.path.basename(config), '> dnapars.log']
-    print "Calling:", " ".join(cmd)
+    if verbose:
+        print "Calling:", " ".join(cmd)
     res = subprocess.call([" ".join(cmd)], shell=True)
 
     # phew, finally got some trees
     trees = phylip_parse(outfile, gl_name)
 
     # take first parsimony tree
-    root = trees[0].get_tree_root()
-    start_seqs = []
-    end_seqs = []
-    for leaf in root:
-        end_seqs.append(leaf.sequence.lower())
-        start_seqs.append(leaf.up.sequence.lower())
+    genes_line = []
+    seq_line = []
+    for idx, descendant in enumerate(trees[0].traverse('preorder')):
+        if descendant.is_root():
+            descendant.name = gl_name
+        else:
+            # use dummy name for internal node sequences
+            descendant.name = '-'.join([descendant.up.name, descendant.name])
+            if [descendant.up.name, descendant.up.sequence.lower()] not in genes_line:
+                genes_line.append([descendant.up.name, descendant.up.sequence.lower()])
+            seq_line.append([descendant.up.name, descendant.name, descendant.sequence.lower()])
 
-    return start_seqs, end_seqs
+    return genes_line, seq_line
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample_or_impute=None, scratch_dir='_output', output_file=None):
+def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_file_name, motif_len=1, scratch_dir='_output', verbose=True):
+    """
+    @param output_genes: where to write processed germline data, if wanted
+    @param output_genes: where to write processed sequence data, if wanted
+    @param gene_file_name: csv file with germline names and sequences
+    @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
+    @param motif_len: length of motif we're using; used to collapse series of "n"s
+    @param scratch_dir: where to write dnapars intermediate files
+    """
+
+    genes = pd.read_csv(gene_file_name)
+    seqs = pd.read_csv(seq_file_name)
+
+    full_data = pd.merge(genes, seqs, on='germline_name')
+
+    out_genes = [['germline_name', 'germline_sequence']]
+    out_seqs = [['germline_name', 'sequence_name', 'sequence']]
+    for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
+        gl_seq = cluster['germline_sequence'].values[0].lower()
+        # Use dnapars to impute nucleotides at intermediate sequences
+
+        # First process sequences to remove unknown nucleotides at the
+        # beginning and end of sequences
+        proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
+        proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
+        seqs_in_cluster = []
+        for idx, elt in cluster.iterrows():
+            proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'])
+            proc_seq = re.sub('^n+|n+$', '', proc_seq)
+            if 'n' in proc_seq or len(proc_seq) != len(proc_gl_seq):
+                # If a sequence has internal "n"s, we would need to
+                # propagate that to all sequences for our processing of
+                # dnapars to work, which may throw away too much data.
+                # Instead throw away that sequence...
+                continue
+            seqs_in_cluster.append(proc_seq)
+
+        if not seqs_in_cluster:
+            # If there are no sequences after processing then dnapars
+            # won't do anything, so move on
+            continue
+
+        genes_line, seqs_line = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq, scratch_dir, gl_name='gene'+str(gl_idx), verbose=verbose)
+        out_genes += genes_line
+        out_seqs += seqs_line 
+
+    with open(output_genes, 'w') as outg, open(output_seqs, 'w') as outs:
+        gene_writer = csv.writer(outg)
+        gene_writer.writerows(out_genes)
+        seq_writer = csv.writer(outs)
+        seq_writer.writerows(out_seqs)
+
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=None):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
-    @param impute_ancestors: impute ancestors using parsimony
-    @param sample_seq: sample one sequence from cluster
+    @param sample: one of 'impute-ancestors', 'sample-random', 'sample-highly-mutated' (default: None);
+        whether to sample sequences from clusters or impute ancestors
+
+    @return ObservedSequenceMutations from processed data
     """
 
-    assert(sample_or_impute in [None, 'impute-ancestors', 'sample-random', 'sample-highly-mutated'])
+    assert(sample in [None, 'sample-random', 'sample-highly-mutated'])
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
@@ -178,60 +251,13 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample_or
     full_data = pd.merge(genes, seqs, on='germline_name')
 
     obs_data = []
-    for germline, cluster in full_data.groupby(['germline_name']):
+    for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
         gl_seq = cluster['germline_sequence'].values[0].lower()
-        if sample_or_impute == 'impute-ancestors':
-            # Use dnapars to impute nucleotides at intermediate sequences
-
-            # First process sequences to remove unknown nucleotides at the
-            # beginning and end of sequences
-            proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
-            proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
-            seqs_in_cluster = []
-            for idx, elt in cluster.iterrows():
-                proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'])
-                proc_seq = re.sub('^n+|n+$', '', proc_seq)
-                if 'n' in proc_seq or len(proc_seq) != len(proc_gl_seq):
-                    # If a sequence has internal "n"s, we would need to
-                    # propagate that to all sequences for our processing of
-                    # dnapars to work, which may throw away too much data.
-                    # Instead throw away that sequence...
-                    continue
-                seqs_in_cluster.append(proc_seq)
-
-            if not seqs_in_cluster:
-                # If there are no sequences after processing then dnapars
-                # won't do anything, so move on
-                continue
-
-            start_seqs, end_seqs = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq, scratch_dir)
-        elif sample_or_impute == 'sample-random':
+        if sample == 'sample-random':
             # Sample a single sequence from a clonal family randomly
             sampled_index = random.choice(cluster.index)
             row = cluster.loc[sampled_index]
-            start_seqs = [gl_seq]
-            end_seqs = [row['sequence'].lower()]
-        elif sample_or_impute == 'sample-highly-mutated':
-            # Choose the sequence from a clonal family that has the highest number
-            # of mutations
-            n_mutes = 0
-            end_seqs = [gl_seq]
-            start_seqs = [gl_seq]
-            for idx, elt in cluster.iterrows():
-                current_mutes = sum([c0 != c1 for c0, c1 in izip(gl_seq, elt['sequence'].lower())])
-                if current_mutes > n_mutes:
-                    end_seqs = [elt['sequence'].lower()]
-        else:
-            # Take all sequences as-is
-            start_seqs = []
-            end_seqs = []
-            for idx, elt in cluster.iterrows():
-                start_seqs.append(gl_seq)
-                end_seqs.append(elt['sequence'].lower())
-
-        for start_seq, end_seq in zip(start_seqs, end_seqs):
-            # process sequences
-            start_seq, end_seq = process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len)
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, row['sequence'].lower(), motif_len)
 
             obs_seq_mutation = ObservedSequenceMutations(
                     start_seq=start_seq,
@@ -240,11 +266,28 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample_or
             )
 
             if obs_seq_mutation.num_mutations > 0:
-                # mutations in nonflanking region, so don't skip
+                # don't consider pairs where mutations occur in flanking regions
                 obs_data.append(obs_seq_mutation)
+        else:
+            for idx, elt in cluster.iterrows():
+                n_mutes = 0
+                current_obs_seq_mutation = None
+                start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
 
-    if output_file is not None:
-        # write to pickled file to save on computation
-        pickle.dump(obs_data, open(output_file, 'w'))
+                obs_seq_mutation = ObservedSequenceMutations(
+                        start_seq=start_seq,
+                        end_seq=end_seq,
+                        motif_len=motif_len,
+                )
+
+                if sample is None and obs_seq_mutation.num_mutations > 0:
+                    # don't consider pairs where mutations occur in flanking regions
+                    obs_data.append(obs_seq_mutation)
+                elif obs_seq_mutation.num_mutations > n_mutes:
+                    current_obs_seq_mutation = obs_seq_mutation
+
+            if sample == 'sample-highly-mutated':
+                obs_data.append(current_obs_seq_mutation)
 
     return obs_data
+
