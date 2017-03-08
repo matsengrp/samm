@@ -10,19 +10,20 @@ class Input_Data_TestCase(unittest.TestCase):
         Test various data processing/input
         """
 
-        motif_len = 3
         temp_genes = '_output/genes.csv'
         temp_seqs = '_output/seqs.csv'
+        motif_len = 3
 
         seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_or_impute='impute-ancestors')
+        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample='sample-random')
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_or_impute='sample-random')
+        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample='sample-highly-mutated')
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample_or_impute='sample-highly-mutated')
+        write_data_after_imputing(temp_genes, temp_seqs, INPUT_GENES, INPUT_SEQS, motif_len, verbose=False)
+        seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
         print len(seqs)
 
