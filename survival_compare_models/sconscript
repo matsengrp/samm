@@ -217,6 +217,4 @@ def operate_on_aggregate_models(outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
-# Aggregate over all replicates
-
 # Plot results
