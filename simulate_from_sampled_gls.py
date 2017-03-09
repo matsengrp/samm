@@ -204,7 +204,7 @@ def simulate(args):
                     descendant.name = '-'.join([descendant.up.name, seq_name])
                     gl_anc_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
                     if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
-                        seq_anc_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                        seq_anc_file.writerow([descendant.up.name, seq_name, descendant.sequence.lower()])
                     if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), sequence) != 0:
                         seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
 
