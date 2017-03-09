@@ -140,11 +140,12 @@ def load_true_theta(theta_file, per_target_model):
 
     @return the true theta vector/matrix
     """
-    true_theta, probability_matrix = pickle.load(open(theta_file, 'rb'))
-    if per_target_model:
-        return true_theta
-    else:
-        return np.matrix(np.max(true_theta, axis=1)).T
+    with open(theta_file, 'rb') as f:
+        true_theta, probability_matrix = pickle.load(f)
+        if per_target_model:
+            return true_theta
+        else:
+            return np.matrix(np.max(true_theta, axis=1)).T
 
 def main(args=sys.argv[1:]):
     args = parse_args()

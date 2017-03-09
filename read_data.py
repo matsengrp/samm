@@ -29,6 +29,8 @@ from itertools import izip
 GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/h/ighv.fasta'
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 
+SAMPLE_RANDOM = 2
+
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
 def write_partis_data_from_annotations(output_genes, output_seqs, annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
     """
@@ -240,7 +242,7 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
             genes_line, seqs_line = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq, scratch_dir, gl_name='gene'+str(gl_idx), verbose=verbose)
 
         out_genes += genes_line
-        out_seqs += seqs_line 
+        out_seqs += seqs_line
 
     with open(output_genes, 'w') as outg, open(output_seqs, 'w') as outs:
         gene_writer = csv.writer(outg)
