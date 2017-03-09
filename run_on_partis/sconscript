@@ -78,7 +78,7 @@ nest.add(
 
 nest.add(
     'penalty_param',
-    lambda c: [.008 if c['model_options'] == 'survival_L' else .00005],
+    lambda c: [.008 if c['model_options'] == 'survival_L' else .0005],
     create_dir=False)
 
 # Nest for model fitting
