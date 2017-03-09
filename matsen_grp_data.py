@@ -74,9 +74,14 @@ def get_paths_to_partis_annotations(pth, chain='k'):
             run_info = fname.split('_')
             run_chain = 'k' if 'IGK' in run_info else 'l'
             if run_chain == chain:
-                run_dir = re.sub('-10k-cluster-annotations.csv', '', fname)
-                annotations_paths.append(os.path.join(root, fname))
-                germline_paths.append(os.path.join(pth, run_dir, 'hmm/germline-sets'))
+                if '-cluster-annotations.csv' in fname and '-10k-cluster-annotations.csv' not in fname:
+                    run_dir = re.sub('-cluster-annotations.csv', '', fname)
+                    annotations_paths.append(os.path.join(root, fname))
+                    germline_paths.append(os.path.join(pth, run_dir, 'hmm/germline-sets'))
+                elif '-10k-cluster-annotations.csv' in fname:
+                    run_dir = re.sub('-10k-cluster-annotations.csv', '', fname)
+                    annotations_paths.append(os.path.join(root, fname))
+                    germline_paths.append(os.path.join(pth, run_dir, 'hmm/germline-sets'))
 
     return annotations_paths, germline_paths
 
