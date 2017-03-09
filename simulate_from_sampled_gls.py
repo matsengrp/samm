@@ -192,36 +192,38 @@ def simulate(args):
             # mutations on each run
             gl_file.writerow([gene,sequence])
             tree = run_gctree(args, sequence)
-            i = 0
-            for descendant in tree.traverse('preorder'):
-                if descendant.frequency != 0:
-                    i += 1
-                    seq_name = 'Run{0}-Sequence{1}'.format(run, i)
-                    # This will be a little redundant since two sequences will share same ancestor
-                    if not descendant.is_root():
-                        descendant.name = '-'.join([descendant.up.name, seq_name])
-                        gl_anc_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
-                        if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
-                            seq_anc_file.writerow([gene, seq_name, descendant.sequence.lower()])
-                        if descendant.is_leaf() and cmp(descendant.sequence.lower(), sequence) != 0:
-                            seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
-                    else:
-                        descendant.name = gene
-                        gl_anc_file.writerow([descendant.name,descendant.sequence.lower()])
+            for idx, descendant in enumerate(tree.traverse('preorder')):
+                # internal nodes will have frequency zero, so for providing output
+                # along a branch we need to consider these cases! otherwise the leaves
+                # should have nonzero frequency
+                seq_name = 'Run{0}-Sequence{1}'.format(run, idx)
+                if descendant.is_root():
+                    descendant.name = gene
+                    gl_anc_file.writerow([descendant.name,descendant.sequence.lower()])
+                else:
+                    descendant.name = '-'.join([descendant.up.name, seq_name])
+                    gl_anc_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
+                    if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
+                        seq_anc_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                    if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), sequence) != 0:
+                        seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
 
     # Dump the true "thetas," which are mutability * substitution
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
     context_model = MutationModel(args.mutability, args.substitution).context_model
-    true_theta = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
-    true_theta.fill(-np.inf)
+    true_thetas = np.empty((feat_generator.feature_vec_len, 1))
+    probability_matrix = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
+    true_thetas.fill(-np.inf)
+    probability_matrix.fill(0.)
     for motif_idx, motif in enumerate(motif_list):
         mutability = args.lambda0 * context_model[motif.upper()][0]
         for nuc in NUCLEOTIDES:
             substitution = context_model[motif.upper()][1][nuc.upper()]
             if mutability > 0 and substitution > 0:
-                true_theta[motif_idx, NUCLEOTIDE_DICT[nuc]] = np.log(mutability) + np.log(substitution)
-    pickle.dump(true_theta, open(args.output_true_theta, 'w'))
+                true_thetas[motif_idx] = np.log(mutability)
+                probability_matrix[motif_idx, NUCLEOTIDE_DICT[nuc]] = substitution
+    pickle.dump([true_thetas, probability_matrix], open(args.output_true_theta, 'w'))
 
 
 def main(args=sys.argv[1:]):
