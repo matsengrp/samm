@@ -21,15 +21,58 @@ ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
-HOT_COLD_SPOT_REGS = [
-    ["RGYW - hot","[atcg][ga]g[ct][at]"],
-    ["WRCY - hot", "[at][ga]c[ct][atcg]"],
-    ["WA - hot", "[atcg][at]a[atcg][atcg]"],
-    ["TW - hot", "[atcg][atcg]t[at][atcg]"],
-    ["SYC - cold", "[cg][ct]c[atcg][atcg]"],
-    ["GRS - cold", "[atcg][atcg]g[ga][cg]"],
-]
+COMPLEMENT_DICT = {
+    'A': 'T',
+    'G': 'C',
+    'C': 'G',
+    'T': 'A',
+    'Y': 'R',
+    'R': 'Y',
+    'S': 'W',
+    'W': 'S',
+    'M': 'K',
+    'K': 'M',
+    'B': 'V',
+    'D': 'H',
+    'H': 'D',
+    'V': 'B',
+    'N': 'N',
+}
+
+DEGENERATE_BASE_DICT = {
+    'A': 'a',
+    'G': 'g',
+    'C': 'c',
+    'T': 't',
+    'Y': '[ct]',
+    'R': '[ag]',
+    'S': '[gc]',
+    'W': '[at]',
+    'M': '[ac]',
+    'K': '[gt]',
+    'B': '[cgt]',
+    'D': '[agt]',
+    'H': '[act]',
+    'V': '[acg]',
+    'N': '[agct]',
+}
+
+HOT_COLD_SPOT_REGS = compute_known_hot_and_cold(
+        ['NRGYW', 'NWANN', 'SYCNN'],
+        ['hot', 'hot', 'cold']
+        )
 INT8_MAX = 127
+
+def return_complement(kmer):
+    return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
+
+def compute_known_hot_and_cold(kmer_list, hot_or_cold_list):
+    hot_cold_regs = []
+    for kmer, hot_or_cold in zip(kmer_list, hot_or_cold_list):
+        for string in (kmer, return_complement(kmer)):
+            hot_cold_regs.append([' - '.join(kmer.replace('N', ''), hot_or_cold),
+            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in kmer])])
+    return hot_cold_regs
 
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
