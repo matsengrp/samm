@@ -18,11 +18,8 @@ base = {'nreps': localenv['NREPS'],
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-sim_size_dict = [
-    # about 10% of sequence gets mutated
-    {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0, 'ratio_nonzero': .05},
-    {'size': 'big', 'n_taxa': 10, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1.25, 'ratio_nonzero': .05},
-]
+sim_size_dict = [{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50},
+                 {'size': 'big', 'n_taxa': 10, 'n_germlines': 100, 'germline_size': 200}]
 
 nest.add(
     'simulation_size',
