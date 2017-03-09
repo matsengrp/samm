@@ -163,7 +163,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     res = subprocess.call([" ".join(cmd)], shell=True)
 
     # phew, finally got some trees
-    trees = phylip_parse(outfile, gl_name)
+    trees = phylip_parse(outfile, countfile=None, naive=gl_name)
 
     # take first parsimony tree
     genes_line = []
