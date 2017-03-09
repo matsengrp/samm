@@ -40,10 +40,6 @@ nest.add(
     lambda c: 'G' if c['chain'] == 'h' else c['chain'].upper(),
     create_dir=False)
 
-nest.add(
-    'data_processing',
-    ['raw_data', 'impute_ancestors'])
-
 # Nest for processing data
 @nest.add_target_with_env(localenv)
 def process_data(env, outdir, c):
@@ -54,10 +50,10 @@ def process_data(env, outdir, c):
                c['chain'],
                '--motif-len',
                MOTIF_LEN,
+               '--read-from-partis',
+               '--impute-ancestors',
                '--output-genes ${TARGETS[0]}',
                '--output-seqs ${TARGETS[1]}']
-    if c['data_processing'] == 'impute_ancestors':
-        cmd += ['--impute-ancestors']
 
     return env.Command(
         [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
@@ -78,13 +74,18 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['basic', 'survival'])
+    ['basic', 'survival_L', 'survival_FL'])
+
+nest.add(
+    'penalty_param',
+    lambda c: [.008 if c['model_options'] == 'survival_L' else .00005],
+    create_dir=False)
 
 # Nest for model fitting
 @nest.add_target_with_env(localenv)
 def fit_models(env, outdir, c):
     cmd = []
-    if c["model_options"] == "survival":
+    if c["model_options"].startswith("survival"):
         cmd = ['python fit_context_model.py',
                '--input-genes ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
@@ -92,8 +93,10 @@ def fit_models(env, outdir, c):
                c['seed'],
                '--motif-len',
                MOTIF_LEN,
+               '--solver',
+               c['model_options'].replace('survival_', ''),
                '--penalty-params',
-               "0.01,0.001,0.0001",
+               c['penalty_param'],
                '--num-cpu-threads',
                10,
                '--num-jobs',
@@ -102,6 +105,8 @@ def fit_models(env, outdir, c):
                2,
                '--num-e-samples',
                4,
+               '--em-max-iters',
+               5,
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     elif c["model_options"] == "basic":
