@@ -28,8 +28,8 @@ COMPLEMENT_DICT = {
     'T': 'A',
     'Y': 'R',
     'R': 'Y',
-    'S': 'W',
-    'W': 'S',
+    'S': 'S',
+    'W': 'W',
     'M': 'K',
     'K': 'M',
     'B': 'V',
@@ -57,10 +57,10 @@ DEGENERATE_BASE_DICT = {
     'N': '[agct]',
 }
 
-HOT_COLD_SPOT_REGS = compute_known_hot_and_cold(
+HOT_COLD_SPOT_REGS = [
         ['NRGYW', 'NWANN', 'SYCNN'],
         ['hot', 'hot', 'cold']
-        )
+    ]
 INT8_MAX = 127
 
 def return_complement(kmer):
@@ -69,9 +69,9 @@ def return_complement(kmer):
 def compute_known_hot_and_cold(kmer_list, hot_or_cold_list):
     hot_cold_regs = []
     for kmer, hot_or_cold in zip(kmer_list, hot_or_cold_list):
-        for string in (kmer, return_complement(kmer)):
-            hot_cold_regs.append([' - '.join(kmer.replace('N', ''), hot_or_cold),
-            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in kmer])])
+        for km_or_com in (kmer, return_complement(kmer)):
+            hot_cold_regs.append([' - '.join([km_or_com.replace('N', ''), hot_or_cold]),
+            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in km_or_com])])
     return hot_cold_regs
 
 def contains_degenerate_base(seq_str):
@@ -101,7 +101,7 @@ def get_nonzero_theta_print_lines(theta, motif_list):
                 # print the whole line if any element in the theta is nonzero
                 motif = motif_list[i]
                 hot_cold_matches = ""
-                for spot_name, spot_regex in HOT_COLD_SPOT_REGS:
+                for spot_name, spot_regex in compute_known_hot_and_cold(HOT_COLD_SPOT_REGS[0], HOT_COLD_SPOT_REGS[1]):
                     if is_match(spot_regex, motif):
                         hot_cold_matches = " -- " + spot_name
                         break
