@@ -13,14 +13,13 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs, approx, scratch_dir):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs, scratch_dir):
         """
         @param observed_data: list of ObservedSequenceMutationsFeatures objects
         @param theta: numpy vector
         @param sampler_cls: class that inherits from Sampler class
         @param feat_generator: FeatureGenerator
         @param num_jobs: number of jobs to submit when performing gibbs sampling
-        @param approx: level of approximation to use to speed up Gibbs sampling
         """
         self.num_jobs = num_jobs
 
@@ -29,7 +28,6 @@ class SamplerCollection:
                 theta,
                 feat_generator,
                 obs_seq,
-                approx,
             )
             for obs_seq in observed_data
         ]
@@ -88,12 +86,11 @@ class SamplerResult:
         self.trace = trace
 
 class Sampler:
-    def __init__(self, theta, feature_generator, obs_seq_mutation, approx="none"):
+    def __init__(self, theta, feature_generator, obs_seq_mutation):
         """
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
         @param obs_seq_mutation: ObservedSequenceMutationsFeatures
-        @param approx: level of approximation to use to speed up Gibbs sampling (none, faster)
         """
         self.theta = theta
         self.exp_theta = np.exp(theta)
@@ -105,7 +102,6 @@ class Sampler:
         self.seq_len = obs_seq_mutation.seq_len
         self.mutated_positions = obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
-        self.approx = approx
 
     def run(self, init_order, burn_in, num_samples):
         """
