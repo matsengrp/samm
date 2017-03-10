@@ -35,8 +35,7 @@ class LogLikelihoodEvaluator:
         obs_seq_samples = sampled_orders.samples
         log_probs = []
         for sampled_order in obs_seq_samples:
-            _, log_numerators, denominators = sampler.compute_log_probs_from_scratch(sampled_order.mutation_order)
-            order_log_prob = np.sum(log_numerators) - (np.log(denominators)).sum()
+            order_log_prob = sampler.get_log_probs(sampled_order.mutation_order)
             log_probs.append(-order_log_prob)
         # Get p(end|start,theta)
         log_prob = - (scipy.misc.logsumexp(log_probs) - np.log(self.num_samples))
