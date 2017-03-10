@@ -226,15 +226,10 @@ def main(args=sys.argv[1:]):
             theta_shape = (theta_mask.sum(), 1)
             flat_theta = theta[theta_mask]
             flat_true_theta = true_theta[theta_mask]
-            try:
-                log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
-                log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
-                log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
-                log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
-            except:
-                log.info("Warning: correlations can't be computed!")
-                log.info("Stddev: estimated=%f, true=%f" % (np.std(flat_theta), np.std(flat_true_theta)))
-                log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
+            log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
+            log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
+            log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
+            log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
