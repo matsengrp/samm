@@ -74,10 +74,6 @@ def parse_args():
         type=float,
         help='Proportion of motifs to set to zero',
         default=0.5)
-    parser.add_argument('--theta-sampling-range',
-        type=float,
-        help='Range over which to sample theta [-r, r]',
-        default=2)
     parser.add_argument('--guarantee-motifs-showup',
         action="store_true",
         help='Make sure the nonzero motifs show up in the germline')
@@ -113,7 +109,7 @@ def _read_mutability_probability_params(motif_list, args):
             motif_hazard = np.log(float(row[1]))
             theta_dict[motif] = motif_hazard
 
-    theta = np.array([theta_dict[m] for m in motif_list]).reshape((len(motif_list), 1))
+    theta = np.array([theta_dict[m] for m in motif_list])
 
     substitution_dict = {}
     with open(args.substitution, "rb") as substitution_f:
@@ -133,8 +129,8 @@ def _read_mutability_probability_params(motif_list, args):
         theta[zero_mask] = -np.inf
         theta = np.array(theta)
         probability_matrix = None
-
-    return theta, probability_matrix
+    num_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
+    return theta.reshape((len(motif_list), num_cols)), probability_matrix
 
 def _generate_true_parameters(motif_list, args):
     """
