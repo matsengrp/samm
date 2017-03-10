@@ -26,7 +26,7 @@ from Bio.Phylo.TreeConstruction import ParsimonyScorer, NNITreeSearcher, Parsimo
 from ete3 import Tree
 from itertools import izip
 
-GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/h/ighv.fasta'
+GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/igh/ighv.fasta'
 SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
@@ -163,7 +163,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     res = subprocess.call([" ".join(cmd)], shell=True)
 
     # phew, finally got some trees
-    trees = phylip_parse(outfile, gl_name)
+    trees = phylip_parse(outfile, countfile=None, naive=gl_name)
 
     # take first parsimony tree
     genes_line = []
