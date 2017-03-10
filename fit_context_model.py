@@ -169,7 +169,8 @@ def main(args=sys.argv[1:]):
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-    log.info("Number of sequences %d" % len(obs_seq_feat_base))
+    log.info("Data statistics:")
+    log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")

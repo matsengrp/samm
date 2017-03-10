@@ -306,3 +306,54 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1)
 
     return obs_data
 
+def get_data_statistics_print_lines(obs_data, feat_generator):
+    """
+    Some interesting statistics we can output (some from Cui et al. 2016 for comparison)
+
+    - Number of sequences
+    - Number of mutations
+    - Number of skipped mutations (bad for us, since these are mutations occurring at flanking areas)
+    - Average sequence length
+    - Average mutation frequency (avg of n_mutations / seq_len)
+    - Number of motifs that had fewer than twenty mutations in center base (bad for Cui because then they average)
+    - Number of motifs that had fewer than five hundred mutations in any base (also bad for Cui because then they average again)
+    - Number of motifs present in data with any number of mutations
+
+    @return a string that summarizes the data
+    """
+
+    n_sequences = len(obs_data)
+    total_mutations = 0
+    total_skipped_mutations = 0
+    avg_seq_len = 0.
+    avg_mutation_frequency = 0.
+    motif_set = set([])
+    mute_set = set([])
+    central_base_mutes = [0] * feat_generator.feature_vec_len
+    any_mutes = [0] * feat_generator.feature_vec_len
+    for obs_seq in obs_data:
+        total_mutations += obs_seq.num_mutations
+        total_skipped_mutations += obs_seq.skipped_mutations
+        avg_seq_len += 1. * obs_seq.seq_len / n_sequences
+        avg_mutation_frequency += (1. * obs_seq.num_mutations / obs_seq.seq_len) / n_sequences
+        motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
+        motif_set |= set([value for _, value in motifs.iteritems()])
+        for mutation_pos, _ in obs_seq.mutation_pos_dict.iteritems():
+            central_base_mutes[motifs[mutation_pos]] += 1
+            for pos in range(max(mutation_pos-feat_generator.half_motif_len, 0),
+                    min(mutation_pos+feat_generator.half_motif_len+1, obs_seq.seq_len)):
+                any_mutes[motifs[pos]] += 1
+
+    return '\n'.join([
+                '  Number of sequences: %d' % n_sequences,
+                '  Number of mutations: %d' % total_mutations,
+                '  Number of skipped mutations (flanks): %d' % total_skipped_mutations,
+                '  Average sequence length: %f' % avg_seq_len,
+                '  Average mutation frequency: %f' % avg_mutation_frequency,
+                '  Number of motifs in dataset: %d' % len(motif_set),
+                '  Number of motifs w/ >1 central base mutation: %d' % len([val for val in central_base_mutes if val > 0]),
+                '  Number of motifs w/ <20 mutes in central base: %d' % len([val for val in central_base_mutes if val < 20]),
+                '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
+            ]
+        )
+
