@@ -92,7 +92,7 @@ class MutationOrderGibbsSampler(Sampler):
         # First consider the full ordering with position under consideration mutating last
         order_last = partial_order + [position]
         if gibbs_step_info is None:
-            feat_mutation_steps, log_numerators, denominators = self._compute_log_probs_from_scratch(
+            feat_mutation_steps, log_numerators, denominators = self.compute_log_probs_from_scratch(
                 order_last,
             )
         else:
@@ -216,7 +216,7 @@ class MutationOrderGibbsSampler(Sampler):
 
         return gibbs_step_sample, all_log_probs[sampled_idx]
 
-    def _compute_log_probs_from_scratch(self, curr_order):
+    def compute_log_probs_from_scratch(self, curr_order):
         """
         Compute the log likelihood for this full mutation ordering
         Calculates the log likelihood of each mutation step
@@ -258,7 +258,7 @@ class MutationOrderGibbsSampler(Sampler):
         @param gibbs_step_base: GibbsStepInfo, the reference mutation order and its intermediate computations
         @param update_step_start: which mutations step to start recalculating the log liklihood terms from
 
-        @return similar to _compute_log_probs_from_scratch
+        @return similar to compute_log_probs_from_scratch
         """
         # Update if we have previous computations
         feat_mutation_steps = self.feature_generator.create_remaining_mutation_steps(

@@ -24,6 +24,7 @@ from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
+from likelihood_evaluator import LogLikelihoodEvaluator
 from multinomial_solver import MultinomialSolver
 from common import *
 from read_data import *
@@ -94,15 +95,26 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.01")
-    parser.add_argument('--theta-file',
-        type=str,
-        help='file with pickled true context model (default: None, for no truth)',
-        default=None)
+        default="0.1,0.01,0.001")
+    parser.add_argument('--tuning-sample-ratio',
+        type=float,
+        help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
+        default=0.1)
+    parser.add_argument('--num-val-mcmc',
+        type=int,
+        help='Number of samples to draw from MCMC to estimate likelihood of validation data',
+        default=30)
+    parser.add_argument('--num-val-burnin',
+        type=int,
+        help='Number of burn in iterations when estimating likelihood of validation data',
+        default=1)
+    parser.add_argument('--full-train',
+        action='store_true',
+        help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
     parser.add_argument('--per-target-model',
         action='store_true')
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=False, full_train=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -133,18 +145,26 @@ def parse_args():
 
     return args
 
-def load_true_theta(theta_file, per_target_model):
-    """
-    @param theta_file: file name
-    @param per_target_model: if True, we return the entire theta. If False, we return a collapsed theta vector
+def create_train_val_sets(obs_data, feat_generator, args):
+    num_obs = len(obs_data)
+    val_size = int(args.tuning_sample_ratio * num_obs)
+    if args.tuning_sample_ratio > 0:
+        val_size = max(val_size, 1)
+    permuted_idx = np.random.permutation(num_obs)
+    train_idx = permuted_idx[:num_obs - val_size]
+    val_idx = permuted_idx[num_obs - val_size:]
+    train_set = []
+    for i in train_idx:
+        train_set.append(
+            feat_generator.create_base_features(obs_data[i])
+        )
 
-    @return the true theta vector/matrix
-    """
-    true_theta, probability_matrix = pickle.load(open(theta_file, 'rb'))
-    if per_target_model:
-        return true_theta
-    else:
-        return np.matrix(np.max(true_theta, axis=1)).T
+    val_set = []
+    for i in val_idx:
+        val_set.append(
+            feat_generator.create_base_features(obs_data[i])
+        )
+    return train_set, val_set
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -157,19 +177,11 @@ def main(args=sys.argv[1:]):
 
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
-    # Load true theta for comparison
-    if args.theta_file is not None:
-        # no true theta if we run on real data
-        true_theta = load_true_theta(args.theta_file, args.per_target_model)
-        assert(true_theta.shape[0] == feat_generator.feature_vec_len)
-
     log.info("Reading data")
     obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
+    train_set, val_set = create_train_val_sets(obs_data, feat_generator, args)
 
-    obs_seq_feat_base = []
-    for obs_seq_mutation in obs_data:
-        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-    log.info("Number of sequences %d" % len(obs_seq_feat_base))
+    log.info("Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
@@ -185,50 +197,78 @@ def main(args=sys.argv[1:]):
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
 
+    val_set_evaluator = LogLikelihoodEvaluator(
+        val_set,
+        args.sampler_cls,
+        feat_generator,
+        args.num_val_mcmc,
+        num_jobs=1,
+        scratch_dir=scratch_dir,
+    )
+
     em_algo = MCMC_EM(
-        obs_seq_feat_base,
+        train_set,
+        val_set,
         feat_generator,
         args.sampler_cls,
         args.problem_solver_cls,
         theta_mask = theta_mask,
         base_num_e_samples=args.num_e_samples,
-        burn_in=args.burn_in,
         num_jobs=args.num_jobs,
         num_threads=args.num_cpu_threads,
-        approx='none',
         scratch_dir=scratch_dir,
     )
-
+    val_burn_in = args.num_val_burnin
+    burn_in = args.burn_in
+    prev_val_log_lik = -np.inf
+    val_log_lik = None
     for penalty_param in sorted(penalty_params, reverse=True):
         log.info("Penalty parameter %f" % penalty_param)
         theta, _ = em_algo.run(
             theta=theta,
+            burn_in=burn_in,
             penalty_param=penalty_param,
             max_em_iters=args.em_max_iters,
+            train_and_val=False
         )
 
+        # Get log likelihood on the validation set for tuning penalty parameter
+        if args.tuning_sample_ratio > 0:
+            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=val_burn_in)
+            log.info("Validation log likelihood %f" % val_log_lik)
+            if args.full_train:
+                theta, _ = em_algo.run(
+                    theta=theta,
+                    burn_in=burn_in,
+                    penalty_param=penalty_param,
+                    max_em_iters=args.em_max_iters,
+                    train_and_val=True
+                )
+        burn_in = 0 # Only use burn in at the very beginning
+        val_burn_in = 0
+
+        # Get the probabilities of the target nucleotides
         fitted_prob_vector = None
         if not args.per_target_model:
             fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta)
             log.info("=== Fitted Probability Vector ===")
             log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
 
-        results_list.append((penalty_param, theta, fitted_prob_vector))
-
+        # We save the final theta (potentially trained over all the data)
+        results_list.append((penalty_param, theta, fitted_prob_vector, val_log_lik))
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
         log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        if args.theta_file is not None and true_theta.shape == theta.shape:
-            theta_shape = (theta_mask.sum(), 1)
-            flat_theta = theta[theta_mask]
-            flat_true_theta = true_theta[theta_mask]
-            log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
-            log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
-            log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
-            log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
+        if args.tuning_sample_ratio:
+            # Decide what to do next - stop or keep searching penalty parameters?
+            if val_log_lik <= prev_val_log_lik:
+                # This penalty parameter is performing worse. We're done!
+                log.info("Stop trying penalty parameters")
+                break
+            prev_val_log_lik = val_log_lik
 
 if __name__ == "__main__":
     main(sys.argv[1:])
