@@ -26,9 +26,17 @@ def parse_args():
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=24)
-    parser.add_argument('--param-path',
+    parser.add_argument('--mutability',
         type=str,
-        help='parameter file path',
+        default='gctree/S5F/Mutability.csv',
+        help='path to mutability model file')
+    parser.add_argument('--substitution',
+        type=str,
+        default='gctree/S5F/Substitution.csv',
+        help='path to substitution model file')
+    parser.add_argument('--germline-path',
+        type=str,
+        help='germline file path',
         default=GERMLINE_PARAM_FILE)
     parser.add_argument('--output-true-theta',
         type=str,
@@ -62,10 +70,10 @@ def parse_args():
         type=float,
         help='Minimum censoring time',
         default=1)
-    parser.add_argument('--ratio-nonzero',
+    parser.add_argument('--sparsity-ratio',
         type=float,
-        help='Proportion of motifs that are nonzero',
-        default=0.1)
+        help='Proportion of motifs to set to zero',
+        default=0.5)
     parser.add_argument('--theta-sampling-range',
         type=float,
         help='Range over which to sample theta [-r, r]',
@@ -92,67 +100,65 @@ def parse_args():
 
     return args
 
-def _generate_true_parameters(feature_vec_len, motif_list, args):
-    # True vector
-    num_theta_col = NUM_NUCLEOTIDES if args.per_target_model else 1
-    true_thetas = np.zeros((feature_vec_len, num_theta_col))
-    probability_matrix = None
+def _read_mutability_probability_params(motif_list, args):
+    """
+    Read S5F parameters
+    """
+    theta_dict = {}
+    with open(args.mutability, "rb") as mutability_f:
+        mut_reader = csv.reader(mutability_f, delimiter=" ")
+        mut_reader.next()
+        for row in mut_reader:
+            motif = row[0].lower()
+            motif_hazard = np.log(float(row[1]))
+            theta_dict[motif] = motif_hazard
 
-    possible_motif_mask = get_possible_motifs_to_targets(motif_list, (feature_vec_len, NUM_NUCLEOTIDES))
-    impossible_motif_mask = ~possible_motif_mask
+    theta = np.array([theta_dict[m] for m in motif_list]).reshape((len(motif_list), 1))
+
+    substitution_dict = {}
+    with open(args.substitution, "rb") as substitution_f:
+        substitution_reader = csv.reader(substitution_f, delimiter=" ")
+        substitution_reader.next()
+        for row in substitution_reader:
+            motif = row[0].lower()
+            substitution_dict[motif] = [float(row[i]) for i in range(1, 5)]
+    probability_matrix = np.array([substitution_dict[m] for m in motif_list])
 
     if args.per_target_model:
-        # Set the impossible thetas to -inf
-        true_thetas[impossible_motif_mask] = -np.inf
-    else:
-        # True probabilities of mutating to a certain target nucleotide
-        # Only relevant when we deal with a single theta column
-        # Suppose equal probability to all target nucleotides for zero motifs
-        probability_matrix = np.ones((feature_vec_len, NUM_NUCLEOTIDES))/3.0
-        probability_matrix[impossible_motif_mask] = 0
+        # Create the S5F target matrix and use this as our true theta
+        theta = np.diag(np.exp(theta)) * np.matrix(probability_matrix)
+        nonzero_mask = np.where(theta != 0)
+        zero_mask = np.where(theta == 0)
+        theta[nonzero_mask] = np.log(theta[nonzero_mask])
+        theta[zero_mask] = -np.inf
+        theta = np.array(theta)
+        probability_matrix = None
 
-    some_num_nonzero_motifs = int(true_thetas.shape[0] * args.ratio_nonzero/2.0)
-    # Remove edge motifs from random choices
-    # Also cannot pick the last motif
-    some_nonzero_motifs = np.random.choice(true_thetas.shape[0] - 1, some_num_nonzero_motifs)
-    # Also make some neighbor motifs nonzero
-    nonzero_motifs = []
-    for idx in some_nonzero_motifs:
-        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[idx][args.motif_len/2]]
-        if not args.per_target_model:
-            true_thetas[idx] = (np.random.rand() - 0.5) * args.theta_sampling_range * 2
-            probability_matrix[idx,:] = np.random.rand(4)
-            probability_matrix[idx, center_nucleotide_idx] = 0
-            probability_matrix[idx,:] /= np.sum(probability_matrix[idx,:])
+    return theta, probability_matrix
 
-            nonzero_motifs.append(motif_list[idx])
-
-            center_nucleotide_idx_next = NUCLEOTIDE_DICT[motif_list[idx + 1][args.motif_len/2]]
-            if center_nucleotide_idx_next == center_nucleotide_idx:
-                # neighboring values also have same value (may get overridden if that motif was originally
-                # set to be nonzero too)
-                true_thetas[idx + 1, :] = true_thetas[idx, :]
-                probability_matrix[idx + 1, :] = probability_matrix[idx, :]
-                nonzero_motifs.append(motif_list[idx + 1])
-                assert(probability_matrix[idx + 1, center_nucleotide_idx_next] == 0)
-        else:
-            true_thetas[idx, :] = (np.random.rand(NUM_NUCLEOTIDES) - 0.5) * args.theta_sampling_range * 2
-            # Cannot mutate motif to a target nucleotide with the same center nucleotide.
-            true_thetas[idx, center_nucleotide_idx] = -np.inf
-
-            nonzero_motifs.append(motif_list[idx])
-
-            center_nucleotide_idx_next = NUCLEOTIDE_DICT[motif_list[idx + 1][args.motif_len/2]]
-            if center_nucleotide_idx_next == center_nucleotide_idx:
-                # Only have same neighboring values if center nucleotides are the same
-
-                # neighboring values also have same value (may get overridden if that motif was originally
-                # set to be nonzero too)
-                true_thetas[idx + 1, :] = true_thetas[idx, :]
-                nonzero_motifs.append(motif_list[idx + 1])
-                assert(true_thetas[idx + 1, center_nucleotide_idx_next] == -np.inf)
-
-    return true_thetas, probability_matrix, nonzero_motifs
+def _generate_true_parameters(motif_list, args):
+    """
+    Read mutability and substitution parameters from S5F
+    Make a sparse version if sparsity_ratio > 0
+    """
+    true_theta, probability_matrix = _read_mutability_probability_params(motif_list, args)
+    nonzero_motifs = motif_list
+    if args.sparsity_ratio > 0:
+        # Let's zero out some motifs now
+        num_zero_motifs = int(args.sparsity_ratio * len(motif_list))
+        zero_motif_idxs = np.random.choice(len(motif_list), size=num_zero_motifs, replace=False)
+        zero_motifs = set()
+        for idx in zero_motif_idxs:
+            zero_motifs.add(motif_list[idx])
+            true_theta[idx,] = 0
+            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[idx][args.motif_len/2]]
+            if args.per_target_model:
+                true_theta[idx, center_nucleotide_idx] = -np.inf
+            else:
+                probability_matrix[idx, :] = 1./3
+                probability_matrix[idx, center_nucleotide_idx] = 0
+        nonzero_motifs = list(set(motif_list) - zero_motifs)
+    return true_theta, probability_matrix, nonzero_motifs
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.random_gene_len > 0:
@@ -169,7 +175,7 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
             germline_nucleotides = [get_random_dna_seq(args.random_gene_len + args.motif_len) for i in range(args.n_germlines)]
     else:
         # Read parameters from file
-        params = read_germline_file(args.param_path)
+        params = read_germline_file(args.germline_path)
 
         # Select, with replacement, args.n_germlines germline genes from our
         # parameter file and place them into a numpy array.
@@ -209,7 +215,7 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
 
-    true_thetas, probability_matrix, nonzero_motifs = _generate_true_parameters(feat_generator.feature_vec_len, motif_list, args)
+    true_thetas, probability_matrix, nonzero_motifs = _generate_true_parameters(motif_list, args)
 
     germline_nucleotides, germline_genes = _get_germline_nucleotides(args, nonzero_motifs)
 
