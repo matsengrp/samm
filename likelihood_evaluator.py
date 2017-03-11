@@ -1,3 +1,4 @@
+from collections import Counter
 import numpy as np
 import scipy.misc
 from sampler_collection import SamplerCollection
@@ -31,15 +32,21 @@ class LogLikelihoodEvaluator:
         """
         assert(sampler.obs_seq_mutation == sampled_orders.samples[0].obs_seq_mutation)
         # The sampled orders for this observed start/end sequence pair
-        # 1/p(end|start,theta) = E_{order|start,end,theta}[1/p(order|start,theta)]
+        # log p(end|start,theta) = log p(order | start, theta) - log p(order | end, start, theta)
         obs_seq_samples = sampled_orders.samples
-        log_probs = []
+        reference_order = obs_seq_samples[-1].mutation_order
+
+        log_prob_ref_order = sampler.get_log_probs(reference_order)
+
+        print Counter([".".join(map(str,sampled_order.mutation_order)) for sampled_order in obs_seq_samples]).most_common(10)
+
+        num_appears = 0
         for sampled_order in obs_seq_samples:
-            order_log_prob = sampler.get_log_probs(sampled_order.mutation_order)
-            log_probs.append(-order_log_prob)
-        # Get p(end|start,theta)
-        log_prob = - (scipy.misc.logsumexp(log_probs) - np.log(self.num_samples))
-        return log_prob
+            num_appears += int(reference_order == sampled_order.mutation_order)
+        print "num_appears", num_appears
+        log_prob_order = np.log(float(num_appears)/len(obs_seq_samples))
+
+        return log_prob_ref_order - log_prob_order
 
     def get_log_lik(self, theta, burn_in=0):
         """
