@@ -208,22 +208,20 @@ def simulate(args):
                     if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), sequence) != 0:
                         seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
 
-    # Dump the true "thetas," which are mutability * substitution
+    # Dump the true thetas=log(lambda*mutability) and substitution probabilities
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     motif_list = feat_generator.get_motif_list()
     context_model = MutationModel(args.mutability, args.substitution).context_model
     true_thetas = np.empty((feat_generator.feature_vec_len, 1))
     probability_matrix = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
-    true_thetas.fill(-np.inf)
-    probability_matrix.fill(0.)
     for motif_idx, motif in enumerate(motif_list):
         mutability = args.lambda0 * context_model[motif.upper()][0]
+        true_thetas[motif_idx] = np.log(mutability)
         for nuc in NUCLEOTIDES:
-            substitution = context_model[motif.upper()][1][nuc.upper()]
-            if mutability > 0 and substitution > 0:
-                true_thetas[motif_idx] = np.log(mutability)
-                probability_matrix[motif_idx, NUCLEOTIDE_DICT[nuc]] = substitution
-    pickle.dump([true_thetas, probability_matrix], open(args.output_true_theta, 'w'))
+            probability_matrix[motif_idx, NUCLEOTIDE_DICT[nuc]] = context_model[motif.upper()][1][nuc.upper()]
+
+    with open(args.output_true_theta, 'w') as output_theta:
+        pickle.dump([true_thetas, probability_matrix], output_theta)
 
 
 def main(args=sys.argv[1:]):

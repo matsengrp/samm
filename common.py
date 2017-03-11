@@ -95,13 +95,14 @@ def get_nonzero_theta_print_lines(theta, motif_list):
         return match_res is not None
 
     lines = []
+    known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS[0], HOT_COLD_SPOT_REGS[1])
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 # print the whole line if any element in the theta is nonzero
                 motif = motif_list[i]
                 hot_cold_matches = ""
-                for spot_name, spot_regex in compute_known_hot_and_cold(HOT_COLD_SPOT_REGS[0], HOT_COLD_SPOT_REGS[1]):
+                for spot_name, spot_regex in known_hot_cold:
                     if is_match(spot_regex, motif):
                         hot_cold_matches = " -- " + spot_name
                         break
