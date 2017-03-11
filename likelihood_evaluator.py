@@ -7,22 +7,18 @@ class LogLikelihoodEvaluator:
     """
     Evaluates the likelihood of a set of model parameters for the given dataset
     """
-    def __init__(self, obs_data, sampler_cls, feat_generator, num_samples, num_jobs, scratch_dir):
+    def __init__(self, obs_data, sampler_cls, feat_generator, num_threads):
         """
         @param obs_data: list of ObservedSequenceMutations
         @param sampler_cls: sampler class, actually has to be MutationOrderGibbsSampler
-        @param num_samples: number of samples to draw from gibbs
         @param feat_generator: SubmotifFeatureGenerator
-        @param num_jobs: number of srun jobs to submit - if 1, doesn't submit any
-        @param scratch_dir: scratch directory for srun jobs
+        @param num_threads: number of cpu threads to use
         """
         self.obs_data = obs_data
         self.init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in obs_data]
         self.sampler_cls = sampler_cls
-        self.num_samples = num_samples
         self.feat_generator = feat_generator
-        self.num_jobs = num_jobs
-        self.scratch_dir = scratch_dir
+        self.num_threads = num_threads
 
     def _get_log_lik_obs_seq(self, sampler, sampled_orders):
         """
@@ -30,19 +26,23 @@ class LogLikelihoodEvaluator:
         @param sampler: MutationOrderGibbsSampler
         @param sampled_orders: the sampled orders from gibbs
         """
-        assert(sampler.obs_seq_mutation == sampled_orders.samples[0].obs_seq_mutation)
-        # The sampled orders for this observed start/end sequence pair
-        # log p(end|start,theta) = log p(order | start, theta) - log p(order | end, start, theta)
+        assert(sampler.obs_seq_mutation.start_seq_with_flanks == sampled_orders.samples[0].obs_seq_mutation.start_seq_with_flanks)
+        assert(sampler.obs_seq_mutation.end_seq_with_flanks == sampled_orders.samples[0].obs_seq_mutation.end_seq_with_flanks)
         obs_seq_samples = sampled_orders.samples
-        reference_order = obs_seq_samples[-1].mutation_order
 
+        # The sampled orders for this observed start/end sequence pair
+        # log p(end|start,theta) = log p(reference order | start, theta) - log p(reference order | end, start, theta)
+
+        # Use the middle order as a reference
+        ref_sample_idx = len(obs_seq_samples)/2
+        reference_order = obs_seq_samples[ref_sample_idx].mutation_order
         log_prob_ref_order = sampler.get_log_probs(reference_order)
 
-        print Counter([".".join(map(str,sampled_order.mutation_order)) for sampled_order in obs_seq_samples]).most_common(10)
-
-        num_appears = 0
-        for sampled_order in obs_seq_samples:
-            num_appears += int(reference_order == sampled_order.mutation_order)
+        # Count number of times this order appears - this is our estimate of
+        # p(reference order | end, start, theta)
+        num_appears = np.sum([
+            reference_order == sampled_order.mutation_order for sampled_order in obs_seq_samples
+        ])
         print "num_appears", num_appears
         log_prob_order = np.log(float(num_appears)/len(obs_seq_samples))
 
@@ -59,16 +59,18 @@ class LogLikelihoodEvaluator:
             theta,
             self.sampler_cls,
             self.feat_generator,
-            self.num_jobs,
-            self.scratch_dir,
+            num_threads=self.num_threads,
         )
 
         # Get samples drawn from the distribution P(order | start, end, theta)
         # If num_jobs > 1, will use srun to get jobs!
+        # We need a lot of gibbs samples if the number of mutations is high. Let's calculate the number of mutations
+        num_mutations_approx = int(np.mean([len(m) for m in self.init_orders[:10]]))
         sampler_results = sampler_collection.get_samples(
             self.init_orders,
-            self.num_samples,
+            np.power(num_mutations_approx, 3), # Draw a lot of gibbs samples
             burn_in,
+            get_full_sweep=True,
         )
         # Store the sampled orders for faster runs next time
         self.init_orders = [res.samples[-1].mutation_order for res in sampler_results]

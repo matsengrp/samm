@@ -44,12 +44,13 @@ class MutationOrderGibbsSampler(Sampler):
             curr_order = init_order
             for i in range(burn_in + num_samples):
                 gibbs_orders, curr_gibbs_step_info, trace = self._do_gibbs_sweep(curr_order, curr_gibbs_step_info, get_full_sweep)
-                samples += gibbs_orders
+                curr_order = gibbs_orders[-1]
+                if i >= burn_in:
+                    samples += gibbs_orders
                 traces += trace
 
-        sampled_orders = samples[-num_samples:]
         return SamplerResult(
-            [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in sampled_orders],
+            [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in samples],
             traces
         )
 
@@ -77,8 +78,8 @@ class MutationOrderGibbsSampler(Sampler):
             if get_full_sweep:
                 gibbs_step_orders.append(list(curr_order))
         if not get_full_sweep:
-            gibbs_steps = [list(gibbs_step_info.order)]
-        return gibbs_steps, gibbs_step_info, trace
+            gibbs_step_orders = [list(gibbs_step_info.order)]
+        return gibbs_step_orders, gibbs_step_info, trace
 
     def _do_gibbs_step(self, partial_order, position, gibbs_step_info=None, pos_order_idx=None):
         """

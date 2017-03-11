@@ -100,10 +100,6 @@ def parse_args():
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
         default=0.1)
-    parser.add_argument('--num-val-mcmc',
-        type=int,
-        help='Number of samples to draw from MCMC to estimate likelihood of validation data',
-        default=30)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
@@ -201,9 +197,7 @@ def main(args=sys.argv[1:]):
         val_set,
         args.sampler_cls,
         feat_generator,
-        args.num_val_mcmc,
-        num_jobs=1,
-        scratch_dir=scratch_dir,
+        num_threads=args.num_cpu_threads,
     )
 
     em_algo = MCMC_EM(
@@ -234,6 +228,7 @@ def main(args=sys.argv[1:]):
 
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
+            log.info("Calculating validation log likelihood for penalty param %f" % penalty_param)
             val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=val_burn_in)
             log.info("Validation log likelihood %f" % val_log_lik)
             if args.full_train:
