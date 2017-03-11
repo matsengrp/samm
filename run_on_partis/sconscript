@@ -76,10 +76,12 @@ nest.add(
     'model_options',
     ['basic', 'survival_L', 'survival_FL'])
 
+# fused lasso seems to take smaller penalties
 nest.add(
     'penalty_param',
-    lambda c: [.008 if c['model_options'] == 'survival_L' else .0005],
+    lambda c: ["0.01,0.001,0.0001" if c['model_options'] == 'survival_L' else "0.001,0.0001,0.00001"],
     create_dir=False)
+
 
 # Nest for model fitting
 @nest.add_target_with_env(localenv)

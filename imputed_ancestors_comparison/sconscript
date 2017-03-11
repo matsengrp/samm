@@ -85,7 +85,7 @@ nest.add(
 nest.add(
     'model_extra_options',
     lambda c: ['' if c['model_options']=='basic' else \
-        '--em-max-iters 5 --penalty-params 0.008 --num-cpu-threads 4 --num-jobs 30 --burn-in 1 --num-e-samples 2'],
+        '--em-max-iters 5 --penalty-params "0.01,0.001,0.0001" --num-cpu-threads 4 --num-jobs 30 --burn-in 1 --num-e-samples 2'],
     create_dir=False)
 
 data_options = [
