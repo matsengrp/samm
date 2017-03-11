@@ -35,17 +35,19 @@ class LogLikelihoodEvaluator:
         # The sampled orders for this observed start/end sequence pair
         # log p(end|start,theta) = log p(reference order | start, theta) - log p(reference order | end, start, theta)
 
-        # Use the middle order as a reference
-        ref_sample_idx = len(obs_seq_samples)/2
-        reference_order = obs_seq_samples[ref_sample_idx].mutation_order
+        # Use the most commonly-seen order as a reference
+        # Note: This is probably introducing some bias? Though it is a consistent estimator...
+        # The reason we don't randomly pick an order is that if there are a lot of mutations,
+        # that mutation is very unlikely to show up multiple times
+        ctr = Counter([".".join(map(str, s.mutation_order)) for s in obs_seq_samples])
+        most_common_order = ctr.most_common(1)[0]
+        num_appears = most_common_order[1]
+        reference_order = [int(p) for p in most_common_order[0].split(".")]
+
         log_prob_ref_order = sampler.get_log_probs(reference_order)
 
         # Count number of times this order appears - this is our estimate of
         # p(reference order | end, start, theta)
-        num_appears = np.sum([
-            reference_order == sampled_order.mutation_order for sampled_order in obs_seq_samples
-        ])
-        print "num_appears", num_appears
         log_prob_order = np.log(float(num_appears)/len(obs_seq_samples))
 
         return log_prob_ref_order - log_prob_order
