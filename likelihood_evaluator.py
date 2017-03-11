@@ -7,18 +7,20 @@ class LogLikelihoodEvaluator:
     """
     Evaluates the likelihood of a set of model parameters for the given dataset
     """
-    def __init__(self, obs_data, sampler_cls, feat_generator, num_threads):
+    def __init__(self, obs_data, sampler_cls, feat_generator, num_jobs, scratch_dir):
         """
         @param obs_data: list of ObservedSequenceMutations
         @param sampler_cls: sampler class, actually has to be MutationOrderGibbsSampler
         @param feat_generator: SubmotifFeatureGenerator
-        @param num_threads: number of cpu threads to use
+        @param num_jobs: number of jobs to submit
+        @param scratch_dir: tmp dir for batch submission manager
         """
         self.obs_data = obs_data
         self.init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in obs_data]
         self.sampler_cls = sampler_cls
         self.feat_generator = feat_generator
-        self.num_threads = num_threads
+        self.num_jobs = num_jobs
+        self.scratch_dir = scratch_dir
 
     def _get_log_lik_obs_seq(self, sampler, sampled_orders):
         """
@@ -59,7 +61,8 @@ class LogLikelihoodEvaluator:
             theta,
             self.sampler_cls,
             self.feat_generator,
-            num_threads=self.num_threads,
+            num_jobs=self.num_jobs,
+            scratch_dir=self.scratch_dir,
         )
 
         # Get samples drawn from the distribution P(order | start, end, theta)

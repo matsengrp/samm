@@ -197,7 +197,8 @@ def main(args=sys.argv[1:]):
         val_set,
         args.sampler_cls,
         feat_generator,
-        num_threads=args.num_cpu_threads,
+        num_jobs=args.num_jobs,
+        scratch_dir=scratch_dir,
     )
 
     em_algo = MCMC_EM(
