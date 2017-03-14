@@ -226,7 +226,7 @@ def main(args=sys.argv[1:]):
         num_threads=args.num_cpu_threads,
         scratch_dir=scratch_dir,
     )
-    val_burn_in = args.num_val_burnin
+
     burn_in = args.burn_in
     prev_val_log_lik = -np.inf
     val_log_lik = None
@@ -240,11 +240,12 @@ def main(args=sys.argv[1:]):
             max_em_iters=args.em_max_iters,
             train_and_val=False
         )
+        burn_in = 0 # Only use burn in at the very beginning
 
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
             log.info("Calculating validation log likelihood for penalty param %s" % penalty_param_str)
-            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=val_burn_in)
+            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin)
             log.info("Validation log likelihood %f" % val_log_lik)
             if args.full_train:
                 theta, _ = em_algo.run(
@@ -254,8 +255,6 @@ def main(args=sys.argv[1:]):
                     max_em_iters=args.em_max_iters,
                     train_and_val=True
                 )
-        burn_in = 0 # Only use burn in at the very beginning
-        val_burn_in = 0
 
         # Get the probabilities of the target nucleotides
         fitted_prob_vector = None
