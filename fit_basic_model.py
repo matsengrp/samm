@@ -115,14 +115,15 @@ def main(args=sys.argv[1:]):
         prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
     else:
         proportions = {motif: 0 for motif in motif_list}
-        probability_matrix = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
+        probability_dict = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
         for key in motif_list:
             num_mutations = sum(mutations[key].values())
             if num_mutations > 0:
                 proportions[key] = 1. * num_mutations / appearances[key]
                 for nucleotide in NUCLEOTIDES:
-                    probability_matrix[key][nucleotide] = 1. * mutations[key][nucleotide] / num_mutations
+                    probability_dict[key][nucleotide] = 1. * mutations[key][nucleotide] / num_mutations
         prop_list = np.array([proportions[motif_list[i]] for i in range(len(motif_list))])
+        probability_matrix = np.array([[probability_dict[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
 
     pickle.dump((prop_list, probability_matrix), open(args.out_file, 'w'))
 

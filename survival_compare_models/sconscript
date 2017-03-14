@@ -28,14 +28,14 @@ nest.add(
 
 nest.add(
     'simulation_options',
-    lambda c: ['python simulate_from_survival.py --motif-len 5 %s' % (
+    lambda c: [
         "" if c["per_target_model"] == "is_single" else "--per-target-model"
-    )],
+    ],
     create_dir=False)
 
 sim_size_dict = [
     # about 10% of sequence gets mutated
-    {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0, 'ratio_nonzero': .05},
+    # {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0, 'ratio_nonzero': .05},
     {'size': 'big', 'n_taxa': 10, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1.25, 'ratio_nonzero': .05},
 ]
 
@@ -61,6 +61,8 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
     cmd = [
+        'python simulate_from_survival.py',
+        '--motif-len 5', # Must be motif length 5 since shmulate only does length 5
         c['simulation_options'],
         '--seed',
         c['seed'],
@@ -85,29 +87,43 @@ def generate(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 # Nest for fitting models
-model_options = [
-    'survival_none', # No penalty parameters - one column
-    'survival_none4', # No penalty parameters - one column
+model_single_options = [
+    'survival_none', # No penalty parameters
     'survival_L',
-    'survival_L4',
     'survival_FL',
     'basic',
+    'shmulate', # shmulate fits both a per-target-model and a single hazard model
+]
+model_per_target_options = [
+    'survival_none4', # No penalty parameters
+    'survival_L4',
     'basic_4',
-    'shmulate'
+    'shmulate', # shmulate fits both a per-target-model and a single hazard model
 ]
 
 nest.add(
     'model_options',
-    model_options)
+    list(set(model_single_options + model_per_target_options)))
 
 # Nest for model fitting
 # TODO: put this all in one driver function so sources/targets jibe with one another
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
+    fit_per_target_model = c['model_options'] in model_per_target_options
+
+    # True model should match the estimated model
+    if fit_per_target_model and c['per_target_model'] == "is_single":
+        return
+    if not fit_per_target_model and c['per_target_model'] == "is_per_target":
+        return
+
+    per_target_model_str = ""
+    if fit_per_target_model:
+        per_target_model_str = "--per-target-model"
+
     cmd = []
     if c["model_options"].startswith("survival"):
         model_option = c["model_options"].replace("survival_", "")
-        per_target_model_str = ""
         if model_option == "none":
             # Do a one-column lasso with penalty parameter zero
             model_option = "L"
@@ -115,21 +131,14 @@ def fit_context_model(env, outdir, c):
         elif model_option == "none4":
             # Do a one-column lasso with penalty parameter zero
             model_option = "L"
-            per_target_model_str = "--per-target-model"
             penalty_params = [0]
         elif model_option == "L4":
             model_option = "L"
-            per_target_model_str = "--per-target-model"
             penalty_params = [0.008]
         elif model_option == "L":
             penalty_params = [0.008]
         elif model_option == "FL":
             penalty_params = [0.0005]
-
-        if c["per_target_model"] == "is_per_target" and per_target_model_str == "":
-            # If true model is per target and we assume a single hazard rate,
-            # then don't fit the model. Skip this.
-            return
 
         cmd = ['python fit_context_model.py',
                '--seed',
@@ -182,8 +191,30 @@ def fit_context_model(env, outdir, c):
         c['generate'],
         ' '.join(map(str, cmd)))
 
-# Aggregate over different fitting methods
+# Pop to get to the simulation_size level - aggregate different replicates of the model
+nest.pop("model_options")
+nest.pop("replicate")
 
-# Aggregate over all replicates
+@nest.add_target()
+def operate_on_aggregate_models(outdir, c):
+    if c['per_target_model'] == "is_single":
+        model_types = ','.join(model_single_options)
+    else:
+        model_types = ','.join(model_per_target_options)
+
+    cmd = ['python compare_models_to_truth.py',
+           '--compare-folder',
+           outdir,
+           '--model-types',
+           model_types,
+           '--reps',
+           localenv["NREPS"],
+           '--model-fit-file fitted.pkl',
+           '--theta-file true_theta.pkl',
+           '--out-file ${TARGETS[0]}']
+    return env.Command(
+        [join(outdir, 'comparisons.txt')],
+        [],
+        ' '.join(map(str, cmd)))
 
 # Plot results
