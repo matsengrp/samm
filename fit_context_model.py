@@ -12,7 +12,6 @@ import csv
 import pickle
 import logging as log
 import time
-import itertools
 
 import numpy as np
 import scipy.stats
@@ -191,9 +190,9 @@ def main(args=sys.argv[1:]):
     sorted_pen_params = sorted(penalty_params, reverse=True)
 
     if args.solver == "FL":
-        pen_params_list = itertools.product(sorted_pen_params, repeat=2)
+        pen_params_list = [(p, p/i) for p in sorted_pen_params for i in FUSED_LASSO_PENALTY_RATIO]
     else:
-        pen_params_list = itertools.product(sorted_pen_params, repeat=1)
+        pen_params_list = [(p,) for p in sorted_pen_params]
 
     results_list = []
 
