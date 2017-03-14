@@ -233,6 +233,8 @@ def main(args=sys.argv[1:]):
             train_and_val=False
         )
 
+        st = time.time()
+
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
             log.info("Calculating validation log likelihood for penalty param %f" % penalty_param)
@@ -257,7 +259,8 @@ def main(args=sys.argv[1:]):
             log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
 
         # We save the final theta (potentially trained over all the data)
-        results_list.append((penalty_param, theta, fitted_prob_vector, val_log_lik))
+        num_nonzero = len(get_nonzero_theta_print_lines(theta, motif_list))
+        results_list.append((penalty_param, theta, fitted_prob_vector, val_log_lik, num_nonzero))
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
@@ -271,6 +274,8 @@ def main(args=sys.argv[1:]):
                 log.info("Stop trying penalty parameters")
                 break
             prev_val_log_lik = val_log_lik
+
+        log.info("Validation time: %f" % (time.time() - st))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -1,6 +1,7 @@
 ## Test model fits against one another
 
 import os
+import pickle 
 
 from os.path import join
 from nestly.scons import SConsWrap
@@ -74,12 +75,12 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['basic', 'survival_L', 'survival_FL'])
+    ['basic', 'survival_L'])
 
 # fused lasso seems to take smaller penalties
 nest.add(
     'penalty_param',
-    lambda c: ["0.01,0.001,0.0001" if c['model_options'] == 'survival_L' else "0.001,0.0001,0.00001"],
+    lambda c: [".01,.005,.001,.0005,.0001" if c['model_options'] == 'survival_L' else "0.001,0.0001,0.00001"],
     create_dir=False)
 
 
@@ -108,7 +109,7 @@ def fit_models(env, outdir, c):
                '--num-e-samples',
                4,
                '--em-max-iters',
-               5,
+               1,
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     elif c["model_options"] == "basic":
@@ -125,4 +126,25 @@ def fit_models(env, outdir, c):
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['process_data'],
         ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def summarize(env, outdir, c):
+    def theta_stats(target, source, env):
+        c = env['control']
+        output_results = ['chain', 'penalty-param', 'num-nonzero', 'log-lik']
+        with open(str(source[0]), 'r') as pickle_file:
+            results_list = pickle.load(pickle_file)
+
+        if c["model_options"].startswith("survival"):
+            with open(str(target[0]), 'w') as cross_val_file:
+                writer = csv.writer(cross_val_file, delimiter=',')
+                writer.writerow('chain penalty-param log-lik num-nonzero'.split())
+                for result in results_list:
+                    writer.writerow([c['chain'], result[0], result[3], result[4]])
+
+    return env.Command(
+        join(outdir, 'cross_val_results.csv'),
+        c['fit_models'],
+        theta_stats,
+        control=c)
 
