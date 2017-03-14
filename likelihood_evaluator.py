@@ -32,25 +32,35 @@ class LogLikelihoodEvaluator:
         assert(sampler.obs_seq_mutation.end_seq_with_flanks == sampled_orders.samples[0].obs_seq_mutation.end_seq_with_flanks)
         obs_seq_samples = sampled_orders.samples
 
-        # The sampled orders for this observed start/end sequence pair
-        # log p(end|start,theta) = log p(reference order | start, theta) - log p(reference order | end, start, theta)
+        # p_reforder is the estimate for p(end|start,theta) using a particular reference order. We can calculate it as follows:
+        # log p_reforder(end|start,theta) = log p(reference order | start, theta) - log p(reference order | end, start, theta)
+        # The first log prob term is computed analytically (it's not conditional on the end sequence, so easy to calculate)
+        # The second log prob term is estimated using the empirical distribution of orders from the gibbs sampler
+        # We estimate log p(end|start,theta) by taking an average over all orders observed from the gibbs sampler
+        # So log p(end|start,theta) = log(mean(p_reforder(end|start,theta)))
 
-        # Use the most commonly-seen order as a reference
-        # Note: This is probably introducing some bias? Though it is a consistent estimator...
-        # The reason we don't randomly pick an order is that if there are a lot of mutations,
-        # that mutation is very unlikely to show up multiple times
-        ctr = Counter([".".join(map(str, s.mutation_order)) for s in obs_seq_samples])
-        most_common_order = ctr.most_common(1)[0]
-        num_appears = most_common_order[1]
-        reference_order = [int(p) for p in most_common_order[0].split(".")]
+        count_dict = {}
+        for s in obs_seq_samples:
+            mut_order_str = ".".join(map(str, s.mutation_order))
+            if mut_order_str not in count_dict:
+                count_dict[mut_order_str] = 1
+            else:
+                count_dict[mut_order_str] += 1
 
-        log_prob_ref_order = sampler.get_log_probs(reference_order)
+        log_probs = []
+        num_sampled_orders = len(count_dict)
+        num_samples = len(obs_seq_samples)
+        for order_str, order_cnt in count_dict.iteritems():
+            reference_order = [int(p) for p in order_str.split(".")]
+            log_prob_ref_order = sampler.get_log_probs(reference_order)
 
-        # Count number of times this order appears - this is our estimate of
-        # p(reference order | end, start, theta)
-        log_prob_order = np.log(float(num_appears)/len(obs_seq_samples))
+            # Count number of times this order appears - this is our estimate of
+            # p(reference order | end, start, theta)
+            log_prob_order = np.log(float(order_cnt)/num_samples)
+            log_probs.append(log_prob_ref_order - log_prob_order)
 
-        return log_prob_ref_order - log_prob_order
+        log_mean_prob = np.log(np.exp(scipy.misc.logsumexp(log_probs))/num_sampled_orders)
+        return log_mean_prob
 
     def get_log_lik(self, theta, burn_in=0):
         """
