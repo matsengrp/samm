@@ -104,7 +104,7 @@ def parse_args():
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
-        default=1)
+        default=2)
     parser.add_argument('--full-train',
         action='store_true',
         help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
@@ -192,6 +192,13 @@ def main(args=sys.argv[1:]):
 
     # Run EM on the lasso parameters from largest to smallest
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
+    sorted_pen_params = sorted(penalty_params, reverse=True)
+
+    if args.solver == "FL":
+        pen_params_list = [(p, p/i) for p in sorted_pen_params for i in FUSED_LASSO_PENALTY_RATIO]
+    else:
+        pen_params_list = [(p,) for p in sorted_pen_params]
+
     results_list = []
 
     theta = np.zeros((feat_generator.feature_vec_len, args.theta_num_col))
@@ -223,26 +230,27 @@ def main(args=sys.argv[1:]):
     burn_in = args.burn_in
     prev_val_log_lik = -np.inf
     val_log_lik = None
-    for penalty_param in sorted(penalty_params, reverse=True):
-        log.info("Penalty parameter %f" % penalty_param)
+    for penalty_params in pen_params_list:
+        penalty_param_str = ",".join(map(str, penalty_params))
+        log.info("Penalty parameter %s" % penalty_param_str)
         theta, _ = em_algo.run(
             theta=theta,
             burn_in=burn_in,
-            penalty_param=penalty_param,
+            penalty_params=penalty_params,
             max_em_iters=args.em_max_iters,
             train_and_val=False
         )
 
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
-            log.info("Calculating validation log likelihood for penalty param %f" % penalty_param)
+            log.info("Calculating validation log likelihood for penalty param %s" % penalty_param_str)
             val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=val_burn_in)
             log.info("Validation log likelihood %f" % val_log_lik)
             if args.full_train:
                 theta, _ = em_algo.run(
                     theta=theta,
                     burn_in=burn_in,
-                    penalty_param=penalty_param,
+                    penalty_params=penalty_params,
                     max_em_iters=args.em_max_iters,
                     train_and_val=True
                 )
@@ -257,14 +265,17 @@ def main(args=sys.argv[1:]):
             log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
 
         # We save the final theta (potentially trained over all the data)
-        results_list.append((penalty_param, theta, fitted_prob_vector, val_log_lik))
+        results_list.append(
+            (penalty_params, theta, fitted_prob_vector, val_log_lik)
+        )
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
+        log.info("==== FINAL theta, penalty param %s ====" % penalty_param_str)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        if args.tuning_sample_ratio:
+        if len(penalty_params) == 1 and args.tuning_sample_ratio:
+            # Only stop early if we are tuning a single penalty parameter
             # Decide what to do next - stop or keep searching penalty parameters?
             if val_log_lik <= prev_val_log_lik:
                 # This penalty parameter is performing worse. We're done!

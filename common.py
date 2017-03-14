@@ -63,6 +63,8 @@ HOT_COLD_SPOT_REGS = [
     ]
 INT8_MAX = 127
 
+FUSED_LASSO_PENALTY_RATIO = [2., 4., 6., 8.]
+
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
@@ -242,7 +244,7 @@ def read_germline_file(fasta):
         for seq_record in SeqIO.parse(fasta_file, 'fasta'):
             genes.append(seq_record.id)
             bases.append(str(seq_record.seq))
-    
+
     return pd.DataFrame({'base': bases}, index=genes)
 
 def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
