@@ -30,7 +30,7 @@ class MutationOrderGibbsSampler(Sampler):
     A class that will do the heavy lifting of Gibbs sampling.
     Returns an order and log probability vector (for tracing)
     """
-    def run(self, init_order, burn_in, num_samples):
+    def run(self, init_order, burn_in, num_samples, get_full_sweep=False):
         traces = []
         if self.num_mutations < 2:
             # If there are zero or one mutations then the same initial order will be returned for
@@ -43,18 +43,18 @@ class MutationOrderGibbsSampler(Sampler):
             curr_gibbs_step_info = None
             curr_order = init_order
             for i in range(burn_in + num_samples):
-                curr_gibbs_step_info, trace = self._do_gibbs_sweep(curr_order, curr_gibbs_step_info)
-                curr_order = curr_gibbs_step_info.order
-                samples.append(curr_order)
+                gibbs_orders, curr_gibbs_step_info, trace = self._do_gibbs_sweep(curr_order, curr_gibbs_step_info, get_full_sweep)
+                curr_order = gibbs_orders[-1]
+                if i >= burn_in:
+                    samples += gibbs_orders
                 traces += trace
 
-        sampled_orders = samples[-num_samples:]
         return SamplerResult(
-            [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in sampled_orders],
+            [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in samples],
             traces
         )
 
-    def _do_gibbs_sweep(self, curr_order, gibbs_step_info=None):
+    def _do_gibbs_sweep(self, curr_order, gibbs_step_info=None, get_full_sweep=False):
         """
         One gibbs sweep is a gibbs sampling step for all the positions
         Returns an order and trace
@@ -63,6 +63,7 @@ class MutationOrderGibbsSampler(Sampler):
         @param gibbs_step_info: GibbsStepInfo with the information from the most recent step.
                                 used to minimize recomputation
         """
+        gibbs_step_orders = []
         trace = []
         # Perform gibbs sweep in a random order
         for position in np.random.permutation(self.mutated_positions):
@@ -74,7 +75,11 @@ class MutationOrderGibbsSampler(Sampler):
             curr_order = gibbs_step_info.order
             # Output probabilities for trace
             trace.append(log_lik)
-        return gibbs_step_info, trace
+            if get_full_sweep:
+                gibbs_step_orders.append(list(curr_order))
+        if not get_full_sweep:
+            gibbs_step_orders = [list(gibbs_step_info.order)]
+        return gibbs_step_orders, gibbs_step_info, trace
 
     def _do_gibbs_step(self, partial_order, position, gibbs_step_info=None, pos_order_idx=None):
         """
