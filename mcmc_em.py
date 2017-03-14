@@ -94,7 +94,9 @@ class MCMC_EM:
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                 )
-                log.info("Current Theta")
+
+                num_nonzero = np.sum((theta != -np.inf) & (theta != 0))
+                log.info("Current Theta, num_nonzero %d" % num_nonzero)
                 log.info(
                     get_nonzero_theta_print_lines(theta, self.motif_list)
                 )
@@ -102,9 +104,8 @@ class MCMC_EM:
                 lower_bound_is_negative = (lower_bound < 0)
                 log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
 
-                num_nonzero = np.count_nonzero(theta)
-                if num_nonzero > theta.size/2 or num_nonzero < 4:
-                    # Too many nonzeros or too many zeros - just stop and consider a different penalty parameter
+                if num_nonzero == 0:
+                    # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
             if lower_bound_is_negative:
