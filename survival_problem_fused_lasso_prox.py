@@ -34,10 +34,8 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)
         self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=np.intc)
 
-        self.penalty_param_fused = self.penalty_param
-        # TODO: This is a hack for now since we assume only one penalty param
-        # We upweight lasso since we don't want to over-penalize.
-        self.penalty_param_lasso = 2 * self.penalty_param
+        self.penalty_param_lasso = self.penalty_params[0]
+        self.penalty_param_fused = self.penalty_params[1]
 
     def get_value(self, theta):
         """

@@ -14,6 +14,9 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
     """
     min_diff_thres = 1e-8
 
+    def post_init(self):
+        self.penalty_param = self.penalty_params[0]
+
     def get_value(self, theta):
         """
         @return negative penalized log likelihood

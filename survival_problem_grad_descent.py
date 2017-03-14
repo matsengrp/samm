@@ -28,14 +28,13 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_param, theta_mask, num_threads=1):
-        assert(penalty_param >= 0)
+    def __init__(self, feat_generator, samples, penalty_params, theta_mask, num_threads=1):
         self.feature_generator = feat_generator
         self.samples = samples
         self.theta_mask = theta_mask
         self.per_target_model = self.theta_mask.shape[1] == NUM_NUCLEOTIDES
         self.num_samples = len(self.samples)
-        self.penalty_param = penalty_param
+        self.penalty_params = penalty_params
 
         self.num_threads = num_threads
         self.pool = Pool(self.num_threads)

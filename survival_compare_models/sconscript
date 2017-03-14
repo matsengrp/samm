@@ -7,6 +7,8 @@ from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
 
+import numpy as np
+
 Import('env')
 localenv = env.Clone()
 
@@ -35,8 +37,8 @@ nest.add(
 
 sim_size_dict = [
     # about 10% of sequence gets mutated
-    # {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0, 'ratio_nonzero': .05},
-    {'size': 'big', 'n_taxa': 10, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1.25, 'ratio_nonzero': .05},
+    # {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0},
+    {'size': 'big', 'n_taxa': 5, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1.75},
 ]
 
 nest.add(
@@ -77,8 +79,8 @@ def generate(env, outdir, c):
        c['simulation_size']['random_gene_len'],
        '--min-censor-time',
        c['simulation_size']['min_censor_time'],
-       '--ratio-nonzero',
-       c['simulation_size']['ratio_nonzero'],
+       '--sparsity-ratio',
+       0
     ]
 
     return env.Command(
@@ -124,6 +126,7 @@ def fit_context_model(env, outdir, c):
     cmd = []
     if c["model_options"].startswith("survival"):
         model_option = c["model_options"].replace("survival_", "")
+        penalty_params = np.power(10, np.arange(-1.5, -3.0, step=-0.5)).tolist()
         if model_option == "none":
             # Do a one-column lasso with penalty parameter zero
             model_option = "L"
@@ -134,11 +137,6 @@ def fit_context_model(env, outdir, c):
             penalty_params = [0]
         elif model_option == "L4":
             model_option = "L"
-            penalty_params = [0.008]
-        elif model_option == "L":
-            penalty_params = [0.008]
-        elif model_option == "FL":
-            penalty_params = [0.0005]
 
         cmd = ['python fit_context_model.py',
                '--seed',
@@ -160,8 +158,8 @@ def fit_context_model(env, outdir, c):
                '--solver',
                model_option,
                per_target_model_str,
-               '--theta-file ${SOURCES[0]}',
-               '--input-file ${SOURCES[1]}',
+               '--full-train',
+               '--input-seqs ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
@@ -182,7 +180,7 @@ def fit_context_model(env, outdir, c):
                5,
                per_target_model_str,
                '--theta-file ${SOURCES[0]}',
-               '--input-file ${SOURCES[1]}',
+               '--input-seqs ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']

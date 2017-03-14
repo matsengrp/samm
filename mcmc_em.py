@@ -32,10 +32,10 @@ class MCMC_EM:
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
 
-    def run(self, theta, penalty_param=1, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
+    def run(self, theta, penalty_params=[1], max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """
         @param theta: initial value for theta in MCMC-EM
-        @param penalty_param: the coefficient for the penalty function
+        @param penalty_params: the coefficient(s) for the penalty function
         @param max_em_iters: the maximum number of iterations of MCMC-EM
         @param burn_in: number of burn in iterations
         @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
@@ -88,13 +88,15 @@ class MCMC_EM:
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
-                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask, self.num_threads)
+                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_params, self.theta_mask, self.num_threads)
 
                 theta, pen_exp_log_lik, log_lik_diff, lower_bound = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                 )
-                log.info("Current Theta")
+
+                num_nonzero = np.sum((theta != -np.inf) & (theta != 0))
+                log.info("Current Theta, num_nonzero %d" % num_nonzero)
                 log.info(
                     get_nonzero_theta_print_lines(theta, self.motif_list)
                 )
@@ -102,9 +104,8 @@ class MCMC_EM:
                 lower_bound_is_negative = (lower_bound < 0)
                 log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
 
-                num_nonzero = np.count_nonzero(theta)
-                if num_nonzero > theta.size/2 or num_nonzero < 4:
-                    # Too many nonzeros or too many zeros - just stop and consider a different penalty parameter
+                if num_nonzero == 0:
+                    # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
             if lower_bound_is_negative:

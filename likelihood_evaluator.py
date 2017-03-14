@@ -83,7 +83,7 @@ class LogLikelihoodEvaluator:
         num_mutations_approx = int(np.mean([len(m) for m in self.init_orders[:10]]))
         sampler_results = sampler_collection.get_samples(
             self.init_orders,
-            np.power(num_mutations_approx, 3), # Draw a lot of gibbs samples
+            num_mutations_approx, # Draw a lot of gibbs samples
             burn_in,
             get_full_sweep=True,
         )
