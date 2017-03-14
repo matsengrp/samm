@@ -15,6 +15,14 @@ def parse_args():
     parser.add_argument('--data-path',
         type=str,
         help='location of data')
+    parser.add_argument('--input-genes',
+        type=str,
+        default=None,
+        help='input germline info')
+    parser.add_argument('--input-seqs',
+        type=str,
+        default=None,
+        help='input sequence info')
     parser.add_argument('--chain',
         default='h',
         choices=('h', 'k', 'l'),
@@ -53,11 +61,13 @@ def main(args=sys.argv[1:]):
     if not os.path.exists(scratch_dir):
         os.makedirs(scratch_dir)
 
-    annotations, germlines = get_paths_to_partis_annotations(args.data_path, chain=args.chain)
-    write_partis_data_from_annotations(args.output_genes, args.output_seqs, annotations, inferred_gls=germlines, chain=args.chain)
-
-    if args.impute_ancestors:
-        write_data_after_imputing(args.output_genes, args.output_seqs, args.output_genes, args.output_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
+    if args.read_from_partis:
+        annotations, germlines = get_paths_to_partis_annotations(args.data_path, chain=args.chain)
+        write_partis_data_from_annotations(args.output_genes, args.output_seqs, annotations, inferred_gls=germlines, chain=args.chain)
+        if args.impute_ancestors:
+            write_data_after_imputing(args.output_genes, args.output_seqs, args.output_genes, args.output_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
+    elif args.impute_ancestors:
+        write_data_after_imputing(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
 
 
 if __name__ == "__main__":

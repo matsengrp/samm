@@ -21,15 +21,58 @@ ZSCORE = 1.65
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
 
+COMPLEMENT_DICT = {
+    'A': 'T',
+    'G': 'C',
+    'C': 'G',
+    'T': 'A',
+    'Y': 'R',
+    'R': 'Y',
+    'S': 'S',
+    'W': 'W',
+    'M': 'K',
+    'K': 'M',
+    'B': 'V',
+    'D': 'H',
+    'H': 'D',
+    'V': 'B',
+    'N': 'N',
+}
+
+DEGENERATE_BASE_DICT = {
+    'A': 'a',
+    'G': 'g',
+    'C': 'c',
+    'T': 't',
+    'Y': '[ct]',
+    'R': '[ag]',
+    'S': '[gc]',
+    'W': '[at]',
+    'M': '[ac]',
+    'K': '[gt]',
+    'B': '[cgt]',
+    'D': '[agt]',
+    'H': '[act]',
+    'V': '[acg]',
+    'N': '[agct]',
+}
+
 HOT_COLD_SPOT_REGS = [
-    ["RGYW - hot","[atcg][ga]g[ct][at]"],
-    ["WRCY - hot", "[at][ga]c[ct][atcg]"],
-    ["WA - hot", "[atcg][at]a[atcg][atcg]"],
-    ["TW - hot", "[atcg][atcg]t[at][atcg]"],
-    ["SYC - cold", "[cg][ct]c[atcg][atcg]"],
-    ["GRS - cold", "[atcg][atcg]g[ga][cg]"],
-]
+        ['NRGYW', 'NWANN', 'SYCNN'],
+        ['hot', 'hot', 'cold']
+    ]
 INT8_MAX = 127
+
+def return_complement(kmer):
+    return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
+
+def compute_known_hot_and_cold(kmer_list, hot_or_cold_list):
+    hot_cold_regs = []
+    for kmer, hot_or_cold in zip(kmer_list, hot_or_cold_list):
+        for km_or_com in (kmer, return_complement(kmer)):
+            hot_cold_regs.append([' - '.join([km_or_com.replace('N', ''), hot_or_cold]),
+            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in km_or_com])])
+    return hot_cold_regs
 
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
@@ -52,13 +95,14 @@ def get_nonzero_theta_print_lines(theta, motif_list):
         return match_res is not None
 
     lines = []
+    known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS[0], HOT_COLD_SPOT_REGS[1])
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 # print the whole line if any element in the theta is nonzero
                 motif = motif_list[i]
                 hot_cold_matches = ""
-                for spot_name, spot_regex in HOT_COLD_SPOT_REGS:
+                for spot_name, spot_regex in known_hot_cold:
                     if is_match(spot_regex, motif):
                         hot_cold_matches = " -- " + spot_name
                         break

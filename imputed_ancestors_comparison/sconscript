@@ -10,6 +10,8 @@ from SCons.Script import Environment, Command, AddOption
 Import('env')
 localenv = env.Clone()
 
+MOTIF_LEN = 5
+
 # Set up state
 base = {'nreps': localenv['NREPS'],
         'output_name': localenv['OUTPUT_NAME']}
@@ -36,10 +38,6 @@ nest.add(
     lambda c: [c['replicate']],
     create_dir=False)
 
-nest.add(
-    'generate_ancestors',
-    ['no_ancestors', 'ancestors'])
-
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
@@ -50,13 +48,22 @@ def generate(env, outdir, c):
                 '--n-germlines',
                 c['simulation_size']['n_germlines'],
                 '--output-true-theta ${TARGETS[0]}',
-                '--output-file ${TARGETS[1]}',
-                '--output-genes ${TARGETS[2]}']
-    if c['generate_ancestors'] == 'ancestors':
-        cmd += ['--output-separate-branches']
+                '--output-genes ${TARGETS[1]}',
+                '--output-seqs ${TARGETS[2]}',
+                '--output-per-branch-genes ${TARGETS[3]}',
+                '--output-per-branch-seqs ${TARGETS[4]}',
+                '&&',
+                'python preprocess_data.py',
+                '--input-genes ${TARGETS[1]}',
+                '--input-seqs ${TARGETS[2]}',
+                '--impute-ancestors',
+                '--output-genes ${TARGETS[5]}',
+                '--output-seqs ${TARGETS[6]}']
 
     return env.Command(
-        [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
+         join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv'),
+         join(outdir, 'genes_with_imputed_ancestors.csv'), join(outdir, 'seqs_with_imputed_ancestors.csv')],
         [],
         ' '.join(map(str, cmd)))
 
@@ -78,7 +85,7 @@ nest.add(
 nest.add(
     'model_extra_options',
     lambda c: ['' if c['model_options']=='basic' else \
-        '--penalty-params "0.01,0.001,0.0001" --num-cpu-threads 1 --num-jobs 20 --burn-in 2 --num-e-samples 4'],
+        '--em-max-iters 5 --penalty-params "0.01,0.001,0.0001" --num-cpu-threads 4 --num-jobs 30 --burn-in 1 --num-e-samples 2'],
     create_dir=False)
 
 data_options = [
@@ -96,33 +103,28 @@ nest.add(
 # Nest for model fitting
 @nest.add_target_with_env(localenv)
 def fit_model(env, outdir, c):
-    cmd = []
-    if c['data_options'] == 'true_ancestors' and c['generate_ancestors'] == 'ancestors':
-        cmd = [c['model_call']] + ['--seed',
-               c['seed'],
-               '--motif-len',
-               5,
-               '--theta-file ${SOURCES[0]}',
-               '--input-file ${SOURCES[1]}',
-               '--input-genes ${SOURCES[2]}',
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
-    elif c['data_options'] != 'true_ancestors' and c['generate_ancestors'] != 'ancestors':
-        cmd = [c['model_call']] + ['--seed',
-               c['seed'],
-               '--motif-len',
-               5,
-               '--theta-file ${SOURCES[0]}',
-               '--input-file ${SOURCES[1]}',
-               '--input-genes ${SOURCES[2]}',
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
-        if c['data_options'] == 'sample_random':
-            cmd += ['--sample-or-impute sample-random']
-        if c['data_options'] == 'sample_highly_mutated':
-            cmd += ['--sample-or-impute sample-highly-mutated']
-        if c['data_options'] == 'impute_ancestors':
-            cmd += ['--sample-or-impute impute-ancestors']
+    cmd = [c['model_call']] + ['--seed',
+            c['seed'],
+            '--motif-len',
+            MOTIF_LEN,
+            '--theta-file ${SOURCES[0]}',
+            '--out-file ${TARGETS[0]}',
+            '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
+    if c['data_options'] == 'true_ancestors':
+        cmd += ['--input-genes ${SOURCES[3]}',
+                '--input-seqs ${SOURCES[4]}']
+    elif c['data_options'] == 'impute_ancestors':
+        cmd += ['--input-genes ${SOURCES[5]}',
+                '--input-seqs ${SOURCES[6]}']
+    else:
+        cmd += ['--input-genes ${SOURCES[1]}',
+                '--input-seqs ${SOURCES[2]}']
+        if c['data_options'] == 'all_data':
+            cmd += ['--sample-regime 1']
+        elif c['data_options'] == 'sample_random':
+            cmd += ['--sample-regime 2']
+        elif c['data_options'] == 'sample_highly_mutated':
+            cmd += ['--sample-regime 3']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['generate'],

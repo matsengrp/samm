@@ -43,6 +43,7 @@ def parse_args():
         help='sequence data in csv',
         default='_output/seqs.csv')
     parser.add_argument('--sample-regime',
+        type=int,
         default=1,
         choices=(1, 2, 3),
         help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
