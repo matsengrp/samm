@@ -25,11 +25,13 @@ class ObservedSequenceMutations:
         start_idx = 0
         end_idx = len(start_seq)
         flank_len = motif_len/2
+        skipped_mutations = 0
 
         # Go through half the sequence forward to find beginning conserved nucleotides
         for flank_start_idx in range(len(start_seq)/2):
             if start_seq[flank_start_idx] != end_seq[flank_start_idx]:
                 start_idx = flank_start_idx + 1
+                skipped_mutations += 1
             elif start_idx == flank_start_idx:
                 break
 
@@ -37,6 +39,7 @@ class ObservedSequenceMutations:
         for flank_end_idx in reversed(range(len(start_seq)/2, len(start_seq))):
             if start_seq[flank_end_idx] != end_seq[flank_end_idx]:
                 end_idx = flank_end_idx
+                skipped_mutations += 1
             elif end_idx - flank_len == flank_end_idx:
                 break
 
@@ -52,6 +55,7 @@ class ObservedSequenceMutations:
                 self.mutation_pos_dict[i] = end_seq[i]
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
+        self.skipped_mutations = skipped_mutations
         self.start_seq = start_seq
         self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank
         self.end_seq = end_seq
