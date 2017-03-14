@@ -32,10 +32,10 @@ class MCMC_EM:
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
 
-    def run(self, theta, penalty_param=1, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
+    def run(self, theta, penalty_params=[1], max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """
         @param theta: initial value for theta in MCMC-EM
-        @param penalty_param: the coefficient for the penalty function
+        @param penalty_params: the coefficient(s) for the penalty function
         @param max_em_iters: the maximum number of iterations of MCMC-EM
         @param burn_in: number of burn in iterations
         @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
@@ -88,7 +88,7 @@ class MCMC_EM:
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
-                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask, self.num_threads)
+                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_params, self.theta_mask, self.num_threads)
 
                 theta, pen_exp_log_lik, log_lik_diff, lower_bound = problem.solve(
                     init_theta=prev_theta,
