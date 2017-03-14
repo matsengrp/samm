@@ -104,7 +104,7 @@ def parse_args():
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
-        default=1)
+        default=2)
     parser.add_argument('--full-train',
         action='store_true',
         help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
