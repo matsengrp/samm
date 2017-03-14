@@ -24,9 +24,9 @@ class Input_Data_TestCase(unittest.TestCase):
         seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample=3)
         print len(seqs)
 
-        #write_data_after_imputing(temp_genes, temp_seqs, INPUT_GENES, INPUT_SEQS, motif_len, verbose=False)
-        #seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
-        #print len(seqs)
+        write_data_after_imputing(temp_genes, temp_seqs, INPUT_GENES, INPUT_SEQS, motif_len, verbose=False)
+        seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
+        print len(seqs)
 
     def test_statistics(self):
 
