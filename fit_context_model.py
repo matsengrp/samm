@@ -265,8 +265,6 @@ def main(args=sys.argv[1:]):
         fitted_prob_vector = None
         if not args.per_target_model:
             fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta)
-            log.info("=== Fitted Probability Vector ===")
-            log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
 
         curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector, val_log_lik)
 
@@ -278,7 +276,7 @@ def main(args=sys.argv[1:]):
         log.info("==== FINAL theta, penalty param %s ====" % penalty_param_str)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        if best_model is None or best_model.val_log_lik > val_log_lik:
+        if best_model is None or best_model.val_log_lik < val_log_lik:
             best_model = curr_model_results
         elif len(penalty_params) == 1 and args.tuning_sample_ratio:
             # This model is not better than the previous model.
