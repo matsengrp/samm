@@ -63,7 +63,7 @@ HOT_COLD_SPOT_REGS = [
     ]
 INT8_MAX = 127
 
-FUSED_LASSO_PENALTY_RATIO = [2., 4., 6., 8.]
+FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
 
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
