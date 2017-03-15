@@ -267,9 +267,8 @@ def main(args=sys.argv[1:]):
             log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
 
         # We save the final theta (potentially trained over all the data)
-        num_nonzero = len(get_nonzero_theta_print_lines(theta, motif_list))
         results_list.append(
-            (penalty_params, theta, fitted_prob_vector, val_log_lik, num_nonzero)
+            (penalty_params, theta, fitted_prob_vector, val_log_lik)
         )
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
