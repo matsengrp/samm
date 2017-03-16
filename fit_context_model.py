@@ -67,8 +67,8 @@ def parse_args():
         default=1)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
-        choices=["CL", "CFL", "L", "FL"],
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, SFL = sparse fused lasso,',
+        choices=["CL", "CFL", "L", "FL", "SFL"],
         default="L")
     parser.add_argument('--motif-len',
         type=int,
@@ -130,7 +130,7 @@ def parse_args():
             args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "L":
         args.problem_solver_cls = SurvivalProblemLasso
-    elif args.solver == "FL":
+    elif args.solver == "FL" or args.solver == "SFL":
         if args.per_target_model:
             raise NotImplementedError()
         else:
@@ -206,9 +206,12 @@ def main(args=sys.argv[1:]):
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
     sorted_pen_params = sorted(penalty_params, reverse=True)
 
-    if args.solver == "FL":
+    if args.solver == "SFL":
         # first param is lasso, second one is fused
         pen_params_list = [(p, p/i) for p in sorted_pen_params for i in FUSED_LASSO_PENALTY_RATIO]
+    elif args.solver == "FL":
+        # first param is lasso, second one is fused
+        pen_params_list = [(0, p) for p in sorted_pen_params]
     else:
         pen_params_list = [(p,) for p in sorted_pen_params]
 
