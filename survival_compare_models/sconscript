@@ -164,6 +164,7 @@ def fit_context_model(env, outdir, c):
                tune_ratio,
                per_target_model_str,
                '--full-train',
+               '--theta-file ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
                '--out-file ${TARGETS[0]}',
