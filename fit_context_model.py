@@ -94,6 +94,10 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
+    parser.add_argument('--theta-file',
+        type=str,
+        help='true theta file',
+        default='')
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
@@ -144,6 +148,11 @@ def parse_args():
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
     return args
+
+def load_true_model(file_name):
+    with open(file_name, "rb") as f:
+        true_theta, probability_matrix = pickle.load(f)
+        return true_theta, probability_matrix
 
 def create_train_val_sets(obs_data, feat_generator, args):
     num_obs = len(obs_data)
@@ -210,6 +219,10 @@ def main(args=sys.argv[1:]):
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
 
+    true_theta = None
+    if args.theta_file != "":
+        true_theta, _ = load_true_model(args.theta_file)
+
     val_set_evaluator = LogLikelihoodEvaluator(
         val_set,
         args.sampler_cls,
@@ -249,6 +262,10 @@ def main(args=sys.argv[1:]):
 
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
+            if true_theta is not None and true_theta.shape == theta.shape:
+                theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
+                log.info("Difference between true and fitted theta %f" % theta_err)
+
             log.info("Calculating validation log likelihood for penalty param %s" % penalty_param_str)
             val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin)
             log.info("Validation log likelihood %f" % val_log_lik)
