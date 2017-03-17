@@ -3,6 +3,7 @@
 import os
 import pickle 
 import csv
+import numpy as np
 
 from os.path import join
 from nestly.scons import SConsWrap
@@ -12,6 +13,7 @@ from random import randint
 from matsen_grp_data import CUI_DATA_PATH
 
 MOTIF_LEN = 5
+METADATA = CUI_DATA_PATH + '/meta.csv'
 
 Import('env')
 localenv = env.Clone()
@@ -32,28 +34,18 @@ nest.add(
     [CUI_DATA_PATH],
     create_dir=False)
 
-# Chains and classes
-nest.add(
-    'chain',
-    ['k', 'l']) # no heavy chain in cui data
-
-nest.add(
-    'igclass',
-    lambda c: 'G' if c['chain'] == 'h' else c['chain'].upper(),
-    create_dir=False)
-
 # Nest for processing data
 @nest.add_target_with_env(localenv)
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--data-path',
                c['data_path'],
-               '--chain',
-               c['chain'],
                '--motif-len',
                MOTIF_LEN,
                '--read-from-partis',
                '--impute-ancestors',
+               '--metadata-path',
+               METADATA,
                '--output-genes ${TARGETS[0]}',
                '--output-seqs ${TARGETS[1]}']
 
@@ -61,6 +53,11 @@ def process_data(env, outdir, c):
         [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
         [],
         ' '.join(map(str, cmd)))
+
+# Loci
+nest.add(
+    'locus',
+    ['igk', 'igl']) # no heavy chain in cui data
 
 nest.add(
     'replicate',
@@ -76,23 +73,24 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['survival_FL'])
+    ['survival_L', 'survival_FL'])
 
-# fused lasso seems to take smaller penalties
 nest.add(
-    'penalty_param',
-    lambda c: [".01,.005,.001,.0005,.0001" if c['model_options'] == 'survival_L' else "0.001,0.0001,0.00001"],
-    create_dir=False)
+    'validation_methods',
+    ['none', 'subject', 'clonal_family'])
 
-
-# Nest for model fitting
+# Nest for deciding parameter ranges
 @nest.add_target_with_env(localenv)
-def fit_models(env, outdir, c):
+def tune_parameters(env, outdir, c):
     cmd = []
     if c["model_options"].startswith("survival"):
         cmd = ['python fit_context_model.py',
                '--input-genes ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
+               '--subset-cols',
+               'locus',
+               '--subset-vals',
+               c['locus'],
                '--seed',
                c['seed'],
                '--motif-len',
@@ -100,7 +98,7 @@ def fit_models(env, outdir, c):
                '--solver',
                c['model_options'].replace('survival_', ''),
                '--penalty-params',
-               c['penalty_param'],
+               ".0005,.0001,.00005,.00001,0",
                '--num-cpu-threads',
                10,
                '--num-jobs',
@@ -113,16 +111,11 @@ def fit_models(env, outdir, c):
                1,
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
-    elif c["model_options"] == "basic":
-        cmd = ['python fit_basic_model.py',
-               '--input-genes ${SOURCES[0]}',
-               '--input-seqs ${SOURCES[1]}',
-               '--seed',
-               c['seed'],
-               '--motif-len',
-               MOTIF_LEN,
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+        if c['validation_methods'] is not 'none':
+            cmd += [
+               '--validation-column',
+               c['validation_methods']]
+
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['process_data'],
@@ -141,11 +134,14 @@ def summarize(env, outdir, c):
                 writer = csv.writer(cross_val_file, delimiter=',')
                 writer.writerow('chain penalty-param log-lik num-nonzero'.split())
                 for result in results_list:
-                    writer.writerow([c['chain'], result[0], result[3], result[4]])
+                    num_nonzero = np.count_nonzero(result[1])
+                    writer.writerow([c['chain'], result[0], result[3], num_nonzero])
 
     return env.Command(
         join(outdir, 'cross_val_results.csv'),
-        c['fit_models'],
+        c['tune_parameters'],
         theta_stats,
         control=c)
 
+# Nest for fitting on all data
+# ...
