@@ -126,15 +126,18 @@ def fit_context_model(env, outdir, c):
     cmd = []
     if c["model_options"].startswith("survival"):
         model_option = c["model_options"].replace("survival_", "")
-        penalty_params = np.power(10, np.arange(-1.5, -3.0, step=-0.5)).tolist()
+        penalty_params = np.power(10, np.arange(-3.0, -5.0, step=-0.5)).tolist()
+        tune_ratio= 0.1
         if model_option == "none":
             # Do a one-column lasso with penalty parameter zero
             model_option = "L"
             penalty_params = [0]
+            tune_ratio = 0
         elif model_option == "none4":
             # Do a one-column lasso with penalty parameter zero
             model_option = "L"
             penalty_params = [0]
+            tune_ratio = 0
         elif model_option == "L4":
             model_option = "L"
 
@@ -144,7 +147,7 @@ def fit_context_model(env, outdir, c):
                '--motif-len',
                5,
                '--em-max-iters',
-               5,
+               15,
                '--penalty-params',
                ",".join(map(str, penalty_params)),
                '--num-cpu-threads',
@@ -157,8 +160,10 @@ def fit_context_model(env, outdir, c):
                2,
                '--solver',
                model_option,
+               '--tuning-sample-ratio',
+               tune_ratio,
                per_target_model_str,
-               '--full-train',
+               '--theta-file ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
                '--out-file ${TARGETS[0]}',

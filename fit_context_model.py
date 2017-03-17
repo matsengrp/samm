@@ -27,6 +27,7 @@ from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from likelihood_evaluator import LogLikelihoodEvaluator
 from multinomial_solver import MultinomialSolver
+from method_results import MethodResults
 from common import *
 from read_data import *
 from matsen_grp_data import *
@@ -67,8 +68,8 @@ def parse_args():
         default=1)
     parser.add_argument('--solver',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
-        choices=["CL", "CFL", "L", "FL"],
+        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, SFL = sparse fused lasso,',
+        choices=["CL", "CFL", "L", "FL", "SFL"],
         default="L")
     parser.add_argument('--motif-len',
         type=int,
@@ -94,6 +95,10 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
+    parser.add_argument('--theta-file',
+        type=str,
+        help='true theta file',
+        default='')
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
@@ -105,11 +110,11 @@ def parse_args():
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
-        default=2)
     parser.add_argument('--validation-column',
         type=str,
         default=None,
         help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)')
+        default=10)
     parser.add_argument('--full-train',
         action='store_true',
         help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
@@ -138,7 +143,7 @@ def parse_args():
             args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
     elif args.solver == "L":
         args.problem_solver_cls = SurvivalProblemLasso
-    elif args.solver == "FL":
+    elif args.solver == "FL" or args.solver == "SFL":
         if args.per_target_model:
             raise NotImplementedError()
         else:
@@ -153,7 +158,14 @@ def parse_args():
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
+    args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
+
     return args
+
+def load_true_model(file_name):
+    with open(file_name, "rb") as f:
+        true_theta, probability_matrix = pickle.load(f)
+        return true_theta, probability_matrix
 
 def create_train_val_sets(obs_data, feat_generator, metadata, args):
     if args.validation_column is None:
@@ -226,9 +238,12 @@ def main(args=sys.argv[1:]):
     penalty_params = [float(l) for l in args.penalty_params.split(",")]
     sorted_pen_params = sorted(penalty_params, reverse=True)
 
-    if args.solver == "FL":
+    if args.solver == "SFL":
         # first param is lasso, second one is fused
         pen_params_list = [(p, p/i) for p in sorted_pen_params for i in FUSED_LASSO_PENALTY_RATIO]
+    elif args.solver == "FL":
+        # first param is lasso, second one is fused
+        pen_params_list = [(0, p) for p in sorted_pen_params]
     else:
         pen_params_list = [(p,) for p in sorted_pen_params]
 
@@ -238,6 +253,10 @@ def main(args=sys.argv[1:]):
     # Set the impossible thetas to -inf
     theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
+
+    true_theta = None
+    if args.theta_file != "":
+        true_theta, _ = load_true_model(args.theta_file)
 
     val_set_evaluator = LogLikelihoodEvaluator(
         val_set,
@@ -263,6 +282,7 @@ def main(args=sys.argv[1:]):
     burn_in = args.burn_in
     prev_val_log_lik = -np.inf
     val_log_lik = None
+    best_model = None
     for penalty_params in pen_params_list:
         penalty_param_str = ",".join(map(str, penalty_params))
         log.info("Penalty parameter %s" % penalty_param_str)
@@ -279,6 +299,10 @@ def main(args=sys.argv[1:]):
 
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
+            if true_theta is not None and true_theta.shape == theta.shape:
+                theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
+                log.info("Difference between true and fitted theta %f" % theta_err)
+
             log.info("Calculating validation log likelihood for penalty param %s" % penalty_param_str)
             val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin)
             log.info("Validation log likelihood %f" % val_log_lik)
@@ -295,27 +319,48 @@ def main(args=sys.argv[1:]):
         fitted_prob_vector = None
         if not args.per_target_model:
             fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta)
-            log.info("=== Fitted Probability Vector ===")
-            log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
+
+        curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector, val_log_lik)
 
         # We save the final theta (potentially trained over all the data)
-        results_list.append(
-            (penalty_params, theta, fitted_prob_vector, val_log_lik)
-        )
-        with open(args.out_file, "w") as f:
+        results_list.append(curr_model_results)
+        with open(args.intermediate_out_file, "w") as f:
             pickle.dump(results_list, f)
 
         log.info("==== FINAL theta, penalty param %s ====" % penalty_param_str)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        if len(penalty_params) == 1 and args.tuning_sample_ratio:
-            # Only stop early if we are tuning a single penalty parameter
-            # Decide what to do next - stop or keep searching penalty parameters?
-            if val_log_lik <= prev_val_log_lik:
-                # This penalty parameter is performing worse. We're done!
-                log.info("Stop trying penalty parameters")
-                break
-            prev_val_log_lik = val_log_lik
+        if best_model is None or best_model.val_log_lik < val_log_lik:
+            best_model = curr_model_results
+        elif len(penalty_params) == 1 and args.tuning_sample_ratio:
+            # This model is not better than the previous model.
+            # Stop early if we are tuning a single penalty parameter
+            log.info("Stop trying penalty parameters")
+            break
+
+    if not args.full_train:
+        log.info("Training best model, best parameters %s" % ",".join(map(str, best_model.penalty_params)))
+        # If we didn't do a full training for this best model, do it now
+        best_theta, _ = em_algo.run(
+            theta=best_model.theta,
+            burn_in=burn_in,
+            penalty_params=best_model.penalty_params,
+            max_em_iters=args.em_max_iters,
+            train_and_val=True
+        )
+        best_fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
+        best_model = MethodResults(
+            best_model.penalty_params,
+            best_theta,
+            best_fitted_prob_vector,
+            best_model.val_log_lik,
+        )
+
+    with open(args.out_file, "w") as f:
+        pickle.dump(
+            (best_model.theta, best_model.fitted_prob_vector),
+            f,
+        )
 
         log.info("Validation time: %f" % (time.time() - st))
 
