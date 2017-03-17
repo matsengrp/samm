@@ -23,10 +23,6 @@ def parse_args():
         type=str,
         default=None,
         help='input sequence info')
-    parser.add_argument('--chain',
-        default='h',
-        choices=('h', 'k', 'l'),
-        help='heavy chain or kappa/lambda light chain')
     parser.add_argument('--motif-len',
         type=int,
         help='length of motif (must be odd)',
@@ -41,6 +37,10 @@ def parse_args():
         type=str,
         help='where to write dnapars files, if necessary',
         default='_output')
+    parser.add_argument('--metadata-path',
+        type=str,
+        help='metadata with subject/species/etc information',
+        default=None)
     parser.add_argument('--output-genes',
         type=str,
         help='output germlines info')
@@ -62,8 +62,7 @@ def main(args=sys.argv[1:]):
         os.makedirs(scratch_dir)
 
     if args.read_from_partis:
-        annotations, germlines = get_paths_to_partis_annotations(args.data_path, chain=args.chain)
-        write_partis_data_from_annotations(args.output_genes, args.output_seqs, annotations, inferred_gls=germlines, chain=args.chain)
+        write_partis_data_from_annotations(args.output_genes, args.output_seqs, args.data_path, args.metadata_path)
         if args.impute_ancestors:
             write_data_after_imputing(args.output_genes, args.output_seqs, args.output_genes, args.output_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
     elif args.impute_ancestors:

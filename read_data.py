@@ -5,6 +5,7 @@ import subprocess
 import os.path
 import pickle
 import pandas as pd
+import glob
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -32,35 +33,37 @@ SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new
 SAMPLE_RANDOM = 2
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, motif_len=1):
     """
     Function to read partis annotations csv
 
-    @param annotations_file_names: list of paths to annotations files
-    @param chain: h for heavy, k or l for kappa or lambda light chain
+    @param path_to_annotations: path to annotations files
+    @param metadata: csv file of metadata; if None defaults will be used for chain/species
     @param use_v: use just the V gene or use the whole sequence?
-    @param species: 'human' or 'mouse'
     @param use_np: use nonproductive sequences only
     @param inferred_gls: list of paths to partis-inferred germlines
 
     @write genes to output_genes and seqs to output_seqs
     """
 
-    if not isinstance(annotations_file_names, list):
-        annotations_file_names = [annotations_file_names]
+    partition_info = []
+    with open(metadata, 'r') as metafile:
+        reader = csv.DictReader(metafile)
+        for line in reader:
+            annotations = glob.glob(os.path.join(path_to_annotations, 'partitions', line['dataset']+'*-cluster-annotations.csv'))
+            if not annotations:
+                # no annotations for this dataset (yet?)
+                continue
+            current_info = {}
+            current_info['germline_file'] = os.path.join(path_to_annotations, line['dataset'], 'hmm/germline-sets')
+            current_info['annotations_file'] = annotations
+            current_info['locus'] = line['locus']
+            current_info['species'] = line['species']
+            current_info['group'] = line['group']
+            current_info['subject'] = line['subject']
+            partition_info.append(current_info)
 
-    # read default germline info
-    if inferred_gls is not None:
-        if not isinstance(inferred_gls, list):
-            inferred_gls = [inferred_gls]
-        germlines = {}
-        for germline_file in set(inferred_gls):
-            germlines[germline_file] = glutils.read_glfo(germline_file, locus='ig'+chain)
-    else:
-        glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, locus='ig'+chain)
-        inferred_gls = [None] * len(annotations_file_names)
-
-    seq_header = ['germline_name', 'sequence_name', 'sequence']
+    seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'sequence_name', 'sequence']
 
     seqs_col = 'v_qr_seqs' if use_v else 'seqs'
     gene_col = 'v_gl_seq' if use_v else 'naive_seq'
@@ -79,10 +82,9 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
         gene_writer.writeheader()
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
-        for data_idx, (annotations_file, germline_file) in enumerate(zip(annotations_file_names, inferred_gls)):
-            if germline_file is not None:
-                glfo = germlines[germline_file]
-            with open(annotations_file, "r") as csvfile:
+        for data_idx, data_info in enumerate(partition_info):
+            glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
+            with open(data_info['annotations_file'][0], "r") as csvfile:
                 reader = csv.DictReader(csvfile)
                 for idx, line in enumerate(reader):
                     # add goodies from partis
@@ -102,6 +104,11 @@ def write_partis_data_from_annotations(output_genes, output_seqs, annotations_fi
 
                     for good_idx in good_seq_idx:
                         seq_writer.writerow({'germline_name': gl_name,
+                            'locus': data_info['locus'],
+                            'clonal_family': gl_name,
+                            'species': data_info['species'],
+                            'group': data_info['group'],
+                            'subject': data_info['subject'],
                             'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
                             'sequence': line[seqs_col][good_idx].lower()})
 
@@ -250,7 +257,7 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer = csv.writer(outs)
         seq_writer.writerows(out_seqs)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1):
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, subset_cols=None, subset_vals=None):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
@@ -264,10 +271,14 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1)
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
+    if subset_cols is not None:
+        for col, val in zip(subset_cols, subset_vals):
+            seqs.where(seqs[col] == val, inplace=True)
 
     full_data = pd.merge(genes, seqs, on='germline_name')
 
     obs_data = []
+    metadata = []
     for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
         gl_seq = cluster['germline_sequence'].values[0].lower()
         if sample == 2:
@@ -285,6 +296,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1)
             if obs_seq_mutation.num_mutations > 0:
                 # don't consider pairs where mutations occur in flanking regions
                 obs_data.append(obs_seq_mutation)
+                metadata.append(row)
         else:
             for idx, elt in cluster.iterrows():
                 n_mutes = 0
@@ -300,13 +312,15 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1)
                 if sample == 1 and obs_seq_mutation.num_mutations > 0:
                     # don't consider pairs where mutations occur in flanking regions
                     obs_data.append(obs_seq_mutation)
+                    metadata.append(elt)
                 elif obs_seq_mutation.num_mutations > n_mutes:
                     current_obs_seq_mutation = obs_seq_mutation
 
             if sample == 'sample-highly-mutated':
                 obs_data.append(current_obs_seq_mutation)
+                metadata.append(elt)
 
-    return obs_data
+    return obs_data, metadata
 
 def get_data_statistics_print_lines(obs_data, feat_generator):
     """
