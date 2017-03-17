@@ -20,11 +20,9 @@ class Gibbs_TestCase(unittest.TestCase):
         cls.BURN_IN = 10
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
         motif_list = cls.feat_gen.get_motif_list()
-        motif_list_len = len(motif_list)
 
         cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("attcgtatac", "ataagttatc", cls.motif_len))
 
-        # This generates a theta where columns are repeated
         cls.theta = np.random.rand(cls.feat_gen.feature_vec_len, 1) * 2
         cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
 
