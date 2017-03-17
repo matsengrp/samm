@@ -12,6 +12,7 @@ import csv
 import pickle
 import logging as log
 import time
+import random
 
 import numpy as np
 import scipy.stats
@@ -105,11 +106,23 @@ def parse_args():
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
         default=2)
+    parser.add_argument('--validation-column',
+        type=str,
+        default=None,
+        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)')
     parser.add_argument('--full-train',
         action='store_true',
         help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
     parser.add_argument('--per-target-model',
         action='store_true')
+    parser.add_argument("--subset-cols",
+        type=str,
+        help="comma separated list of what to subset data on (chain, species, etc.)",
+        default=None)
+    parser.add_argument("--subset-vals",
+        type=str,
+        help="comma separated list of values to subset data on (h, mouse, etc.)",
+        default=None)
 
     parser.set_defaults(per_target_model=False, full_train=False)
     args = parser.parse_args()
@@ -142,14 +155,26 @@ def parse_args():
 
     return args
 
-def create_train_val_sets(obs_data, feat_generator, args):
-    num_obs = len(obs_data)
-    val_size = int(args.tuning_sample_ratio * num_obs)
-    if args.tuning_sample_ratio > 0:
-        val_size = max(val_size, 1)
-    permuted_idx = np.random.permutation(num_obs)
-    train_idx = permuted_idx[:num_obs - val_size]
-    val_idx = permuted_idx[num_obs - val_size:]
+def create_train_val_sets(obs_data, feat_generator, metadata, args):
+    if args.validation_column is None:
+        num_obs = len(obs_data)
+        val_size = int(args.tuning_sample_ratio * num_obs)
+        if args.tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+        permuted_idx = np.random.permutation(num_obs)
+        train_idx = permuted_idx[:num_obs - val_size]
+        val_idx = permuted_idx[num_obs - val_size:]
+    else:
+        categories = set([elt[args.validation_column] for elt in metadata])
+        num_categories = len(categories)
+        val_size = int(args.tuning_sample_ratio * num_categories)
+        if args.tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+        val_categories = set(random.sample(categories, val_size))
+        train_categories = categories - val_categories
+        train_idx = [idx for idx, elt in enumerate(metadata) if elt[args.validation_column] in train_categories]
+        val_idx = [idx for idx, elt in enumerate(metadata) if elt[args.validation_column] in val_categories]
+
     train_set = []
     for i in train_idx:
         train_set.append(
@@ -175,8 +200,15 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     log.info("Reading data")
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
-    train_set, val_set = create_train_val_sets(obs_data, feat_generator, args)
+    obs_data, metadata = read_gene_seq_csv_data(
+            args.input_genes,
+            args.input_seqs,
+            motif_len=args.motif_len,
+            sample=args.sample_regime,
+            subset_cols=args.subset_cols.split(","),
+            subset_vals=args.subset_vals.split(",")
+        )
+    train_set, val_set = create_train_val_sets(obs_data, feat_generator, metadata, args)
 
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
