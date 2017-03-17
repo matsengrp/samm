@@ -73,7 +73,7 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['survival_L', 'survival_FL'])
+    ['survival_ref', 'survival_L', 'survival_FL'])
 
 nest.add(
     'validation_methods',
@@ -84,6 +84,14 @@ nest.add(
 def tune_parameters(env, outdir, c):
     cmd = []
     if c["model_options"].startswith("survival"):
+        if c['model_options'] == 'survival_ref':
+            # no penalty
+            solver = 'L'
+            penalty_params = '0'
+        else:
+            solver = c['model_options'].replace('survival_', '')
+            penalty_params = '.0005,.0001,.00005,.00001'
+
         cmd = ['python fit_context_model.py',
                '--input-genes ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
@@ -96,9 +104,9 @@ def tune_parameters(env, outdir, c):
                '--motif-len',
                MOTIF_LEN,
                '--solver',
-               c['model_options'].replace('survival_', ''),
+               solver,
                '--penalty-params',
-               ".0005,.0001,.00005,.00001,0",
+               penalty_params,
                '--num-cpu-threads',
                10,
                '--num-jobs',
@@ -132,10 +140,10 @@ def summarize(env, outdir, c):
         if c["model_options"].startswith("survival"):
             with open(str(target[0]), 'w') as cross_val_file:
                 writer = csv.writer(cross_val_file, delimiter=',')
-                writer.writerow('chain penalty-param log-lik num-nonzero'.split())
+                writer.writerow('chain model validation penalty-param log-lik num-nonzero'.split())
                 for result in results_list:
                     num_nonzero = np.count_nonzero(result[1])
-                    writer.writerow([c['chain'], result[0], result[3], num_nonzero])
+                    writer.writerow([c['chain'], c['model_options'], c['validation_methods'], result[0], result[3], num_nonzero])
 
     return env.Command(
         join(outdir, 'cross_val_results.csv'),
