@@ -1,7 +1,7 @@
 import unittest
 
-from read_data import *
-from matsen_grp_data import *
+from read_data import write_partis_data_from_annotations, read_gene_seq_csv_data
+from matsen_grp_data import CUI_DATA_PATH
 
 class Input_Data_TestCase(unittest.TestCase):
     def test_partis_fns(self):
@@ -14,12 +14,8 @@ class Input_Data_TestCase(unittest.TestCase):
         motif_len = 3
 
         for dataset in [CUI_DATA_PATH]:
-            print 'dataset: ', dataset
-            print 'chain, class, nonproductive reads'
-            for chain in ['k', 'l']:
-                # check light chain
-                annotations, germlines = get_paths_to_partis_annotations(dataset, chain=chain)
-                write_partis_data_from_annotations(temp_genes, temp_seqs, annotations, inferred_gls=germlines, chain=chain)
-                seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
-                print chain, len(seqs)
+            write_partis_data_from_annotations(temp_genes, temp_seqs, dataset, dataset+'/meta.csv')
+            for chain in ['igk', 'igl']:
+                seqs, meta = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len, subset_cols=['locus'], subset_vals=[chain])
+                print chain, len(seqs), len(set([elt['subject'] for elt in meta]))
 
