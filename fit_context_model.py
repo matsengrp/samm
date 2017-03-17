@@ -173,6 +173,9 @@ def create_train_val_sets(obs_data, feat_generator, args):
         val_set.append(
             feat_generator.create_base_features(obs_data[i])
         )
+
+    if args.tuning_sample_ratio > 0:
+        assert(len(val_set) > 0)
     return train_set, val_set
 
 def main(args=sys.argv[1:]):
@@ -228,7 +231,6 @@ def main(args=sys.argv[1:]):
 
     val_set_evaluator = LogLikelihoodEvaluator(
         val_set,
-        args.sampler_cls,
         feat_generator,
         num_jobs=args.num_jobs,
         scratch_dir=scratch_dir,

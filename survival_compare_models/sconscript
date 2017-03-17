@@ -38,7 +38,7 @@ nest.add(
 sim_size_dict = [
     # about 10% of sequence gets mutated
     # {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0},
-    {'size': 'big', 'n_taxa': 5, 'n_germlines': 1000, 'random_gene_len': 400, 'min_censor_time': 1.75},
+    {'size': 'big', 'n_taxa': 1, 'n_germlines': 3000, 'random_gene_len': 300, 'min_censor_time': 1},
 ]
 
 nest.add(

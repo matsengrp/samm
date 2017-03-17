@@ -50,6 +50,8 @@ class SamplerCollection:
         @param num_samples: number of samples to retrieve from each gibbs sampler
         @param burn_in_sweeps: number of samplers to run initially for burn in
         @param get_full_sweep: whether to return all the gibbs samples (so all steps, not just each sweep)
+        @param conditional_partial_order: list of position for a partial mutation order. if non-empty, then
+                                            condition on this conditional_partial_order
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
         """
         rand_seed = get_randint()
@@ -91,17 +93,6 @@ class SamplerPoolWorker(ParallelWorker):
     def __str__(self):
         return "SamplerPoolWorker %s" % self.sampler.obs_seq_mutation
 
-class SamplerResult:
-    def __init__(self, samples, trace):
-        """
-        class returned by Sampler after a run
-
-        @param samples: list of ImputedSequenceMutations
-        @param trace: list of things to plot for trace diagnostics
-        """
-        self.samples = samples
-        self.trace = trace
-
 class Sampler:
     def __init__(self, theta, feature_generator, obs_seq_mutation):
         """
@@ -119,12 +110,3 @@ class Sampler:
         self.seq_len = obs_seq_mutation.seq_len
         self.mutated_positions = obs_seq_mutation.mutation_pos_dict.keys()
         self.num_mutations = len(self.mutated_positions)
-
-    def run(self, init_order, burn_in, num_samples):
-        """
-        @param init_order: a mutation order to initialize the sampler (list of integers)
-        @param burn_in: number of iterations for burn in
-        @param num_samples: number of samples needed
-        @return SamplerResult
-        """
-        raise NotImplementedError

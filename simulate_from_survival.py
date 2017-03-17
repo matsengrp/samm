@@ -242,8 +242,11 @@ def main(args=sys.argv[1:]):
             ]
 
             # write to file in csv format
+            num_mutations = []
             for i, sample in enumerate(full_data_samples):
+                num_mutations.append(len(sample.mutations))
                 seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
+            print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
