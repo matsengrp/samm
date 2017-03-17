@@ -13,7 +13,6 @@ from random import randint
 from matsen_grp_data import CUI_DATA_PATH
 
 MOTIF_LEN = 5
-METADATA = CUI_DATA_PATH + '/meta.csv'
 
 Import('env')
 localenv = env.Clone()
@@ -39,7 +38,7 @@ nest.add(
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--data-path',
-               c['data_path'],
+               c['data_path'] + '/meta.csv',
                '--motif-len',
                MOTIF_LEN,
                '--read-from-partis',
