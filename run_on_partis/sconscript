@@ -38,13 +38,13 @@ nest.add(
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--data-path',
-               c['data_path'] + '/meta.csv',
+               c['data_path'],
                '--motif-len',
                MOTIF_LEN,
                '--read-from-partis',
                '--impute-ancestors',
                '--metadata-path',
-               METADATA,
+               c['data_path'] + '/meta.csv',
                '--output-genes ${TARGETS[0]}',
                '--output-seqs ${TARGETS[1]}']
 

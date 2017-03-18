@@ -204,9 +204,11 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
 
     full_data = pd.merge(genes, seqs, on='germline_name')
 
-    out_genes = [['germline_name', 'germline_sequence']]
-    out_seqs = [['germline_name', 'sequence_name', 'sequence']]
+    out_genes = []
+    out_seqs = []
     for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
+        seqs_line = []
+        genes_line = []
         gl_seq = cluster['germline_sequence'].values[0].lower()
         gl_name = cluster['germline_name'].values[0]
         # Use dnapars to impute nucleotides at intermediate sequences
@@ -217,6 +219,8 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
         seqs_in_cluster = []
         names_in_cluster = []
+        meta_in_cluster = cluster.iloc[0].to_dict()
+        meta_in_cluster.pop('germline_sequence', None)
         for idx, elt in cluster.iterrows():
             proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'])
             proc_seq = re.sub('^n+|n+$', '', proc_seq)
@@ -239,22 +243,44 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
 
             if cmp(seqs_in_cluster[0], proc_gl_seq):
                 # There are mutations so add to output
-                genes_line = [[gl_name, proc_gl_seq]]
-                seqs_line = [[gl_name, names_in_cluster[0], seqs_in_cluster[0]]]
+                genes_line.append({'germline_name': gl_name,
+                    'germline_sequence': proc_gl_seq})
+                current_seq['germline_name'] = gl_name
+                current_seq['sequence_name'] = names_in_cluster[0]
+                current_seq['sequence'] = seqs_in_cluster[0]
+                seqs_line.append(meta_in_cluster)
             else:
                 # No mutations, skip
                 continue
         else:
             # otherwise, take it away dnapars
-            genes_line, seqs_line = impute_ancestors_dnapars(seqs_in_cluster, proc_gl_seq, scratch_dir, gl_name='gene'+str(gl_idx), verbose=verbose)
+            pars_gene, pars_seq = impute_ancestors_dnapars(
+                    seqs_in_cluster,
+                    proc_gl_seq,
+                    scratch_dir,
+                    gl_name='gene'+str(gl_idx),
+                    verbose=verbose
+                )
+            current_seq = meta_in_cluster
+            for seq_line in pars_seq:
+                current_seq['germline_name'] = seq_line[0]
+                current_seq['sequence_name'] = seq_line[1]
+                current_seq['sequence'] = seq_line[2]
+                seqs_line.append(current_seq)
+
+            for gene_line in pars_gene:
+                genes_line.append({'germline_name': gene_line[0],
+                    'germline_sequence': gene_line[1]})
 
         out_genes += genes_line
         out_seqs += seqs_line
 
-    with open(output_genes, 'w') as outg, open(output_seqs, 'w') as outs:
-        gene_writer = csv.writer(outg)
+    with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
+        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values))
+        gene_writer.writeheader()
         gene_writer.writerows(out_genes)
-        seq_writer = csv.writer(outs)
+        seq_writer = csv.DictWriter(seqs_file, list(seqs.columns.values))
+        seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
 
 def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, subset_cols=None, subset_vals=None):
@@ -263,6 +289,8 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
     @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
+    @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
+    @param subset_vals: list of values of these variables to subset on (e.g., ['k', 'mouse'])
 
     @return ObservedSequenceMutations from processed data
     """
@@ -319,6 +347,8 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
             if sample == 'sample-highly-mutated':
                 obs_data.append(current_obs_seq_mutation)
                 metadata.append(elt)
+
+    assert(len(obs_data) == len(metadata))
 
     return obs_data, metadata
 
