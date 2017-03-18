@@ -110,20 +110,21 @@ def parse_args():
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
+        default=10)
     parser.add_argument('--validation-column',
         type=str,
-        default=None,
-        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)')
+        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
+        default=None)
     parser.add_argument('--full-train',
         action='store_true',
         help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
     parser.add_argument('--per-target-model',
         action='store_true')
-    parser.add_argument("--chain",
+    parser.add_argument("--locus",
         type=str,
-        choices=('h','k','l'),
-        help="chain (h, k or l; default h)",
-        default='h')
+        choices=('igh','igk','igl'),
+        help="locus (igh, igk or igl; default igh)",
+        default='igh')
     parser.add_argument("--species",
         type=str,
         choices=('mouse','human'),
@@ -216,7 +217,7 @@ def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_rati
             feat_generator.create_base_features(obs_data[i])
         )
 
-    if args.tuning_sample_ratio > 0:
+    if tuning_sample_ratio > 0:
         assert(len(val_set) > 0)
     return train_set, val_set
 
@@ -237,8 +238,8 @@ def main(args=sys.argv[1:]):
             args.input_seqs,
             motif_len=args.motif_len,
             sample=args.sample_regime,
-            subset_cols=['chain', 'species'],
-            subset_vals=[args.chain, args.species],
+            subset_cols=['locus', 'species'],
+            subset_vals=[args.locus, args.species],
         )
     train_set, val_set = create_train_val_sets(
             obs_data,
