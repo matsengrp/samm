@@ -15,17 +15,17 @@ class Input_Data_TestCase(unittest.TestCase):
         temp_seqs = '_output/seqs.csv'
         motif_len = 3
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
+        seqs, metadata = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample=2)
+        seqs, metadata = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample=2)
         print len(seqs)
 
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample=3)
+        seqs, metadata = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len, sample=3)
         print len(seqs)
 
         write_data_after_imputing(temp_genes, temp_seqs, INPUT_GENES, INPUT_SEQS, motif_len, verbose=False)
-        seqs = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
+        seqs, metadata = read_gene_seq_csv_data(temp_genes, temp_seqs, motif_len)
         print len(seqs)
 
     def test_statistics(self):
@@ -33,6 +33,6 @@ class Input_Data_TestCase(unittest.TestCase):
         motif_len = 3
 
         feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
-        seqs = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
+        seqs, metadata = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
         print get_data_statistics_print_lines(seqs, feat_generator)
 

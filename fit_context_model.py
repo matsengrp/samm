@@ -12,6 +12,7 @@ import csv
 import pickle
 import logging as log
 import time
+import random
 
 import numpy as np
 import scipy.stats
@@ -109,12 +110,25 @@ def parse_args():
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
-        default=10)
+    parser.add_argument('--validation-column',
+        type=str,
+        default=None,
+        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)')
     parser.add_argument('--full-train',
         action='store_true',
         help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
     parser.add_argument('--per-target-model',
         action='store_true')
+    parser.add_argument("--chain",
+        type=str,
+        choices=('h','k','l'),
+        help="chain (h, k or l; default h)",
+        default='h')
+    parser.add_argument("--species",
+        type=str,
+        choices=('mouse','human'),
+        help="species (mouse or human; default human)",
+        default='human')
 
     parser.set_defaults(per_target_model=False, full_train=False)
     args = parser.parse_args()
@@ -154,14 +168,42 @@ def load_true_model(file_name):
         true_theta, probability_matrix = pickle.load(f)
         return true_theta, probability_matrix
 
-def create_train_val_sets(obs_data, feat_generator, args):
-    num_obs = len(obs_data)
-    val_size = int(args.tuning_sample_ratio * num_obs)
-    if args.tuning_sample_ratio > 0:
-        val_size = max(val_size, 1)
-    permuted_idx = np.random.permutation(num_obs)
-    train_idx = permuted_idx[:num_obs - val_size]
-    val_idx = permuted_idx[num_obs - val_size:]
+def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_ratio, validation_column):
+    """
+    @param obs_data: observed mutation data
+    @param feat_generator: submotif feature generator
+    @param metadata: metadata to include variables to perform validation on
+    @param tuning_sample_ratio: ratio of data to place in validation set
+    @param validation_column: variable to perform validation on (if None then sample randomly)
+
+    @return training and validation indices
+    """
+
+    if validation_column is None:
+        # For no validation column just sample data randomly
+        num_obs = len(obs_data)
+        val_size = int(tuning_sample_ratio * num_obs)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+        permuted_idx = np.random.permutation(num_obs)
+        train_idx = permuted_idx[:num_obs - val_size]
+        val_idx = permuted_idx[num_obs - val_size:]
+    else:
+        # For a validation column, sample the categories randomly based on
+        # tuning_sample_ratio
+        categories = set([elt[validation_column] for elt in metadata])
+        num_categories = len(categories)
+        val_size = int(tuning_sample_ratio * num_categories)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+
+        # sample random categories from our validation variable
+        val_categories = set(random.sample(categories, val_size))
+        train_categories = categories - val_categories
+        train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
+        val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
+
+    # construct training and validation sets based on CV regime above
     train_set = []
     for i in train_idx:
         train_set.append(
@@ -190,8 +232,21 @@ def main(args=sys.argv[1:]):
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
     log.info("Reading data")
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
-    train_set, val_set = create_train_val_sets(obs_data, feat_generator, args)
+    obs_data, metadata = read_gene_seq_csv_data(
+            args.input_genes,
+            args.input_seqs,
+            motif_len=args.motif_len,
+            sample=args.sample_regime,
+            subset_cols=['chain', 'species'],
+            subset_vals=[args.chain, args.species],
+        )
+    train_set, val_set = create_train_val_sets(
+            obs_data,
+            feat_generator,
+            metadata,
+            args.tuning_sample_ratio,
+            args.validation_column,
+        )
 
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
@@ -265,6 +320,8 @@ def main(args=sys.argv[1:]):
         )
         burn_in = 0 # Only use burn in at the very beginning
 
+        st = time.time()
+
         # Get log likelihood on the validation set for tuning penalty parameter
         if args.tuning_sample_ratio > 0:
             if true_theta is not None and true_theta.shape == theta.shape:
@@ -329,6 +386,8 @@ def main(args=sys.argv[1:]):
             (best_model.theta, best_model.fitted_prob_vector),
             f,
         )
+
+        log.info("Validation time: %f" % (time.time() - st))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

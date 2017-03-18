@@ -125,7 +125,8 @@ def main(args=sys.argv[1:]):
         prop_list = np.array([proportions[motif_list[i]] for i in range(len(motif_list))])
         probability_matrix = np.array([[probability_dict[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
 
-    pickle.dump((prop_list, probability_matrix), open(args.out_file, 'w'))
+    with open(args.out_file, 'w') as pickle_file:
+        pickle.dump((prop_list, probability_matrix), pickle_file)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
