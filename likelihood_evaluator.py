@@ -21,7 +21,7 @@ class LogLikelihoodEvaluator:
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
 
-    def get_log_lik(self, theta, burn_in=0):
+    def get_log_lik(self, theta, num_samples=10, burn_in=0):
         """
         Get the log likelihood of the data
         @param theta: the model parameter to evaluate this for
@@ -42,7 +42,7 @@ class LogLikelihoodEvaluator:
         num_mutations_approx = int(np.mean([len(m) for m in self.init_orders[:10]]))
         sampler_results = sampler_collection.get_samples(
             self.init_orders,
-            num_mutations_approx * self.NUM_SAMPLES_FACTOR,
+            num_samples,
             burn_in,
             get_full_sweep=True,
         )

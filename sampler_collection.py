@@ -47,7 +47,7 @@ class SamplerCollection:
     def get_samples(self, init_orders_for_iter, num_samples, burn_in_sweeps=0, get_full_sweep=False):
         """
         @param init_orders_for_iter: what order to initialize each gibbs sampler
-        @param num_samples: number of samples to retrieve from each gibbs sampler
+        @param num_samples: number of samples to retrieve from the sampler
         @param burn_in_sweeps: number of samplers to run initially for burn in
         @param get_full_sweep: whether to return all the gibbs samples (so all steps, not just each sweep)
         @param conditional_partial_order: list of position for a partial mutation order. if non-empty, then
