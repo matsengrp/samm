@@ -29,6 +29,10 @@ class Chibs_TestCase(unittest.TestCase):
         self._test_chibs_for_obs_seq_mut(
             ObservedSequenceMutations("attacacgta", "attgggggta", self.motif_len)
         )
+        # Only 1 mutation
+        self._test_chibs_for_obs_seq_mut(
+            ObservedSequenceMutations("attcgta", "attagta", self.motif_len)
+        )
 
     def _test_chibs_for_obs_seq_mut(self, obs_seq_mut):
         obs_seq_m = self.feat_gen.create_base_features(obs_seq_mut)
