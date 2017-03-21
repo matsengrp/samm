@@ -93,6 +93,11 @@ class MutationOrderChibsSampler(Sampler):
             2. partial ordering [3, 8, 2]
             3. mutation ordering [10, 3, 8, 2]
         """
+
+        if self.num_mutations <= 1:
+            # If there are one or fewer mutations the Chibs step is trivial, so output logprob of zero
+            return 0.
+
         log_prob_order_terms = []
 
         ref_partial_order = reference_order[-1:]
@@ -122,15 +127,14 @@ class MutationOrderChibsSampler(Sampler):
                     return None
                 log_prob_order_terms.append(np.log(num_agrees_normalized))
 
-        if self.num_mutations > 1:
-            # Calculate the probability of seeing the full mutation order given a partial ordering of all the other positions
-            # This is done analytically. No need for a gibbs sampler.
-            # First get the probability of all the mutation orders consistent with this partial ordering.
-            _, _, all_log_probs = gibbs_sampler._do_gibbs_step(ref_partial_order, reference_order[0])
-            # Normalize across the probability of all consistent mutation orders to get the probability of the full mutation order
-            # given the n-1 partial ordering
-            log_conditional_prob = all_log_probs[-1] - scipy.misc.logsumexp(all_log_probs)
-            log_prob_order_terms.append(log_conditional_prob)
+        # Calculate the probability of seeing the full mutation order given a partial ordering of all the other positions
+        # This is done analytically. No need for a gibbs sampler.
+        # First get the probability of all the mutation orders consistent with this partial ordering.
+        _, _, all_log_probs = gibbs_sampler._do_gibbs_step(ref_partial_order, reference_order[0])
+        # Normalize across the probability of all consistent mutation orders to get the probability of the full mutation order
+        # given the n-1 partial ordering
+        log_conditional_prob = all_log_probs[-1] - scipy.misc.logsumexp(all_log_probs)
+        log_prob_order_terms.append(log_conditional_prob)
 
         # The final estimate of the log probability is the sum of all the log conditional probabilities
         return np.sum(log_prob_order_terms)
