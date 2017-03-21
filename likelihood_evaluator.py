@@ -38,7 +38,6 @@ class LogLikelihoodEvaluator:
         # Get samples drawn from the distribution P(order | start, end, theta)
         # If num_jobs > 1, will use srun to get jobs!
         # We need a lot of gibbs samples if the number of mutations is high. Let's calculate the number of mutations
-        num_mutations_approx = int(np.mean([len(m) for m in self.init_orders[:10]]))
         sampler_results = sampler_collection.get_samples(
             self.init_orders,
             num_samples,
