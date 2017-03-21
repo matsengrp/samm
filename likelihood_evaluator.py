@@ -6,7 +6,6 @@ class LogLikelihoodEvaluator:
     """
     Evaluates the likelihood of a set of model parameters for the given dataset
     """
-    NUM_SAMPLES_FACTOR = 1000
 
     def __init__(self, obs_data, feat_generator, num_jobs=1, scratch_dir=""):
         """
@@ -21,7 +20,7 @@ class LogLikelihoodEvaluator:
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
 
-    def get_log_lik(self, theta, burn_in=0):
+    def get_log_lik(self, theta, num_samples=1000, burn_in=0):
         """
         Get the log likelihood of the data
         @param theta: the model parameter to evaluate this for
@@ -39,10 +38,9 @@ class LogLikelihoodEvaluator:
         # Get samples drawn from the distribution P(order | start, end, theta)
         # If num_jobs > 1, will use srun to get jobs!
         # We need a lot of gibbs samples if the number of mutations is high. Let's calculate the number of mutations
-        num_mutations_approx = int(np.mean([len(m) for m in self.init_orders[:10]]))
         sampler_results = sampler_collection.get_samples(
             self.init_orders,
-            num_mutations_approx * self.NUM_SAMPLES_FACTOR,
+            num_samples,
             burn_in,
             get_full_sweep=True,
         )
