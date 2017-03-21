@@ -93,6 +93,11 @@ class MutationOrderChibsSampler(Sampler):
             2. partial ordering [3, 8, 2]
             3. mutation ordering [10, 3, 8, 2]
         """
+
+        if self.num_mutations <= 1:
+            # If there are one or fewer mutations the Chibs step is trivial, so output logprob of zero
+            return 0.
+
         log_prob_order_terms = []
 
         ref_partial_order = reference_order[-1:]
