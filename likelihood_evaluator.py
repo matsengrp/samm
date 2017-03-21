@@ -6,7 +6,6 @@ class LogLikelihoodEvaluator:
     """
     Evaluates the likelihood of a set of model parameters for the given dataset
     """
-    NUM_SAMPLES_FACTOR = 1000
 
     def __init__(self, obs_data, feat_generator, num_jobs=1, scratch_dir=""):
         """
@@ -21,7 +20,7 @@ class LogLikelihoodEvaluator:
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
 
-    def get_log_lik(self, theta, num_samples=10, burn_in=0):
+    def get_log_lik(self, theta, num_samples=1000, burn_in=0):
         """
         Get the log likelihood of the data
         @param theta: the model parameter to evaluate this for
