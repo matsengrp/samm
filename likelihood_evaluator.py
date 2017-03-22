@@ -20,7 +20,7 @@ class LogLikelihoodEvaluator:
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
 
-    def get_log_lik(self, theta, num_samples=1000, burn_in=0):
+    def get_log_lik(self, theta, num_samples=100, burn_in=0):
         """
         Get the log likelihood of the data
         @param theta: the model parameter to evaluate this for

@@ -122,14 +122,14 @@ def parse_args():
         action='store_true')
     parser.add_argument("--locus",
         type=str,
-        choices=('igh','igk','igl'),
-        help="locus (igh, igk or igl; default igh)",
-        default='igh')
+        choices=('','igh','igk','igl'),
+        help="locus (igh, igk or igl; default empty)",
+        default='')
     parser.add_argument("--species",
         type=str,
-        choices=('mouse','human'),
-        help="species (mouse or human; default human)",
-        default='human')
+        choices=('','mouse','human'),
+        help="species (mouse or human; default empty)",
+        default='')
 
     parser.set_defaults(per_target_model=False, full_train=False)
     args = parser.parse_args()
@@ -238,8 +238,8 @@ def main(args=sys.argv[1:]):
             args.input_seqs,
             motif_len=args.motif_len,
             sample=args.sample_regime,
-            subset_cols=['locus', 'species'],
-            subset_vals=[args.locus, args.species],
+            locus=args.locus,
+            species=args.species,
         )
     train_set, val_set = create_train_val_sets(
             obs_data,
