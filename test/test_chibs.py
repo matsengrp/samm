@@ -21,6 +21,10 @@ class Chibs_TestCase(unittest.TestCase):
         """
         Check that chibs is calculating the correct marginal log likelihood
         """
+        # Only 1 mutation
+        self._test_chibs_for_obs_seq_mut(
+            ObservedSequenceMutations("attcgta", "attagta", self.motif_len)
+        )
         # Only 2 mutations
         self._test_chibs_for_obs_seq_mut(
             ObservedSequenceMutations("attcgta", "ataagta", self.motif_len)
@@ -28,10 +32,6 @@ class Chibs_TestCase(unittest.TestCase):
         # Many mutations
         self._test_chibs_for_obs_seq_mut(
             ObservedSequenceMutations("attacacgta", "attgggggta", self.motif_len)
-        )
-        # Only 1 mutation
-        self._test_chibs_for_obs_seq_mut(
-            ObservedSequenceMutations("attcgta", "attagta", self.motif_len)
         )
 
     def _test_chibs_for_obs_seq_mut(self, obs_seq_mut):
@@ -41,11 +41,11 @@ class Chibs_TestCase(unittest.TestCase):
         fake_chibs_ll = self.get_log_lik_obs_seq_fake_chibs(
             gibbs_sampler,
             obs_seq_m,
-            num_samples=obs_seq_mut.num_mutations * 5000
+            num_samples=obs_seq_mut.num_mutations * 10000
         )
 
         val_set_evaluator = LogLikelihoodEvaluator([obs_seq_m], self.feat_gen)
-        real_chibs_ll = val_set_evaluator.get_log_lik(self.theta, burn_in=self.burn_in)
+        real_chibs_ll = val_set_evaluator.get_log_lik(self.theta, burn_in=self.burn_in, num_samples=1000)
         self.assertTrue(np.abs(fake_chibs_ll - real_chibs_ll) < 0.01)
 
     def get_log_lik_obs_seq_fake_chibs(self, sampler, obs_seq_m, num_samples=1000):

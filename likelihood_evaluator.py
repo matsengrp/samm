@@ -49,4 +49,5 @@ class LogLikelihoodEvaluator:
 
         data_set_log_lik = [res.log_prob_order - res.log_prob_estimate for res in sampler_results]
         total_log_lik = np.sum(data_set_log_lik)
+        print "total_log_lik", total_log_lik
         return total_log_lik

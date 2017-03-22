@@ -102,7 +102,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.1,0.01,0.001")
+        default="0.1")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -330,7 +330,10 @@ def main(args=sys.argv[1:]):
                 log.info("Difference between true and fitted theta %f" % theta_err)
 
             log.info("Calculating validation log likelihood for penalty param %s" % penalty_param_str)
-            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin)
+            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin, num_samples=25)
+            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin, num_samples=100)
+            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin, num_samples=500)
+            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin, num_samples=1000)
             log.info("Validation log likelihood %f" % val_log_lik)
             if args.full_train:
                 theta, _ = em_algo.run(
