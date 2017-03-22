@@ -283,14 +283,14 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, subset_cols=None, subset_vals=None):
+def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, locus="", species=""):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
     @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
-    @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
-    @param subset_vals: list of values of these variables to subset on (e.g., ['k', 'mouse'])
+    @param locus: locus to subset data on
+    @param species: species to subset data on
 
     @return ObservedSequenceMutations from processed data
     """
@@ -299,9 +299,10 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
-    if subset_cols is not None:
-        for col, val in zip(subset_cols, subset_vals):
-            seqs.where(seqs[col] == val, inplace=True)
+    if locus:
+        seqs.where(seqs["locus"] == locus, inplace=True)
+    if species:
+        seqs.where(seqs["species"] == species, inplace=True)
 
     full_data = pd.merge(genes, seqs, on='germline_name')
 
@@ -402,4 +403,3 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
                 '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
             ]
         )
-
