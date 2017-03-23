@@ -327,7 +327,7 @@ def main(args=sys.argv[1:]):
             if best_model is not None and val_set_evaluator is not None:
                 log.info("Comparing validation log likelihood for penalty param %s" % penalty_param_str)
                 log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(theta)
-                log.info("Validation log likelihood %f" % log_lik_ratio)
+                log.info("Validation log likelihood ratio %f" % log_lik_ratio)
 
             if args.full_train:
                 theta, _ = em_algo.run(
