@@ -30,11 +30,11 @@ def parse_args():
 def main(args=sys.argv[1:]):
     args = parse_args()
     with open(args.input_file, "r") as input_file:
-        workers = pickle.load(input_file)
+        batched_workers = pickle.load(input_file)
 
     results = []
-    for i, worker in enumerate(workers):
-        results.append(worker.run())
+    for i, worker in enumerate(batched_workers.workers):
+        results.append(worker.run(batched_workers.shared_obj))
 
     with open(args.output_file, "w") as output_file:
         pickle.dump(results, output_file)

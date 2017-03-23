@@ -8,6 +8,11 @@ import numpy as np
 
 from common import DEBUG
 
+class BatchParallelWorkers:
+    def __init__(self, workers, shared_obj):
+        self.shared = shared_obj
+        self.workers = workers
+
 class ParallelWorker:
     """
     Stores the information for running something in parallel
@@ -19,7 +24,7 @@ class ParallelWorker:
         """
         raise NotImplementedError()
 
-    def run(self):
+    def run(self, shared_obj):
         """
         Do not implement this function!
         """
@@ -27,13 +32,13 @@ class ParallelWorker:
 
         result = None
         try:
-            result = self.run_worker()
+            result = self.run_worker(shared_obj)
         except Exception as e:
             print "Exception caught in parallel worker: %s" % e
             traceback.print_exc()
         return result
 
-    def run_worker(self):
+    def run_worker(self, shared_obj):
         """
         Implement this function!
         Returns whatever value needed from this task
@@ -94,16 +99,17 @@ class BatchSubmissionManager(ParallelWorkerManager):
     """
     Handles submitting jobs to a job submission system (e.g. slurm)
     """
-    def __init__(self, worker_list, num_approx_batches, worker_folder):
+    def __init__(self, worker_list, shared_obj, num_approx_batches, worker_folder):
         """
         @param worker_list: List of ParallelWorkers
+        @param shared_obj: object shared across parallel workers
         @param num_approx_batches: number of batches to make approximately (might be a bit more)
         @param worker_folder: the folder to make all the results from the workers
         """
         self.batch_worker_cmds = []
         self.batched_workers = [] # Tracks the batched workers if something fails
         self.output_files = []
-        self.create_batch_worker_cmds(worker_list, num_approx_batches, worker_folder)
+        self.create_batch_worker_cmds(worker_list, shared_obj, num_approx_batches, worker_folder)
 
     def run(self):
         self.clean_outputs()
@@ -112,7 +118,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
         self.clean_outputs()
         return res
 
-    def create_batch_worker_cmds(self, worker_list, num_approx_batches, worker_folder):
+    def create_batch_worker_cmds(self, worker_list, shared_obj, num_approx_batches, worker_folder):
         """
         Create commands for submitting to a batch manager
         Pickles the workers as input files to the jobs
@@ -136,7 +142,10 @@ class BatchSubmissionManager(ParallelWorkerManager):
             self.output_files.append(output_file_name)
             with open(input_file_name, "w") as cmd_input_file:
                 # Pickle the worker as input to the job
-                pickle.dump(batched_workers, cmd_input_file)
+                pickle.dump(
+                    BatchParallelWorkers(batched_workers, shared_obj),
+                    cmd_input_file,
+                )
                 cmd_str = "python run_worker.py --input-file %s --output-file %s" % (input_file_name, output_file_name)
                 batch_cmd = CustomCommand(
                     cmd_str,
