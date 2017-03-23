@@ -26,6 +26,7 @@ from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from likelihood_evaluator import LikelihoodComparer
+from likelihood_evaluator import LogLikelihoodEvaluator
 from multinomial_solver import MultinomialSolver
 from method_results import MethodResults
 from common import *
@@ -102,7 +103,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.1,0.01,0.001")
+        default="0.1, 0.01, 0.001")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -115,6 +116,9 @@ def parse_args():
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
         default=100)
+    parser.add_argument('--chibs',
+        action='store_true',
+        help='True = estimate the marginal likelihood via Chibs')
     parser.add_argument('--validation-column',
         type=str,
         help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
@@ -135,7 +139,7 @@ def parse_args():
         help="species (mouse or human; default empty)",
         default='')
 
-    parser.set_defaults(per_target_model=False, full_train=False)
+    parser.set_defaults(per_target_model=False, full_train=False, chibs=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -323,6 +327,16 @@ def main(args=sys.argv[1:]):
             if true_theta is not None and true_theta.shape == theta.shape:
                 theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
                 log.info("Difference between true and fitted theta %f" % theta_err)
+
+            if args.chibs:
+                val_chibs = LogLikelihoodEvaluator(
+                    val_set,
+                    feat_generator,
+                    num_jobs=args.num_jobs,
+                    scratch_dir=scratch_dir,
+                )
+                ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
+                log.info("Chibs log likelihood estimate: %f" % ll_chibs)
 
             if best_model is not None and val_set_evaluator is not None:
                 log.info("Comparing validation log likelihood for penalty param %s" % penalty_param_str)
