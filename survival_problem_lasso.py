@@ -21,7 +21,8 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         """
         @return negative penalized log likelihood
         """
-        return -(1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) - self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1))
+        l1_norm = np.linalg.norm(theta[self.theta_mask,], ord=1) if self.theta_mask is not None else 0
+        return -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) + self.penalty_param * l1_norm
 
     def solve_prox(self, theta, step_size):
         """
@@ -34,5 +35,5 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         @return tuple: negative penalized log likelihood and array of log likelihoods
         """
         log_lik_vec = self._get_log_lik_parallel(theta)
-        lasso_pen = self.penalty_param * np.linalg.norm(theta[self.theta_mask,], ord=1)
-        return -1.0/self.num_samples * log_lik_vec.sum() + lasso_pen, log_lik_vec
+        lasso_pen = np.linalg.norm(theta[self.theta_mask,], ord=1) if self.theta_mask is not None else 0
+        return -1.0/self.num_samples * log_lik_vec.sum() + self.penalty_param * lasso_pen, log_lik_vec

@@ -28,11 +28,11 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, theta_mask, num_threads=1):
+    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, num_threads=1):
         self.feature_generator = feat_generator
         self.samples = samples
         self.theta_mask = theta_mask
-        self.per_target_model = self.theta_mask.shape[1] == NUM_NUCLEOTIDES
+        self.per_target_model = per_target_model
         self.num_samples = len(self.samples)
         self.penalty_params = penalty_params
 
@@ -81,6 +81,17 @@ class SurvivalProblemCustom(SurvivalProblem):
         @return negative penalized log likelihood
         """
         raise NotImplementedError()
+
+    def calculate_log_lik_ratio_vec(self, theta1, theta2):
+        """
+        @param theta: the theta in the numerator
+        @param prev_theta: the theta in the denominator
+        @return the log likelihood ratios between theta and prev_theta for each e-step sample
+        """
+        _, ll_vec1 = self._get_value_parallel(theta1)
+        _, ll_vec2 = self._get_value_parallel(theta2)
+        return ll_vec1 - ll_vec2
+
 
     def _get_log_lik_parallel(self, theta, batch_factor=1):
         """
