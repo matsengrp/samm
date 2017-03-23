@@ -25,7 +25,7 @@ from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
-from likelihood_evaluator import LogLikelihoodEvaluator
+from likelihood_evaluator import LikelihoodComparer
 from multinomial_solver import MultinomialSolver
 from method_results import MethodResults
 from common import *
@@ -111,6 +111,10 @@ def parse_args():
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
         default=10)
+    parser.add_argument('--num-val-samples',
+        type=int,
+        help='Number of burn in iterations when estimating likelihood of validation data',
+        default=100)
     parser.add_argument('--validation-column',
         type=str,
         help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
@@ -285,13 +289,6 @@ def main(args=sys.argv[1:]):
     if args.theta_file != "":
         true_theta, _ = load_true_model(args.theta_file)
 
-    val_set_evaluator = LogLikelihoodEvaluator(
-        val_set,
-        feat_generator,
-        num_jobs=args.num_jobs,
-        scratch_dir=scratch_dir,
-    )
-
     em_algo = MCMC_EM(
         train_set,
         val_set,
@@ -329,9 +326,11 @@ def main(args=sys.argv[1:]):
                 theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
                 log.info("Difference between true and fitted theta %f" % theta_err)
 
-            log.info("Calculating validation log likelihood for penalty param %s" % penalty_param_str)
-            val_log_lik = val_set_evaluator.get_log_lik(theta, burn_in=args.num_val_burnin)
-            log.info("Validation log likelihood %f" % val_log_lik)
+            if best_model is not None and val_set_evaluator is not None:
+                log.info("Comparing validation log likelihood for penalty param %s" % penalty_param_str)
+                log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(theta)
+                log.info("Validation log likelihood %f" % log_lik_ratio)
+
             if args.full_train:
                 theta, _ = em_algo.run(
                     theta=theta,
@@ -356,8 +355,17 @@ def main(args=sys.argv[1:]):
         log.info("==== FINAL theta, penalty param %s ====" % penalty_param_str)
         log.info(get_nonzero_theta_print_lines(theta, motif_list))
 
-        if best_model is None or best_model.val_log_lik < val_log_lik:
+        if best_model is None or log_lik_ratio > 0:
             best_model = curr_model_results
+            val_set_evaluator = LikelihoodComparer(
+                val_set,
+                feat_generator,
+                theta_ref=best_model.theta,
+                num_samples=args.num_val_samples,
+                burn_in=args.num_val_burnin,
+                num_jobs=args.num_jobs,
+                scratch_dir=scratch_dir,
+            )
         elif len(penalty_params) == 1 and args.tuning_sample_ratio:
             # This model is not better than the previous model.
             # Stop early if we are tuning a single penalty parameter

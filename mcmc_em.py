@@ -31,6 +31,7 @@ class MCMC_EM:
         self.num_threads = num_threads
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
+        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES
 
     def run(self, theta, penalty_params=[1], max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """
@@ -88,7 +89,7 @@ class MCMC_EM:
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
-                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_params, self.theta_mask, self.num_threads)
+                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_params, self.per_target_model, self.theta_mask, self.num_threads)
 
                 theta, pen_exp_log_lik, log_lik_diff, lower_bound = problem.solve(
                     init_theta=prev_theta,
