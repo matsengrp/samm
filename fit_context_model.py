@@ -303,8 +303,6 @@ def main(args=sys.argv[1:]):
     )
 
     burn_in = args.burn_in
-    prev_val_log_lik = -np.inf
-    val_log_lik = None
     best_model = None
     for penalty_params in pen_params_list:
         penalty_param_str = ",".join(map(str, penalty_params))
@@ -345,7 +343,7 @@ def main(args=sys.argv[1:]):
         if not args.per_target_model:
             fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta)
 
-        curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector, val_log_lik)
+        curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector)
 
         # We save the final theta (potentially trained over all the data)
         results_list.append(curr_model_results)
@@ -357,6 +355,7 @@ def main(args=sys.argv[1:]):
 
         if best_model is None or log_lik_ratio > 0:
             best_model = curr_model_results
+            log.info("===== Best model so far %s" % best_model)
             val_set_evaluator = LikelihoodComparer(
                 val_set,
                 feat_generator,
@@ -387,7 +386,6 @@ def main(args=sys.argv[1:]):
             best_model.penalty_params,
             best_theta,
             best_fitted_prob_vector,
-            best_model.val_log_lik,
         )
 
     with open(args.out_file, "w") as f:
