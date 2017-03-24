@@ -18,19 +18,8 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
 
     def post_init(self):
         # Calculate the fused lasso indices
-        self.motif_list = self.feature_generator.get_motif_list()
-
-        # We implement the fused penalty in terms of differences of pairs that are stored in these
-        # index lists: the first entry of the first list minus the first entry in the second list, etc.
-        motifs_fused_lasso1 = []
-        motifs_fused_lasso2 = []
-        for i1, m1 in enumerate(self.motif_list):
-            for i2, m2 in enumerate(self.motif_list):
-                if i1 == i2:
-                    continue
-                if get_idx_differ_by_one_character(m1, m2) is not None or is_central_kmer_shared(m1, m2, k=5):
-                    motifs_fused_lasso1.append(i1)
-                    motifs_fused_lasso2.append(i2)
+        self.motif_list = self.feature_generator.motif_list
+        motifs_fused_lasso1, motifs_fused_lasso2 = self.feature_generator.get_similar_motifs()
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)
         self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=np.intc)
 

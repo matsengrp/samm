@@ -91,7 +91,7 @@ def main(args=sys.argv[1:]):
 
     obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
 
-    motif_list = feat_generator.get_motif_list()
+    motif_list = feat_generator.motif_list
 
     mutations = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
     appearances = {motif: 0. for motif in motif_list}

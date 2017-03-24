@@ -16,7 +16,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         cls.motif_len = 5
         cls.BURN_IN = 10
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
-        cls.motif_list = cls.feat_gen.get_motif_list()
+        cls.motif_list = cls.feat_gen.motif_list
         cls.obs = cls.feat_gen.create_base_features(
             ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "aggctcgtattcgctaaaataagcaccag", cls.motif_len)
         )

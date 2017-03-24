@@ -210,7 +210,7 @@ def simulate(args):
 
     # Dump the true thetas=log(lambda*mutability) and substitution probabilities
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
-    motif_list = feat_generator.get_motif_list()
+    motif_list = feat_generator.motif_list
     context_model = MutationModel(args.mutability, args.substitution).context_model
     true_thetas = np.empty((feat_generator.feature_vec_len, 1))
     probability_matrix = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))

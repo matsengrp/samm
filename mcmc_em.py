@@ -22,7 +22,7 @@ class MCMC_EM:
         self.train_data = train_data
         self.val_data = val_data
         self.feat_generator = feat_generator
-        self.motif_list = self.feat_generator.get_motif_list()
+        self.motif_list = self.feat_generator.motif_list
         self.base_num_e_samples = base_num_e_samples
         self.max_m_iters = max_m_iters
         self.sampler_cls = sampler_cls

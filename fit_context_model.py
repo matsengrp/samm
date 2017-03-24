@@ -267,7 +267,7 @@ def main(args=sys.argv[1:]):
 
     log.info("Running EM")
 
-    motif_list = feat_generator.get_motif_list()
+    motif_list = feat_generator.motif_list
 
     # Run EM on the lasso parameters from largest to smallest
     penalty_params = [float(l) for l in args.penalty_params.split(",")]

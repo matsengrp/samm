@@ -188,8 +188,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         prev_feat_mut_step = feat_mut_steps[0]
         for i, feat_mut_step in enumerate(feat_mut_steps[1:]):
             nonzero_rows = features_per_step_matrix[:,i].nonzero()[0]
-            # All the features are very similar between risk groups - copy first
-            features_per_step_matrix[nonzero_rows,i + 1] = features_per_step_matrix[nonzero_rows,i]
+            if nonzero_rows.size:
+                # All the features are very similar between risk groups - copy first
+                features_per_step_matrix[nonzero_rows,i + 1] = features_per_step_matrix[nonzero_rows,i]
 
             # Remove feature corresponding to position that mutated already
             features_per_step_matrix[prev_feat_mut_step.mutating_pos_feat, i + 1] -= 1
