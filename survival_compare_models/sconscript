@@ -6,8 +6,9 @@ from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
-
 import numpy as np
+
+from matsen_grp_data import SCRATCH_DIR
 
 Import('env')
 localenv = env.Clone()
@@ -163,6 +164,8 @@ def fit_context_model(env, outdir, c):
                '--tuning-sample-ratio',
                tune_ratio,
                per_target_model_str,
+               '--scratch-directory',
+               SCRATCH_DIR,
                '--theta-file ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
                '--input-genes ${SOURCES[2]}',
