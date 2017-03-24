@@ -143,6 +143,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
         The commands specify the output file names for each job - read these output files
         to retrieve the results from the jobs
         """
+        self.shared_obj = shared_obj
         num_workers = len(worker_list)
         num_per_batch = max(num_workers/num_approx_batches, 1)
         for batch_idx, start_idx in enumerate(range(0, num_workers, num_per_batch)):
@@ -188,7 +189,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
                 traceback.print_exc()
                 print "Rerunning locally -- could not load pickle files %s" % f
                 # Now let's try to recover by running the worker
-                res = [w.run() for w in self.batched_workers[i]]
+                res = [w.run(self.shared_obj) for w in self.batched_workers[i]]
 
             for j, r in enumerate(res):
                 if r is None:
