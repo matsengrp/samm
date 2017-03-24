@@ -50,7 +50,7 @@ class SamplerCollection:
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
         """
         rand_seed = get_randint()
-        shared_obj = SamplerPoolWorkerShared(self.theta, self.feat_generator, num_samples, burn_in_sweeps, get_full_sweep)
+        shared_obj = SamplerPoolWorkerShared(self.sampler_cls, self.theta, self.feat_generator, num_samples, burn_in_sweeps, get_full_sweep)
         worker_list = [
             SamplerPoolWorker(rand_seed + i, obs_data, init_order)
             for i, (obs_data, init_order) in enumerate(zip(self.observed_data, init_orders_for_iter))
@@ -65,14 +65,18 @@ class SamplerCollection:
             self.pool.close()
             self.pool.join()
         else:
-            sampled_orders_list = [worker.run() for worker in worker_list]
+            sampled_orders_list = [worker.run(shared_obj) for worker in worker_list]
 
         return sampled_orders_list
 
 class SamplerPoolWorkerShared:
-    def __init__(self, theta, feat_generator, num_samples, burn_in_sweeps, get_full_sweep):
+    def __init__(self, sampler_cls, theta, feat_generator, num_samples, burn_in_sweeps, get_full_sweep):
+        self.sampler_cls = sampler_cls
         self.theta = theta
         self.feat_generator = feat_generator
+        self.num_samples = num_samples
+        self.burn_in_sweeps = burn_in_sweeps
+        self.get_full_sweep = get_full_sweep
 
 class SamplerPoolWorker(ParallelWorker):
     """

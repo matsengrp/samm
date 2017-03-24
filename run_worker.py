@@ -33,7 +33,7 @@ def main(args=sys.argv[1:]):
         batched_workers = pickle.load(input_file)
 
     results = []
-    for i, worker in enumerate(batched_workers.workers):
+    for worker in batched_workers.workers:
         results.append(worker.run(batched_workers.shared_obj))
 
     with open(args.output_file, "w") as output_file:

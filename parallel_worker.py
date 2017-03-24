@@ -10,8 +10,8 @@ from common import DEBUG
 
 class BatchParallelWorkers:
     def __init__(self, workers, shared_obj):
-        self.shared = shared_obj
         self.workers = workers
+        self.shared_obj = shared_obj
 
 class ParallelWorker:
     """
@@ -26,6 +26,8 @@ class ParallelWorker:
 
     def run(self, shared_obj):
         """
+        @param shared_obj: an object that is taken in - shared among ParallelWorkers
+
         Do not implement this function!
         """
         np.random.seed(self.seed)
@@ -40,6 +42,8 @@ class ParallelWorker:
 
     def run_worker(self, shared_obj):
         """
+        @param shared_obj: an object that is taken in - shared among ParallelWorkers
+
         Implement this function!
         Returns whatever value needed from this task
         """
@@ -63,37 +67,51 @@ class MultiprocessingManager(ParallelWorkerManager):
     Handles submitting jobs to a multiprocessing pool
     So runs ParallelWorkers using multiple CPUs on the same machine
     """
-    def __init__(self, pool, worker_list):
+    def __init__(self, pool, worker_list, shared_obj=None, num_approx_batches=1):
         """
         @param worker_list: List of ParallelWorkers
+        @param shared_obj: shared object between workers - useful to minimize disk space usage
+        @param num_approx_batches: number of batches to split across processes (might be a bit more)
         """
         self.pool = pool
-        self.worker_list = worker_list
+
+        # Batch commands together
+        num_workers = len(worker_list)
+        num_per_batch = max(num_workers/num_approx_batches, 1)
+        self.batched_workers_list = []
+        for batch_idx, start_idx in enumerate(range(0, num_workers, num_per_batch)):
+            batched_workers = worker_list[start_idx:start_idx + num_per_batch]
+            self.batched_workers_list.append(
+                BatchParallelWorkers(batched_workers, shared_obj)
+            )
 
     def run(self):
         try:
             # Note that multiprocessing pool will already batch things for you
-            results_raw = self.pool.map(run_multiprocessing_worker, self.worker_list)
+            results_raw = self.pool.map(run_multiprocessing_worker, self.batched_workers_list)
         except Exception as e:
             print "Error occured when trying to process workers in parallel %s" % e
             # Just do it all one at a time instead
-            results_raw = map(run_multiprocessing_worker, self.worker_list)
+            results_raw = map(run_multiprocessing_worker, self.batched_workers_list)
 
         results = []
         for i, r in enumerate(results_raw):
             if r is None:
-                print "WARNING: multiprocessing worker for this worker failed %s" % self.worker_list[i]
+                print "WARNING: multiprocessing worker for this worker failed %s" % self.batched_workers_list[i]
             else:
-                results.append(r)
+                results += r
         return results
 
-def run_multiprocessing_worker(worker):
+def run_multiprocessing_worker(batched_workers):
     """
-    @param worker: Worker
+    @param batched_workers: BatchParallelWorkers
     Function called on each worker process, used by MultiprocessingManager
     Note: this must be a global function
     """
-    return worker.run()
+    results = []
+    for worker in batched_workers.workers:
+        results.append(worker.run(batched_workers.shared_obj))
+    return results
 
 class BatchSubmissionManager(ParallelWorkerManager):
     """
@@ -102,7 +120,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
     def __init__(self, worker_list, shared_obj, num_approx_batches, worker_folder):
         """
         @param worker_list: List of ParallelWorkers
-        @param shared_obj: object shared across parallel workers
+        @param shared_obj: object shared across parallel workers - useful to minimize disk space usage
         @param num_approx_batches: number of batches to make approximately (might be a bit more)
         @param worker_folder: the folder to make all the results from the workers
         """

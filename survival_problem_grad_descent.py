@@ -52,7 +52,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         raise NotImplementedError()
 
-    def _create_precalc_data_parallel(self, samples, batch_factor=10):
+    def _create_precalc_data_parallel(self, samples, batch_factor=4):
         """
         calculate the precalculated data for each sample in parallel
         """
@@ -70,10 +70,10 @@ class SurvivalProblemCustom(SurvivalProblem):
             ) for i, sample in enumerate(samples)
         ]
         if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list)
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list, num_approx_batches=self.num_threads * batch_factor)
             precalc_data = multiproc_manager.run()
         else:
-            precalc_data = [worker.run() for worker in worker_list]
+            precalc_data = [worker.run(None) for worker in worker_list]
         return precalc_data
 
     def get_value(self, theta):
@@ -93,7 +93,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         return ll_vec1 - ll_vec2
 
 
-    def _get_log_lik_parallel(self, theta, batch_factor=1):
+    def _get_log_lik_parallel(self, theta, batch_factor=2):
         """
         @param theta: the theta to calculate the likelihood for
         @param batch_factor: When using multiprocessing, we batch the samples together for speed
@@ -106,14 +106,18 @@ class SurvivalProblemCustom(SurvivalProblem):
         exp_theta = np.exp(theta)
         rand_seed = get_randint()
         worker_list = [
-            ObjectiveValueWorker(rand_seed + i, exp_theta, sample_data)
-            for i, sample_data in enumerate(self.precalc_data)
+            ObjectiveValueWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list)
+            multiproc_manager = MultiprocessingManager(
+                self.pool,
+                worker_list,
+                shared_obj=exp_theta,
+                num_approx_batches=self.num_threads * batch_factor,
+            )
             ll = multiproc_manager.run()
         else:
-            ll = [worker.run() for worker in worker_list]
+            ll = [worker.run(exp_theta) for worker in worker_list]
         return np.array(ll)
 
     def _get_gradient_log_lik(self, theta, batch_factor=2):
@@ -130,14 +134,18 @@ class SurvivalProblemCustom(SurvivalProblem):
         exp_thetaT = np.exp(theta).T
         rand_seed = get_randint()
         worker_list = [
-            GradientWorker(rand_seed + i, exp_thetaT, sample_data)
-            for i, sample_data in enumerate(self.precalc_data)
+            GradientWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list)
+            multiproc_manager = MultiprocessingManager(
+                self.pool,
+                worker_list,
+                shared_obj=exp_thetaT,
+                num_approx_batches=self.num_threads * batch_factor,
+            )
             l = multiproc_manager.run()
         else:
-            l = [worker.run() for worker in worker_list]
+            l = [worker.run(exp_thetaT) for worker in worker_list]
 
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
@@ -278,8 +286,9 @@ class PrecalcDataWorker(ParallelWorker):
         self.num_features = num_features
         self.per_target_model = per_target_model
 
-    def run_worker(self):
+    def run_worker(self, shared_obj=None):
         """
+        @param shared_obj: ignored object
         @return SamplePrecalcData
         """
         return SurvivalProblemCustom.get_precalc_data(self.sample, self.feat_mut_steps, self.num_features, self.per_target_model)
@@ -288,20 +297,19 @@ class GradientWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, seed, exp_thetaT, sample_data):
+    def __init__(self, seed, sample_data):
         """
-        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
         @param sample_data: class SamplePrecalcData
         """
         self.seed = seed
-        self.exp_thetaT = exp_thetaT
         self.sample_data = sample_data
 
-    def run_worker(self):
+    def run_worker(self, exp_thetaT):
         """
+        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
         @return the gradient of the log likelihood for this sample
         """
-        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(self.exp_thetaT, self.sample_data)
+        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(exp_thetaT, self.sample_data)
 
     def __str__(self):
         return "GradientWorker %s" % self.sample_data.init_feat_counts
@@ -310,20 +318,19 @@ class ObjectiveValueWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
     """
-    def __init__(self, seed, exp_theta, sample_data):
+    def __init__(self, seed, sample_data):
         """
-        @param exp_theta: theta is where to take the gradient of the total log likelihood, exp_theta is exp(theta)
         @param sample: SamplePrecalcData
         """
         self.seed = seed
-        self.exp_theta = exp_theta
         self.sample_data = sample_data
 
-    def run_worker(self):
+    def run_worker(self, exp_theta):
         """
+        @param exp_theta: the exp of theta
         @return the log likelihood for this sample
         """
-        return SurvivalProblemCustom.calculate_per_sample_log_lik(self.exp_theta, self.sample_data)
+        return SurvivalProblemCustom.calculate_per_sample_log_lik(exp_theta, self.sample_data)
 
     def __str__(self):
         return "ObjectiveValueWorker %s" % self.sample_data.init_feat_counts
