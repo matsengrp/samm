@@ -163,6 +163,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
                 cPickle.dump(
                     BatchParallelWorkers(batched_workers, shared_obj),
                     cmd_input_file,
+                    protocol=cPickle.HIGHEST_PROTOCOL,
                 )
                 cmd_str = "python run_worker.py --input-file %s --output-file %s" % (input_file_name, output_file_name)
                 batch_cmd = CustomCommand(

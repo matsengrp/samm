@@ -1,8 +1,10 @@
+import time
 import numpy as np
 from sampler_collection import SamplerCollection
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from mutation_order_chibs import MutationOrderChibsSampler
 from survival_problem_lasso import SurvivalProblemLasso
+import logging as log
 from common import *
 
 class LikelihoodComparer:
@@ -31,6 +33,8 @@ class LikelihoodComparer:
         self.theta_ref = theta_ref
         per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES
 
+        log.info("Creating likelihood comparer")
+        st_time = time.time()
         sampler_collection = SamplerCollection(
             obs_data,
             self.theta_ref,
@@ -47,6 +51,7 @@ class LikelihoodComparer:
             num_samples,
             burn_in,
         )
+        log.info("Finished getting samples, time %s" % (time.time() - st_time))
 
         # Setup a problem so that we can extract the log likelihood ratio
         self.prob = SurvivalProblemLasso(
