@@ -34,7 +34,7 @@ def main(args=sys.argv[1:]):
         results.append(worker.run(batched_workers.shared_obj))
 
     with open(args.output_file, "w") as output_file:
-        cPickle.dump(results, output_file)
+        cPickle.dump(results, output_file, protocol=cPickle.HIGHEST_PROTOCOL)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
