@@ -17,7 +17,7 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
 
     def post_init(self):
         # Calculate the fused lasso indices
-        motif_list = self.feature_generator.get_motif_list()
+        motif_list = self.feature_generator.motif_list
         fused_lasso_pen = 0
         # We implement the fused penalty in terms of differences of pairs that are stored in these
         # index lists: the first entry of the first list minus the first entry in the second list, etc.

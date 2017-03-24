@@ -3,6 +3,7 @@ import numpy as np
 import itertools
 import scipy.sparse
 import re
+import logging as log
 
 from common import *
 from feature_generator import *
@@ -18,8 +19,11 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         self.half_motif_len = motif_len/2
         self.feature_vec_len = np.power(4, motif_len)
 
-        motif_list = self.get_motif_list()
-        self.motif_dict = {motif: i for i, motif in enumerate(motif_list)}
+        self.motif_list = self._get_motif_list()
+        self.motif_dict = {motif: i for i, motif in enumerate(self.motif_list)}
+
+        self.motifs_fused_lasso1 = []
+        self.motifs_fused_lasso2 = []
 
     def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
         feat_vec_dict = dict()
@@ -300,6 +304,61 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return self.motif_dict[submotif]
 
-    def get_motif_list(self):
+    def _get_motif_list(self):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
         return ["".join(m) for m in motif_list]
+
+    def get_similar_motifs(self, central_ks=[5]):
+        """
+        @param central_ks: a list of lengths of the central k-mer. Any motifs that share this central k-mer should be
+                            fused together.
+
+        @return two list of motifs that should be fused together (list1 index i fuses with list2 index i). Motifs
+                that differ by one character should be fused together. Also fuses motifs that share central k-mers.
+        """
+        def _add_grouped_motifs(linked_motifs, grouped_motifs):
+            for k, motif_idx_list in grouped_motifs.iteritems():
+                for k, m1 in enumerate(motif_idx_list[:-1]):
+                    for m2 in motif_idx_list[k+1:]:
+                        linked_motifs.add((m1, m2))
+
+        # We implement the fused penalty in terms of differences of pairs that are stored in these
+        # index lists: the first entry of the first list minus the first entry in the second list, etc.
+        if len(self.motifs_fused_lasso1) == 0:
+            log.info("Finding similar motifs")
+
+            linked_motifs = set()
+
+            # Find motifs that differ by one character
+            # Drop the i-th position in the motif and group motifs together by the remaining characters
+            for i in range(self.motif_len):
+                motifs_diff_one = dict()
+                for motif_idx, m in enumerate(self.motif_list):
+                    drop_i_motif = m[:i] + m[i+1:]
+                    if drop_i_motif not in motifs_diff_one:
+                        motifs_diff_one[drop_i_motif] = [motif_idx]
+                    else:
+                        motifs_diff_one[drop_i_motif].append(motif_idx)
+
+                _add_grouped_motifs(linked_motifs, motifs_diff_one)
+
+            # Find motifs that share central k-mer
+            if self.motif_len > 5:
+                for k in central_ks:
+                    if k < self.motif_len:
+                        offset = (self.motif_len - k)/2
+                        motifs_same_center = dict()
+                        for motif_idx, m in enumerate(self.motif_list):
+                            center_motif = m[offset:-offset]
+                            if center_motif not in motifs_same_center:
+                                motifs_same_center[center_motif] = [motif_idx]
+                            else:
+                                motifs_same_center[center_motif].append(motif_idx)
+
+                        _add_grouped_motifs(linked_motifs, motifs_same_center)
+
+            for (m1, m2) in linked_motifs:
+                self.motifs_fused_lasso1.append(m1)
+                self.motifs_fused_lasso2.append(m2)
+
+        return self.motifs_fused_lasso1, self.motifs_fused_lasso2

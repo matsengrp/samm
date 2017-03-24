@@ -209,7 +209,7 @@ def main(args=sys.argv[1:]):
     np.random.seed(args.seed)
 
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
-    motif_list = feat_generator.get_motif_list()
+    motif_list = feat_generator.motif_list
 
     true_thetas, probability_matrix, nonzero_motifs = _generate_true_parameters(motif_list, args)
 

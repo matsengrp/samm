@@ -319,6 +319,23 @@ def get_idx_differ_by_one_character(s1, s2):
             idx_differ = i
     return idx_differ
 
+def is_central_kmer_shared(s1, s2, k=5):
+    """
+    Return if central k-mer matches
+    @param k: must be odd
+    """
+    if k % 2 == 0:
+        return False
+
+    str_len = len(s1)
+    if str_len - k <= 0:
+        return False
+    else:
+        offset = (str_len - k)/2
+        central1 = s1[offset:-offset]
+        central2 = s2[offset:-offset]
+        return central1 == central2
+
 def get_target_col(sample, mutation_pos):
     """
     @param sample: ObservedSequenceMutations

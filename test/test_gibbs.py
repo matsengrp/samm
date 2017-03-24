@@ -19,7 +19,7 @@ class Gibbs_TestCase(unittest.TestCase):
         cls.motif_len = 3
         cls.BURN_IN = 10
         cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
-        motif_list = cls.feat_gen.get_motif_list()
+        motif_list = cls.feat_gen.motif_list
 
         cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("attcgtatac", "ataagttatc", cls.motif_len))
 
@@ -28,7 +28,7 @@ class Gibbs_TestCase(unittest.TestCase):
 
         # This generates a theta with random entries
         cls.multi_theta = np.random.rand(cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
-        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.get_motif_list(), cls.multi_theta.shape)
+        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.motif_list, cls.multi_theta.shape)
         cls.multi_theta[~theta_mask] = -np.inf
         cls.multi_gibbs_sampler = MutationOrderGibbsSampler(cls.multi_theta, cls.feat_gen, cls.obs_seq_m)
 

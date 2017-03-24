@@ -19,7 +19,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
 
         cls.theta_g = np.random.rand(cls.feature_vec_len)
 
-        motif_list = feat_gen.get_motif_list()
+        motif_list = feat_gen.motif_list
         cls.fuse_idx1, cls.fuse_idx2 = cls._get_fuse_indices(motif_list)
 
     @classmethod
