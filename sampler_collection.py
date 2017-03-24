@@ -32,17 +32,12 @@ class SamplerCollection:
         """
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
-
         self.num_threads = num_threads
 
-        self.samplers = [
-            sampler_cls(
-                theta,
-                feat_generator,
-                obs_seq,
-            )
-            for obs_seq in observed_data
-        ]
+        self.sampler_cls = sampler_cls
+        self.theta = theta
+        self.feat_generator = feat_generator
+        self.observed_data = observed_data
 
     def get_samples(self, init_orders_for_iter, num_samples, burn_in_sweeps=0, get_full_sweep=False):
         """
@@ -55,13 +50,13 @@ class SamplerCollection:
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
         """
         rand_seed = get_randint()
-
+        shared_obj = SamplerPoolWorkerShared(self.sampler_cls, self.theta, self.feat_generator, num_samples, burn_in_sweeps, get_full_sweep)
         worker_list = [
-            SamplerPoolWorker(rand_seed + i, sampler, init_order, num_samples, burn_in_sweeps, get_full_sweep)
-            for i, (sampler, init_order) in enumerate(zip(self.samplers, init_orders_for_iter))
+            SamplerPoolWorker(rand_seed + i, obs_data, init_order)
+            for i, (obs_data, init_order) in enumerate(zip(self.observed_data, init_orders_for_iter))
         ]
         if self.num_jobs is not None and self.num_jobs > 1:
-            batch_manager = BatchSubmissionManager(worker_list, self.num_jobs, os.path.join(self.scratch_dir, "gibbs_workers"))
+            batch_manager = BatchSubmissionManager(worker_list, shared_obj, self.num_jobs, os.path.join(self.scratch_dir, "gibbs_workers"))
             sampled_orders_list = batch_manager.run()
         elif self.num_threads is not None and self.num_threads > 1:
             self.pool = Pool(self.num_threads)
@@ -70,24 +65,35 @@ class SamplerCollection:
             self.pool.close()
             self.pool.join()
         else:
-            sampled_orders_list = [worker.run() for worker in worker_list]
+            sampled_orders_list = [worker.run(shared_obj) for worker in worker_list]
 
         return sampled_orders_list
+
+class SamplerPoolWorkerShared:
+    def __init__(self, sampler_cls, theta, feat_generator, num_samples, burn_in_sweeps, get_full_sweep):
+        self.sampler_cls = sampler_cls
+        self.theta = theta
+        self.feat_generator = feat_generator
+        self.num_samples = num_samples
+        self.burn_in_sweeps = burn_in_sweeps
+        self.get_full_sweep = get_full_sweep
 
 class SamplerPoolWorker(ParallelWorker):
     """
     Stores the information for running a sampler
     """
-    def __init__(self, seed, sampler, init_order, num_samples, burn_in_sweeps, get_full_sweep):
+    def __init__(self, seed, obs_seq, init_order):
         self.seed = seed
-        self.sampler = sampler
-        self.num_samples = num_samples
-        self.burn_in_sweeps = burn_in_sweeps
+        self.obs_seq = obs_seq
         self.init_order = init_order
-        self.get_full_sweep = get_full_sweep
 
-    def run_worker(self):
-        sampler_res = self.sampler.run(self.init_order, self.burn_in_sweeps, self.num_samples, self.get_full_sweep)
+    def run_worker(self, shared_obj):
+        sampler = shared_obj.sampler_cls(
+            shared_obj.theta,
+            shared_obj.feat_generator,
+            self.obs_seq
+        )
+        sampler_res = sampler.run(self.init_order, shared_obj.burn_in_sweeps, shared_obj.num_samples, shared_obj.get_full_sweep)
         return sampler_res
 
     def __str__(self):
