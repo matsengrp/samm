@@ -129,7 +129,7 @@ class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
         @param max_iters: ignored
         @param num_threads: ignored
         """
-        motif_list = self.feature_generator.get_motif_list()
+        motif_list = self.feature_generator.motif_list
 
         theta = Variable(self.feature_generator.feature_vec_len)
         obj = 0

@@ -72,7 +72,7 @@ def main(args=sys.argv[1:]):
 
     # Read in the results from the shmulate model-fitter
     feat_gen = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
-    motif_list = feat_gen.get_motif_list()
+    motif_list = feat_gen.motif_list
     # Read target matrix
     target_motif_dict = dict()
     with open(args.model_pkl.replace(".pkl", "_target.csv"), "r") as model_file:

@@ -103,6 +103,10 @@ def parse_args():
         type=str,
         help="penalty parameters, comma separated",
         default="0.1, 0.01, 0.001")
+    parser.add_argument("--fuse-center",
+        type=str,
+        help="center motif lengths, comma separated",
+        default="")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -166,6 +170,13 @@ def parse_args():
         args.theta_num_col = 1
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
+
+    if args.fuse_center and args.problem_solver_cls != SurvivalProblemLasso:
+        args.fuse_center = [int(k) for k in args.fuse_center.split(",")]
+        for k in args.fuse_center:
+            assert(k % 2 == 1) # all center fusions must be odd length
+    else:
+        args.fuse_center = []
 
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
@@ -324,7 +335,7 @@ def main(args=sys.argv[1:]):
 
     log.info("Running EM")
 
-    motif_list = feat_generator.get_motif_list()
+    motif_list = feat_generator.motif_list
 
     # Run EM on the lasso parameters from largest to smallest
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
@@ -362,6 +373,7 @@ def main(args=sys.argv[1:]):
                 burn_in=burn_in,
                 penalty_params=penalty_params,
                 max_em_iters=args.em_max_iters,
+                fuse_center=args.fuse_center,
                 train_and_val=False
             )
             burn_in = 0 # Only use burn in at the very beginning

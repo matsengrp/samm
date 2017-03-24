@@ -2,7 +2,7 @@ import time
 from multiprocessing import Pool
 import numpy as np
 import scipy as sp
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, dok_matrix
 
 import logging as log
 from survival_problem import SurvivalProblem
@@ -28,17 +28,17 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, num_threads=1):
+    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_center=[], num_threads=1):
         self.feature_generator = feat_generator
         self.samples = samples
         self.theta_mask = theta_mask
         self.per_target_model = per_target_model
         self.num_samples = len(self.samples)
         self.penalty_params = penalty_params
+        self.fuse_center = fuse_center
 
         self.num_threads = num_threads
         self.pool = Pool(self.num_threads)
-
         self.precalc_data = self._create_precalc_data_parallel(samples)
 
         self.post_init()
@@ -181,14 +181,16 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         # Get the grad component from grad of log(sum(exp(psi * theta)))
         # This matrix is just the number of times we saw each feature in the risk group
-        features_per_step_matrix = np.zeros((
+        features_per_step_matrix = dok_matrix((
             num_features,
             sample.obs_seq_mutation.num_mutations
-        ))
+        ), dtype=np.int16)
         prev_feat_mut_step = feat_mut_steps[0]
         for i, feat_mut_step in enumerate(feat_mut_steps[1:]):
-            # All the features are very similar between risk groups - copy first
-            features_per_step_matrix[:,i + 1] = features_per_step_matrix[:,i]
+            nonzero_rows = features_per_step_matrix[:,i].nonzero()[0]
+            if nonzero_rows.size:
+                # All the features are very similar between risk groups - copy first
+                features_per_step_matrix[nonzero_rows,i + 1] = features_per_step_matrix[nonzero_rows,i]
 
             # Remove feature corresponding to position that mutated already
             features_per_step_matrix[prev_feat_mut_step.mutating_pos_feat, i + 1] -= 1

@@ -17,7 +17,7 @@ class Survival_Problem_TestCase(unittest.TestCase):
         penalty_param = 0.5
 
         feat_gen = SubmotifFeatureGenerator(motif_len)
-        motif_list = feat_gen.get_motif_list()
+        motif_list = feat_gen.motif_list
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
         theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
         theta[~theta_mask] = -np.inf

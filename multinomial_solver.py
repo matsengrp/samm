@@ -25,7 +25,7 @@ class MultinomialSolver:
         @return MLE of a multinomial distribution
         """
         motif_len = feat_generator.motif_len
-        motif_list = feat_generator.get_motif_list()
+        motif_list = feat_generator.motif_list
 
         motif_classes = []
         motif_to_motif_class_dict = dict()
