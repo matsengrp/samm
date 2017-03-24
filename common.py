@@ -88,6 +88,19 @@ def get_randint():
     """
     return np.random.randint(low=0, high=2**32 - 1)
 
+def get_num_nonzero(theta):
+    nonzero_idx = np.logical_and(np.isfinite(theta), np.abs(theta) > ZERO_THRES)
+    return np.sum(nonzero_idx)
+
+def get_num_unique_theta(theta):
+    zero_theta_mask = np.abs(theta) < ZERO_THRES
+    nonzero_idx = np.logical_and(np.isfinite(theta), ~zero_theta_mask)
+    unique_theta = set(theta[nonzero_idx].flatten().tolist())
+    num_unique = len(unique_theta)
+    if np.any(zero_theta_mask):
+        num_unique += 1
+    return num_unique
+
 def get_nonzero_theta_print_lines(theta, motif_list):
     """
     @return a string that summarizes the theta vector/matrix

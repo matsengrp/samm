@@ -7,6 +7,50 @@ from survival_problem_lasso import SurvivalProblemLasso
 import logging as log
 from common import *
 
+class GreedyLikelihoodComparer:
+    """
+    Given a list of models to compare, this will use a greedy method to compare them
+    """
+    @staticmethod
+    def do_greedy_search(val_set, feat_generator, models, sort_func, burn_in, num_samples, num_jobs, scratch_dir):
+        """
+        @param val_set: list of ObservedSequenceMutations
+        @param feat_generator: FeatureGenerator
+        @param models: list of MethodResults
+        @param sort_func: a function for sorting the list of models, some measure of model complexity
+        @param burn_in, num_samples, num_jobs, scratch_dir
+
+        @return Orders the models from least complex to the most complex. Stops searching the model list once the difference
+            between EM surrogate functions is negative. Returns the last model where the EM surrogate function was increasing.
+        """
+        sorted_models = sorted(models, key=sort_func)
+        best_model = sorted_models[0]
+
+        val_set_evaluator = LikelihoodComparer(
+            val_set,
+            feat_generator,
+            theta_ref=best_model.theta,
+            num_samples=num_samples,
+            burn_in=burn_in,
+            num_jobs=num_jobs,
+            scratch_dir=scratch_dir,
+        )
+        for model in sorted_models[1:]:
+            log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(model.theta)
+            log.info("  Greedy search: ratio %f, model %s" % (log_lik_ratio, model))
+            if log_lik_ratio > 0:
+                best_model = model
+                val_set_evaluator = LikelihoodComparer(
+                    val_set,
+                    feat_generator,
+                    theta_ref=best_model.theta,
+                    num_samples=num_samples,
+                    burn_in=burn_in,
+                    num_jobs=num_jobs,
+                    scratch_dir=scratch_dir,
+                )
+        return best_model
+
 class LikelihoodComparer:
     """
     Compares the likelihood of between model parameters for the given dataset
@@ -31,11 +75,13 @@ class LikelihoodComparer:
         @param scratch_dir: tmp dir for batch submission manager
         """
         self.theta_ref = theta_ref
-        per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES
+        self.num_samples = num_samples
+        self.feat_generator = feat_generator
+        self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES
 
         log.info("Creating likelihood comparer")
         st_time = time.time()
-        sampler_collection = SamplerCollection(
+        self.sampler_collection = SamplerCollection(
             obs_data,
             self.theta_ref,
             MutationOrderGibbsSampler,
@@ -45,20 +91,23 @@ class LikelihoodComparer:
         )
 
         # Get samples drawn from the distribution P(order | start, end, theta reference)
-        init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in obs_data]
-        sampler_results = sampler_collection.get_samples(
-            init_orders,
-            num_samples,
+        self.init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in obs_data]
+        sampler_results = self.sampler_collection.get_samples(
+            self.init_orders,
+            self.num_samples,
             burn_in,
         )
         log.info("Finished getting samples, time %s" % (time.time() - st_time))
+        sampled_orders_list = [res.samples for res in sampler_results]
+        self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
 
+        self.samples = [o for orders in sampled_orders_list for o in orders]
         # Setup a problem so that we can extract the log likelihood ratio
         self.prob = SurvivalProblemLasso(
             feat_generator,
-            [o for res in sampler_results for o in res.samples],
+            self.samples,
             penalty_params=[0],
-            per_target_model=per_target_model,
+            per_target_model=self.per_target_model,
             theta_mask=None,
             num_threads=1,
         )
@@ -70,7 +119,38 @@ class LikelihoodComparer:
         @return Q(theta | theta ref) - Q(theta ref | theta ref)
         """
         ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
-        return np.mean(ll_ratio_vec)
+        mean_ll_ratio = np.mean(ll_ratio_vec)
+        ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
+
+        upper_bound = 1
+        while lower_bound < 0 and upper_bound > 0:
+            # If we aren't sure if the mean log likelihood ratio is negative or positive, grab more samples
+            log.info("Get more samples likelihood comparer")
+            st_time = time.time()
+            sampler_results = self.sampler_collection.get_samples(
+                self.init_orders,
+                self.num_samples,
+                burn_in_sweeps=0,
+            )
+            log.info("Finished getting samples, time %s" % (time.time() - st_time))
+            sampled_orders_list = [res.samples for res in sampler_results]
+            self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
+
+            self.samples += [s for res in sampler_results for s in res.samples]
+            # Setup a problem so that we can extract the log likelihood ratio
+            self.prob = SurvivalProblemLasso(
+                self.feat_generator,
+                self.samples,
+                penalty_params=[0],
+                per_target_model=self.per_target_model,
+                theta_mask=None,
+                num_threads=1,
+            )
+            ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
+            mean_ll_ratio = np.mean(ll_ratio_vec)
+            ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
+
+        return mean_ll_ratio
 
 class LogLikelihoodEvaluator:
     """

@@ -96,7 +96,7 @@ class MCMC_EM:
                     max_iters=self.max_m_iters,
                 )
 
-                num_nonzero = np.sum((theta != -np.inf) & (theta != 0))
+                num_nonzero = get_num_nonzero(theta)
                 log.info("Current Theta, num_nonzero %d" % num_nonzero)
                 log.info(
                     get_nonzero_theta_print_lines(theta, self.motif_list)
