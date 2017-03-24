@@ -28,7 +28,7 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
             for i2, m2 in enumerate(self.motif_list):
                 if i1 == i2:
                     continue
-                if get_idx_differ_by_one_character(m1, m2) is not None:
+                if get_idx_differ_by_one_character(m1, m2) is not None or is_central_kmer_shared(m1, m2, k=5):
                     motifs_fused_lasso1.append(i1)
                     motifs_fused_lasso2.append(i2)
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)

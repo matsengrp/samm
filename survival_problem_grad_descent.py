@@ -2,7 +2,7 @@ import time
 from multiprocessing import Pool
 import numpy as np
 import scipy as sp
-from scipy.sparse import csr_matrix
+from scipy.sparse import csr_matrix, dok_matrix
 
 import logging as log
 from survival_problem import SurvivalProblem
@@ -181,14 +181,15 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         # Get the grad component from grad of log(sum(exp(psi * theta)))
         # This matrix is just the number of times we saw each feature in the risk group
-        features_per_step_matrix = np.zeros((
+        features_per_step_matrix = dok_matrix((
             num_features,
             sample.obs_seq_mutation.num_mutations
-        ))
+        ), dtype=np.int16)
         prev_feat_mut_step = feat_mut_steps[0]
         for i, feat_mut_step in enumerate(feat_mut_steps[1:]):
+            nonzero_rows = features_per_step_matrix[:,i].nonzero()[0]
             # All the features are very similar between risk groups - copy first
-            features_per_step_matrix[:,i + 1] = features_per_step_matrix[:,i]
+            features_per_step_matrix[nonzero_rows,i + 1] = features_per_step_matrix[nonzero_rows,i]
 
             # Remove feature corresponding to position that mutated already
             features_per_step_matrix[prev_feat_mut_step.mutating_pos_feat, i + 1] -= 1

@@ -29,7 +29,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         """
         theta = np.random.rand(self.feat_gen.feature_vec_len, theta_num_col)
         theta_mask = get_possible_motifs_to_targets(self.motif_list, theta.shape)
-        prob_solver = SurvivalProblemCustom(self.feat_gen, [self.sample], 1, theta_mask)
+        prob_solver = SurvivalProblemCustom(self.feat_gen, [self.sample], [1], theta_num_col == NUM_NUCLEOTIDES, theta_mask)
         sample_data = prob_solver.precalc_data[0]
 
         # Basic gradient calculation
@@ -53,7 +53,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         theta = np.random.rand(self.feat_gen.feature_vec_len, theta_num_col)
 
         theta_mask = get_possible_motifs_to_targets(self.motif_list, theta.shape)
-        prob_solver = SurvivalProblemCustom(self.feat_gen, [self.sample], 1, theta_mask)
+        prob_solver = SurvivalProblemCustom(self.feat_gen, [self.sample], [1], theta_num_col == NUM_NUCLEOTIDES, theta_mask)
         sample_data = prob_solver.precalc_data[0]
 
         feat_mut_steps = self.feat_gen.create_for_mutation_steps(self.sample)
