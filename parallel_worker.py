@@ -145,7 +145,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
         """
         self.shared_obj = shared_obj
         num_workers = len(worker_list)
-        num_per_batch = max(num_workers/num_approx_batches, 1)
+        num_per_batch = int(max(np.ceil(float(num_workers)/num_approx_batches), 1))
         for batch_idx, start_idx in enumerate(range(0, num_workers, num_per_batch)):
             batched_workers = worker_list[start_idx:start_idx + num_per_batch]
             self.batched_workers.append(batched_workers)
