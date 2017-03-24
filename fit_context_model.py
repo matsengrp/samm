@@ -174,6 +174,8 @@ def parse_args():
 
     if args.fuse_center and args.problem_solver_cls != SurvivalProblemLasso:
         args.fuse_center = [int(k) for k in args.fuse_center.split(",")]
+        for k in args.fuse_center:
+            assert(k % 2 == 1) # all center fusions must be odd length
     else:
         args.fuse_center = []
 

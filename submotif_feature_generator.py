@@ -309,6 +309,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         return ["".join(m) for m in motif_list]
 
     def get_similar_motifs(self, central_ks=[5]):
+        """
+        @param central_ks: a list of lengths of the central k-mer. Any motifs that share this central k-mer should be
+                            fused together.
+
+        @return two list of motifs that should be fused together (list1 index i fuses with list2 index i). Motifs
+                that differ by one character should be fused together. Also fuses motifs that share central k-mers.
+        """
         def _add_grouped_motifs(linked_motifs, grouped_motifs):
             for k, motif_idx_list in grouped_motifs.iteritems():
                 for k, m1 in enumerate(motif_idx_list[:-1]):
