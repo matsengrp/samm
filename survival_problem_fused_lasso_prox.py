@@ -19,7 +19,7 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
     def post_init(self):
         # Calculate the fused lasso indices
         self.motif_list = self.feature_generator.motif_list
-        motifs_fused_lasso1, motifs_fused_lasso2 = self.feature_generator.get_similar_motifs()
+        motifs_fused_lasso1, motifs_fused_lasso2 = self.feature_generator.get_similar_motifs(central_ks=self.fuse_center)
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)
         self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=np.intc)
 

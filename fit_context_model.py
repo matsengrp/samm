@@ -104,6 +104,10 @@ def parse_args():
         type=str,
         help="penalty parameters, comma separated",
         default="0.1, 0.01, 0.001")
+    parser.add_argument("--fuse-center",
+        type=str,
+        help="center motif lengths, comma separated",
+        default="")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -167,6 +171,11 @@ def parse_args():
         args.theta_num_col = 1
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
+
+    if args.fuse_center and args.problem_solver_cls != SurvivalProblemLasso:
+        args.fuse_center = [int(k) for k in args.fuse_center.split(",")]
+    else:
+        args.fuse_center = []
 
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
@@ -315,6 +324,7 @@ def main(args=sys.argv[1:]):
             theta=theta,
             burn_in=burn_in,
             penalty_params=penalty_params,
+            fuse_center=args.fuse_center,
             max_em_iters=args.em_max_iters,
             train_and_val=False
         )
