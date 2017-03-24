@@ -25,8 +25,7 @@ from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
-from likelihood_evaluator import LikelihoodComparer
-from likelihood_evaluator import LogLikelihoodEvaluator
+from likelihood_evaluator import *
 from multinomial_solver import MultinomialSolver
 from method_results import MethodResults
 from common import *
@@ -181,6 +180,10 @@ def parse_args():
 
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
+    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    if not os.path.exists(args.scratch_dir):
+        os.makedirs(args.scratch_dir)
+
     return args
 
 def load_true_model(file_name):
@@ -240,14 +243,68 @@ def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_rati
         assert(len(val_set) > 0)
     return train_set, val_set
 
+def get_penalty_params(pen_param_str, solver):
+    """
+    @param pen_param_str: comma separated list of penalty parameters
+    @param solver: the solver requested (L, FL, SFL)
+    Determines the grid of penalty parameters to search over
+    """
+    penalty_params = [float(l) for l in pen_param_str.split(",")]
+    sorted_pen_params = sorted(penalty_params, reverse=True)
+
+    if solver == "SFL":
+        # first param is lasso, second one is fused
+        pen_params_lists = [[(p, p/i) for i in FUSED_LASSO_PENALTY_RATIO] for p in sorted_pen_params]
+    elif solver == "FL":
+        # first param is lasso, second one is fused
+        pen_params_lists = [[(0, p) for p in sorted_pen_params]]
+    else:
+        pen_params_lists = [[(p,) for p in sorted_pen_params]]
+    return pen_params_lists
+
+def initialize_theta(num_rows, num_cols, motif_list):
+    """
+    Initialize theta -- start with all zeros
+    """
+    theta = np.zeros((num_rows, num_cols))
+    # Set the impossible thetas to -inf
+    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
+    theta[~theta_mask] = -np.inf
+    return theta, theta_mask
+
+def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta, args):
+    """
+    Does various checks on the model fitted on the training data.
+    Most importantly, it calculates the difference between the EM surrogate functions
+    It also will calculate the marginal likelihood if args.chibs is True
+    It will also compare against the true_theta if it is known and if the true_theta is the same shape
+    """
+    theta_err = None
+    if true_theta is not None and true_theta.shape == theta.shape:
+        theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
+        log.info("Difference between true and fitted theta %f" % theta_err)
+
+    ll_chibs = None
+    if args.chibs:
+        val_chibs = LogLikelihoodEvaluator(
+            val_set,
+            feat_generator,
+            num_jobs=args.num_jobs,
+            scratch_dir=args.scratch_dir,
+        )
+        ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
+        log.info("Chibs log likelihood estimate: %f" % ll_chibs)
+
+    log_lik_ratio = None
+    if val_set_evaluator is not None:
+        log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(theta)
+
+    return log_lik_ratio, ll_chibs, theta_err
+
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-
-    scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
-    if not os.path.exists(scratch_dir):
-        os.makedirs(scratch_dir)
 
     feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
@@ -281,24 +338,9 @@ def main(args=sys.argv[1:]):
     motif_list = feat_generator.motif_list
 
     # Run EM on the lasso parameters from largest to smallest
-    penalty_params = [float(l) for l in args.penalty_params.split(",")]
-    sorted_pen_params = sorted(penalty_params, reverse=True)
+    pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
-    if args.solver == "SFL":
-        # first param is lasso, second one is fused
-        pen_params_list = [(p, p/i) for p in sorted_pen_params for i in FUSED_LASSO_PENALTY_RATIO]
-    elif args.solver == "FL":
-        # first param is lasso, second one is fused
-        pen_params_list = [(0, p) for p in sorted_pen_params]
-    else:
-        pen_params_list = [(p,) for p in sorted_pen_params]
-
-    results_list = []
-
-    theta = np.zeros((feat_generator.feature_vec_len, args.theta_num_col))
-    # Set the impossible thetas to -inf
-    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
-    theta[~theta_mask] = -np.inf
+    theta, theta_mask = initialize_theta(feat_generator.feature_vec_len, args.theta_num_col, motif_list)
 
     true_theta = None
     if args.theta_file != "":
@@ -314,91 +356,96 @@ def main(args=sys.argv[1:]):
         base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         num_threads=args.num_cpu_threads,
-        scratch_dir=scratch_dir,
+        scratch_dir=args.scratch_dir,
     )
 
     burn_in = args.burn_in
-    best_model = None
-    for penalty_params in pen_params_list:
-        penalty_param_str = ",".join(map(str, penalty_params))
-        log.info("Penalty parameter %s" % penalty_param_str)
-        theta, _ = em_algo.run(
-            theta=theta,
-            burn_in=burn_in,
-            penalty_params=penalty_params,
-            fuse_center=args.fuse_center,
-            max_em_iters=args.em_max_iters,
-            train_and_val=False
-        )
-        burn_in = 0 # Only use burn in at the very beginning
+    results_list = []
+    best_models = []
+    for pen_params_list in pen_params_lists:
+        best_model_in_list = None
+        val_set_evaluator = None
+        for penalty_params in pen_params_list:
+            penalty_param_str = ",".join(map(str, penalty_params))
+            log.info("Penalty parameter %s" % penalty_param_str)
+            theta, _ = em_algo.run(
+                theta=theta,
+                burn_in=burn_in,
+                penalty_params=penalty_params,
+                max_em_iters=args.em_max_iters,
+                fuse_center=args.fuse_center,
+                train_and_val=False
+            )
+            burn_in = 0 # Only use burn in at the very beginning
 
-        st = time.time()
+            if args.tuning_sample_ratio > 0:
+                # Do checks on the validation set
+                log_lik_ratio, _, _ = do_validation_set_checks(
+                    theta,
+                    theta_mask,
+                    val_set,
+                    val_set_evaluator,
+                    feat_generator,
+                    true_theta,
+                    args,
+                )
+                if log_lik_ratio is not None:
+                    log.info("Comparing validation log likelihood for penalty param %s, ratio: %f" % (penalty_param_str, log_lik_ratio))
 
-        # Get log likelihood on the validation set for tuning penalty parameter
-        if args.tuning_sample_ratio > 0:
-            if true_theta is not None and true_theta.shape == theta.shape:
-                theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
-                log.info("Difference between true and fitted theta %f" % theta_err)
+                if args.full_train:
+                    theta, _ = em_algo.run(
+                        theta=theta,
+                        burn_in=burn_in,
+                        penalty_params=penalty_params,
+                        max_em_iters=args.em_max_iters,
+                        train_and_val=True
+                    )
 
-            if args.chibs:
-                val_chibs = LogLikelihoodEvaluator(
+            # Get the probabilities of the target nucleotides
+            fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
+            curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector)
+
+            # We save the final theta (potentially trained over all the data)
+            results_list.append(curr_model_results)
+            with open(args.intermediate_out_file, "w") as f:
+                pickle.dump(results_list, f)
+
+            log.info("==== FINAL theta, %s====" % curr_model_results)
+            log.info(get_nonzero_theta_print_lines(theta, motif_list))
+
+            if best_model_in_list is None or log_lik_ratio > 0:
+                best_model_in_list = curr_model_results
+                log.info("===== Best model so far %s" % best_model_in_list)
+                val_set_evaluator = LikelihoodComparer(
                     val_set,
                     feat_generator,
+                    theta_ref=best_model_in_list.theta,
+                    num_samples=args.num_val_samples,
+                    burn_in=args.num_val_burnin,
                     num_jobs=args.num_jobs,
-                    scratch_dir=scratch_dir,
+                    scratch_dir=args.scratch_dir,
                 )
-                ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
-                log.info("Chibs log likelihood estimate: %f" % ll_chibs)
+            elif args.tuning_sample_ratio and log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
+                # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
+                log.info("Stop trying penalty parameters for this penalty parameter list")
+                break
+        best_models.append(best_model_in_list)
 
-            if best_model is not None and val_set_evaluator is not None:
-                log.info("Comparing validation log likelihood for penalty param %s" % penalty_param_str)
-                log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(theta)
-                log.info("Validation log likelihood ratio %f" % log_lik_ratio)
+    # A greedy comparison
+    best_model = GreedyLikelihoodComparer.do_greedy_search(
+        val_set,
+        feat_generator,
+        best_models,
+        lambda m:get_num_unique_theta(m.theta),
+        args.num_val_burnin,
+        args.num_val_samples,
+        args.num_jobs,
+        args.scratch_dir,
+    )
 
-            if args.full_train:
-                theta, _ = em_algo.run(
-                    theta=theta,
-                    burn_in=burn_in,
-                    penalty_params=penalty_params,
-                    max_em_iters=args.em_max_iters,
-                    train_and_val=True
-                )
-
-        # Get the probabilities of the target nucleotides
-        fitted_prob_vector = None
-        if not args.per_target_model:
-            fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta)
-
-        curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector)
-
-        # We save the final theta (potentially trained over all the data)
-        results_list.append(curr_model_results)
-        with open(args.intermediate_out_file, "w") as f:
-            pickle.dump(results_list, f)
-
-        log.info("==== FINAL theta, penalty param %s ====" % penalty_param_str)
-        log.info(get_nonzero_theta_print_lines(theta, motif_list))
-
-        if best_model is None or log_lik_ratio > 0:
-            best_model = curr_model_results
-            log.info("===== Best model so far %s" % best_model)
-            val_set_evaluator = LikelihoodComparer(
-                val_set,
-                feat_generator,
-                theta_ref=best_model.theta,
-                num_samples=args.num_val_samples,
-                burn_in=args.num_val_burnin,
-                num_jobs=args.num_jobs,
-                scratch_dir=scratch_dir,
-            )
-        elif len(penalty_params) == 1 and args.tuning_sample_ratio:
-            # This model is not better than the previous model.
-            # Stop early if we are tuning a single penalty parameter
-            log.info("Stop trying penalty parameters")
-            break
-
+    log.info("=== FINAL Best model: %s" % best_model)
     if not args.full_train:
-        log.info("Training best model, best parameters %s" % ",".join(map(str, best_model.penalty_params)))
+        log.info("Begin a final training of the model")
         # If we didn't do a full training for this best model, do it now
         best_theta, _ = em_algo.run(
             theta=best_model.theta,
@@ -415,12 +462,7 @@ def main(args=sys.argv[1:]):
         )
 
     with open(args.out_file, "w") as f:
-        pickle.dump(
-            (best_model.theta, best_model.fitted_prob_vector),
-            f,
-        )
-
-        log.info("Validation time: %f" % (time.time() - st))
+        pickle.dump((best_model.theta, best_model.fitted_prob_vector), f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
