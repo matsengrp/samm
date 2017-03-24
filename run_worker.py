@@ -5,10 +5,7 @@ Pickles results to an output file
 """
 import sys
 import argparse
-import os
-import pickle
-
-import numpy as np
+import cPickle
 
 def parse_args():
     ''' parse command line arguments '''
@@ -30,14 +27,14 @@ def parse_args():
 def main(args=sys.argv[1:]):
     args = parse_args()
     with open(args.input_file, "r") as input_file:
-        batched_workers = pickle.load(input_file)
+        batched_workers = cPickle.load(input_file)
 
     results = []
     for worker in batched_workers.workers:
         results.append(worker.run(batched_workers.shared_obj))
 
     with open(args.output_file, "w") as output_file:
-        pickle.dump(results, output_file)
+        cPickle.dump(results, output_file)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

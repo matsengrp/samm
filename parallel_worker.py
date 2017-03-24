@@ -1,7 +1,7 @@
 import sys
 import os
 import traceback
-import pickle
+import cPickle
 import custom_utils
 from custom_utils import CustomCommand
 import numpy as np
@@ -65,6 +65,7 @@ class ParallelWorkerManager:
 class MultiprocessingManager(ParallelWorkerManager):
     """
     Handles submitting jobs to a multiprocessing pool
+    We have written our own custom function for batching jobs together
     So runs ParallelWorkers using multiple CPUs on the same machine
     """
     def __init__(self, pool, worker_list, shared_obj=None, num_approx_batches=1):
@@ -87,7 +88,6 @@ class MultiprocessingManager(ParallelWorkerManager):
 
     def run(self):
         try:
-            # Note that multiprocessing pool will already batch things for you
             results_raw = self.pool.map(run_multiprocessing_worker, self.batched_workers_list)
         except Exception as e:
             print "Error occured when trying to process workers in parallel %s" % e
@@ -160,7 +160,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
             self.output_files.append(output_file_name)
             with open(input_file_name, "w") as cmd_input_file:
                 # Pickle the worker as input to the job
-                pickle.dump(
+                cPickle.dump(
                     BatchParallelWorkers(batched_workers, shared_obj),
                     cmd_input_file,
                 )
@@ -181,7 +181,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
         for i, f in enumerate(self.output_files):
             try:
                 with open(f, "r") as output_f:
-                    res = pickle.load(output_f)
+                    res = cPickle.load(output_f)
             except Exception as e:
                 # Probably the file doesn't exist and the job failed?
                 traceback.print_exc()
