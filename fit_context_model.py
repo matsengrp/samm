@@ -118,7 +118,11 @@ def parse_args():
     parser.add_argument('--num-val-samples',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
-        default=100)
+        default=10)
+    parser.add_argument('--num-val-threads',
+        type=int,
+        help='number of threads to use for validation calculations',
+        default=12)
     parser.add_argument('--chibs',
         action='store_true',
         help='True = estimate the marginal likelihood via Chibs')
@@ -424,6 +428,7 @@ def main(args=sys.argv[1:]):
                     burn_in=args.num_val_burnin,
                     num_jobs=args.num_jobs,
                     scratch_dir=args.scratch_dir,
+                    num_threads=args.num_val_threads,
                 )
             elif args.tuning_sample_ratio and log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
                 # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
