@@ -227,10 +227,12 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     # Effective sample size calculation
     ess = values.size/autocorr
 
-    # Corrected standard error
-    ase = np.sqrt(var/ess)
-
-    return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
+    if var/ess < 0:
+        return None, -np.inf, np.inf
+    else:
+        # Corrected standard error
+        ase = np.sqrt(var/ess)
+        return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
 
 def soft_threshold(theta, thres):
     """

@@ -104,6 +104,7 @@ class LikelihoodComparer:
 
         self.samples = [o for orders in sampled_orders_list for o in orders]
         # Setup a problem so that we can extract the log likelihood ratio
+        st_time = time.time()
         self.prob = SurvivalProblemLasso(
             feat_generator,
             self.samples,
@@ -112,6 +113,7 @@ class LikelihoodComparer:
             theta_mask=None,
             num_threads=self.num_threads,
         )
+        log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
 
     def get_log_likelihood_ratio(self, theta):
         """
