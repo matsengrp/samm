@@ -411,7 +411,7 @@ def main(args=sys.argv[1:]):
                 pickle.dump(results_list, f)
 
             log.info("==== FINAL theta, %s====" % curr_model_results)
-            log.info(get_nonzero_theta_print_lines(theta, motif_list))
+            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.motif_len))
 
             if best_model_in_list is None or log_lik_ratio > 0:
                 best_model_in_list = curr_model_results

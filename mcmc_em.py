@@ -107,7 +107,7 @@ class MCMC_EM:
                 num_nonzero = get_num_nonzero(theta)
                 log.info("Current Theta, num_nonzero %d" % num_nonzero)
                 log.info(
-                    get_nonzero_theta_print_lines(theta, self.motif_list)
+                    get_nonzero_theta_print_lines(theta, self.motif_list, self.feat_generator.motif_len)
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < 0)

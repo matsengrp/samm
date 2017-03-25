@@ -190,7 +190,7 @@ def dump_parameters(true_thetas, probability_matrix, args, motif_list):
     # Dump a text file of theta for easy viewing
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
-        lines = get_nonzero_theta_print_lines(true_thetas, motif_list)
+        lines = get_nonzero_theta_print_lines(true_thetas, motif_list, args.motif_len)
         f.write(lines)
 
 def dump_germline_data(germline_nucleotides, germline_genes, args):
