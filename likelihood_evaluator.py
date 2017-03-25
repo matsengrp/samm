@@ -64,7 +64,7 @@ class LikelihoodComparer:
     Therefore we can compare theta parameters using the Q function
     """
 
-    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=100, burn_in=0, num_jobs=1, scratch_dir=""):
+    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=100, burn_in=0, num_jobs=1, scratch_dir="", num_threads=1):
         """
         @param obs_data: list of ObservedSequenceMutations
         @param feat_generator: SubmotifFeatureGenerator
@@ -78,6 +78,7 @@ class LikelihoodComparer:
         self.num_samples = num_samples
         self.feat_generator = feat_generator
         self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES
+        self.num_threads = num_threads
 
         log.info("Creating likelihood comparer")
         st_time = time.time()
@@ -109,7 +110,7 @@ class LikelihoodComparer:
             penalty_params=[0],
             per_target_model=self.per_target_model,
             theta_mask=None,
-            num_threads=1,
+            num_threads=self.num_threads,
         )
 
     def get_log_likelihood_ratio(self, theta):

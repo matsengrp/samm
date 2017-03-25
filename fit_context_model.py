@@ -424,6 +424,7 @@ def main(args=sys.argv[1:]):
                     burn_in=args.num_val_burnin,
                     num_jobs=args.num_jobs,
                     scratch_dir=args.scratch_dir,
+                    num_threads=args.num_cpu_threads,
                 )
             elif args.tuning_sample_ratio and log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
                 # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
