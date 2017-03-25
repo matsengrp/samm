@@ -31,11 +31,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @return final fitted value of theta and penalized log likelihood
         """
         theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, min_iters, verbose)
-        # Ensure no more new jobs submitted to the pool
-        self.pool.close()
-        # Wait for the worker processes to exit -- make sure we don't keep these processes open!
-        # Otherwise memory usage goes crazy
-        self.pool.join()
+        self.close()
 
         return theta, -current_value, diff, -upper_bound
 

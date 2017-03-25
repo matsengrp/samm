@@ -420,6 +420,10 @@ def main(args=sys.argv[1:]):
             if best_model_in_list is None or log_lik_ratio > 0:
                 best_model_in_list = curr_model_results
                 log.info("===== Best model so far %s" % best_model_in_list)
+
+                if val_set_evaluator is not None:
+                    val_set_evaluator.close()
+
                 val_set_evaluator = LikelihoodComparer(
                     val_set,
                     feat_generator,

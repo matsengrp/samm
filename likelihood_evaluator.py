@@ -115,6 +115,9 @@ class LikelihoodComparer:
         )
         log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
 
+    def close(self):
+        self.prob.close()
+
     def get_log_likelihood_ratio(self, theta):
         """
         Get the log likelihood ratio between theta and a reference theta

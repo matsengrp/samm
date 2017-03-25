@@ -46,6 +46,14 @@ class SurvivalProblemCustom(SurvivalProblem):
     def post_init(self):
         return
 
+    def close(self):
+        """ Close pools if there is a pool open """
+        # Ensure no more new jobs submitted to the pool
+        self.pool.close()
+        # Wait for the worker processes to exit -- make sure we don't keep these processes open!
+        # Otherwise memory usage goes crazy
+        self.pool.join()
+
     def solve(self):
         """
         Solve the problem and return the solution. Make sure to call self.pool.close()!!!
