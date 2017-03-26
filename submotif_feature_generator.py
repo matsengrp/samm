@@ -326,7 +326,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             fuse_motif_dict = dict()
             for motif_idx, m in enumerate(self.motif_list):
                 fuse_motif = fuse_func(m)
-                print 'm', m, 'fuse_motif', fuse_motif
                 if fuse_motif not in fuse_motif_dict:
                     fuse_motif_dict[fuse_motif] = [motif_idx]
                 else:
@@ -343,7 +342,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Find motifs that share a 2,3,4-mer offset
             center_idx = self.motif_len/2
             for k in offset_k:
-                print "=====================k", k
                 if k > 1 and k < self.motif_len:
                     start_idx = max(center_idx - k + 1, 0)
                     fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + k])
