@@ -105,7 +105,8 @@ class MCMC_EM:
                 )
 
                 num_nonzero = get_num_nonzero(theta)
-                log.info("Current Theta, num_nonzero %d" % num_nonzero)
+                num_unique = get_num_unique_theta(theta)
+                log.info("Current Theta, num_nonzero %d, unique %d" % (num_nonzero, num_unique))
                 log.info(
                     get_nonzero_theta_print_lines(theta, self.motif_list, self.feat_generator.motif_len)
                 )
