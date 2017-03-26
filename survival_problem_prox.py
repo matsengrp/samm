@@ -17,7 +17,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         """
         raise NotImplementedError()
 
-    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, min_iters=10, verbose=False):
+    def solve(self, init_theta, max_iters=1000, init_step_size=1, step_size_shrink=0.5, backtrack_alpha = 0.01, diff_thres=1e-6, min_iters=20, verbose=False):
         """
         Runs proximal gradient descent to minimize the negative penalized log likelihood
 

@@ -63,8 +63,7 @@ class LikelihoodComparer:
 
     Therefore we can compare theta parameters using the Q function
     """
-
-    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=100, burn_in=0, num_jobs=1, scratch_dir="", num_threads=1):
+    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=10, burn_in=0, num_jobs=1, scratch_dir="", num_threads=1):
         """
         @param obs_data: list of ObservedSequenceMutations
         @param feat_generator: SubmotifFeatureGenerator
@@ -131,7 +130,7 @@ class LikelihoodComparer:
         upper_bound = 1
         while lower_bound < 0 and upper_bound > 0:
             # If we aren't sure if the mean log likelihood ratio is negative or positive, grab more samples
-            log.info("Get more samples likelihood comparer")
+            log.info("Get more samples likelihood comparer (lower,upper)=(%f,%f)" % (lower_bound, upper_bound))
             st_time = time.time()
             sampler_results = self.sampler_collection.get_samples(
                 self.init_orders,
@@ -143,6 +142,7 @@ class LikelihoodComparer:
             self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
 
             self.samples += [s for res in sampler_results for s in res.samples]
+            self.num_samples += self.num_samples
             # Setup a problem so that we can extract the log likelihood ratio
             self.prob = SurvivalProblemLasso(
                 self.feat_generator,

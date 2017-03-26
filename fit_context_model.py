@@ -110,7 +110,7 @@ def parse_args():
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
-        default=0.1)
+        default=0.2)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
@@ -266,15 +266,14 @@ def get_penalty_params(pen_param_str, solver):
         pen_params_lists = [[(p,) for p in sorted_pen_params]]
     return pen_params_lists
 
-def initialize_theta(num_rows, num_cols, motif_list):
+def initialize_theta(theta_shape, theta_mask):
     """
     Initialize theta -- start with all zeros
     """
-    theta = np.zeros((num_rows, num_cols))
+    theta = np.zeros(theta_shape)
     # Set the impossible thetas to -inf
-    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
     theta[~theta_mask] = -np.inf
-    return theta, theta_mask
+    return theta
 
 def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta, args):
     """
@@ -344,7 +343,8 @@ def main(args=sys.argv[1:]):
     # Run EM on the lasso parameters from largest to smallest
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
-    theta, theta_mask = initialize_theta(feat_generator.feature_vec_len, args.theta_num_col, motif_list)
+    theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
+    theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape)
 
     true_theta = None
     if args.theta_file != "":
@@ -372,6 +372,9 @@ def main(args=sys.argv[1:]):
         for penalty_params in pen_params_list:
             penalty_param_str = ",".join(map(str, penalty_params))
             log.info("Penalty parameter %s" % penalty_param_str)
+
+            theta = initialize_theta(theta_shape, theta_mask)
+
             theta, _ = em_algo.run(
                 theta=theta,
                 burn_in=burn_in,
@@ -422,13 +425,16 @@ def main(args=sys.argv[1:]):
                 log.info("===== Best model so far %s" % best_model_in_list)
 
                 if val_set_evaluator is not None:
+                    num_val_samples = val_set_evaluator.num_samples
                     val_set_evaluator.close()
+                else:
+                    num_val_samples = args.num_val_samples
 
                 val_set_evaluator = LikelihoodComparer(
                     val_set,
                     feat_generator,
                     theta_ref=best_model_in_list.theta,
-                    num_samples=args.num_val_samples,
+                    num_samples=num_val_samples,
                     burn_in=args.num_val_burnin,
                     num_jobs=args.num_jobs,
                     scratch_dir=args.scratch_dir,
