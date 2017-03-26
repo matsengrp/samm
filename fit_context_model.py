@@ -298,11 +298,11 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
         ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
         log.info("Chibs log likelihood estimate: %f" % ll_chibs)
 
-    log_lik_ratio = None
+    ll_ratio_lower_bound = None
     if val_set_evaluator is not None:
-        log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(theta)
+        log_lik_ratio, ll_ratio_lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(theta)
 
-    return log_lik_ratio, ll_chibs, theta_err
+    return ll_ratio_lower_bound, ll_chibs, theta_err
 
 def main(args=sys.argv[1:]):
     args = parse_args()

@@ -308,7 +308,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
         return ["".join(m) for m in motif_list]
 
-    def get_similar_motifs(self, central_ks=[5]):
+    def get_similar_motifs(self, central_ks=[5], offset_k=[2,3,4]):
         """
         @param central_ks: a list of lengths of the central k-mer. Any motifs that share this central k-mer should be
                             fused together.
@@ -322,6 +322,17 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                     for m2 in motif_idx_list[k+1:]:
                         linked_motifs.add((m1, m2))
 
+        def _get_fuse_motifs(fuse_func):
+            fuse_motif_dict = dict()
+            for motif_idx, m in enumerate(self.motif_list):
+                fuse_motif = fuse_func(m)
+                print 'm', m, 'fuse_motif', fuse_motif
+                if fuse_motif not in fuse_motif_dict:
+                    fuse_motif_dict[fuse_motif] = [motif_idx]
+                else:
+                    fuse_motif_dict[fuse_motif].append(motif_idx)
+            return fuse_motif_dict
+
         # We implement the fused penalty in terms of differences of pairs that are stored in these
         # index lists: the first entry of the first list minus the first entry in the second list, etc.
         if len(self.motifs_fused_lasso1) == 0:
@@ -329,33 +340,45 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
             linked_motifs = set()
 
+            # Find motifs that share a 2,3,4-mer offset
+            center_idx = self.motif_len/2
+            for k in offset_k:
+                print "=====================k", k
+                if k > 1 and k < self.motif_len:
+                    start_idx = max(center_idx - k + 1, 0)
+                    fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + k])
+                    _add_grouped_motifs(linked_motifs, fuse_motif_dict)
+
+                    end_idx = min(center_idx + k, self.motif_len)
+                    fuse_motif_dict = _get_fuse_motifs(lambda m: m[end_idx - k:end_idx])
+                    _add_grouped_motifs(linked_motifs, fuse_motif_dict)
+
             # Find motifs that differ by one character
             # Drop the i-th position in the motif and group motifs together by the remaining characters
-            for i in range(self.motif_len):
-                motifs_diff_one = dict()
-                for motif_idx, m in enumerate(self.motif_list):
-                    drop_i_motif = m[:i] + m[i+1:]
-                    if drop_i_motif not in motifs_diff_one:
-                        motifs_diff_one[drop_i_motif] = [motif_idx]
-                    else:
-                        motifs_diff_one[drop_i_motif].append(motif_idx)
-
-                _add_grouped_motifs(linked_motifs, motifs_diff_one)
+            # for i in range(self.motif_len):
+            #     motifs_diff_one = dict()
+            #     for motif_idx, m in enumerate(self.motif_list):
+            #         drop_i_motif = m[:i] + m[i+1:]
+            #         if drop_i_motif not in motifs_diff_one:
+            #             motifs_diff_one[drop_i_motif] = [motif_idx]
+            #         else:
+            #             motifs_diff_one[drop_i_motif].append(motif_idx)
+            #
+            #     _add_grouped_motifs(linked_motifs, motifs_diff_one)
 
             # Find motifs that share central k-mer
-            if self.motif_len > 5:
-                for k in central_ks:
-                    if k < self.motif_len:
-                        offset = (self.motif_len - k)/2
-                        motifs_same_center = dict()
-                        for motif_idx, m in enumerate(self.motif_list):
-                            center_motif = m[offset:-offset]
-                            if center_motif not in motifs_same_center:
-                                motifs_same_center[center_motif] = [motif_idx]
-                            else:
-                                motifs_same_center[center_motif].append(motif_idx)
+            for k in central_ks:
+                if k < self.motif_len:
+                    offset = (self.motif_len - k)/2
+                    motifs_same_center = dict()
+                    for motif_idx, m in enumerate(self.motif_list):
+                        center_motif = m[offset:-offset]
+                        if center_motif not in motifs_same_center:
+                            motifs_same_center[center_motif] = [motif_idx]
+                        else:
+                            motifs_same_center[center_motif].append(motif_idx)
 
-                        _add_grouped_motifs(linked_motifs, motifs_same_center)
+                    _add_grouped_motifs(linked_motifs, motifs_same_center)
 
             for (m1, m2) in linked_motifs:
                 self.motifs_fused_lasso1.append(m1)
