@@ -96,8 +96,8 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param prev_theta: the theta in the denominator
         @return the log likelihood ratios between theta and prev_theta for each e-step sample
         """
-        _, ll_vec1 = self._get_value_parallel(theta1)
-        _, ll_vec2 = self._get_value_parallel(theta2)
+        ll_vec1 = self._get_log_lik_parallel(theta1)
+        ll_vec2 = self._get_log_lik_parallel(theta2)
         return ll_vec1 - ll_vec2
 
 
