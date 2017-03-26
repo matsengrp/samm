@@ -117,7 +117,7 @@ class LikelihoodComparer:
     def close(self):
         self.prob.close()
 
-    def get_log_likelihood_ratio(self, theta, max_iters=3):
+    def get_log_likelihood_ratio(self, theta, max_iters=2):
         """
         Get the log likelihood ratio between theta and a reference theta
         @param theta: the model parameter to compare against
@@ -130,7 +130,7 @@ class LikelihoodComparer:
         curr_iter = 1
         while lower_bound < 0 and upper_bound > 0:
             # If we aren't sure if the mean log likelihood ratio is negative or positive, grab more samples
-            log.info("Get more samples likelihood comparer (lower,upper)=(%f,%f)" % (lower_bound, upper_bound))
+            log.info("Get more samples likelihood comparer (lower,mean,upper)=(%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound))
             st_time = time.time()
             sampler_results = self.sampler_collection.get_samples(
                 self.init_orders,
