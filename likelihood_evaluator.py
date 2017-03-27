@@ -117,7 +117,7 @@ class LikelihoodComparer:
     def close(self):
         self.prob.close()
 
-    def get_log_likelihood_ratio(self, theta):
+    def get_log_likelihood_ratio(self, theta, max_iters=2):
         """
         Get the log likelihood ratio between theta and a reference theta
         @param theta: the model parameter to compare against
@@ -127,10 +127,10 @@ class LikelihoodComparer:
         mean_ll_ratio = np.mean(ll_ratio_vec)
         ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
 
-        upper_bound = 1
+        curr_iter = 1
         while lower_bound < 0 and upper_bound > 0:
             # If we aren't sure if the mean log likelihood ratio is negative or positive, grab more samples
-            log.info("Get more samples likelihood comparer (lower,upper)=(%f,%f)" % (lower_bound, upper_bound))
+            log.info("Get more samples likelihood comparer (lower,mean,upper)=(%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound))
             st_time = time.time()
             sampler_results = self.sampler_collection.get_samples(
                 self.init_orders,
@@ -142,7 +142,7 @@ class LikelihoodComparer:
             self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
 
             self.samples += [s for res in sampler_results for s in res.samples]
-            self.num_samples += self.num_samples
+            self.num_samples = len(self.samples)
             # Setup a problem so that we can extract the log likelihood ratio
             self.prob = SurvivalProblemLasso(
                 self.feat_generator,
@@ -150,13 +150,17 @@ class LikelihoodComparer:
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
                 theta_mask=None,
-                num_threads=1,
+                num_threads=self.num_threads,
             )
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
             mean_ll_ratio = np.mean(ll_ratio_vec)
             ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
 
-        return mean_ll_ratio
+            curr_iter += 1
+            if curr_iter > max_iters:
+                break
+
+        return mean_ll_ratio, lower_bound, upper_bound
 
 class LogLikelihoodEvaluator:
     """

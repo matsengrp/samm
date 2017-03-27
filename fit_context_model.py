@@ -103,10 +103,10 @@ def parse_args():
         type=str,
         help="penalty parameters, comma separated",
         default="0.1, 0.01, 0.001")
-    parser.add_argument("--fuse-center",
+    parser.add_argument("--fuse-windows",
         type=str,
-        help="center motif lengths, comma separated",
-        default="")
+        help="shared submotif lengths, comma separated",
+        default="4")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -175,12 +175,11 @@ def parse_args():
 
     assert(args.motif_len % 2 == 1 and args.motif_len > 1)
 
-    if args.fuse_center and args.problem_solver_cls != SurvivalProblemLasso:
-        args.fuse_center = [int(k) for k in args.fuse_center.split(",")]
-        for k in args.fuse_center:
-            assert(k % 2 == 1) # all center fusions must be odd length
+    if args.problem_solver_cls != SurvivalProblemLasso:
+        assert(len(args.fuse_windows) > 0)
+        args.fuse_windows = [int(k) for k in args.fuse_windows.split(",")]
     else:
-        args.fuse_center = []
+        args.fuse_windows = []
 
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
@@ -298,11 +297,11 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
         ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
         log.info("Chibs log likelihood estimate: %f" % ll_chibs)
 
-    log_lik_ratio = None
+    ll_ratio_lower_bound = None
     if val_set_evaluator is not None:
-        log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(theta)
+        log_lik_ratio, ll_ratio_lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(theta)
 
-    return log_lik_ratio, ll_chibs, theta_err
+    return ll_ratio_lower_bound, ll_chibs, theta_err
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -380,10 +379,9 @@ def main(args=sys.argv[1:]):
                 burn_in=burn_in,
                 penalty_params=penalty_params,
                 max_em_iters=args.em_max_iters,
-                fuse_center=args.fuse_center,
+                fuse_windows=args.fuse_windows,
                 train_and_val=False
             )
-            burn_in = 0 # Only use burn in at the very beginning
 
             if args.tuning_sample_ratio > 0:
                 # Do checks on the validation set
