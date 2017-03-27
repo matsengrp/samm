@@ -332,6 +332,14 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                     fuse_motif_dict[fuse_motif].append(motif_idx)
             return fuse_motif_dict
 
+        def _fuse_like_hedgehog(motif):
+            center_idx = self.motif_len/2
+            if motif[center_idx] in ["a", "c"]:
+                # read 5' to 3'
+                return motif[0:-1]
+            else:
+                return motif[1:]
+
         # We implement the fused penalty in terms of differences of pairs that are stored in these
         # index lists: the first entry of the first list minus the first entry in the second list, etc.
         if len(self.motifs_fused_lasso1) == 0:
@@ -339,11 +347,14 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
             linked_motifs = set()
 
+            fuse_motif_dict = _get_fuse_motifs(_fuse_like_hedgehog)
+            _add_grouped_motifs(linked_motifs, fuse_motif_dict)
+
             # Find motifs that share an inner submotif with length from fuse_windows
-            for window_len in fuse_windows:
-                for start_idx in range(max(self.motif_len - window_len + 1, 0)):
-                    fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + window_len])
-                    _add_grouped_motifs(linked_motifs, fuse_motif_dict)
+            # for window_len in fuse_windows:
+            #     for start_idx in range(max(self.motif_len - window_len + 1, 0)):
+            #         fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + window_len])
+            #         _add_grouped_motifs(linked_motifs, fuse_motif_dict)
 
             # Find motifs that differ by one character
             # Drop the i-th position in the motif and group motifs together by the remaining characters

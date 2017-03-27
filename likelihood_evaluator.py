@@ -150,7 +150,7 @@ class LikelihoodComparer:
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
                 theta_mask=None,
-                num_threads=1,
+                num_threads=self.num_threads,
             )
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
             mean_ll_ratio = np.mean(ll_ratio_vec)
