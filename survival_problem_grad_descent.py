@@ -28,7 +28,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], num_threads=1):
+    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, num_threads=1):
         self.feature_generator = feat_generator
         self.samples = samples
         self.theta_mask = theta_mask
@@ -36,6 +36,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.num_samples = len(self.samples)
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
+        self.fuse_center_only = fuse_center_only
 
         self.num_threads = num_threads
         self.pool = Pool(self.num_threads)

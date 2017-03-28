@@ -33,7 +33,7 @@ class MCMC_EM:
         self.scratch_dir = scratch_dir
         self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES
 
-    def run(self, theta, penalty_params=[1], fuse_windows=[], max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
+    def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """
         @param theta: initial value for theta in MCMC-EM
         @param penalty_params: the coefficient(s) for the penalty function
@@ -96,6 +96,7 @@ class MCMC_EM:
                     self.per_target_model,
                     self.theta_mask,
                     fuse_windows=fuse_windows,
+                    fuse_center_only=fuse_center_only,
                     num_threads=self.num_threads,
                 )
 

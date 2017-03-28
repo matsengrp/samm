@@ -107,6 +107,9 @@ def parse_args():
         type=str,
         help="shared submotif lengths, comma separated",
         default="4")
+    parser.add_argument("--fuse-center-only",
+        action='store_true',
+        help="shared submotif lengths, comma separated, should be odd")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -146,7 +149,7 @@ def parse_args():
         help="species (mouse or human; default empty)",
         default='')
 
-    parser.set_defaults(per_target_model=False, full_train=False, chibs=False)
+    parser.set_defaults(per_target_model=False, full_train=False, chibs=False, fuse_center_only=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -380,6 +383,7 @@ def main(args=sys.argv[1:]):
                 penalty_params=penalty_params,
                 max_em_iters=args.em_max_iters,
                 fuse_windows=args.fuse_windows,
+                fuse_center_only=args.fuse_center_only,
                 train_and_val=False
             )
 

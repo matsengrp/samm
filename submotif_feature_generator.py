@@ -308,7 +308,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
         return ["".join(m) for m in motif_list]
 
-    def get_similar_motifs(self, fuse_windows=[3,4]):
+    def get_similar_motifs(self, fuse_windows=[3,4], fuse_center_only=False):
         """
         @param fuse_windows: a list of submotif lengths to fuse together -- if two motifs share a submotif of this length,
                             consider these motifs similar
@@ -341,7 +341,12 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
             # Find motifs that share an inner submotif with length from fuse_windows
             for window_len in fuse_windows:
-                for start_idx in range(max(self.motif_len - window_len + 1, 0)):
+                if not fuse_center_only:
+                    for start_idx in range(max(self.motif_len - window_len + 1, 0)):
+                        fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + window_len])
+                        _add_grouped_motifs(linked_motifs, fuse_motif_dict)
+                elif window_len % 2 == 1:
+                    start_idx = self.motif_len/2 - window_len/2
                     fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + window_len])
                     _add_grouped_motifs(linked_motifs, fuse_motif_dict)
 
