@@ -13,8 +13,6 @@ from random import randint
 from matsen_grp_data import CUI_DATA_PATH
 from matsen_grp_data import SCRATCH_DIR
 
-MOTIF_LEN = 5
-
 Import('env')
 localenv = env.Clone()
 
@@ -22,6 +20,8 @@ localenv = env.Clone()
 base = {'output_name': localenv['OUTPUT_NAME']}
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 
 # Nest for datasets
 nest.add(
@@ -34,6 +34,23 @@ nest.add(
     [CUI_DATA_PATH],
     create_dir=False)
 
+nest.add(
+    'motif_length',
+    [
+        #3,
+        #5,
+        7,
+        #9,
+    ],
+    label_func='{:02d}mers'.format)
+
+nest.add(
+    'sample_or_impute',
+    [
+        'sample',
+        #'impute'
+    ])
+
 # Nest for processing data
 @nest.add_target_with_env(localenv)
 def process_data(env, outdir, c):
@@ -41,13 +58,14 @@ def process_data(env, outdir, c):
                '--data-path',
                c['data_path'],
                '--motif-len',
-               MOTIF_LEN,
+               c['motif_length'],
                '--read-from-partis',
-               '--impute-ancestors',
                '--metadata-path',
                c['data_path'] + '/meta.csv',
                '--output-genes ${TARGETS[0]}',
                '--output-seqs ${TARGETS[1]}']
+    if c['sample_or_impute'] == 'impute':
+        cmd += ['--impute-ancestors']
 
     return env.Command(
         [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
@@ -55,9 +73,13 @@ def process_data(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 # Loci
+# ! no heavy chain in cui data
 nest.add(
     'locus',
-    ['igk', 'igl']) # no heavy chain in cui data
+    [
+        'igk',
+        #'igl'
+    ])
 
 nest.add(
     'replicate',
@@ -73,11 +95,22 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['survival_ref', 'survival_L', 'survival_FL'])
+    [
+        #'survival_ref',
+        #'survival_L',
+        #'survival_FL_3_4',
+        'survival_FL_5',
+        'survival_FL_5_6',
+        #'survival_SFL'
+    ])
 
 nest.add(
     'validation_methods',
-    ['none', 'subject', 'clonal_family'])
+    [
+        'none',
+        #'subject',
+        #'clonal_family'
+    ])
 
 # Nest for deciding parameter ranges
 @nest.add_target_with_env(localenv)
@@ -87,26 +120,31 @@ def tune_parameters(env, outdir, c):
         if c['model_options'] == 'survival_ref':
             # no penalty
             solver = 'L'
+            windows = ""
             penalty_params = '0'
         else:
-            solver = c['model_options'].replace('survival_', '')
-            penalty_params = '.0005,.0001,.00005,.00001'
+            solver = 'FL'
+            windows = ",".join(c['model_options'].replace('survival_FL_', '').split('_'))
+            #penalty_params = '.0005,.0001,.00005,.00001'
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
 
         cmd = ['python fit_context_model.py',
                '--input-genes ${SOURCES[0]}',
                '--input-seqs ${SOURCES[1]}',
-               '--subset-cols',
-               'locus',
-               '--subset-vals',
+               '--locus',
                c['locus'],
+               '--species',
+               'mouse',
                '--seed',
                c['seed'],
                '--motif-len',
-               MOTIF_LEN,
+               c['motif_length'],
                '--solver',
                solver,
                '--penalty-params',
                penalty_params,
+               '--fuse-windows',
+               windows,
                '--num-cpu-threads',
                10,
                '--num-jobs',
@@ -114,9 +152,9 @@ def tune_parameters(env, outdir, c):
                '--burn-in',
                2,
                '--num-e-samples',
-               4,
+               2,
                '--em-max-iters',
-               1,
+               2,
                '--scratch-directory',
                SCRATCH_DIR,
                '--out-file ${TARGETS[0]}',
@@ -125,33 +163,37 @@ def tune_parameters(env, outdir, c):
             cmd += [
                '--validation-column',
                c['validation_methods']]
+        if c['sample_or_impute'] == 'sample':
+            cmd += ['--sample-regime', 2]
+        if len(windows) == 1:
+            cmd += ['--fuse-center-only']
 
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['process_data'],
         ' '.join(map(str, cmd)))
 
-@nest.add_target_with_env(localenv)
-def summarize(env, outdir, c):
-    def theta_stats(target, source, env):
-        c = env['control']
-        output_results = ['chain', 'penalty-param', 'num-nonzero', 'log-lik']
-        with open(str(source[0]), 'r') as pickle_file:
-            results_list = pickle.load(pickle_file)
-
-        if c["model_options"].startswith("survival"):
-            with open(str(target[0]), 'w') as cross_val_file:
-                writer = csv.writer(cross_val_file, delimiter=',')
-                writer.writerow('chain model validation penalty-param log-lik num-nonzero'.split())
-                for result in results_list:
-                    num_nonzero = np.count_nonzero(result[1])
-                    writer.writerow([c['chain'], c['model_options'], c['validation_methods'], result[0], result[3], num_nonzero])
-
-    return env.Command(
-        join(outdir, 'cross_val_results.csv'),
-        c['tune_parameters'],
-        theta_stats,
-        control=c)
+#@nest.add_target_with_env(localenv)
+#def summarize(env, outdir, c):
+#    def theta_stats(target, source, env):
+#        c = env['control']
+#        output_results = ['chain', 'penalty-param', 'num-nonzero', 'log-lik']
+#        with open(str(source[0]), 'r') as pickle_file:
+#            results_list = pickle.load(pickle_file)
+#
+#        if c["model_options"].startswith("survival"):
+#            with open(str(target[0]), 'w') as cross_val_file:
+#                writer = csv.writer(cross_val_file, delimiter=',')
+#                writer.writerow('locus model validation penalty-param log-lik num-nonzero'.split())
+#                for result in results_list:
+#                    num_nonzero = np.sum(result.theta > 1e-6)
+#                    writer.writerow([c['locus'], c['model_options'], c['validation_methods'], results.penalty_params, results., num_nonzero])
+#
+#    return env.Command(
+#        join(outdir, 'cross_val_results.csv'),
+#        c['tune_parameters'],
+#        theta_stats,
+#        control=c)
 
 # Nest for fitting on all data
 # ...
