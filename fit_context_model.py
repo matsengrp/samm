@@ -399,7 +399,7 @@ def main(args=sys.argv[1:]):
                     args,
                 )
                 if log_lik_ratio is not None:
-                    log.info("Comparing validation log likelihood for penalty param %s, ratio: %f" % (penalty_param_str, log_lik_ratio))
+                    log.info("Comparing validation log likelihood for penalty param %s, log ratio: %f" % (penalty_param_str, log_lik_ratio))
 
                 if args.full_train:
                     theta, _ = em_algo.run(
@@ -428,7 +428,6 @@ def main(args=sys.argv[1:]):
 
                 if val_set_evaluator is not None:
                     num_val_samples = val_set_evaluator.num_samples
-                    val_set_evaluator.close()
                 else:
                     num_val_samples = args.num_val_samples
 

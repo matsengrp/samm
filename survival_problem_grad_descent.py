@@ -55,6 +55,10 @@ class SurvivalProblemCustom(SurvivalProblem):
         # Otherwise memory usage goes crazy
         self.pool.join()
 
+    def open(self):
+        """ Reopen the pools if they have been closed """
+        self.pool = Pool(self.num_threads)
+
     def solve(self):
         """
         Solve the problem and return the solution. Make sure to call self.pool.close()!!!
