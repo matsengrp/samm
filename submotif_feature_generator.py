@@ -36,6 +36,33 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str, seq_len, left_flank, right_flank)
         return feat_vec_dict
 
+    def _get_base_features(self, obs_seq_mutation):
+        """
+        Create the feature matrices and feature vector dictionary
+        before any mutations have occurred
+
+        @return ObservedSequenceMutations augmented with a feature matrix and dictionary
+        """
+        indices = []
+        indptr = [0]
+        num_entries = 0
+
+        feat_dict = dict()
+        for pos in range(obs_seq_mutation.seq_len):
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos: pos + self.motif_len]
+            feat_idx = self.motif_dict[submotif]
+            feat_dict[pos] = feat_idx
+            indptr.append(pos + 1)
+            indices.append(feat_idx)
+
+        data = [True] * obs_seq_mutation.seq_len
+        feat_matrix = scipy.sparse.csr_matrix(
+            (data, indices, indptr),
+            shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
+            dtype=bool,
+        )
+        return feat_dict, feat_matrix
+
     def create_base_features(self, obs_seq_mutation):
         """
         Create the feature matrices and feature vector dictionary

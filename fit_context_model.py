@@ -312,7 +312,8 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    # feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
@@ -334,9 +335,9 @@ def main(args=sys.argv[1:]):
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-    log.info("Data statistics:")
-    log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
-    log.info(get_data_statistics_print_lines(obs_data, feat_generator))
+    # log.info("Data statistics:")
+    # log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
+    # log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
