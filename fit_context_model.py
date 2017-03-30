@@ -428,7 +428,6 @@ def main(args=sys.argv[1:]):
 
                 if val_set_evaluator is not None:
                     num_val_samples = val_set_evaluator.num_samples
-                    val_set_evaluator.close()
                 else:
                     num_val_samples = args.num_val_samples
 
