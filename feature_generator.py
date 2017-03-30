@@ -49,6 +49,47 @@ class FeatureGenerator:
         """
         raise NotImplementedError()
 
+class MultiFeatureMutationStep:
+    """
+    Stores the deltas between each mutation step
+
+    This allows fast calculation of the likelihood of the mutation order.
+    Recall that the denominator = sum(exp(psi * theta)).
+    At the next mutation step, we know that
+    1. One of the terms must disappear because the risk group is smaller. One of the positions has mutated.
+    2. The nucleotides next to the position that mutated have new motifs; so we need to update the motif
+        indices for these positions. If we use the denominator from the previous step, we need to subtract
+        out the old exp(psi * theta)) and add in new exp(psi * theta)
+    """
+    def __init__(self):
+        """
+        @param mutating_pos_feats: the feature index of the position that mutated
+        @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
+        @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
+        """
+        self.mutating_pos_feats = []
+        self.neighbors_feat_old = dict()
+        self.neighbors_feat_new = dict()
+
+    def update(self, feat_mut_step, feature_offset):
+        """
+        @param feat_mut_step: FeatureMutationStep
+        """
+        self.mutating_pos_feats.append(feat_mut_step.mutating_pos_feat + feature_offset)
+        self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
+        self._merge_dicts(self.neighbors_feat_new, feat_mut_step.neighbors_feat_new, feature_offset)
+
+    def _merge_dicts(self, my_dict, new_dict, feature_offset):
+        for k in new_dict.keys():
+            new_feature = new_dict[k] + feature_offset
+            if k not in my_dict:
+                my_dict[k] = [new_feature]
+            else:
+                my_dict[k].append(new_feature)
+
+    def __str__(self):
+        return "(%s, old: %s, new: %s)" % (self.mutating_pos_feats, self.neighbors_feat_old, self.neighbors_feat_new)
+
 class FeatureMutationStep:
     """
     Stores the deltas between each mutation step

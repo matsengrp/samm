@@ -21,6 +21,7 @@ class ObservedSequenceMutations:
         """
 
         assert(len(start_seq) == len(end_seq))
+        self.motif_len = motif_len
 
         start_idx = 0
         end_idx = len(start_seq)

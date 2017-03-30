@@ -165,7 +165,7 @@ class MutationOrderGibbsSampler(Sampler):
             )
             # Now get the features - we only need the feature of the mutating position at the ith step
             # And the feature updates at the time of the `i+1`-th step
-            first_mutation_feat, second_feat_mut_step = self.feature_generator.get_shuffled_mutation_steps_delta(
+            first_mutation_feats, second_feat_mut_step = self.feature_generator.get_shuffled_mutation_steps_delta(
                 ImputedSequenceMutations(
                     self.obs_seq_mutation,
                     possible_full_order
@@ -179,11 +179,11 @@ class MutationOrderGibbsSampler(Sampler):
             full_ordering_log_prob += -log_numerators[i] - log_numerators[i + 1] + np.log(denominators[i + 1])
 
             col_idx_earlier = get_target_col(self.obs_seq_mutation, position) if self.per_target_model else 0
-            log_numerators[i] = np.asscalar(self.theta[first_mutation_feat, col_idx_earlier])
+            log_numerators[i] = self.theta[first_mutation_feats, col_idx_earlier].sum()
 
             col_idx_later = get_target_col(self.obs_seq_mutation, shuffled_position) if self.per_target_model else 0
-            log_numerators[i + 1] = np.asscalar(self.theta[second_feat_mut_step.mutating_pos_feat, col_idx_later])
-            denominators[i + 1] = self._get_denom_update(denominators[i], first_mutation_feat, second_feat_mut_step)
+            log_numerators[i + 1] = self.theta[second_feat_mut_step.mutating_pos_feats, col_idx_later].sum()
+            denominators[i + 1] = self._get_denom_update(denominators[i], first_mutation_feats, second_feat_mut_step)
 
             # correct the full ordering probability by adding back the new terms
             full_ordering_log_prob += log_numerators[i] + log_numerators[i + 1] - np.log(denominators[i + 1])
@@ -274,16 +274,18 @@ class MutationOrderGibbsSampler(Sampler):
         log_numerators = []
         for i, mut_step in enumerate(feat_mutation_steps):
             col_idx = get_target_col(self.obs_seq_mutation, curr_order[i]) if self.per_target_model else 0
-            log_numerators.append(np.asscalar(self.theta[mut_step.mutating_pos_feat, col_idx]))
+            log_numerators.append(self.theta[mut_step.mutating_pos_feats, col_idx].sum())
 
         denominators = [
             (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
         ]
         prev_feat_mut_step = feat_mutation_steps[0]
         for i, feat_mut_step in enumerate(feat_mutation_steps[1:]):
-            new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feat, feat_mut_step)
+            new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
+        print "log_numerators", log_numerators
+        print "denominators", denominators
         return feat_mutation_steps, log_numerators, denominators
 
     def _compute_log_probs_with_reference(self, curr_order, gibbs_step_base, update_step_start=0):
@@ -308,19 +310,19 @@ class MutationOrderGibbsSampler(Sampler):
         log_numerators = gibbs_step_base.log_numerators[:update_step_start]
         for i, mut_step in enumerate(feat_mutation_steps):
             col_idx = get_target_col(self.obs_seq_mutation, curr_order[update_step_start + i]) if self.per_target_model else 0
-            log_numerators.append(np.asscalar(self.theta[mut_step.mutating_pos_feat, col_idx]))
+            log_numerators.append(self.theta[mut_step.mutating_pos_feats, col_idx].sum())
 
         denominators = gibbs_step_base.denominators[:update_step_start + 1]
         prev_feat_mut_step = feat_mutation_steps[0]
         for i in range(update_step_start, self.num_mutations - 1):
             feat_mut_step = feat_mutation_steps[i - update_step_start + 1]
-            new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feat, feat_mut_step)
+            new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
 
         return feat_mutation_steps, log_numerators, denominators
 
-    def _get_denom_update(self, old_denominator, prev_feat_idx, feat_mut_step):
+    def _get_denom_update(self, old_denominator, prev_feat_idxs, feat_mut_step):
         """
         Calculate the denominator of the next mutation step quickly by reusing past computations
         and incorporating the deltas appropriately
@@ -329,6 +331,6 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
-        new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
-        return old_denominator - self.exp_theta_sum[prev_feat_idx] - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)
+        old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+        new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+        return old_denominator - self.exp_theta_sum[prev_feat_idxs].sum() - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)

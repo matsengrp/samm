@@ -48,8 +48,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         num_entries = 0
 
         feat_dict = dict()
+        offset = (obs_seq_mutation.motif_len - self.motif_len)/2
         for pos in range(obs_seq_mutation.seq_len):
-            submotif = obs_seq_mutation.start_seq_with_flanks[pos: pos + self.motif_len]
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos + offset: pos + self.motif_len + offset]
             feat_idx = self.motif_dict[submotif]
             feat_dict[pos] = feat_idx
             indptr.append(pos + 1)

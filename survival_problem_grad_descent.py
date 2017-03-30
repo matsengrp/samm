@@ -184,9 +184,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         # get the grad component from grad of psi * theta
         for i, feat_mut_step in enumerate(feat_mut_steps):
             col_idx = get_target_col(sample.obs_seq_mutation, sample.mutation_order[i]) if per_target_model else 0
-            base_grad[feat_mut_step.mutating_pos_feat, col_idx] += 1
-            mutating_pos_feat_vals_rows.append(feat_mut_step.mutating_pos_feat)
-            mutating_pos_feat_vals_cols.append(col_idx)
+            base_grad[feat_mut_step.mutating_pos_feats, col_idx] += 1
+            mutating_pos_feat_vals_rows += feat_mut_step.mutating_pos_feats
+            mutating_pos_feat_vals_cols += [col_idx] * len(feat_mut_step.mutating_pos_feats)
 
         # Get the grad component from grad of log(sum(exp(psi * theta)))
         # This matrix is just the number of times we saw each feature in the risk group
@@ -202,20 +202,23 @@ class SurvivalProblemCustom(SurvivalProblem):
                 features_per_step_matrix[nonzero_rows,i + 1] = features_per_step_matrix[nonzero_rows,i]
 
             # Remove feature corresponding to position that mutated already
-            features_per_step_matrix[prev_feat_mut_step.mutating_pos_feat, i + 1] -= 1
+            for f in prev_feat_mut_step.mutating_pos_feats:
+                features_per_step_matrix[f, i + 1] -= 1
 
             # Need to update the terms for positions near the previous mutation
             # Remove old feature values
             old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
             # it is possible to have the same feature idxs in this list - hence we need the for loop
-            for f in old_feat_idxs:
-                features_per_step_matrix[f, i + 1] -= 1
+            for f_list in old_feat_idxs:
+                for f in f_list:
+                    features_per_step_matrix[f, i + 1] -= 1
 
             # Add new feature values
             new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
             # it is possible to have the same feature idxs in this list - hence we need the for loop
-            for f in new_feat_idxs:
-                features_per_step_matrix[f, i + 1] += 1
+            for f_list in new_feat_idxs:
+                for f in f_list:
+                    features_per_step_matrix[f, i + 1] += 1
 
             prev_feat_mut_step = feat_mut_step
 
