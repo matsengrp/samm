@@ -399,7 +399,7 @@ def main(args=sys.argv[1:]):
                     args,
                 )
                 if log_lik_ratio is not None:
-                    log.info("Comparing validation log likelihood for penalty param %s, ratio: %f" % (penalty_param_str, log_lik_ratio))
+                    log.info("Comparing validation log likelihood for penalty param %s, log ratio: %f" % (penalty_param_str, log_lik_ratio))
 
                 if args.full_train:
                     theta, _ = em_algo.run(

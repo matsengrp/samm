@@ -113,6 +113,7 @@ class LikelihoodComparer:
             num_threads=self.num_threads,
         )
         log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
+        self.close()
 
     def close(self):
         self.prob.close()
@@ -123,9 +124,11 @@ class LikelihoodComparer:
         @param theta: the model parameter to compare against
         @return Q(theta | theta ref) - Q(theta ref | theta ref)
         """
+        self.prob.open()
         ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
         mean_ll_ratio = np.mean(ll_ratio_vec)
         ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
+        self.close()
 
         curr_iter = 1
         while lower_bound < 0 and upper_bound > 0:
@@ -155,6 +158,7 @@ class LikelihoodComparer:
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
             mean_ll_ratio = np.mean(ll_ratio_vec)
             ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
+            self.close()
 
             curr_iter += 1
             if curr_iter > max_iters:
