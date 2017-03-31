@@ -11,26 +11,23 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         self.feat_gens = [SubmotifFeatureGenerator(m_len) for m_len in motif_lens]
         feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
+
         self.feature_vec_len = np.sum(feat_offsets)
         self.motif_list = []
         for f in self.feat_gens:
             self.motif_list += f.motif_list
 
     def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
-        raise NotImplementedError()
-        # feat_vec_dict = dict()
-        # for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-        #     offset = self.max_motif_len - feat_gen.motif_len
-        #     mini_seq_str = seq_str[offset/2:-offset/2]
-        #     mini_left = left_flank[offset/2:] if offset > 1
-        #     mini_right = left_flank[offset/2:] if offset < 1
-        #     f_dict = feat_gen.create_for_sequence(mini_seq_str, left_flank[offset/2:], right_flank[:-offset/2], do_feat_vec_pos)
-        #     for pos, feat in f_dict.iteritems():
-        #         if pos in feat_vec_dict:
-        #             feat_vec_dict[pos].append(feat + offset)
-        #         else:
-        #             feat_vec_dict[pos] = [feat + offset]
-        # return feat_vec_dict
+        feat_vec_dict = dict()
+        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
+            seq_offset = (self.max_motif_len - feat_gen.motif_len)/2
+            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos, offset=seq_offset)
+            for pos, feat in f_dict.iteritems():
+                if pos in feat_vec_dict:
+                    feat_vec_dict[pos].append(feat + offset)
+                else:
+                    feat_vec_dict[pos] = [feat + offset]
+        return feat_vec_dict
 
     def create_base_features(self, obs_seq_mutation):
         feat_vec_dict = dict()
@@ -48,14 +45,13 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         return obs_seq_mutation
 
     def create_for_mutation_steps(self, seq_mut_order):
-        print "create_for_mutation_steps"
         feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations)]
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
             mut_steps = feat_gen.create_for_mutation_steps(seq_mut_order)
             for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
                 multi_f.update(single_f, offset)
-        for s in feat_mutation_steps:
-            print "feat mut step", str(s)
+        # for s in feat_mutation_steps:
+        #     print "feat mut step", str(s)
         return feat_mutation_steps
 
     def get_shuffled_mutation_steps_delta(
@@ -69,10 +65,11 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         first_mut_feats = []
         multi_feat_mut_step = MultiFeatureMutationStep()
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
+            seq_offset = (seq_mut_order.obs_seq_mutation.motif_len - feat_gen.motif_len)/2
             mut_pos_feat, mut_step = feat_gen.get_shuffled_mutation_steps_delta(
                 seq_mut_order,
                 update_step,
-                flanked_seq,
+                flanked_seq[seq_offset:-seq_offset] if seq_offset > 0 else flanked_seq,
                 already_mutated_pos,
             )
             first_mut_feats.append(mut_pos_feat + offset)
@@ -96,6 +93,6 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
                 print "single_f", single_f
                 multi_f.update(single_f, offset)
-        for s in feat_mutation_steps:
-            print "feat mut step", str(s)
+        # for s in feat_mutation_steps:
+        #     print "feat mut step", str(s)
         return feat_mutation_steps

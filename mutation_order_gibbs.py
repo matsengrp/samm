@@ -331,6 +331,14 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-        new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
-        return old_denominator - self.exp_theta_sum[prev_feat_idxs].sum() - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)
+        if len(prev_feat_idxs) > 0:
+            # CHECK AXIS!
+            old_feat_theta_sums = [self.theta[feat_idxs,:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_theta_sums = [self.theta[feat_idxs,:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+            if self.theta.shape[1] == NUM_NUCLEOTIDES:
+                assert(self.theta[prev_feat_idxs].sum(axis=0).shape == (1, NUM_NUCLEOTIDES))
+            return old_denominator - np.exp(self.theta[prev_feat_idxs,:].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
+        else:
+            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+            return old_denominator - self.exp_theta_sum[prev_feat_idxs].sum() - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)
