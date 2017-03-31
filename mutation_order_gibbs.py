@@ -274,8 +274,10 @@ class MutationOrderGibbsSampler(Sampler):
         log_numerators = []
         for i, mut_step in enumerate(feat_mutation_steps):
             col_idx = get_target_col(self.obs_seq_mutation, curr_order[i]) if self.per_target_model else 0
+            print "self.theta[mut_step.mutating_pos_feats, col_idx]", mut_step.mutating_pos_feats, col_idx
             log_numerators.append(self.theta[mut_step.mutating_pos_feats, col_idx].sum())
-
+        print "self.obs_seq_mutation.feat_matrix_start", self.obs_seq_mutation.feat_matrix_start.shape
+        print 'self.theta', self.theta.shape
         denominators = [
             (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
         ]
@@ -335,8 +337,6 @@ class MutationOrderGibbsSampler(Sampler):
             # CHECK AXIS!
             old_feat_theta_sums = [self.theta[feat_idxs,:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
             new_feat_theta_sums = [self.theta[feat_idxs,:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
-            if self.theta.shape[1] == NUM_NUCLEOTIDES:
-                assert(self.theta[prev_feat_idxs].sum(axis=0).shape == (1, NUM_NUCLEOTIDES))
             return old_denominator - np.exp(self.theta[prev_feat_idxs,:].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
             old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]

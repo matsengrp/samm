@@ -28,7 +28,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     Our own implementation to solve the survival problem
     """
-    print_iter = 10 # print status every `print_iter` iterations
+    print_iter = 5 # print status every `print_iter` iterations
 
     def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, num_threads=1):
         self.feature_generator = feat_generator
