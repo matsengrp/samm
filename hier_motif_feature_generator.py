@@ -68,6 +68,7 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
                 update_step,
                 flanked_seq[seq_offset:-seq_offset] if seq_offset > 0 else flanked_seq,
                 already_mutated_pos,
+                extension=seq_offset,
             )
             first_mut_feats.append(mut_pos_feat + offset)
             multi_feat_mut_step.update(mut_step, offset)

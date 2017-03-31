@@ -179,7 +179,7 @@ def parse_args():
 
     args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_lens:
-        assert(m % 2 == 1 and m > 1)
+        assert(m % 2 == 1)
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -314,7 +314,6 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    # feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
 
     log.info("Reading data")

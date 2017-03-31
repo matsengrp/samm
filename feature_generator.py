@@ -61,21 +61,27 @@ class MultiFeatureMutationStep:
         indices for these positions. If we use the denominator from the previous step, we need to subtract
         out the old exp(psi * theta)) and add in new exp(psi * theta)
     """
-    def __init__(self):
+    def __init__(self, mutating_pos_feat=None, neighbors_feat_old=None, neighbors_feat_new=None):
         """
         @param mutating_pos_feats: the feature index of the position that mutated
         @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
         @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
+        @param feat_mut_step: FeatureMutationStep
         """
-        self.mutating_pos_feats = np.array([], dtype=int)
         self.neighbors_feat_old = dict()
         self.neighbors_feat_new = dict()
+        if mutating_pos_feat is not None:
+            self.mutating_pos_feats = np.array([mutating_pos_feat], dtype=int)
+            self._merge_dicts(self.neighbors_feat_old, neighbors_feat_old, feature_offset=0)
+            self._merge_dicts(self.neighbors_feat_new, neighbors_feat_new, feature_offset=0)
+        else:
+            self.mutating_pos_feats = np.array([], dtype=int)
 
     def update(self, feat_mut_step, feature_offset):
         """
-        @param feat_mut_step: FeatureMutationStep
+        @param feat_mut_step: MultiFeatureMutationStep
         """
-        self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feat + feature_offset)
+        self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feats + feature_offset)
         self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
         self._merge_dicts(self.neighbors_feat_new, feat_mut_step.neighbors_feat_new, feature_offset)
 

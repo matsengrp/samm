@@ -126,10 +126,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 already_mutated_pos,
                 extension=offset,
             )
-            feat_mutation_steps.append(FeatureMutationStep(
+            feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat,
-                feat_dict_prev,
-                feat_dict_curr,
+                neighbors_feat_old=feat_dict_prev,
+                neighbors_feat_new=feat_dict_curr,
             ))
 
             # Apply mutation
@@ -182,10 +182,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 already_mutated_pos,
                 extension=offset,
             )
-            feat_mutation_steps.append(FeatureMutationStep(
+            feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat,
-                feat_dict_prev,
-                feat_dict_curr,
+                neighbors_feat_old=feat_dict_prev,
+                neighbors_feat_new=feat_dict_curr,
             ))
 
             # Apply mutation
@@ -247,10 +247,10 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             extension=extension,
         )
 
-        return first_mut_pos_feat, FeatureMutationStep(
+        return first_mut_pos_feat, MultiFeatureMutationStep(
             second_mut_pos_feat,
-            feat_dict_future,
-            feat_dict_curr,
+            neighbors_feat_old=feat_dict_future,
+            neighbors_feat_new=feat_dict_curr,
         )
 
     def _update_mutation_step(

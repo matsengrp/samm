@@ -93,7 +93,6 @@ class MutationOrderGibbsSampler(Sampler):
             # Take out the position we are going to sample order for and get the partial ordering under consideration
             pos_order_idx = curr_order.index(position)
             partial_order = curr_order[0:pos_order_idx] + curr_order[pos_order_idx + 1:]
-
             gibbs_step_info, log_lik, _ = self._do_gibbs_step(partial_order, position, gibbs_step_info, pos_order_idx)
             curr_order = gibbs_step_info.order
             # Output probabilities for trace
@@ -165,6 +164,7 @@ class MutationOrderGibbsSampler(Sampler):
             )
             # Now get the features - we only need the feature of the mutating position at the ith step
             # And the feature updates at the time of the `i+1`-th step
+
             first_mutation_feats, second_feat_mut_step = self.feature_generator.get_shuffled_mutation_steps_delta(
                 ImputedSequenceMutations(
                     self.obs_seq_mutation,
@@ -329,9 +329,8 @@ class MutationOrderGibbsSampler(Sampler):
         @param feat_mut_step: the features that differed for this next mutation step
         """
         if len(prev_feat_idxs) > 0:
-            # CHECK AXIS!
-            old_feat_theta_sums = [self.theta[feat_idxs,:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_theta_sums = [self.theta[feat_idxs,:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+            old_feat_theta_sums = [self.theta[feat_idxs,].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_theta_sums = [self.theta[feat_idxs,].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
             return old_denominator - np.exp(self.theta[prev_feat_idxs,:].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
             old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]

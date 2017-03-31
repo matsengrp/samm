@@ -16,15 +16,12 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         np.random.seed(10)
         cls.motif_len = 5
         cls.BURN_IN = 10
-        cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
 
         cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
 
         obs_seq_mut = ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "aggctcgtattcgctaaaataagcaccag", cls.motif_len)
         cls.mutation_order = [12, 18, 3, 5, 19, 16, 8, 17, 21, 0, 22, 10, 24, 11, 9, 23]
 
-
-        cls.sample = ImputedSequenceMutations(cls.feat_gen.create_base_features(obs_seq_mut), cls.mutation_order)
         cls.sample_hier = ImputedSequenceMutations(cls.feat_gen_hier.create_base_features(obs_seq_mut), cls.mutation_order)
 
     def _compare_grad_calculation(self, feat_gen, sample, theta_num_col):
@@ -40,10 +37,6 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         old_grad = self.calculate_grad_slow(theta, feat_gen, sample)
 
         # Fast gradient calculation
-        # fast_grad = SurvivalProblemCustom.get_gradient_log_lik_per_sample(
-        #     np.exp(theta).T,
-        #     sample_data,
-        # )
         fast_grad = SurvivalProblemCustom.get_gradient_log_lik_per_sample(
             theta,
             sample_data,
@@ -54,9 +47,6 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
     def test_grad_calculation(self):
         self._compare_grad_calculation(self.feat_gen_hier, self.sample_hier, 1)
         self._compare_grad_calculation(self.feat_gen_hier, self.sample_hier, NUM_NUCLEOTIDES)
-
-        # self._compare_grad_calculation(self.feat_gen, self.sample, 1)
-        # self._compare_grad_calculation(self.feat_gen, self.sample, NUM_NUCLEOTIDES)
 
     def _compare_log_likelihood_calculation(self, feat_gen, sample, theta_num_col):
         """
@@ -73,16 +63,12 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         # Basic gradient calculation
         old_ll = self.calculate_log_likelihood_slow(theta, feat_gen, sample)
         # Fast log likelihood calculation
-        # fast_ll = SurvivalProblemCustom.calculate_per_sample_log_lik(np.exp(theta), sample_data, use_iterative=False)
         fast_ll = SurvivalProblemCustom.calculate_per_sample_log_lik(theta, sample_data)
         self.assertTrue(np.allclose(fast_ll, old_ll))
 
     def test_log_likelihood_calculation(self):
         self._compare_log_likelihood_calculation(self.feat_gen_hier, self.sample_hier, 1)
         self._compare_log_likelihood_calculation(self.feat_gen_hier, self.sample_hier, NUM_NUCLEOTIDES)
-
-        # self._compare_log_likelihood_calculation(self.feat_gen, self.sample, 1)
-        # self._compare_log_likelihood_calculation(self.feat_gen, self.sample, NUM_NUCLEOTIDES)
 
     def calculate_grad_slow(self, theta, feat_gen, sample):
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
