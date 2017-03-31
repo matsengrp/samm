@@ -23,8 +23,6 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         obs_seq_mut = ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "aggctcgtattcgctaaaataagcaccag", cls.motif_len)
         cls.mutation_order = [12, 18, 3, 5, 19, 16, 8, 17, 21, 0, 22, 10, 24, 11, 9, 23]
 
-        obs_seq_mut = ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "agtctggcatcaaataaagtgcgatttag", cls.motif_len)
-        cls.mutation_order = [12, 18]
 
         cls.sample = ImputedSequenceMutations(cls.feat_gen.create_base_features(obs_seq_mut), cls.mutation_order)
         cls.sample_hier = ImputedSequenceMutations(cls.feat_gen_hier.create_base_features(obs_seq_mut), cls.mutation_order)
