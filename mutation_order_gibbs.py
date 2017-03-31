@@ -274,10 +274,7 @@ class MutationOrderGibbsSampler(Sampler):
         log_numerators = []
         for i, mut_step in enumerate(feat_mutation_steps):
             col_idx = get_target_col(self.obs_seq_mutation, curr_order[i]) if self.per_target_model else 0
-            print "self.theta[mut_step.mutating_pos_feats, col_idx]", mut_step.mutating_pos_feats, col_idx
             log_numerators.append(self.theta[mut_step.mutating_pos_feats, col_idx].sum())
-        print "self.obs_seq_mutation.feat_matrix_start", self.obs_seq_mutation.feat_matrix_start.shape
-        print 'self.theta', self.theta.shape
         denominators = [
             (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
         ]
@@ -286,8 +283,6 @@ class MutationOrderGibbsSampler(Sampler):
             new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
-        print "log_numerators", log_numerators
-        print "denominators", denominators
         return feat_mutation_steps, log_numerators, denominators
 
     def _compute_log_probs_with_reference(self, curr_order, gibbs_step_base, update_step_start=0):

@@ -50,8 +50,6 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             mut_steps = feat_gen.create_for_mutation_steps(seq_mut_order)
             for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
                 multi_f.update(single_f, offset)
-        # for s in feat_mutation_steps:
-        #     print "feat mut step", str(s)
         return feat_mutation_steps
 
     def get_shuffled_mutation_steps_delta(
@@ -61,7 +59,6 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         flanked_seq,
         already_mutated_pos,
     ):
-        print "get_shuffled_mutation_steps_delta"
         first_mut_feats = []
         multi_feat_mut_step = MultiFeatureMutationStep()
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
@@ -74,10 +71,6 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             )
             first_mut_feats.append(mut_pos_feat + offset)
             multi_feat_mut_step.update(mut_step, offset)
-            print "mut_pos_feat", mut_pos_feat
-            print "mut_step", mut_step
-        print "first_mut_feats", first_mut_feats
-        print "multi_feat_mut_step", multi_feat_mut_step
         return first_mut_feats, multi_feat_mut_step
 
     def create_remaining_mutation_steps(
@@ -85,14 +78,10 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         seq_mut_order,
         update_step_start,
     ):
-        print "== create_remaining_mutation_steps =="
         feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations - update_step_start)]
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
             mut_steps = feat_gen.create_remaining_mutation_steps(seq_mut_order, update_step_start)
             assert(len(mut_steps) == len(feat_mutation_steps))
             for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
-                print "single_f", single_f
                 multi_f.update(single_f, offset)
-        # for s in feat_mutation_steps:
-        #     print "feat mut step", str(s)
         return feat_mutation_steps

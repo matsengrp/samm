@@ -72,10 +72,10 @@ def parse_args():
         help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, SFL = sparse fused lasso,',
         choices=["CL", "CFL", "L", "FL", "SFL"],
         default="L")
-    parser.add_argument('--motif-len',
-        type=int,
+    parser.add_argument('--motif-lens',
+        type=str,
         help='length of motif (must be odd)',
-        default=5)
+        default='5')
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -177,7 +177,9 @@ def parse_args():
     else:
         args.theta_num_col = 1
 
-    assert(args.motif_len % 2 == 1 and args.motif_len > 1)
+    args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
+    for m in args.motif_lens:
+        assert(m % 2 == 1 and m > 1)
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -313,13 +315,13 @@ def main(args=sys.argv[1:]):
     np.random.seed(args.seed)
 
     # feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
             args.input_genes,
             args.input_seqs,
-            motif_len=args.motif_len,
+            motif_len=max(args.motif_lens),
             sample=args.sample_regime,
             locus=args.locus,
             species=args.species,
