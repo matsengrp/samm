@@ -31,6 +31,7 @@ from method_results import MethodResults
 from common import *
 from read_data import *
 from matsen_grp_data import *
+from multiprocessing import Pool
 
 def parse_args():
     ''' parse command line arguments '''
@@ -352,6 +353,8 @@ def main(args=sys.argv[1:]):
     if args.theta_file != "":
         true_theta, _ = load_true_model(args.theta_file)
 
+    all_runs_pool = Pool(args.num_cpu_threads)
+
     em_algo = MCMC_EM(
         train_set,
         val_set,
@@ -363,6 +366,7 @@ def main(args=sys.argv[1:]):
         num_jobs=args.num_jobs,
         num_threads=args.num_cpu_threads,
         scratch_dir=args.scratch_dir,
+        pool=all_runs_pool,
     )
 
     burn_in = args.burn_in
@@ -440,6 +444,7 @@ def main(args=sys.argv[1:]):
                     num_jobs=args.num_jobs,
                     scratch_dir=args.scratch_dir,
                     num_threads=args.num_val_threads,
+                    pool=all_runs_pool,
                 )
             elif args.tuning_sample_ratio and log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
                 # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
@@ -457,6 +462,7 @@ def main(args=sys.argv[1:]):
         args.num_val_samples,
         args.num_jobs,
         args.scratch_dir,
+        pool=all_runs_pool,
     )
 
     log.info("=== FINAL Best model: %s" % best_model)
@@ -476,6 +482,10 @@ def main(args=sys.argv[1:]):
             best_theta,
             best_fitted_prob_vector,
         )
+
+    all_runs_pool.close()
+    # helpful comment copied over: make sure we don't keep these processes open!
+    all_runs_pool.join()
 
     with open(args.out_file, "w") as f:
         pickle.dump((best_model.theta, best_model.fitted_prob_vector), f)
