@@ -67,7 +67,7 @@ class MultiFeatureMutationStep:
         @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
         @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
         """
-        self.mutating_pos_feats = []
+        self.mutating_pos_feats = np.array([], dtype=int)
         self.neighbors_feat_old = dict()
         self.neighbors_feat_new = dict()
 
@@ -75,7 +75,7 @@ class MultiFeatureMutationStep:
         """
         @param feat_mut_step: FeatureMutationStep
         """
-        self.mutating_pos_feats.append(feat_mut_step.mutating_pos_feat + feature_offset)
+        self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feat + feature_offset)
         self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
         self._merge_dicts(self.neighbors_feat_new, feat_mut_step.neighbors_feat_new, feature_offset)
 
@@ -83,9 +83,9 @@ class MultiFeatureMutationStep:
         for k in new_dict.keys():
             new_feature = new_dict[k] + feature_offset
             if k not in my_dict:
-                my_dict[k] = [new_feature]
+                my_dict[k] = np.array([new_feature], dtype=int)
             else:
-                my_dict[k].append(new_feature)
+                my_dict[k] = np.append(my_dict[k], new_feature)
 
     def __str__(self):
         return "(%s, old: %s, new: %s)" % (self.mutating_pos_feats, self.neighbors_feat_old, self.neighbors_feat_new)

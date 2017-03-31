@@ -179,16 +179,16 @@ class SurvivalProblemCustom(SurvivalProblem):
             3. `mutating_pos_feat_vals_rows`: the feature row idxs for which a mutation occured
             4. `mutating_pos_feat_vals_cols`: the feature column idxs for which a mutation occured
         """
-        mutating_pos_feat_vals_rows = []
-        mutating_pos_feat_vals_cols = []
+        mutating_pos_feat_vals_rows = np.array([])
+        mutating_pos_feat_vals_cols = np.array([])
         num_targets = NUM_NUCLEOTIDES if per_target_model else 1
         base_grad = np.zeros((num_features, num_targets))
         # get the grad component from grad of psi * theta
         for i, feat_mut_step in enumerate(feat_mut_steps):
             col_idx = get_target_col(sample.obs_seq_mutation, sample.mutation_order[i]) if per_target_model else 0
             base_grad[feat_mut_step.mutating_pos_feats, col_idx] += 1
-            mutating_pos_feat_vals_rows += feat_mut_step.mutating_pos_feats
-            mutating_pos_feat_vals_cols += [col_idx] * len(feat_mut_step.mutating_pos_feats)
+            mutating_pos_feat_vals_rows = np.append(mutating_pos_feat_vals_rows, feat_mut_step.mutating_pos_feats)
+            mutating_pos_feat_vals_cols = np.append(mutating_pos_feat_vals_cols, [col_idx] * len(feat_mut_step.mutating_pos_feats))
 
         # Get the grad component from grad of log(sum(exp(psi * theta)))
         # This matrix is just the number of times we saw each feature in the risk group

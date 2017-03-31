@@ -415,7 +415,7 @@ def main(args=sys.argv[1:]):
                     )
 
             # Get the probabilities of the target nucleotides
-            fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
+            fitted_prob_vector = None #MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
             curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector)
 
             # We save the final theta (potentially trained over all the data)
@@ -475,7 +475,7 @@ def main(args=sys.argv[1:]):
             max_em_iters=args.em_max_iters,
             train_and_val=True
         )
-        best_fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
+        best_fitted_prob_vector = None#MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
         best_model = MethodResults(
             best_model.penalty_params,
             best_theta,
