@@ -15,9 +15,11 @@ class SamplePrecalcData:
     """
     Stores data for gradient calculations
     """
-    def __init__(self, init_feat_counts, features_per_step_matrixT, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
+    def __init__(self, init_feat_counts, features_per_step_matrices, features_sign_updates, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
         self.init_feat_counts = init_feat_counts
-        self.features_per_step_matrixT = features_per_step_matrixT
+        # self.features_per_step_matrixT = features_per_step_matrixT
+        self.features_per_step_matrices = features_per_step_matrices
+        self.features_sign_updates = features_sign_updates
         self.init_grad_vector = init_grad_vector
         self.mutating_pos_feat_vals_rows = mutating_pos_feat_vals_rows
         self.mutating_pos_feat_vals_cols = mutating_pos_feat_vals_cols
@@ -114,7 +116,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         if self.pool is None:
             raise ValueError("Pool has not been initialized")
 
-        # exp_theta = np.exp(theta)
         rand_seed = get_randint()
         worker_list = [
             ObjectiveValueWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
@@ -130,7 +131,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         else:
             ll = [worker.run(theta) for worker in worker_list]
         return np.array(ll)
-
+    @profile
     def _get_gradient_log_lik(self, theta, batch_factor=2):
         """
         @param theta: the theta to calculate the likelihood for
@@ -192,45 +193,47 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         # Get the grad component from grad of log(sum(exp(psi * theta)))
         # This matrix is just the number of times we saw each feature in the risk group
-        features_per_step_matrix = dok_matrix((
-            num_features,
-            sample.obs_seq_mutation.num_mutations
-        ), dtype=np.int16)
+        features_per_step_matrices = []
+        features_sign_updates = []
         prev_feat_mut_step = feat_mut_steps[0]
         for i, feat_mut_step in enumerate(feat_mut_steps[1:]):
-            nonzero_rows = features_per_step_matrix[:,i].nonzero()[0]
-            if nonzero_rows.size:
-                # All the features are very similar between risk groups - copy first
-                features_per_step_matrix[nonzero_rows,i + 1] = features_per_step_matrix[nonzero_rows,i]
+            num_old = len(feat_mut_step.neighbors_feat_old)
+            num_new = len(feat_mut_step.neighbors_feat_new)
+            # First row of this matrix is the mutating pos. Next set are the positions with their old feature idxs. Then all the positions with their new feature idxs.
+            # plus one because one position mutates and must be removed
+            pos_feat_matrix = dok_matrix((
+                num_old + num_new + 1,
+                num_features,
+            ), dtype=np.int8)
 
             # Remove feature corresponding to position that mutated already
-            for f in prev_feat_mut_step.mutating_pos_feats:
-                features_per_step_matrix[f, i + 1] -= 1
+            pos_feat_matrix[0, prev_feat_mut_step.mutating_pos_feats] = 1
 
             # Need to update the terms for positions near the previous mutation
             # Remove old feature values
             old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
             # it is possible to have the same feature idxs in this list - hence we need the for loop
-            for f_list in old_feat_idxs:
-                for f in f_list:
-                    features_per_step_matrix[f, i + 1] -= 1
+            for f_idx, f_list in enumerate(old_feat_idxs):
+                pos_feat_matrix[f_idx + 1, f_list] = 1
 
             # Add new feature values
             new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
             # it is possible to have the same feature idxs in this list - hence we need the for loop
-            for f_list in new_feat_idxs:
-                for f in f_list:
-                    features_per_step_matrix[f, i + 1] += 1
+            for f_idx, f_list in enumerate(new_feat_idxs):
+                pos_feat_matrix[f_idx + 1 + num_old, f_list] = 1
+
+            features_per_step_matrices.append(csr_matrix(pos_feat_matrix))
+            features_sign_updates.append(
+                np.reshape(np.concatenate([-1 * np.ones(num_old + 1), np.ones(num_new)]), (num_old + num_new + 1, 1))
+            )
 
             prev_feat_mut_step = feat_mut_step
 
-        mat_type = np.int8
-        if np.max(np.abs(features_per_step_matrix)) > INT8_MAX:
-            mat_type = np.int16 # range is -32768 to 32767
-
         return SamplePrecalcData(
             sample.obs_seq_mutation.feat_counts,
-            csr_matrix(features_per_step_matrix.T, dtype=mat_type),
+            # csr_matrix(features_per_step_matrix.T, dtype=mat_type),
+            features_per_step_matrices,
+            features_sign_updates,
             base_grad,
             np.array(mutating_pos_feat_vals_rows, dtype=np.int16),
             np.array(mutating_pos_feat_vals_cols, dtype=np.int16),
@@ -238,126 +241,101 @@ class SurvivalProblemCustom(SurvivalProblem):
             feat_mut_steps,
         )
 
-    @staticmethod
-    def calculate_per_sample_log_lik(theta, sample_data, use_iterative=True):
-        """
-        Calculate the log likelihood of this sample
-        """
-        if use_iterative:
-            # HACK: remove later
-            denominators = [
-                (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
-            ]
-            prev_feat_mut_step = sample_data.feat_mut_steps[0]
-            for i, feat_mut_step in enumerate(sample_data.feat_mut_steps[1:]):
-                new_denom = SurvivalProblemCustom._get_denom_update(theta, denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
-                prev_feat_mut_step = feat_mut_step
-                denominators.append(new_denom)
+# @staticmethod
+@profile
+def calculate_per_sample_log_lik(theta, sample_data, use_iterative=True):
+    """
+    Calculate the log likelihood of this sample
+    """
+    if use_iterative:
+        denominators = [
+            (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        ]
+        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        for pos_feat_matrix, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_sign_updates):
+            exp_thetas = np.exp(pos_feat_matrix.dot(theta))
+            signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
+            new_denom = prev_denom + signed_exp_thetas.sum()
+            denominators.append(new_denom)
+            prev_denom = new_denom
 
-            numerators = theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
-            log_lik = numerators.sum() - np.log(denominators).sum()
-        else:
-            # Use dense matrix multiplication
-            risk_group_sum_base = np.dot(sample_data.init_feat_counts, exp_theta)
-            # Use sparse matrix multiplication
-            risk_group_sum_deltas = sample_data.features_per_step_matrixT.dot(exp_theta)
+        numerators = theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
+        log_lik = numerators.sum() - np.log(denominators).sum()
+    else:
+        # Use dense matrix multiplication
+        risk_group_sum_base = np.dot(sample_data.init_feat_counts, exp_theta)
+        # Use sparse matrix multiplication
+        risk_group_sum_deltas = sample_data.features_per_step_matrixT.dot(exp_theta)
 
-            denominators = (risk_group_sum_deltas + risk_group_sum_base).sum(axis=1)
-            numerators = exp_theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
-            log_lik = np.log(numerators).sum() - np.log(denominators).sum()
-        return log_lik
+        denominators = (risk_group_sum_deltas + risk_group_sum_base).sum(axis=1)
+        numerators = exp_theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
+        log_lik = np.log(numerators).sum() - np.log(denominators).sum()
+    return log_lik
 
-    @staticmethod
-    def _get_denom_update(theta, old_denominator, prev_feat_idxs, feat_mut_step):
-        """
-        Calculate the denominator of the next mutation step quickly by reusing past computations
-        and incorporating the deltas appropriately
+# @staticmethod
+@profile
+def get_gradient_log_lik_per_sample(theta, sample_data, use_iterative=True):
+    """
+    Calculate the gradient of the log likelihood of this sample
+    All the gradients for each step are the gradient of psi * theta - log(sum(exp(theta * psi)))
+    Calculate the gradient from each step one at a time
 
-        @param old_denominator: the denominator from the previous mutation step
-        @param old_log_numerator: the numerator from the previous mutation step
-        @param feat_mut_step: the features that differed for this next mutation step
-        """
-        # CHECK AXIS!
-        old_feat_theta_sums = [theta[feat_idxs].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-        new_feat_theta_sums = [theta[feat_idxs].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
-        return old_denominator - np.exp(theta[prev_feat_idxs].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
+    @param theta: the theta to evaluate the gradient at
+    @param sample_data: SamplePrecalcData
+    """
+    if use_iterative:
 
-    @staticmethod
-    def get_gradient_log_lik_per_sample(theta, sample_data, use_iterative=True):
-        """
-        Calculate the gradient of the log likelihood of this sample
-        All the gradients for each step are the gradient of psi * theta - log(sum(exp(theta * psi)))
-        Calculate the gradient from each step one at a time
+        denominators = [
+            (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        ]
+        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
 
-        @param theta: the theta to evaluate the gradient at
-        @param sample_data: SamplePrecalcData
-        """
-        if use_iterative:
-            pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)
-            denominator = pos_exp_theta.sum()
-            risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.T * pos_exp_theta
+        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)
+        denominator = pos_exp_theta.sum()
+        prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.T * pos_exp_theta
 
-            risk_group_grads = [risk_group_grad/denominator]
-            risk_group_grad_tot = risk_group_grad/denominator
-            prev_denominator = denominator
-            prev_feat_mut_step = sample_data.feat_mut_steps[0]
-            for i, feat_mut_step in enumerate(sample_data.feat_mut_steps[1:]):
-                new_risk_group_grad, new_denom = SurvivalProblemCustom._get_grad_update(
-                    theta,
-                    risk_group_grad,
-                    prev_denominator,
-                    prev_feat_mut_step.mutating_pos_feats,
-                    feat_mut_step,
+        risk_group_grads = [prev_risk_group_grad/denominator]
+        risk_group_grad_tot = prev_risk_group_grad/denominator
+        prev_denominator = denominator
+        for pos_feat_matrix, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_sign_updates):
+            exp_thetas = np.exp(pos_feat_matrix.dot(theta))
+            signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
+
+            new_denom = prev_denom + signed_exp_thetas.sum()
+            denominators.append(new_denom)
+            grad_update = pos_feat_matrix.transpose().dot(signed_exp_thetas)
+            risk_group_grad = prev_risk_group_grad + grad_update
+            risk_group_grads.append(risk_group_grad/new_denom)
+            risk_group_grad_tot += risk_group_grad/new_denom
+
+            prev_denom = new_denom
+            prev_risk_group_grad = risk_group_grad
+        return sample_data.init_grad_vector - risk_group_grad_tot
+    else:
+        # Calculate the base gradient
+        grad_log_sum_baseT = np.multiply(sample_data.init_feat_counts, exp_thetaT)
+        features_per_step_matrixT = sample_data.features_per_step_matrixT.todense()
+
+        if exp_thetaT.shape[0] == NUM_NUCLEOTIDES:
+            grad_log_sum_expsTs = []
+            for i in range(exp_thetaT.shape[0]):
+                grad_log_sum_exps_deltasT = np.multiply(features_per_step_matrixT, exp_thetaT[i,:])
+                grad_log_sum_expsTs.append(
+                    grad_log_sum_baseT[i,:] + grad_log_sum_exps_deltasT
                 )
-                prev_feat_mut_step = feat_mut_step
-                prev_denominator = new_denom
-                risk_group_grad = new_risk_group_grad
-                risk_group_grad_tot += new_risk_group_grad/new_denom
-                risk_group_grads.append(new_risk_group_grad/new_denom)
-            return sample_data.init_grad_vector - risk_group_grad_tot
+            grad_log_sum_expsT = np.hstack(grad_log_sum_expsTs)
+            denominators = grad_log_sum_expsT.sum(axis=1)
+            grad_components = np.divide(grad_log_sum_expsT, denominators)
+            grad_components_sum = grad_components.sum(axis=0)
+            grad_components_sum = np.reshape(grad_components_sum, (NUM_NUCLEOTIDES, grad_components_sum.size/NUM_NUCLEOTIDES)).T
+            return sample_data.init_grad_vector - grad_components_sum
         else:
-            # Calculate the base gradient
-            grad_log_sum_baseT = np.multiply(sample_data.init_feat_counts, exp_thetaT)
-            features_per_step_matrixT = sample_data.features_per_step_matrixT.todense()
-
-            if exp_thetaT.shape[0] == NUM_NUCLEOTIDES:
-                grad_log_sum_expsTs = []
-                for i in range(exp_thetaT.shape[0]):
-                    grad_log_sum_exps_deltasT = np.multiply(features_per_step_matrixT, exp_thetaT[i,:])
-                    grad_log_sum_expsTs.append(
-                        grad_log_sum_baseT[i,:] + grad_log_sum_exps_deltasT
-                    )
-                grad_log_sum_expsT = np.hstack(grad_log_sum_expsTs)
-                denominators = grad_log_sum_expsT.sum(axis=1)
-                grad_components = np.divide(grad_log_sum_expsT, denominators)
-                grad_components_sum = grad_components.sum(axis=0)
-                grad_components_sum = np.reshape(grad_components_sum, (NUM_NUCLEOTIDES, grad_components_sum.size/NUM_NUCLEOTIDES)).T
-                return sample_data.init_grad_vector - grad_components_sum
-            else:
-                # element-wise multiplication
-                grad_log_sum_exps_deltasT = np.multiply(features_per_step_matrixT, exp_thetaT)
-                grad_log_sum_expsT = grad_log_sum_baseT + grad_log_sum_exps_deltasT
-                denominators = grad_log_sum_expsT.sum(axis=1)
-                grad_components = np.divide(grad_log_sum_expsT, denominators)
-                return sample_data.init_grad_vector - grad_components.sum(axis=0).T
-
-    @staticmethod
-    def _get_grad_update(theta, old_risk_group_grad, old_denominator, mutating_pos_feats, feat_mut_step):
-        remove_term = np.exp(theta[mutating_pos_feats,:].sum(axis=0))
-        new_denom = old_denominator - remove_term.sum()
-
-        new_risk_group_grad = np.copy(old_risk_group_grad)
-        new_risk_group_grad[mutating_pos_feats,:] -= remove_term
-
-        for pos, feat_idxs in feat_mut_step.neighbors_feat_old.iteritems():
-            remove_term = np.exp(theta[feat_idxs,:].sum(axis=0))
-            new_risk_group_grad[feat_idxs,:] -= remove_term
-            new_denom -= remove_term.sum()
-        for pos, feat_idxs in feat_mut_step.neighbors_feat_new.iteritems():
-            add_term = np.exp(theta[feat_idxs,:].sum(axis=0))
-            new_risk_group_grad[feat_idxs,:] += add_term
-            new_denom += add_term.sum()
-        return new_risk_group_grad, new_denom
+            # element-wise multiplication
+            grad_log_sum_exps_deltasT = np.multiply(features_per_step_matrixT, exp_thetaT)
+            grad_log_sum_expsT = grad_log_sum_baseT + grad_log_sum_exps_deltasT
+            denominators = grad_log_sum_expsT.sum(axis=1)
+            grad_components = np.divide(grad_log_sum_expsT, denominators)
+            return sample_data.init_grad_vector - grad_components.sum(axis=0).T
 
 class PrecalcDataWorker(ParallelWorker):
     """
@@ -400,6 +378,7 @@ class GradientWorker(ParallelWorker):
         @return the gradient of the log likelihood for this sample
         """
         return SurvivalProblemCustom.get_gradient_log_lik_per_sample(theta, self.sample_data)
+        # return get_gradient_log_lik_per_sample(theta, self.sample_data)
 
     def __str__(self):
         return "GradientWorker %s" % self.sample_data.init_feat_counts
@@ -421,6 +400,7 @@ class ObjectiveValueWorker(ParallelWorker):
         @return the log likelihood for this sample
         """
         return SurvivalProblemCustom.calculate_per_sample_log_lik(theta, self.sample_data)
+        # return calculate_per_sample_log_lik(theta, self.sample_data)
 
     def __str__(self):
         return "ObjectiveValueWorker %s" % self.sample_data.init_feat_counts

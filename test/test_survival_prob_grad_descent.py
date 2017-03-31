@@ -124,6 +124,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
 
         obj = 0
+        denoms = []
         seq_str = sample.obs_seq_mutation.start_seq
         for i in range(len(sample.mutation_order)):
             mutating_pos = sample.mutation_order[i]
@@ -137,6 +138,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
             # vecs_at_mutation_step[i] are the feature vectors of the at-risk group after mutation i
             feature_idx_mutated = feature_dict[mutating_pos]
             denom = np.exp([theta[f,:].sum(axis=0) for f in feature_dict.values()]).sum()
+            denoms.append(denom)
             log_denom = np.log(denom)
 
             col_idx = 0
