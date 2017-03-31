@@ -2,7 +2,6 @@ import time
 import numpy as np
 import scipy as sp
 import logging as log
-from multiprocessing import Pool
 
 from survival_problem_prox import SurvivalProblemProximal
 from common import soft_threshold

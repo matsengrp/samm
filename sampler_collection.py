@@ -2,7 +2,6 @@ import sys
 import numpy as np
 import traceback
 import os.path
-from multiprocessing import Pool
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker
 from parallel_worker import BatchSubmissionManager
@@ -15,7 +14,7 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs=None, scratch_dir=None, num_threads=None):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs=None, scratch_dir=None, num_threads=None, pool=None):
         """
         There are two choices for running a sampler collection: Batch submission and multithreading.
         If num_jobs and scratch_dir are specified, then we perform batch submission.
@@ -29,10 +28,12 @@ class SamplerCollection:
         @param num_jobs: number of jobs to submit when performing gibbs sampling
         @param scratch_dir: a tmp directory to write files in for the batch submission manager
         @param num_threads: number of threads to run to perform gibbs sampling
+        @param pool: multiprocessing pool previously initialized before model fitting
         """
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
         self.num_threads = num_threads
+        self.pool = pool
 
         self.sampler_cls = sampler_cls
         self.theta = theta
@@ -59,11 +60,8 @@ class SamplerCollection:
             batch_manager = BatchSubmissionManager(worker_list, shared_obj, self.num_jobs, os.path.join(self.scratch_dir, "gibbs_workers"))
             sampled_orders_list = batch_manager.run()
         elif self.num_threads is not None and self.num_threads > 1:
-            self.pool = Pool(self.num_threads)
             proc_manager = MultiprocessingManager(self.pool, worker_list)
             sampled_orders_list = proc_manager.run()
-            self.pool.close()
-            self.pool.join()
         else:
             sampled_orders_list = [worker.run(shared_obj) for worker in worker_list]
 

@@ -1,5 +1,4 @@
 import time
-from multiprocessing import Pool
 import numpy as np
 import scipy as sp
 from scipy.sparse import csr_matrix, dok_matrix
@@ -28,7 +27,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, num_threads=1):
+    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, num_threads=1, pool=None):
         self.feature_generator = feat_generator
         self.samples = samples
         self.theta_mask = theta_mask
@@ -39,7 +38,8 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.fuse_center_only = fuse_center_only
 
         self.num_threads = num_threads
-        self.pool = Pool(self.num_threads)
+        self.pool = pool
+
         self.precalc_data = self._create_precalc_data_parallel(samples)
 
         self.post_init()
@@ -49,15 +49,11 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     def close(self):
         """ Close pools if there is a pool open """
-        # Ensure no more new jobs submitted to the pool
-        self.pool.close()
-        # Wait for the worker processes to exit -- make sure we don't keep these processes open!
-        # Otherwise memory usage goes crazy
-        self.pool.join()
+        raise NotImplementedError()
 
     def open(self):
         """ Reopen the pools if they have been closed """
-        self.pool = Pool(self.num_threads)
+        raise NotImplementedError()
 
     def solve(self):
         """

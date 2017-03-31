@@ -2,7 +2,6 @@ from cvxpy import *
 import time
 import numpy as np
 import logging as log
-from multiprocessing import Pool
 
 from survival_problem_prox import SurvivalProblemProximal
 from common import *
