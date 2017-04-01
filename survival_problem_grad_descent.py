@@ -47,14 +47,6 @@ class SurvivalProblemCustom(SurvivalProblem):
     def post_init(self):
         return
 
-    def close(self):
-        """ Close pools if there is a pool open """
-        raise NotImplementedError()
-
-    def open(self):
-        """ Reopen the pools if they have been closed """
-        raise NotImplementedError()
-
     def solve(self):
         """
         Solve the problem and return the solution. Make sure to call self.pool.close()!!!
