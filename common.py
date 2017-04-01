@@ -81,7 +81,7 @@ def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5):
             len(spot['right_flank']) > motif_len/2:
                 # this hot/cold spot is not a part of our motif size
                 continue
-            
+
         left_pad = spot['left_flank'].rjust(motif_len/2, 'N')
         right_pad = spot['right_flank'].ljust(motif_len/2, 'N')
         kmer_list.append(left_pad + spot['central'] + right_pad)
@@ -162,8 +162,8 @@ def get_possible_motifs_to_targets(motif_list, mask_shape):
 
     # Estimating a different theta vector for different target nucleotides
     # We cannot have a motif mutate to the same center nucleotide
-    center_motif_idx = len(motif_list[0])/2
     for i in range(len(motif_list)):
+        center_motif_idx = len(motif_list[i])/2
         center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
         theta_mask[i, center_nucleotide_idx] = False
     return theta_mask

@@ -84,7 +84,7 @@ class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
         mutate_positions = []
         for p in pos_to_mutate:
             motif_idx = feature_vec_dict[p]
-            hazard_weights.append(np.exp(self.thetas[motif_idx,0]))
+            hazard_weights.append(np.exp(self.thetas[motif_idx,0].sum(axis=0)))
             mutate_positions.append(p)
 
         # sample the time for the next mutation
@@ -98,7 +98,10 @@ class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
         sampled_idx = sample_multinomial(hazard_weights)
         mutate_pos = mutate_positions[sampled_idx]
         mutate_feat_idx = feature_vec_dict[mutate_pos]
-        nucleotide_target_idx = sample_multinomial(self.probability_matrix[mutate_feat_idx,:])
+        nucleotide_target_idx = sample_multinomial(
+            # Silly hack: generate probabilities for the target nucleotide by averaging across the different features.
+            self.probability_matrix[mutate_feat_idx,:].sum(axis=0)/len(mutate_feat_idx)
+        )
         return mutate_time_delta, mutate_pos, NUCLEOTIDES[nucleotide_target_idx]
 
 class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
@@ -127,11 +130,11 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         target_nucleotides = []
         mutate_positions = []
         for p in pos_to_mutate:
-            motif_idx = feature_vec_dict[p]
+            motif_idxs = feature_vec_dict[p]
             nucleotide_to_mutate = intermediate_seq[p]
             for theta_idx, target_nucleotide in enumerate(NUCLEOTIDES):
                 if target_nucleotide != nucleotide_to_mutate:
-                    hazard_weights.append(np.exp(self.thetas[motif_idx, theta_idx]))
+                    hazard_weights.append(np.exp(self.thetas[motif_idxs, theta_idx].sum(axis=0)))
                     target_nucleotides.append(target_nucleotide)
                     mutate_positions.append(p)
 
