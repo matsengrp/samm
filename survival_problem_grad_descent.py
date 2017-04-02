@@ -27,7 +27,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, num_threads=1, pool=None):
+    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, pool=None):
         self.feature_generator = feat_generator
         self.samples = samples
         self.theta_mask = theta_mask
@@ -37,7 +37,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.fuse_windows = fuse_windows
         self.fuse_center_only = fuse_center_only
 
-        self.num_threads = num_threads
         self.pool = pool
 
         self.precalc_data = self._create_precalc_data_parallel(samples)
@@ -57,9 +56,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         calculate the precalculated data for each sample in parallel
         """
-        if self.pool is None:
-            raise ValueError("Pool has not been initialized")
-
         rand_seed = get_randint()
         worker_list = [
             PrecalcDataWorker(
@@ -70,8 +66,8 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.per_target_model,
             ) for i, sample in enumerate(samples)
         ]
-        if self.num_threads > 1:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list, num_approx_batches=self.num_threads * batch_factor)
+        if self.pool is not None:
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list, num_approx_batches=self.pool._processes * batch_factor)
             precalc_data = multiproc_manager.run()
         else:
             precalc_data = [worker.run(None) for worker in worker_list]
@@ -101,20 +97,17 @@ class SurvivalProblemCustom(SurvivalProblem):
                             We make `num_threads` * `batch_factor` batches
         @return vector of log likelihood values
         """
-        if self.pool is None:
-            raise ValueError("Pool has not been initialized")
-
         exp_theta = np.exp(theta)
         rand_seed = get_randint()
         worker_list = [
             ObjectiveValueWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
         ]
-        if self.num_threads > 1:
+        if self.pool is not None:
             multiproc_manager = MultiprocessingManager(
                 self.pool,
                 worker_list,
                 shared_obj=exp_theta,
-                num_approx_batches=self.num_threads * batch_factor,
+                num_approx_batches=self.pool._processes * batch_factor,
             )
             ll = multiproc_manager.run()
         else:
@@ -129,20 +122,17 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         Calculate the gradient of the negative log likelihood - delegates to separate cpu threads if threads > 1
         """
-        if self.pool is None:
-            raise ValueError("Pool has not been initialized")
-
         exp_thetaT = np.exp(theta).T
         rand_seed = get_randint()
         worker_list = [
             GradientWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
         ]
-        if self.num_threads > 1:
+        if self.pool is not None:
             multiproc_manager = MultiprocessingManager(
                 self.pool,
                 worker_list,
                 shared_obj=exp_thetaT,
-                num_approx_batches=self.num_threads * batch_factor,
+                num_approx_batches=self.pool._processes * batch_factor,
             )
             l = multiproc_manager.run()
         else:
