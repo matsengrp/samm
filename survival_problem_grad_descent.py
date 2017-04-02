@@ -109,7 +109,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.pool,
                 worker_list,
                 shared_obj=theta,
-                num_approx_batches=self.num_threads * batch_factor,
+                num_approx_batches=self.pool._processes * batch_factor,
             )
             ll = multiproc_manager.run()
         else:
@@ -133,7 +133,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.pool,
                 worker_list,
                 shared_obj=theta,
-                num_approx_batches=self.num_threads * batch_factor,
+                num_approx_batches=self.pool._processes * batch_factor,
             )
             l = multiproc_manager.run()
         else:
