@@ -12,7 +12,7 @@ class GreedyLikelihoodComparer:
     Given a list of models to compare, this will use a greedy method to compare them
     """
     @staticmethod
-    def do_greedy_search(val_set, feat_generator, models, sort_func, burn_in, num_samples, num_jobs, scratch_dir):
+    def do_greedy_search(val_set, feat_generator, models, sort_func, burn_in, num_samples, num_jobs, scratch_dir, pool=None):
         """
         @param val_set: list of ObservedSequenceMutations
         @param feat_generator: FeatureGenerator
@@ -34,6 +34,7 @@ class GreedyLikelihoodComparer:
             burn_in=burn_in,
             num_jobs=num_jobs,
             scratch_dir=scratch_dir,
+            pool=pool,
         )
         for model in sorted_models[1:]:
             log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(model.theta)
@@ -48,6 +49,7 @@ class GreedyLikelihoodComparer:
                     burn_in=burn_in,
                     num_jobs=num_jobs,
                     scratch_dir=scratch_dir,
+                    pool=pool,
                 )
         return best_model
 
@@ -63,7 +65,7 @@ class LikelihoodComparer:
 
     Therefore we can compare theta parameters using the Q function
     """
-    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=10, burn_in=0, num_jobs=1, scratch_dir="", num_threads=1):
+    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=10, burn_in=0, num_jobs=1, scratch_dir="", pool=None):
         """
         @param obs_data: list of ObservedSequenceMutations
         @param feat_generator: SubmotifFeatureGenerator
@@ -72,12 +74,13 @@ class LikelihoodComparer:
         @param burn_in: number of burn in samples
         @param num_jobs: number of jobs to submit
         @param scratch_dir: tmp dir for batch submission manager
+        @param pool: multiprocessing pool previously initialized before model fitting
         """
         self.theta_ref = theta_ref
         self.num_samples = num_samples
         self.feat_generator = feat_generator
         self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES
-        self.num_threads = num_threads
+        self.pool = pool
 
         log.info("Creating likelihood comparer")
         st_time = time.time()
@@ -110,13 +113,9 @@ class LikelihoodComparer:
             penalty_params=[0],
             per_target_model=self.per_target_model,
             theta_mask=None,
-            num_threads=self.num_threads,
+            pool=self.pool,
         )
         log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
-        self.close()
-
-    def close(self):
-        self.prob.close()
 
     def get_log_likelihood_ratio(self, theta, max_iters=2):
         """
@@ -124,11 +123,9 @@ class LikelihoodComparer:
         @param theta: the model parameter to compare against
         @return Q(theta | theta ref) - Q(theta ref | theta ref)
         """
-        self.prob.open()
         ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
         mean_ll_ratio = np.mean(ll_ratio_vec)
         ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
-        self.close()
 
         curr_iter = 1
         while lower_bound < 0 and upper_bound > 0:
@@ -153,12 +150,11 @@ class LikelihoodComparer:
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
                 theta_mask=None,
-                num_threads=self.num_threads,
+                pool=self.pool,
             )
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
             mean_ll_ratio = np.mean(ll_ratio_vec)
             ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
-            self.close()
 
             curr_iter += 1
             if curr_iter > max_iters:

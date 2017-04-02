@@ -8,7 +8,7 @@ from sampler_collection import SamplerCollection
 from profile_support import profile
 
 class MCMC_EM:
-    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, num_threads=1, scratch_dir='_output'):
+    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', pool=None):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
@@ -17,7 +17,6 @@ class MCMC_EM:
         @param base_num_e_samples: number of E-step samples to draw initially
         @param max_m_iters: maximum number of iterations for the M-step
         @param num_jobs: number of jobs to submit for E-step
-        @param num_threads: number of threads to use for M-step
         """
         self.train_data = train_data
         self.val_data = val_data
@@ -28,7 +27,7 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
         self.num_jobs = num_jobs
-        self.num_threads = num_threads
+        self.pool = pool
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
         self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES
@@ -97,7 +96,7 @@ class MCMC_EM:
                     self.theta_mask,
                     fuse_windows=fuse_windows,
                     fuse_center_only=fuse_center_only,
-                    num_threads=self.num_threads,
+                    pool=self.pool,
                 )
 
                 theta, pen_exp_log_lik, log_lik_diff, lower_bound = problem.solve(

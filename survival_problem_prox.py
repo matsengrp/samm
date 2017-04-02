@@ -2,7 +2,6 @@ import time
 import numpy as np
 import scipy as sp
 import logging as log
-from multiprocessing import Pool
 from profile_support import profile
 
 from common import *
@@ -31,7 +30,6 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @return final fitted value of theta and penalized log likelihood
         """
         theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, min_iters, verbose)
-        self.close()
 
         return theta, -current_value, diff, -upper_bound
 
