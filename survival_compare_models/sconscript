@@ -91,11 +91,12 @@ def generate(env, outdir, c):
 
 # Nest for fitting models
 model_single_options = [
-    'survival_none', # No penalty parameters
-    'survival_L',
-    'survival_FL',
-    'basic',
-    'shmulate', # shmulate fits both a per-target-model and a single hazard model
+    'survival_L7'
+    #'survival_none', # No penalty parameters
+    #'survival_L',
+    #'survival_FL',
+    #'basic',
+    #'shmulate', # shmulate fits both a per-target-model and a single hazard model
 ]
 model_per_target_options = [
     'survival_none4', # No penalty parameters
@@ -141,12 +142,14 @@ def fit_context_model(env, outdir, c):
             tune_ratio = 0
         elif model_option == "L4":
             model_option = "L"
+        else:
+            model_option = "L"
 
         cmd = ['python fit_context_model.py',
                '--seed',
                c['seed'],
                '--motif-len',
-               5,
+               7,
                '--em-max-iters',
                15,
                '--penalty-params',
@@ -193,7 +196,7 @@ def fit_context_model(env, outdir, c):
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        [join(outdir, 'fitted_test.pkl'), join(outdir, 'log_test.txt')],
         c['generate'],
         ' '.join(map(str, cmd)))
 

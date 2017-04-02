@@ -20,6 +20,7 @@ import scipy.stats
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
@@ -72,10 +73,10 @@ def parse_args():
         help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, SFL = sparse fused lasso,',
         choices=["CL", "CFL", "L", "FL", "SFL"],
         default="L")
-    parser.add_argument('--motif-len',
-        type=int,
+    parser.add_argument('--motif-lens',
+        type=str,
         help='length of motif (must be odd)',
-        default=5)
+        default='5')
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -177,7 +178,9 @@ def parse_args():
     else:
         args.theta_num_col = 1
 
-    assert(args.motif_len % 2 == 1 and args.motif_len > 1)
+    args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
+    for m in args.motif_lens:
+        assert(m % 2 == 1)
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -312,13 +315,13 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
             args.input_genes,
             args.input_seqs,
-            motif_len=args.motif_len,
+            motif_len=max(args.motif_lens),
             sample=args.sample_regime,
             locus=args.locus,
             species=args.species,
@@ -334,9 +337,9 @@ def main(args=sys.argv[1:]):
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-    log.info("Data statistics:")
-    log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
-    log.info(get_data_statistics_print_lines(obs_data, feat_generator))
+    # log.info("Data statistics:")
+    # log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
+    # log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
@@ -417,7 +420,7 @@ def main(args=sys.argv[1:]):
                     )
 
             # Get the probabilities of the target nucleotides
-            fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
+            fitted_prob_vector = None #MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
             curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector)
 
             # We save the final theta (potentially trained over all the data)
@@ -477,7 +480,7 @@ def main(args=sys.argv[1:]):
             max_em_iters=args.em_max_iters,
             train_and_val=True
         )
-        best_fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
+        best_fitted_prob_vector = None#MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
         best_model = MethodResults(
             best_model.penalty_params,
             best_theta,

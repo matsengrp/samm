@@ -10,6 +10,7 @@ from models import ObservedSequenceMutations
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
 class Gibbs_TestCase(unittest.TestCase):
@@ -18,54 +19,39 @@ class Gibbs_TestCase(unittest.TestCase):
         np.random.seed(10)
         cls.motif_len = 3
         cls.BURN_IN = 10
-        cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
-        motif_list = cls.feat_gen.motif_list
+        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[3])
+        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[1,3])
+        cls.obs = ObservedSequenceMutations("attcaaatgatatac", "ataaatagggtttac", cls.motif_len)
 
-        cls.obs_seq_m = cls.feat_gen.create_base_features(ObservedSequenceMutations("attcgtatac", "ataagttatc", cls.motif_len))
-
-        cls.theta = np.random.rand(cls.feat_gen.feature_vec_len, 1) * 2
-        cls.gibbs_sampler = MutationOrderGibbsSampler(cls.theta, cls.feat_gen, cls.obs_seq_m)
-
-        # This generates a theta with random entries
-        cls.multi_theta = np.random.rand(cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
-        theta_mask = get_possible_motifs_to_targets(cls.feat_gen.motif_list, cls.multi_theta.shape)
-        cls.multi_theta[~theta_mask] = -np.inf
-        cls.multi_gibbs_sampler = MutationOrderGibbsSampler(cls.multi_theta, cls.feat_gen, cls.obs_seq_m)
-
-        cls.probability_matrix = np.ones((cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES))/3.0
-        possible_motif_mask = get_possible_motifs_to_targets(motif_list, (cls.feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
-        impossible_motif_mask = ~possible_motif_mask
-        cls.probability_matrix[impossible_motif_mask] = 0
-
-    def _test_compute_log_probs(self, per_target_model):
+    def _test_compute_log_probs(self, feat_gen, per_target_model):
         if per_target_model:
-            theta = self.multi_theta
-            sampler = self.multi_gibbs_sampler
+            theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
         else:
-            theta = self.theta
-            sampler = self.gibbs_sampler
+            theta = np.random.rand(feat_gen.feature_vec_len, 1) * 2
+        obs_seq_m = feat_gen.create_base_features(self.obs)
+        sampler = MutationOrderGibbsSampler(theta, feat_gen, obs_seq_m)
 
-        order = self.obs_seq_m.mutation_pos_dict.keys()
+        order = obs_seq_m.mutation_pos_dict.keys()
 
         # This calculates denominators efficiently using deltas
         feat_mut_steps, log_numerators, denominators = sampler._compute_log_probs_from_scratch(order)
 
         self.assertEqual(len(log_numerators), len(order))
         self.assertEqual(len(denominators), len(order))
-        seq_str = self.obs_seq_m.start_seq
+        seq_str = obs_seq_m.start_seq
         for i in range(len(order)):
             mutating_pos = order[i]
-            col_idx = NUCLEOTIDE_DICT[self.obs_seq_m.end_seq[mutating_pos]] if per_target_model else 0
-            log_num = theta[feat_mut_steps[i].mutating_pos_feat, col_idx]
-            feature_dict = self.feat_gen.create_for_sequence(
+            col_idx = NUCLEOTIDE_DICT[obs_seq_m.end_seq[mutating_pos]] if per_target_model else 0
+            log_num = theta[feat_mut_steps[i].mutating_pos_feats, col_idx].sum()
+            feature_dict = feat_gen.create_for_sequence(
                 seq_str,
-                self.obs_seq_m.left_flank,
-                self.obs_seq_m.right_flank,
-                set(range(self.obs_seq_m.seq_len)) - set(order[:i])
+                obs_seq_m.left_flank,
+                obs_seq_m.right_flank,
+                set(range(obs_seq_m.seq_len)) - set(order[:i])
             )
             # Calculates denominators from scratch - sum(exp(psi * theta))
             denom = np.exp([
-                theta[feat_idx, :] for feat_idx in feature_dict.values()
+                theta[feat_idx, :].sum(axis=0) for feat_idx in feature_dict.values()
             ]).sum()
             self.assertEqual(log_num, log_numerators[i])
             self.assertTrue(np.isclose(denom, denominators[i]))
@@ -73,22 +59,26 @@ class Gibbs_TestCase(unittest.TestCase):
             seq_str = mutate_string(
                 seq_str,
                 order[i],
-                self.obs_seq_m.end_seq[order[i]]
+                obs_seq_m.end_seq[order[i]]
             )
 
     def test_compute_log_probs(self):
-        self._test_compute_log_probs(False)
-        self._test_compute_log_probs(True)
+        self._test_compute_log_probs(self.feat_gen_hier, False)
+        self._test_compute_log_probs(self.feat_gen_hier, True)
 
-    def test_compute_log_probs_with_reference(self):
-        prev_order = self.obs_seq_m.mutation_pos_dict.keys()
+    def _test_compute_log_probs_with_reference(self, feat_gen):
+        obs_seq_m = feat_gen.create_base_features(self.obs)
+        theta = np.random.rand(feat_gen.feature_vec_len, 1) * 2
+        sampler = MutationOrderGibbsSampler(theta, feat_gen, obs_seq_m)
+
+        prev_order = obs_seq_m.mutation_pos_dict.keys()
         curr_order = prev_order[:2] + [prev_order[3], prev_order[2]] + prev_order[4:]
 
-        prev_feat_mutation_steps, prev_log_numerators, prev_denominators = self.gibbs_sampler._compute_log_probs_from_scratch(
+        prev_feat_mutation_steps, prev_log_numerators, prev_denominators = sampler._compute_log_probs_from_scratch(
             prev_order,
         )
 
-        _, curr_log_numerators, curr_denominators = self.gibbs_sampler._compute_log_probs_from_scratch(
+        _, curr_log_numerators, curr_denominators = sampler._compute_log_probs_from_scratch(
             curr_order,
         )
 
@@ -97,7 +87,7 @@ class Gibbs_TestCase(unittest.TestCase):
             prev_log_numerators,
             prev_denominators,
         )
-        _, fast_log_numerators, fast_denominators = self.gibbs_sampler._compute_log_probs_with_reference(
+        _, fast_log_numerators, fast_denominators = sampler._compute_log_probs_with_reference(
             curr_order,
             gibbs_step_info,
             update_step_start=2,
@@ -105,24 +95,31 @@ class Gibbs_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(curr_denominators, fast_denominators))
         self.assertTrue(np.allclose(curr_log_numerators, fast_log_numerators))
 
-    def _test_joint_distribution(self, theta):
+    def test_compute_log_probs_with_reference(self):
+        self._test_compute_log_probs_with_reference(self.feat_gen)
+        self._test_compute_log_probs_with_reference(self.feat_gen_hier)
+
+    def _test_joint_distribution(self, feat_gen, theta):
         """
         Check that the distribution of mutation orders is similar when we generate mutation orders directly
         from the survival model vs. when we generate mutation orders given the mutation positions from the
         gibbs sampler
         """
         START_SEQ = "attcgc" # MUST BE LESS THAN TEN, Includes flanks!
-        NUM_OBS_SAMPLES = 8000
         BURN_IN = 15
         CENSORING_TIME = 2.0
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
+        NUM_OBS_SAMPLES=8000
 
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
         if not per_target_model:
-            surv_simulator = SurvivalModelSimulatorSingleColumn(theta, self.probability_matrix, self.feat_gen, lambda0=LAMBDA0)
+            probability_matrix = np.ones((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))/3.0
+            possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list, (feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
+            probability_matrix[~possible_motif_mask] = 0
+            surv_simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, feat_gen, lambda0=LAMBDA0)
         else:
-            surv_simulator = SurvivalModelSimulatorMultiColumn(theta, self.feat_gen, lambda0=LAMBDA0)
+            surv_simulator = SurvivalModelSimulatorMultiColumn(theta, feat_gen, lambda0=LAMBDA0)
 
         # Simulate some data from the same starting sequence
         # Get the distribution of mutation orders from our survival model
@@ -130,11 +127,11 @@ class Gibbs_TestCase(unittest.TestCase):
         # We make the mutation orders strings so easy to process
         true_order_distr = ["".join(map(str,m.get_mutation_order())) for m in full_seq_muts]
         obs_seq_mutations = [
-            self.feat_gen.create_base_features(
+            feat_gen.create_base_features(
                 ObservedSequenceMutations(
                     m.left_flank + m.start_seq + m.right_flank,
                     m.left_flank + m.end_seq + m.right_flank,
-                    self.motif_len,
+                    motif_len=3,
                 )
             ) for m in full_seq_muts
         ]
@@ -143,7 +140,7 @@ class Gibbs_TestCase(unittest.TestCase):
         # given known mutation positions)
         gibbs_order = []
         for i, obs_seq_m in enumerate(obs_seq_mutations):
-            gibbs_sampler = MutationOrderGibbsSampler(theta, self.feat_gen, obs_seq_m)
+            gibbs_sampler = MutationOrderGibbsSampler(theta, feat_gen, obs_seq_m)
             gibbs_samples = gibbs_sampler.run(obs_seq_m.mutation_pos_dict.keys(), BURN_IN, 1)
             order_sample = gibbs_samples.samples[0].mutation_order
             order_sample = map(str, order_sample)
@@ -169,7 +166,13 @@ class Gibbs_TestCase(unittest.TestCase):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
-        rho, pval = self._test_joint_distribution(self.theta)
+        theta = np.random.rand(self.feat_gen.feature_vec_len, 1) * 2
+        rho, pval = self._test_joint_distribution(self.feat_gen, theta)
+        self.assertTrue(rho > 0.95)
+        self.assertTrue(pval < 1e-33)
+
+        theta = np.random.rand(self.feat_gen_hier.feature_vec_len, 1)
+        rho, pval = self._test_joint_distribution(self.feat_gen_hier, theta)
         self.assertTrue(rho > 0.95)
         self.assertTrue(pval < 1e-33)
 
@@ -177,7 +180,19 @@ class Gibbs_TestCase(unittest.TestCase):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
         """
-        rho, pval = self._test_joint_distribution(self.multi_theta)
+        def _make_multi_theta(feat_gen):
+            # This generates a theta with random entries
+            multi_theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
+            theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, multi_theta.shape)
+            multi_theta[~theta_mask] = -np.inf
+            return multi_theta
 
+        multi_theta = _make_multi_theta(self.feat_gen)
+        rho, pval = self._test_joint_distribution(self.feat_gen, multi_theta)
         self.assertTrue(rho > 0.96)
         self.assertTrue(pval < 1e-37)
+
+        multi_theta = _make_multi_theta(self.feat_gen_hier)/2
+        rho, pval = self._test_joint_distribution(self.feat_gen_hier, multi_theta)
+        self.assertTrue(rho > 0.92)
+        self.assertTrue(pval < 1e-28)
