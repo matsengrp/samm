@@ -9,7 +9,7 @@ import re
 
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
-from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from common import *
 from read_data import GERMLINE_PARAM_FILE
 
@@ -208,7 +208,7 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
     motif_list = feat_generator.motif_list
 
     true_thetas, probability_matrix, nonzero_motifs = _generate_true_parameters(motif_list, args)

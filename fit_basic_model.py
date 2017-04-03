@@ -18,7 +18,7 @@ import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from common import *
 from read_data import read_gene_seq_csv_data
@@ -66,7 +66,7 @@ def parse_args():
     parser.add_argument('--out-file',
         type=str,
         help='file to output fitted proportions',
-        default='_output/prop_file.pkl')
+        default='_output/basic_file.pkl')
     parser.add_argument('--log-file',
         type=str,
         help='file to output logs',
@@ -87,9 +87,9 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
 
-    obs_data = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
+    obs_data, metadata = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
 
     motif_list = feat_generator.motif_list
 
@@ -100,10 +100,18 @@ def main(args=sys.argv[1:]):
         germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
 
         for key, value in germline_motifs.iteritems():
-            appearances[motif_list[value]] += 1
+            appearances[motif_list[value[0]]] += 1
 
         for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
-            mutations[motif_list[germline_motifs[mut_pos]]][mut_nuc] += 1
+            feat_idx = (germline_motifs[mut_pos])[0]
+            mutations[motif_list[feat_idx]][mut_nuc] += 1
+
+    # Print number of times the motifs appear in the starting sequence
+    motif_appear_counts = [(m, k) for m, k in appearances.iteritems()]
+    motif_appear_counts_sorted = sorted(motif_appear_counts, key=lambda x: x[1], reverse=True)
+    log.info("Appearances in the starting sequence")
+    for m,k in motif_appear_counts_sorted:
+        log.info("%s: %d" % (m, k))
 
     if args.per_target_model:
         proportions = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
@@ -118,12 +126,19 @@ def main(args=sys.argv[1:]):
         probability_dict = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
         for key in motif_list:
             num_mutations = sum(mutations[key].values())
-            if num_mutations > 0:
+            # if num_mutations > 0:
+            if num_mutations > 0 and appearances[key] > 150:
                 proportions[key] = 1. * num_mutations / appearances[key]
                 for nucleotide in NUCLEOTIDES:
                     probability_dict[key][nucleotide] = 1. * mutations[key][nucleotide] / num_mutations
         prop_list = np.array([proportions[motif_list[i]] for i in range(len(motif_list))])
         probability_matrix = np.array([[probability_dict[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
+
+        # Print theta values
+        log.info("Fitted theta values")
+        motif_theta_vals = [(motif_list[i], proportions[motif_list[i]]) for i in range(len(motif_list))]
+        for m, t in sorted(motif_theta_vals, key=lambda x: x[1]):
+            log.info("%s: %f" % (m, t))
 
     with open(args.out_file, 'w') as pickle_file:
         pickle.dump((prop_list, probability_matrix), pickle_file)
