@@ -342,10 +342,10 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
                     # don't consider pairs where mutations occur in flanking regions
                     obs_data.append(obs_seq_mutation)
                     metadata.append(elt)
-                elif obs_seq_mutation.num_mutations > n_mutes:
+                elif sample == 3 and obs_seq_mutation.num_mutations > n_mutes:
                     current_obs_seq_mutation = obs_seq_mutation
 
-            if sample == 'sample-highly-mutated':
+            if sample == 3:
                 obs_data.append(current_obs_seq_mutation)
                 metadata.append(elt)
 

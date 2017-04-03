@@ -276,7 +276,7 @@ def initialize_theta(theta_shape, theta_mask):
     """
     Initialize theta -- start with all zeros
     """
-    theta = np.zeros(theta_shape)
+    theta = np.random.randn(theta_shape[0], theta_shape[1]) * 1e-3
     # Set the impossible thetas to -inf
     theta[~theta_mask] = -np.inf
     return theta
