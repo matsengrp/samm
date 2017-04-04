@@ -61,10 +61,10 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         # Create the base_feat_vec_dicts and base_intermediate_seqs
         # (position 2 mutates last)
         base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
-        self.assertEqual(base_feat_mut_steps[0].mutating_pos_feat, 3)
+        self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 3)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
-        self.assertEqual(base_feat_mut_steps[1].mutating_pos_feat, 16 * 3 + 3 * 4 + 3)
+        self.assertEqual(base_feat_mut_steps[1].mutating_pos_feats, 16 * 3 + 3 * 4 + 3)
         self.assertEqual(base_feat_mut_steps[1].neighbors_feat_old[1], 15)
         self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new[1], 63)
         self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new.keys(), [1])
@@ -118,9 +118,9 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 2]),
         )
         self.assertEqual(first_mutation_feat, 14)
-        self.assertEqual(feat_mut_steps1[-2].mutating_pos_feat, 14)
-        self.assertEqual(second_mut_step.mutating_pos_feat, 0)
-        self.assertEqual(feat_mut_steps1[-1].mutating_pos_feat, 0)
+        self.assertEqual(feat_mut_steps1[-2].mutating_pos_feats, 14)
+        self.assertEqual(second_mut_step.mutating_pos_feats, 0)
+        self.assertEqual(feat_mut_steps1[-1].mutating_pos_feats, 0)
 
         # Compare update to create feature vectors by changing the mutation order by another step
         # Shuffle second to last with the third to last mutation positions
@@ -145,7 +145,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 3]),
         )
         self.assertEqual(first_mutation_feat2, 14)
-        self.assertEqual(second_mut_step2.mutating_pos_feat, 14)
+        self.assertEqual(second_mut_step2.mutating_pos_feats, 14)
         self.assertEqual(second_mut_step2.neighbors_feat_old, {9: 57, 7: 3})
         self.assertEqual(second_mut_step2.neighbors_feat_new, {9: 9, 7: 0})
         self.assertEqual(second_mut_step2.neighbors_feat_old, feat_mut_steps2[-2].neighbors_feat_old)
