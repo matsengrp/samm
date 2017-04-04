@@ -14,7 +14,8 @@ def parse_args():
 
     parser.add_argument('--data-path',
         type=str,
-        help='location of data')
+        help='location of data',
+        default=None)
     parser.add_argument('--input-genes',
         type=str,
         default=None,

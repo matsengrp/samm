@@ -6,11 +6,10 @@ from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
+from matsen_grp_data import SCRATCH_DIR
 
 Import('env')
 localenv = env.Clone()
-
-MOTIF_LEN = 5
 
 # Set up state
 base = {'nreps': localenv['NREPS'],
@@ -18,13 +17,23 @@ base = {'nreps': localenv['NREPS'],
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-sim_size_dict = [{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50},
-                 {'size': 'big', 'n_taxa': 10, 'n_germlines': 100, 'germline_size': 200}]
+sim_size_dict = [
+    #{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50},
+    {'size': 'big', 'n_taxa': 10, 'n_germlines': 100, 'germline_size': 200},
+]
 
 nest.add(
     'simulation_size',
     sim_size_dict,
     label_func=lambda c: c['size'])
+
+nest.add(
+    'motif_length',
+    [
+        #3,
+        5,
+    ],
+    label_func='{:02d}mers'.format)
 
 # Nest for replicates
 nest.add(
@@ -56,7 +65,11 @@ def generate(env, outdir, c):
                 'python preprocess_data.py',
                 '--input-genes ${TARGETS[1]}',
                 '--input-seqs ${TARGETS[2]}',
+                '--motif-len',
+                c['motif_length'],
                 '--impute-ancestors',
+                '--scratch-directory',
+                SCRATCH_DIR,
                 '--output-genes ${TARGETS[5]}',
                 '--output-seqs ${TARGETS[6]}']
 
@@ -67,64 +80,78 @@ def generate(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
-# Nest for fitting models
-model_options = [
-    'basic',
-    'survival',
-]
-
+# Targets
 nest.add(
     'model_options',
-    model_options)
-
-nest.add(
-    'model_call',
-    lambda c: ['python fit_basic_model.py' if c['model_options']=='basic' else 'python fit_context_model.py'],
-    create_dir=False)
-
-nest.add(
-    'model_extra_options',
-    lambda c: ['' if c['model_options']=='basic' else \
-        '--em-max-iters 5 --penalty-params "0.01,0.001,0.0001" --num-cpu-threads 4 --num-jobs 30 --burn-in 1 --num-e-samples 2'],
-    create_dir=False)
-
-data_options = [
-    'true_ancestors',
-    'all_data',
-    'sample_random',
-    'sample_highly_mutated',
-    'impute_ancestors'
-]
+    [
+        'survival_ref',
+    ])
 
 nest.add(
     'data_options',
-    data_options)
+    [
+        'true_ancestors',
+        'all_data',
+        'sample_random',
+        'sample_highly_mutated',
+        'impute_ancestors'
+    ])
 
-# Nest for model fitting
+# Nest for deciding parameter ranges
 @nest.add_target_with_env(localenv)
 def fit_model(env, outdir, c):
-    cmd = [c['model_call']] + ['--seed',
-            c['seed'],
-            '--motif-len',
-            MOTIF_LEN,
+    cmd = []
+    # no penalty
+    solver = 'L'
+    windows = ""
+    penalty_params = '0'
+
+    cmd = ['python fit_context_model.py',
+           '--seed',
+           c['seed'],
+           '--motif-len',
+           c['motif_length'],
+           '--solver',
+           solver,
+           '--penalty-params',
+           penalty_params,
+           '--num-cpu-threads',
+           4,
+           '--num-jobs',
+           40,
+           '--burn-in',
+           2,
+           '--num-e-samples',
+           2,
+           '--em-max-iters',
+           10,
+           '--scratch-directory',
+           SCRATCH_DIR,
             '--theta-file ${SOURCES[0]}',
-            '--out-file ${TARGETS[0]}',
-            '--log-file ${TARGETS[1]}'] + [c['model_extra_options']]
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+
     if c['data_options'] == 'true_ancestors':
         cmd += ['--input-genes ${SOURCES[3]}',
-                '--input-seqs ${SOURCES[4]}']
+                '--input-seqs ${SOURCES[4]}',
+                '--sample-regime',
+                1]
     elif c['data_options'] == 'impute_ancestors':
         cmd += ['--input-genes ${SOURCES[5]}',
-                '--input-seqs ${SOURCES[6]}']
+                '--input-seqs ${SOURCES[6]}',
+                '--sample-regime',
+                1]
     else:
         cmd += ['--input-genes ${SOURCES[1]}',
                 '--input-seqs ${SOURCES[2]}']
-        if c['data_options'] == 'all_data':
-            cmd += ['--sample-regime 1']
-        elif c['data_options'] == 'sample_random':
-            cmd += ['--sample-regime 2']
-        elif c['data_options'] == 'sample_highly_mutated':
-            cmd += ['--sample-regime 3']
+
+    if c['data_options'] == 'all_data':
+        cmd += ['--sample-regime', 1]
+    elif c['data_options'] == 'sample_random':
+        cmd += ['--sample-regime', 2]
+    elif c['data_options'] == 'sample_highly_mutated':
+        cmd += ['--sample-regime', 3]
+
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['generate'],
