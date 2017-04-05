@@ -7,7 +7,7 @@ library(lazyeval)
 library(alakazam)
 library(gridExtra)
 
-source('R/plot_barchart.R')
+source('R/plotBarchart.R')
 
 ## Uncomment output you want to plot
 ## 3mer model (basic proof of concept)
@@ -20,7 +20,7 @@ source('R/plot_barchart.R')
 data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_357mer.csv'
 motif_lens <- c(3,5,7)
 
-# Read data and convert to format plot_barchart wants
+# Read data and convert to format plotBarchart wants
 raw_data <- read.table(data_path, sep=',')
 log_mutabilities <- unlist(raw_data['V2'])
 names(log_mutabilities) <- unlist(raw_data['V1'])
@@ -36,23 +36,29 @@ if (length(motif_lens) > 1) {
             ]
     for (mute in names(filtered_log_mutes)) {
         for (sub_len in head(motif_lens, -1)) {
-            filtered_log_mutes[mute] <- filtered_log_mutes[mute] + log_mutabilities[substr(mute, max_len %/% 2 - sub_len %/% 2, max_len %/% 2 + sub_len %/% 2)]
+            filtered_log_mutes[mute] <-
+                filtered_log_mutes[mute] +
+                log_mutabilities[substr(mute,
+                                        max_len %/% 2 - sub_len %/% 2,
+                                        max_len %/% 2 + sub_len %/% 2)]
         }
     }
     # We're plotting mutabilities, so we exponentiate and scale them
-    filtered_mutes <- exp(filtered_log_mutes) / sum(exp(filtered_log_mutes), na.rm=TRUE)
+    filtered_mutes <- exp(filtered_log_mutes) /
+        sum(exp(filtered_log_mutes), na.rm=TRUE)
 } else {
     # We're plotting mutabilities, so we exponentiate and scale them
-    filtered_mutes <- exp(log_mutabilities) / sum(exp(log_mutabilities), na.rm=TRUE)
+    filtered_mutes <- exp(log_mutabilities) /
+        sum(exp(log_mutabilities), na.rm=TRUE)
 }
 
 # Plot for one nucleotide
 center_nuc <- 'A'
-plot_list <- plot_barchart(filtered_mutes, center_nuc, 'bar')
+plot_list <- plotBarchart(filtered_mutes, center_nuc, 'bar', bar.size=.25)
 do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
 
 # Plot for multiple nucleotides
 center_nuc <- c('A', 'T', 'G', 'C')
-plot_list <- plot_barchart(filtered_mutes, center_nuc, 'bar')
+plot_list <- plotBarchart(filtered_mutes, center_nuc, 'bar')
 do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
 
