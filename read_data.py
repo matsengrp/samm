@@ -32,6 +32,23 @@ SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new
 
 SAMPLE_RANDOM = 2
 
+def read_germline_file(fasta):
+    """
+    Read fasta file containing germlines
+
+    @return dataframe with column "gene" for the name of the germline gene and
+    "base" for the nucleotide content
+    """
+
+    with open(fasta) as fasta_file:
+        genes = []
+        bases = []
+        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
+            genes.append(seq_record.id)
+            bases.append(str(seq_record.seq))
+
+    return pd.DataFrame({'base': bases}, index=genes)
+
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
 def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, motif_len=1):
     """

@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import re
 import random
 import warnings
@@ -262,23 +261,6 @@ def soft_threshold(theta, thres):
     @return theta that is soft-thresholded with constant thres
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
-
-def read_germline_file(fasta):
-    """
-    Read fasta file containing germlines
-
-    @return dataframe with column "gene" for the name of the germline gene and
-    "base" for the nucleotide content
-    """
-
-    with open(fasta) as fasta_file:
-        genes = []
-        bases = []
-        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
-            genes.append(seq_record.id)
-            bases.append(str(seq_record.seq))
-
-    return pd.DataFrame({'base': bases}, index=genes)
 
 def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
     """
