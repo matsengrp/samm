@@ -76,9 +76,10 @@ def fit_context_model(env, outdir, c):
            '--input-file ${SOURCES[1]}',
            '--input-genes ${SOURCES[2]}',
            '--out-file ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
+           '--intermediate-out-file ${TARGETS[1]}',
+           '--log-file ${TARGETS[2]}']
     return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        [join(outdir, 'fitted.pkl'), join(outdir, 'fitted_intermed.pkl'), join(outdir, 'log.txt')],
         c['generate'],
         ' '.join(map(str, cmd)))
 

@@ -158,7 +158,8 @@ def tune_parameters(env, outdir, c):
                '--scratch-directory',
                SCRATCH_DIR,
                '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+               '--intermediate-out-file ${TARGETS[1]}',
+               '--log-file ${TARGETS[2]}']
         if c['validation_methods'] is not 'none':
             cmd += [
                '--validation-column',
@@ -169,7 +170,7 @@ def tune_parameters(env, outdir, c):
             cmd += ['--fuse-center-only']
 
     return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        [join(outdir, 'fitted.pkl'), join(outdir, 'fitted_intermed.pkl'), join(outdir, 'log.txt')],
         c['process_data'],
         ' '.join(map(str, cmd)))
 
