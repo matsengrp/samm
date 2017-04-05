@@ -87,25 +87,37 @@ nest.add(
         'survival_ref',
     ])
 
-nest.add(
-    'data_options',
-    [
-        'true_ancestors',
-        'all_data',
-        'sample_random',
-        'sample_highly_mutated',
-        'impute_ancestors'
-    ])
+data_dict = [
+    {'data_type': 'true_ancestors',
+     'sampling_option': 1,
+     'sources': [3,4]},
+    {'data_type': 'imputed_ancestors',
+     'sampling_option': 1,
+     'sources': [5,6]},
+    {'data_type': 'all_data',
+     'sampling_option': 1,
+     'sources': [1,2]},
+    {'data_type': 'sample_random',
+     'sampling_option': 2,
+     'sources': [1,2]},
+    {'data_type': 'sample_highly_mutated',
+     'sampling_option': 3,
+     'sources': [1,2]},
+]
 
-# Nest for deciding parameter ranges
+nest.add(
+    'data_type',
+    data_dict,
+    label_func=lambda c: c['data_type'])
+
 @nest.add_target_with_env(localenv)
-def fit_model(env, outdir, c):
-    cmd = []
+def fit_context_model(env, outdir, c):
     # no penalty
     solver = 'L'
     windows = ""
     penalty_params = '0'
 
+    data_cmd = ['--input-genes ${SOURCES[{}]} --input-seqs ${SOURCES[{}]}'.format(c['data_type']['sources'])]
     cmd = ['python fit_context_model.py',
            '--seed',
            c['seed'],
@@ -124,36 +136,18 @@ def fit_model(env, outdir, c):
            '--num-e-samples',
            2,
            '--em-max-iters',
-           10,
+           1,
            '--scratch-directory',
            SCRATCH_DIR,
-            '--theta-file ${SOURCES[0]}',
+           '--theta-file ${SOURCES[0]}',
            '--out-file ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
-
-    if c['data_options'] == 'true_ancestors':
-        cmd += ['--input-genes ${SOURCES[3]}',
-                '--input-seqs ${SOURCES[4]}',
-                '--sample-regime',
-                1]
-    elif c['data_options'] == 'impute_ancestors':
-        cmd += ['--input-genes ${SOURCES[5]}',
-                '--input-seqs ${SOURCES[6]}',
-                '--sample-regime',
-                1]
-    else:
-        cmd += ['--input-genes ${SOURCES[1]}',
-                '--input-seqs ${SOURCES[2]}']
-
-    if c['data_options'] == 'all_data':
-        cmd += ['--sample-regime', 1]
-    elif c['data_options'] == 'sample_random':
-        cmd += ['--sample-regime', 2]
-    elif c['data_options'] == 'sample_highly_mutated':
-        cmd += ['--sample-regime', 3]
+           '--intermediate-out-file ${TARGETS[1]}',
+           '--log-file ${TARGETS[2]}',
+           '--sample-regime',
+           c['data_type']['sampling_option']]
 
     return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        [join(outdir, 'fitted.pkl'), join(outdir, 'fitted_intermed.pkl'), join(outdir, 'log.txt')],
         c['generate'],
         ' '.join(map(str, cmd)))
 
