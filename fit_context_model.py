@@ -97,6 +97,10 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
+    parser.add_argument('--intermediate-out-file',
+        type=str,
+        help='file with pickled context model',
+        default='_output/context_model_intermed.pkl')
     parser.add_argument('--theta-file',
         type=str,
         help='true theta file',
@@ -187,8 +191,6 @@ def parse_args():
         args.fuse_windows = [int(k) for k in args.fuse_windows.split(",")]
     else:
         args.fuse_windows = []
-
-    args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
     args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
     if not os.path.exists(args.scratch_dir):
