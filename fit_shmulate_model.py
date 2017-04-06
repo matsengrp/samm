@@ -133,7 +133,7 @@ def main(args=sys.argv[1:]):
         pickle.dump((mut_model_array, (target_model_array, sub_model_array)), shmulate_file)
 
 def _read_shmulate_val(shmulate_value):
-    return -np.inf if shmulate_value == "NA" else float(shmulate_value)
+    return -np.inf if shmulate_value == "NA" else np.log(float(shmulate_value))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
