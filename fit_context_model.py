@@ -376,6 +376,9 @@ def main(args=sys.argv[1:]):
         pool=all_runs_pool,
     )
 
+    # Flag to tell if we're fitting a single model. For debugging for now
+    single_fit = (len(pen_params_lists) == 1) and (len(pen_params_lists[0]) == 1)
+
     burn_in = args.burn_in
     results_list = []
     best_models = []
@@ -433,6 +436,11 @@ def main(args=sys.argv[1:]):
             log.info("==== FINAL theta, %s====" % curr_model_results)
             log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.motif_len))
 
+            if single_fit:
+                # Fitting single model
+                best_model_in_list = curr_model_results
+                break
+
             if best_model_in_list is None or log_lik_ratio > 0:
                 best_model_in_list = curr_model_results
                 log.info("===== Best model so far %s" % best_model_in_list)
@@ -459,17 +467,20 @@ def main(args=sys.argv[1:]):
         best_models.append(best_model_in_list)
 
     # A greedy comparison
-    best_model = GreedyLikelihoodComparer.do_greedy_search(
-        val_set,
-        feat_generator,
-        best_models,
-        lambda m:get_num_unique_theta(m.theta),
-        args.num_val_burnin,
-        args.num_val_samples,
-        args.num_jobs,
-        args.scratch_dir,
-        pool=all_runs_pool,
-    )
+    if single_fit:
+        best_model = best_models[0]
+    else:
+        best_model = GreedyLikelihoodComparer.do_greedy_search(
+            val_set,
+            feat_generator,
+            best_models,
+            lambda m:get_num_unique_theta(m.theta),
+            args.num_val_burnin,
+            args.num_val_samples,
+            args.num_jobs,
+            args.scratch_dir,
+            pool=all_runs_pool,
+        )
 
     log.info("=== FINAL Best model: %s" % best_model)
     if not args.full_train:
