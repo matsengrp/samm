@@ -51,19 +51,6 @@ nest.add(
     lambda c: [c['replicate']],
     create_dir=False)
 
-def write_files(target, source, env):
-    c = env['control']
-    with open(str(source[0]), 'r') as f:
-        theta, _ = pickle.load(f)
-
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[c['motif_length']])
-    motif_list = feat_generator.motif_list
-    mutabilities = theta
-
-    with open(str(target[0]), 'wb') as f:
-        writer = csv.writer(f)
-        writer.writerows(izip([motif.upper() for motif in motif_list], mutabilities.ravel()))
-
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
@@ -97,39 +84,63 @@ def generate(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
+def write_truth(target, source, env):
+    c = env['control']
+    with open(str(source[0]), 'r') as f:
+        theta, _ = pickle.load(f)
+
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[c['motif_length']])
+    motif_list = feat_generator.motif_list
+    mutabilities = theta
+
+    with open(str(target[0]), 'wb') as f:
+        writer = csv.writer(f)
+        writer.writerow(
+            'rep sim model'.split() +
+            [motif.upper() for motif in motif_list]
+        )
+        writer.writerow([
+            c['replicate'],
+            c['simulation_size']['size'],
+            'truth'] +
+            mutabilities.ravel().tolist()
+        )
+
 @nest.add_target_with_env(localenv)
 def convert_truth(env, outdir, c):
     return env.Command(
         join(outdir, 'true_theta.csv'),
         c['generate'],
-        write_files,
+        write_truth,
         control=c)
 
-# Targets
-nest.add(
-    'model_options',
-    [
-        'survival_ref',
-        'shmulate',
-    ])
+nest.add_aggregate('compare_models', list)
 
 data_dict = [
     {'data_type': 'true_ancestors',
      'sampling_option': 1},
-    #{'data_type': 'imputed_ancestors',
-    # 'sampling_option': 1},
-    #{'data_type': 'all_data',
-    # 'sampling_option': 1},
-    #{'data_type': 'sample_random',
-    # 'sampling_option': 2},
-    #{'data_type': 'sample_highly_mutated',
-    # 'sampling_option': 3},
+    {'data_type': 'imputed_ancestors',
+     'sampling_option': 1},
+    {'data_type': 'all_data',
+     'sampling_option': 1},
+    {'data_type': 'sample_random',
+     'sampling_option': 2},
+    {'data_type': 'sample_highly_mutated',
+     'sampling_option': 3},
 ]
 
 nest.add(
     'data_type',
     data_dict,
     label_func=lambda c: c['data_type'])
+
+# Targets
+nest.add(
+    'model_options',
+    [
+        'survival_ref',
+        'shazam',
+    ])
 
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
@@ -169,7 +180,7 @@ def fit_context_model(env, outdir, c):
                '--log-file ${TARGETS[2]}',
                '--sample-regime',
                c['data_type']['sampling_option']]
-    elif c['model_options'] == 'shmulate':
+    elif c['model_options'] == 'shazam':
         cmd = ['python fit_shmulate_model.py',
                '--seed',
                c['seed'],
@@ -191,25 +202,55 @@ def fit_context_model(env, outdir, c):
 
 @nest.add_target_with_env(localenv)
 def convert_fit(env, outdir, c):
-    return env.Command(
+
+    def write_files(target, source, env):
+        c = env['control']
+        with open(str(source[0]), 'r') as f:
+            theta, _ = pickle.load(f)
+    
+        feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[c['motif_length']])
+        motif_list = feat_generator.motif_list
+        mutabilities = theta
+    
+        with open(str(target[0]), 'wb') as f:
+            writer = csv.writer(f)
+            writer.writerow(
+                'rep sim data model'.split() +
+                [motif.upper() for motif in motif_list]
+            )
+            writer.writerow([
+                c['replicate'],
+                c['simulation_size']['size'],
+                c['data_type']['data_type'],
+                c['model_options']] +
+                mutabilities.ravel().tolist()
+            )
+
+    c['compare_models'].append(env.Command(
         join(outdir, 'fitted.csv'),
         c['fit_context_model'],
         write_files,
-        control=c)
+        control=c))
 
+nest.pop('data_type')
+
+# concatenate into one file with parameter values and what type of data we obtained.
 @nest.add_target_with_env(localenv)
-def make_plots(env, outdir, c):
-
-    cmd = ['Rscript R/plot_vs_truth.R',
-           '${SOURCES[0]}',
-           '${SOURCES[1]}',
-           '${TARGETS[0]}',
-           '\"fitted vs. true log mutabilities ({})\"'.format(c['data_type']['data_type']),
-           '\"true log mutabilities\"',
-           '\"{} log mutabilities\"'.format(c['model_options'])]
-
+def summarize(env, outdir, c):
+    def cat_files(target, source, env):
+        with open(str(target[0]), 'w') as catted_files:
+            with open(str(source[0])) as first_file:
+                # keep header from first file
+                for line in first_file:
+                    catted_files.write(line)
+        
+            for fname in source[1:]:
+                with open(str(fname)) as next_file:
+                    next(next_file)
+                    for line in next_file:
+                        catted_files.write(line)
     return env.Command(
-        join(outdir, 'fit_vs_truth.png'),
-        [c['convert_truth'], c['convert_fit']],
-        ' '.join(map(str, cmd)))
+        join(outdir, 'results.csv'),
+        c['compare_models'],
+        cat_files)
 
