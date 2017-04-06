@@ -31,7 +31,7 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--input-file',
+    parser.add_argument('--input-seqs',
         type=str,
         help='sequence data in csv',
         default='_output/seqs.csv')
@@ -39,14 +39,14 @@ def parse_args():
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
-    parser.add_argument('--theta-file',
-        type=str,
-        help='file with pickled context model',
-        default='_output/true_theta.pkl')
-    parser.add_argument('--model-pkl',
+    parser.add_argument('--out-file',
         type=str,
         help='file to output fitted proportions (will also output csv)',
         default='_output/theta_shmulate.pkl')
+    parser.add_argument('--intermediate-out-file',
+        type=str,
+        help='intermediate file with s5f model',
+        default='_output/theta_intermed.pkl')
     parser.add_argument('--log-file',
         type=str,
         help='file to output logs',
@@ -66,7 +66,7 @@ def main(args=sys.argv[1:]):
     command = 'Rscript'
     script_file = 'R/fit_shmulate_model.R'
 
-    cmd = [command, script_file, args.input_file, args.input_genes, args.model_pkl.replace(".pkl", "")]
+    cmd = [command, script_file, args.input_seqs, args.input_genes, args.out_file.replace(".pkl", "")]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
@@ -75,7 +75,7 @@ def main(args=sys.argv[1:]):
     motif_list = feat_gen.motif_list
     # Read target matrix
     target_motif_dict = dict()
-    with open(args.model_pkl.replace(".pkl", "_target.csv"), "r") as model_file:
+    with open(args.out_file.replace(".pkl", "_target.csv"), "r") as model_file:
         csv_reader = csv.reader(model_file)
         # Assume header is ACGT
         header = csv_reader.next()
@@ -91,7 +91,7 @@ def main(args=sys.argv[1:]):
 
     # Read mutability matrix
     mut_motif_dict = dict()
-    with open(args.model_pkl.replace(".pkl", "_mut.csv"), "r") as model_file:
+    with open(args.out_file.replace(".pkl", "_mut.csv"), "r") as model_file:
         csv_reader = csv.reader(model_file)
         motifs = csv_reader.next()[1:]
         motif_vals = csv_reader.next()[1:]
@@ -100,7 +100,7 @@ def main(args=sys.argv[1:]):
 
     # Read substitution matrix
     sub_motif_dict = dict()
-    with open(args.model_pkl.replace(".pkl", "_sub.csv"), "r") as model_file:
+    with open(args.out_file.replace(".pkl", "_sub.csv"), "r") as model_file:
         csv_reader = csv.reader(model_file)
         # Assume header is ACGT
         header = csv_reader.next()
@@ -120,11 +120,17 @@ def main(args=sys.argv[1:]):
     mut_model_array = np.zeros((feat_gen.feature_vec_len, 1))
     sub_model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
     for motif_idx, motif in enumerate(motif_list):
+        mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
         for nuc in NUCLEOTIDES:
             target_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(target_motif_dict[motif][nuc])
-            mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
             sub_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(sub_motif_dict[motif][nuc])
-    pickle.dump((target_model_array, mut_model_array, sub_model_array), open(args.model_pkl, 'w'))
+
+    with open(args.out_file, 'w') as shmulate_file:
+        pickle.dump((mut_model_array, (target_model_array, sub_model_array)), shmulate_file)
+
+    # temporary hack so scons is happy
+    with open(args.intermediate_out_file, 'w') as shmulate_file:
+        pickle.dump((mut_model_array, (target_model_array, sub_model_array)), shmulate_file)
 
 def _read_shmulate_val(shmulate_value):
     return -np.inf if shmulate_value == "NA" else float(shmulate_value)
