@@ -1,12 +1,16 @@
 ## Test model fits against one another
 
 import os
+import pickle
+import csv
 
 from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
 from matsen_grp_data import SCRATCH_DIR
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from itertools import izip
 
 Import('env')
 localenv = env.Clone()
@@ -47,6 +51,19 @@ nest.add(
     lambda c: [c['replicate']],
     create_dir=False)
 
+def write_files(target, source, env):
+    c = env['control']
+    with open(str(source[0]), 'r') as f:
+        theta, _ = pickle.load(f)
+
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[c['motif_length']])
+    motif_list = feat_generator.motif_list
+    mutabilities = theta
+
+    with open(str(target[0]), 'wb') as f:
+        writer = csv.writer(f)
+        writer.writerows(izip([motif.upper() for motif in motif_list], mutabilities.ravel()))
+
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
@@ -80,29 +97,33 @@ def generate(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
+@nest.add_target_with_env(localenv)
+def convert_truth(env, outdir, c):
+    return env.Command(
+        join(outdir, 'true_theta.csv'),
+        c['generate'],
+        write_files,
+        control=c)
+
 # Targets
 nest.add(
     'model_options',
     [
         'survival_ref',
+        'shmulate',
     ])
 
 data_dict = [
     {'data_type': 'true_ancestors',
-     'sampling_option': 1,
-     'sources': [3,4]},
-    {'data_type': 'imputed_ancestors',
-     'sampling_option': 1,
-     'sources': [5,6]},
-    {'data_type': 'all_data',
-     'sampling_option': 1,
-     'sources': [1,2]},
-    {'data_type': 'sample_random',
-     'sampling_option': 2,
-     'sources': [1,2]},
-    {'data_type': 'sample_highly_mutated',
-     'sampling_option': 3,
-     'sources': [1,2]},
+     'sampling_option': 1},
+    #{'data_type': 'imputed_ancestors',
+    # 'sampling_option': 1},
+    #{'data_type': 'all_data',
+    # 'sampling_option': 1},
+    #{'data_type': 'sample_random',
+    # 'sampling_option': 2},
+    #{'data_type': 'sample_highly_mutated',
+    # 'sampling_option': 3},
 ]
 
 nest.add(
@@ -112,42 +133,81 @@ nest.add(
 
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
-    # no penalty
-    solver = 'L'
-    windows = ""
-    penalty_params = '0'
+    cmd =[]
 
-    data_cmd = ['--input-genes ${SOURCES[{}]} --input-seqs ${SOURCES[{}]}'.format(c['data_type']['sources'])]
-    cmd = ['python fit_context_model.py',
-           '--seed',
-           c['seed'],
-           '--motif-len',
-           c['motif_length'],
-           '--solver',
-           solver,
-           '--penalty-params',
-           penalty_params,
-           '--num-cpu-threads',
-           4,
-           '--num-jobs',
-           40,
-           '--burn-in',
-           2,
-           '--num-e-samples',
-           2,
-           '--em-max-iters',
-           1,
-           '--scratch-directory',
-           SCRATCH_DIR,
-           '--theta-file ${SOURCES[0]}',
-           '--out-file ${TARGETS[0]}',
-           '--intermediate-out-file ${TARGETS[1]}',
-           '--log-file ${TARGETS[2]}',
-           '--sample-regime',
-           c['data_type']['sampling_option']]
+    if c['model_options'] == 'survival_ref':
+        # no penalty
+        solver = 'L'
+        windows = ""
+        penalty_params = '0'
+    
+        cmd = ['python fit_context_model.py',
+               '--seed',
+               c['seed'],
+               '--motif-len',
+               c['motif_length'],
+               '--solver',
+               solver,
+               '--penalty-params',
+               penalty_params,
+               '--num-cpu-threads',
+               4,
+               '--num-jobs',
+               40,
+               '--burn-in',
+               2,
+               '--num-e-samples',
+               2,
+               '--em-max-iters',
+               10,
+               '--scratch-directory',
+               SCRATCH_DIR,
+               '--tuning-sample-ratio',
+               0,
+               '--out-file ${TARGETS[0]}',
+               '--intermediate-out-file ${TARGETS[1]}',
+               '--log-file ${TARGETS[2]}',
+               '--sample-regime',
+               c['data_type']['sampling_option']]
+    elif c['model_options'] == 'shmulate':
+        cmd = ['python fit_shmulate_model.py',
+               '--seed',
+               c['seed'],
+               '--out-file ${TARGETS[0]}',
+               '--intermediate-out-file ${TARGETS[1]}',
+               '--log-file ${TARGETS[2]}']
+
+    if c['data_type'] == 'true_ancestors':
+        cmd += ['--input-genes ${SOURCES[3]} --input-seqs ${SOURCES[4]}']
+    elif c['data_type'] == 'imputed_ancestors':
+        cmd += ['--input-genes ${SOURCES[5]} --input-seqs ${SOURCES[6]}']
+    else:
+        cmd += ['--input-genes ${SOURCES[1]} --input-seqs ${SOURCES[2]}']
 
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'fitted_intermed.pkl'), join(outdir, 'log.txt')],
         c['generate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def convert_fit(env, outdir, c):
+    return env.Command(
+        join(outdir, 'fitted.csv'),
+        c['fit_context_model'],
+        write_files,
+        control=c)
+
+@nest.add_target_with_env(localenv)
+def make_plots(env, outdir, c):
+
+    cmd = ['Rscript R/plot_vs_truth.R',
+           '${SOURCES[0]}',
+           '${SOURCES[1]}',
+           '${TARGETS[0]}',
+           c['model_options']]
+
+    return env.Command(
+        join(outdir, 'fit_vs_truth.png'),
+        [c['convert_truth'], c['convert_fit']],
         ' '.join(map(str, cmd)))
 
