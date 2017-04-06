@@ -204,7 +204,9 @@ def make_plots(env, outdir, c):
            '${SOURCES[0]}',
            '${SOURCES[1]}',
            '${TARGETS[0]}',
-           c['model_options']]
+           '\"fitted vs. true log mutabilities ({})\"'.format(c['data_type']['data_type']),
+           '\"true log mutabilities\"',
+           '\"{} log mutabilities\"'.format(c['model_options'])]
 
     return env.Command(
         join(outdir, 'fit_vs_truth.png'),

@@ -5,6 +5,8 @@ true_data_path <- arg[1]
 fitted_data_path <- arg[2]
 plot_path <- arg[3]
 plot_title <- arg[4]
+x_str <- arg[5]
+y_str <- arg[6]
 
 getLogMutabilitiesFromPath <- function(path) {
     # what it says on the tin
@@ -28,9 +30,9 @@ png(plot_path)
 
 plot(true_scaled,
      fitted_scaled,
-     xlab = 'True',
-     ylab = 'Fitted',
-     main = plot_title)
+     main = plot_title,
+     xlab = x_str,
+     ylab = y_str)
 abline(0,1)
 
 dev.off()
