@@ -300,10 +300,11 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, locus='', species=''):
+def read_gene_seq_csv_data(gene_file_name, seq_file_name=None, motif_len=1, sample=1, locus='', species=''):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
+                          if seq_file_name is None, germline and sequence information is assumed to be in gene_file_name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
     @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
     @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
@@ -315,13 +316,19 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
     assert(sample in range(1, 4))
 
     genes = pd.read_csv(gene_file_name)
-    seqs = pd.read_csv(seq_file_name)
-    if locus:
-        seqs.where(seqs['locus'] == locus, inplace=True)
-    if species:
-        seqs.where(seqs['species'] == species, inplace=True)
 
-    full_data = pd.merge(genes, seqs, on='germline_name')
+    if seq_file_name is None:
+        # all info in gene_file_name
+        full_data = genes
+    else:
+        # merge sequence info with gene info
+        seqs = pd.read_csv(seq_file_name)
+        if locus:
+            seqs.where(seqs['locus'] == locus, inplace=True)
+        if species:
+            seqs.where(seqs['species'] == species, inplace=True)
+
+        full_data = pd.merge(genes, seqs, on='germline_name')
 
     obs_data = []
     metadata = []
