@@ -46,11 +46,11 @@ def parse_args():
     parser.add_argument('--input-genes',
         type=str,
         help='genes data in csv',
-        default='_output/genes.csv')
+        default='_output/ExampleDbIgA.csv')
     parser.add_argument('--input-seqs',
         type=str,
         help='sequence data in csv',
-        default='_output/seqs.csv')
+        default=None)
     parser.add_argument('--sample-regime',
         type=int,
         default=1,
@@ -322,7 +322,7 @@ def main(args=sys.argv[1:]):
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
             args.input_genes,
-            args.input_seqs,
+            seq_file_name=args.input_seqs,
             motif_len=max(args.motif_lens),
             sample=args.sample_regime,
             locus=args.locus,
