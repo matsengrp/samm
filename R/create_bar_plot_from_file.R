@@ -1,24 +1,26 @@
-# Test bar plot
+# Plot bar chart
 
 # Dependencies for plots
+library(methods)
 library(ggplot2)
 library(dplyr)
 library(lazyeval)
 library(alakazam)
 library(gridExtra)
-
 source('R/plotBarchart.R')
 
-## Uncomment output you want to plot
-## 3mer model (basic proof of concept)
-#data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_3mer.csv'
-#motif_lens <- c(3)
-## 5mer model (calculated from S5F)
-#data_path <- '/fh/fast/matsen_e/dshaw/samm/s5f_log_mutability.csv'
-#motif_lens <- c(5)
-# 3-5-7mer model (basic proof of concept)
-data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_357mer.csv'
-motif_lens <- c(3,5,7)
+data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_3mer.csv'
+motif_lens <- c(3)
+#data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_357mer.csv'
+#motif_lens <- c(3,5,7)
+arg <- commandArgs(TRUE)
+data_path <- arg[1]
+
+# comma-separated motif lengths list
+motif_str <- arg[2]
+output_file <- arg[3]
+
+motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 
 # Read data and convert to format plotBarchart wants
 raw_data <- read.table(data_path, sep=',')
@@ -52,13 +54,10 @@ if (length(motif_lens) > 1) {
         sum(exp(log_mutabilities), na.rm=TRUE)
 }
 
-# Plot for one nucleotide
-center_nuc <- 'A'
+# Plot for multiple nucleotides
+svg(output_file, width=20, height=5)
+center_nuc <- c('A', 'T', 'G', 'C')
 plot_list <- plotBarchart(filtered_mutes, center_nuc, 'bar', bar.size=.25)
 do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
-
-# Plot for multiple nucleotides
-center_nuc <- c('A', 'T', 'G', 'C')
-plot_list <- plotBarchart(filtered_mutes, center_nuc, 'bar')
-do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
+dev.off()
 
