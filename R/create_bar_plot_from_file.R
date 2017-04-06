@@ -9,10 +9,6 @@ library(alakazam)
 library(gridExtra)
 source('R/plotBarchart.R')
 
-data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_3mer.csv'
-motif_lens <- c(3)
-#data_path <- '/fh/fast/matsen_e/dshaw/samm/cui_357mer.csv'
-#motif_lens <- c(3,5,7)
 arg <- commandArgs(TRUE)
 data_path <- arg[1]
 
@@ -55,7 +51,12 @@ if (length(motif_lens) > 1) {
 }
 
 # Plot for multiple nucleotides
-svg(output_file, width=20, height=5)
+png(filename=output_file,
+    units="in", 
+    width=20, 
+    height=5, 
+    pointsize=12, 
+    res=128)
 center_nuc <- c('A', 'T', 'G', 'C')
 plot_list <- plotBarchart(filtered_mutes, center_nuc, 'bar', bar.size=.25)
 do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
