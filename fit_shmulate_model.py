@@ -120,14 +120,16 @@ def main(args=sys.argv[1:]):
     mut_model_array = np.zeros((feat_gen.feature_vec_len, 1))
     sub_model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
     for motif_idx, motif in enumerate(motif_list):
+        mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
         for nuc in NUCLEOTIDES:
             target_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(target_motif_dict[motif][nuc])
-            mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
             sub_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(sub_motif_dict[motif][nuc])
-    pickle.dump((target_model_array, mut_model_array, sub_model_array), open(args.model_pkl, 'w'))
+    # keep mut_model_array in same position as mutabilities from fit_context
+    pickle.dump((mut_model_array, (target_model_array, sub_model_array)), open(args.model_pkl, 'w'))
 
 def _read_shmulate_val(shmulate_value):
-    return -np.inf if shmulate_value == "NA" else float(shmulate_value)
+    """ return the log so we can be sure we're comparing the same things!"""
+    return -np.inf if shmulate_value == "NA" else np.log(float(shmulate_value))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
