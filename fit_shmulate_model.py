@@ -121,6 +121,7 @@ def main(args=sys.argv[1:]):
     sub_model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
     for motif_idx, motif in enumerate(motif_list):
         mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
+        log.info("%s:%f" % (motif, mut_model_array[motif_idx]))
         for nuc in NUCLEOTIDES:
             target_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(target_motif_dict[motif][nuc])
             sub_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(sub_motif_dict[motif][nuc])

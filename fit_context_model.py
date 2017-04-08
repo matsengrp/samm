@@ -292,7 +292,8 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
     if true_theta is not None and true_theta.shape == theta.shape:
         theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
         pearson_r, _ = scipy.stats.pearsonr(true_theta[theta_mask], theta[theta_mask])
-        log.info("Difference between true and fitted theta %f, corr %f" % (theta_err, pearson_r))
+        spearman_r, _ = scipy.stats.spearmanr(true_theta[theta_mask], theta[theta_mask])
+        log.info("Difference between true and fitted theta %f, pear %f, spear %f" % (theta_err, pearson_r, spearman_r))
 
     ll_chibs = None
     if args.chibs:

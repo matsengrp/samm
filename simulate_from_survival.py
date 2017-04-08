@@ -6,6 +6,7 @@ import os
 import os.path
 import csv
 import re
+import random
 
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
@@ -83,8 +84,11 @@ def parse_args():
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')
+    parser.add_argument('--shuffle',
+        action="store_true",
+        help='Use a shuffled version of the S5F parameters')
 
-    parser.set_defaults(guarantee_motifs_showup=False, per_target_model=False, with_replacement=False)
+    parser.set_defaults(guarantee_motifs_showup=False, per_target_model=False, with_replacement=False, shuffle=False)
     args = parser.parse_args()
     # Only even random gene lengths allowed
     assert(args.random_gene_len % 2 == 0)
@@ -98,7 +102,11 @@ def parse_args():
 
 def _read_mutability_probability_params(motif_list, args):
     """
-    Read S5F parameters
+    Read S5F parameters and use a shuffled version if requested
+    Note: a shuffled version should prevent bias when comparing
+    performance between shazam and our survival model since the
+    current S5F parameters were estimated by counting and then
+    aggregating inner 3-mers.
     """
     theta_dict = {}
     with open(args.mutability, "rb") as mutability_f:
@@ -109,6 +117,8 @@ def _read_mutability_probability_params(motif_list, args):
             motif_hazard = np.log(float(row[1]))
             theta_dict[motif] = motif_hazard
 
+    if args.shuffle:
+        random.shuffle(motif_list)
     theta = np.array([theta_dict[m] for m in motif_list])
 
     substitution_dict = {}
@@ -137,8 +147,15 @@ def _generate_true_parameters(motif_list, args):
     Read mutability and substitution parameters from S5F
     Make a sparse version if sparsity_ratio > 0
     """
-    true_theta, probability_matrix = _read_mutability_probability_params(motif_list, args)
-    nonzero_motifs = motif_list
+    if args.motif_len == 3 and not args.per_target_model:
+        true_theta = 2 * np.random.rand(len(motif_list), 1) - 1
+        probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
+        for idx, m in enumerate(motif_list):
+            center_nucleotide_idx = NUCLEOTIDE_DICT[m[args.motif_len/2]]
+            probability_matrix[idx, center_nucleotide_idx] = 0
+    elif args.motif_len == 5:
+        true_theta, probability_matrix = _read_mutability_probability_params(motif_list, args)
+        nonzero_motifs = motif_list
     if args.sparsity_ratio > 0:
         # Let's zero out some motifs now
         num_zero_motifs = int(args.sparsity_ratio * len(motif_list))
@@ -236,7 +253,7 @@ def main(args=sys.argv[1:]):
             full_data_samples = [
                 simulator.simulate(
                     start_seq=sequence.lower(),
-                    censoring_time=args.min_censor_time + 0.1 * np.random.rand(), # allow some variation in censor time
+                    censoring_time=args.min_censor_time + np.random.rand(), # allow some variation in censor time
                     with_replacement=args.with_replacement,
                 ) for i in range(args.n_taxa)
             ]
