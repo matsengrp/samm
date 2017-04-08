@@ -54,6 +54,7 @@ def parse_args():
 def load_true_model(file_name):
     with open(file_name, "rb") as f:
         true_theta, probability_matrix = pickle.load(f)
+        true_theta -= np.median(true_theta)
         return true_theta, probability_matrix
 
 def load_fitted_model(file_name, model_type, is_per_target):
@@ -61,15 +62,14 @@ def load_fitted_model(file_name, model_type, is_per_target):
         if model_type.startswith("survival"):
             survival_fits = pickle.load(f)
             # right now assume we just have one fit
-            _, fitted_theta, fitted_prob_vector = survival_fits[0]
+            fitted_theta, fitted_prob_vector = survival_fits
         elif model_type.startswith("basic"):
             fitted_theta, fitted_prob_vector = pickle.load(f)
+            fitted_theta -= np.median(fitted_theta)
         elif model_type == "shmulate":
-            if is_per_target:
-                # use the target matrix instead...
-                fitted_theta, _, fitted_prob_vector = pickle.load(f)
-            else:
-                _, fitted_theta, fitted_prob_vector = pickle.load(f)
+            fitted_theta, (_, fitted_prob_vector) = pickle.load(f)
+            # correct for baseline
+            fitted_theta -= np.median(fitted_theta)
         else:
             raise ValueError()
     return fitted_theta, fitted_prob_vector
@@ -87,10 +87,11 @@ class ModelStats:
         self.prob_err2 = [] # L2 distance??
 
     def append(self, model, true_model):
-        assert(model[0].shape == true_model[0].shape)
+        assert(model[0].size == true_model[0].size)
+        model_theta = np.reshape(model[0], true_model[0].shape)
 
         theta_mask = np.where(true_model[0] != -np.inf)
-        fitted_theta = model[0][theta_mask].flatten()
+        fitted_theta = model_theta[theta_mask].flatten()
         true_theta = true_model[0][theta_mask].flatten()
         s_corr = scipy.stats.spearmanr(fitted_theta, true_theta)
         self.theta_spearmanr.append(s_corr[0])
@@ -101,18 +102,18 @@ class ModelStats:
         theta_err2 = np.linalg.norm(true_theta - fitted_theta, ord=2)
         self.theta_err2.append(theta_err2)
 
-        if true_model[1] is not None:
-            prob_mask = np.where(true_model[1] != 0)
-            fitted_probs = np.array(model[1])[prob_mask].flatten()
-            true_probs = true_model[1][prob_mask].flatten()
-            s_corr = scipy.stats.spearmanr(fitted_probs, true_probs)
-            self.prob_spearmanr.append(s_corr[0])
-            p_corr = scipy.stats.pearsonr(fitted_probs, true_probs)
-            self.prob_pearsonr.append(p_corr[0])
-            prob_err1 = np.linalg.norm(true_probs - fitted_probs, ord=1)
-            self.prob_err1.append(prob_err1)
-            prob_err2 = np.linalg.norm(true_probs - fitted_probs, ord=2)
-            self.prob_err2.append(prob_err2)
+        # if true_model[1] is not None:
+        #     prob_mask = np.where(true_model[1] != 0)[0]
+        #     fitted_probs = np.array(model[1])[prob_mask].flatten()
+        #     true_probs = true_model[1][prob_mask].flatten()
+        #     s_corr = scipy.stats.spearmanr(fitted_probs, true_probs)
+        #     self.prob_spearmanr.append(s_corr[0])
+        #     p_corr = scipy.stats.pearsonr(fitted_probs, true_probs)
+        #     self.prob_pearsonr.append(p_corr[0])
+        #     prob_err1 = np.linalg.norm(true_probs - fitted_probs, ord=1)
+        #     self.prob_err1.append(prob_err1)
+        #     prob_err2 = np.linalg.norm(true_probs - fitted_probs, ord=2)
+        #     self.prob_err2.append(prob_err2)
 
     def print_summary(self):
         def get_mean_var(vals):
