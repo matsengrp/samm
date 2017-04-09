@@ -1,6 +1,7 @@
 import pickle
 import sys
 import argparse
+import itertools
 import numpy as np
 import os
 import os.path
@@ -87,8 +88,11 @@ def parse_args():
     parser.add_argument('--shuffle',
         action="store_true",
         help='Use a shuffled version of the S5F parameters')
+    parser.add_argument('--hierarchical',
+        action="store_true",
+        help='Generate parameters in a hierarchical manner')
 
-    parser.set_defaults(guarantee_motifs_showup=False, per_target_model=False, with_replacement=False, shuffle=False)
+    parser.set_defaults(guarantee_motifs_showup=False, per_target_model=False, with_replacement=False, shuffle=False, hierarchical=False)
     args = parser.parse_args()
     # Only even random gene lengths allowed
     assert(args.random_gene_len % 2 == 0)
@@ -142,6 +146,27 @@ def _read_mutability_probability_params(motif_list, args):
     num_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
     return theta.reshape((len(motif_list), num_cols)), probability_matrix
 
+def _generate_hierarchical_params(motif_list, motif_len):
+    true_theta = 2 * np.zeros((len(motif_list), 1)) - 1
+
+    motif_lens = range(3, motif_len + 1, 2)
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
+    theta_scaling = 1.0
+    for f in feat_generator.feat_gens:
+        motif_list = f.motif_list
+        sub_theta = theta_scaling * 2 * np.random.rand(len(motif_list), 1) - 1
+        for i, motif in enumerate(motif_list):
+            flank_len = motif_len - f.motif_len
+            motif_flanks = itertools.product(*([NUCLEOTIDES] * flank_len))
+            for flank in motif_flanks:
+                full_motif = "".join(flank[:flank_len/2]) + motif + "".join(flank[-flank_len/2:])
+                # print "full_motif", full_motif
+                full_motif_idx = feat_generator.feat_gens[-1].motif_dict[full_motif]
+                true_theta[full_motif_idx] += sub_theta[i] * theta_scaling
+        theta_scaling /= 2
+
+    return true_theta
+
 def _generate_true_parameters(motif_list, args):
     """
     Read mutability and substitution parameters from S5F
@@ -153,9 +178,18 @@ def _generate_true_parameters(motif_list, args):
         for idx, m in enumerate(motif_list):
             center_nucleotide_idx = NUCLEOTIDE_DICT[m[args.motif_len/2]]
             probability_matrix[idx, center_nucleotide_idx] = 0
-    elif args.motif_len == 5:
+    elif args.hierarchical and not args.per_target_model:
+        true_theta = _generate_hierarchical_params(motif_list, args.motif_len)
+        probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
+        for idx, m in enumerate(motif_list):
+            center_nucleotide_idx = NUCLEOTIDE_DICT[m[args.motif_len/2]]
+            probability_matrix[idx, center_nucleotide_idx] = 0
+    elif args.motif_len == 5 and not args.hierarchical:
         true_theta, probability_matrix = _read_mutability_probability_params(motif_list, args)
         nonzero_motifs = motif_list
+    else:
+        raise NotImplementedError()
+
     if args.sparsity_ratio > 0:
         # Let's zero out some motifs now
         num_zero_motifs = int(args.sparsity_ratio * len(motif_list))
