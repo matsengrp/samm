@@ -41,7 +41,8 @@ sim_size_dict = [
     # {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0},
     #{'size': 'big', 'n_taxa': 1, 'n_germlines': 1000, 'random_gene_len': 300, 'min_censor_time': 1, 'shuffle', False},
     #{'size': 'big_diff', 'n_taxa': 1, 'n_germlines': 1000, 'random_gene_len': 300, 'min_censor_time': 0.25, 'shuffle': False},
-    {'size': 'big_diff_shuffle', 'n_taxa': 1, 'n_germlines': 1000, 'random_gene_len': 300, 'min_censor_time': 0.25, 'shuffle': True},
+    #{'size': 'big_diff_shuffle', 'n_taxa': 1, 'n_germlines': 1000, 'random_gene_len': 300, 'min_censor_time': 0.25, 'shuffle': True},
+    {'size': 'big_diff_shuffle_longer', 'n_taxa': 1, 'n_germlines': 1000, 'random_gene_len': 300, 'min_censor_time': 0.75, 'shuffle': True},
 ]
 
 nest.add(
@@ -142,7 +143,7 @@ def fit_context_model(env, outdir, c):
                '--motif-lens',
                ",".join(map(str, motif_lens)),
                '--em-max-iters',
-               10,
+               15,
                '--penalty-params',
                ",".join(map(str, penalty_params)),
                '--num-cpu-threads',
