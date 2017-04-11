@@ -60,6 +60,9 @@ SConscript(flag + '/sconscript', exports=['flag'])
 flag = 'survival_compare_models'
 SConscript(flag + '/sconscript', exports=['flag'])
 
+flag = 'survival_hier_simulation'
+SConscript(flag + '/sconscript', exports=['flag'])
+
 flag = 'survival_ctmc'
 SConscript(flag + '/sconscript', exports=['flag'])
 

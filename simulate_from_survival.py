@@ -147,14 +147,14 @@ def _read_mutability_probability_params(motif_list, args):
     return theta.reshape((len(motif_list), num_cols)), probability_matrix
 
 def _generate_hierarchical_params(motif_list, motif_len):
-    true_theta = 2 * np.zeros((len(motif_list), 1)) - 1
+    true_theta = np.zeros((len(motif_list), 1))
 
     motif_lens = range(3, motif_len + 1, 2)
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
     theta_scaling = 1.0
     for f in feat_generator.feat_gens:
         motif_list = f.motif_list
-        sub_theta = theta_scaling * 2 * np.random.rand(len(motif_list), 1) - 1
+        sub_theta = theta_scaling * (2 * np.random.rand(len(motif_list), 1) - 1)
         for i, motif in enumerate(motif_list):
             flank_len = motif_len - f.motif_len
             motif_flanks = itertools.product(*([NUCLEOTIDES] * flank_len))
@@ -163,7 +163,7 @@ def _generate_hierarchical_params(motif_list, motif_len):
                 # print "full_motif", full_motif
                 full_motif_idx = feat_generator.feat_gens[-1].motif_dict[full_motif]
                 true_theta[full_motif_idx] += sub_theta[i] * theta_scaling
-        theta_scaling /= 2
+        theta_scaling *= 0.8
 
     return true_theta
 
@@ -172,6 +172,7 @@ def _generate_true_parameters(motif_list, args):
     Read mutability and substitution parameters from S5F
     Make a sparse version if sparsity_ratio > 0
     """
+    nonzero_motifs = motif_list
     if args.motif_len == 3 and not args.per_target_model:
         true_theta = 2 * np.random.rand(len(motif_list), 1) - 1
         probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
@@ -186,7 +187,6 @@ def _generate_true_parameters(motif_list, args):
             probability_matrix[idx, center_nucleotide_idx] = 0
     elif args.motif_len == 5 and not args.hierarchical:
         true_theta, probability_matrix = _read_mutability_probability_params(motif_list, args)
-        nonzero_motifs = motif_list
     else:
         raise NotImplementedError()
 

@@ -21,24 +21,20 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 sim_models = [
-    'is_single',
+    #'is_single', # used theta_ratio0.5
+    'more_variance_theta', # theta ratio 0.8
 ]
 
 nest.add(
     'per_target_model',
     sim_models)
 
-nest.add(
-    'simulation_options',
-    lambda c: [
-        "" if c["per_target_model"] == "is_single" else "--per-target-model"
-    ],
-    create_dir=False)
-
 sim_size_dict = [
-    # about 10% of sequence gets mutated
-    {'size': 'mini', 'n_taxa': 2, 'n_germlines': 2, 'random_gene_len': 50, 'min_censor_time': 2.0},
-    # {'size': 'big', 'n_taxa': 1, 'n_germlines': 1000, 'random_gene_len': 300, 'min_censor_time': 1},
+    {'size': 'size1', 'n_germlines': 250, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    {'size': 'size2', 'n_germlines': 500, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    {'size': 'size3', 'n_germlines': 1000, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    {'size': 'size4', 'n_germlines': 2000, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    #{'size': 'mini', 'n_taxa': 1, 'n_germlines': 10, 'random_gene_len': 300, 'min_censor_time': 1},
 ]
 
 nest.add(
@@ -64,8 +60,7 @@ nest.add(
 def generate(env, outdir, c):
     cmd = [
         'python simulate_from_survival.py',
-        '--motif-lens 7', # Must be motif length 5 since shmulate only does length 5
-        c['simulation_options'],
+        '--motif-len 7',
         '--seed',
         c['seed'],
         '--n-taxa',
@@ -80,7 +75,7 @@ def generate(env, outdir, c):
        '--min-censor-time',
        c['simulation_size']['min_censor_time'],
        '--sparsity-ratio',
-       0
+       0,
        '--hierarchical'
     ]
 
@@ -90,7 +85,10 @@ def generate(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 # Nest for fitting models
-model_single_options = ['survival']
+model_single_options = [
+    #'survival',
+    'fine_pen_param'
+]
 model_per_target_options = []
 
 nest.add(
@@ -101,29 +99,18 @@ nest.add(
 # TODO: put this all in one driver function so sources/targets jibe with one another
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
-    fit_per_target_model = c['model_options'] in model_per_target_options
-
     # True model should match the estimated model
-    if c['per_target_model'] == "is_per_target":
-        if c['model_options'] not in model_per_target_options:
-            return
-    else:
-        if c['model_options'] not in model_single_options:
-            return
-
     per_target_model_str = ""
-    if fit_per_target_model:
-        per_target_model_str = "--per-target-model"
-
     cmd = []
     motif_lens = [3,5,7]
+    penalty_params = np.power(10, np.arange(-2.0, -6.0, step=-0.25)).tolist()
     cmd = ['python fit_context_model.py',
            '--seed',
            c['seed'],
            '--motif-lens',
            ",".join(map(str, motif_lens)),
            '--em-max-iters',
-           10,
+           8,
            '--penalty-params',
            ",".join(map(str, penalty_params)),
            '--num-cpu-threads',
@@ -151,30 +138,3 @@ def fit_context_model(env, outdir, c):
         c['generate'],
         ' '.join(map(str, cmd)))
 
-# Pop to get to the simulation_size level - aggregate different replicates of the model
-nest.pop("model_options")
-nest.pop("replicate")
-
-@nest.add_target_with_env(localenv)
-def operate_on_aggregate_models(env, outdir, c):
-if c['per_target_model'] == "is_single":
-    model_types = ','.join(model_single_options)
-else:
-    model_types = ','.join(model_per_target_options)
-
-cmd = ['python compare_models_to_truth.py',
-       '--compare-folder',
-       outdir,
-       '--model-types',
-       model_types,
-       '--reps',
-       localenv["NREPS"],
-       '--model-fit-file fitted.pkl',
-       '--theta-file true_theta.pkl',
-       '--out-file ${TARGETS[0]}']
-return env.Command(
-    [join(outdir, 'comparisons.txt')],
-    [],
-    ' '.join(map(str, cmd)))
-
-# Plot results
