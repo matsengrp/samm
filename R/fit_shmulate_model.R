@@ -2,6 +2,14 @@
 source('shmulate/R/SHMulate.R')
 source('shmulate/R/SHMulate_Functions.R')
 
+customSlideWindowDb <- function(db, sequenceColumn="sequence", germlineColumn="germline_sequence", mutThresh=6, windowSize=10) {
+  db_filter <- sapply(1:nrow(db), function(i) {
+    sequence <- toupper(db[i, sequenceColumn])
+    germline <- toupper(db[i,germlineColumn])
+    slideWindowSeq(inputSeq = sequence, germlineSeq = germline, mutThresh = mutThresh, windowSize = windowSize)
+  })
+}
+
 # Packages needed:
 # igraph
 # plyr
@@ -19,9 +27,12 @@ genes <- read.csv(gene.file)
 seq_genes <- merge(seq, genes, by="germline_name")
 
 orig_num_seqs <- nrow(seq_genes)
-filter_mask <- slideWindowDb(db = seq_genes, sequenceColumn="sequence_name", germlineColumn="germline_sequence", mutThresh=6, windowSize=10)
 print(paste("Original number of sequences", orig_num_seqs))
-print(paste("Post-Filter number of sequences", orig_num_seqs - sum(filter_mask)))
+
+filter_mask <- customSlideWindowDb(db = seq_genes)
+# Filter sequences
+seq_genes <- seq_genes[filter_mask,]
+print(paste("Post-Filter number of sequences", nrow(seq_genes)))
 
 shm_model_type <- "RS"
 # Create model using only silent mutations
