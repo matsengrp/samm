@@ -86,7 +86,7 @@ def main(args=sys.argv[1:]):
         with open(args.true_theta, "r") as f:
             true_theta = pickle.load(f)[0]
 
-        print "L2 err", np.linalg.norm(true_theta - full_theta)/full_theta.size
+        print "L2 err", np.linalg.norm(true_theta - full_theta)/np.sqrt(full_theta.size)
         print "Pearson corr", scipy.stats.pearsonr(true_theta, full_theta)
 
 if __name__ == "__main__":
