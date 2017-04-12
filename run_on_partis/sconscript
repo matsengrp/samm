@@ -37,8 +37,8 @@ nest.add(
 nest.add(
     'sample_or_impute',
     [
-        #'sample',
-        'impute'
+        'sample',
+        #'impute'
     ])
 
 # Nest for processing data
