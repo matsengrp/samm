@@ -119,14 +119,14 @@ def get_num_unique_theta(theta):
         num_unique += 1
     return num_unique
 
+def is_re_match(regex, submotif):
+    match_res = re.match(regex, submotif)
+    return match_res is not None
+
 def get_nonzero_theta_print_lines(theta, motif_list, motif_len):
     """
     @return a string that summarizes the theta vector/matrix
     """
-    def is_match(regex, submotif):
-        match_res = re.match(regex, submotif)
-        return match_res is not None
-
     lines = []
     known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len)
     for i in range(theta.shape[0]):
@@ -136,7 +136,7 @@ def get_nonzero_theta_print_lines(theta, motif_list, motif_len):
                 motif = motif_list[i]
                 hot_cold_matches = ""
                 for spot_name, spot_regex in known_hot_cold:
-                    if is_match(spot_regex, motif):
+                    if is_re_match(spot_regex, motif):
                         hot_cold_matches = " -- " + spot_name
                         break
                 thetas = theta[i,]
@@ -147,6 +147,12 @@ def get_nonzero_theta_print_lines(theta, motif_list, motif_len):
                 break
     sorted_lines = sorted(lines, key=lambda s: s[0])
     return "\n".join([l[1] for l in sorted_lines])
+
+def print_known_cold_hot_spot(motif, known_hot_cold_regexs):
+    for spot_name, spot_regex in known_hot_cold_regexs:
+        if is_re_match(spot_regex, motif):
+            return spot_name
+    return None
 
 def get_possible_motifs_to_targets(motif_list, mask_shape):
     """
