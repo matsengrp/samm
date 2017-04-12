@@ -33,7 +33,7 @@ SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new
 SAMPLE_RANDOM = 2
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=True, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -41,6 +41,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
     @param metadata: csv file of metadata; if None defaults will be used for chain/species
     @param use_v: use just the V gene or use the whole sequence?
     @param use_np: use nonproductive sequences only
+    @param use_immunized: use immunized mice only
     @param inferred_gls: list of paths to partis-inferred germlines
 
     @write genes to output_genes and seqs to output_seqs
@@ -60,6 +61,8 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
             current_info['locus'] = line['locus']
             current_info['species'] = line['species']
             current_info['group'] = line['group']
+            if use_immunized and current_info['group'] != 'immunized':
+                continue
             current_info['subject'] = line['subject']
             partition_info.append(current_info)
 

@@ -44,8 +44,6 @@ def convert_to_csv(target, mutabilities, motif_lens):
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
     motif_list = feat_generator.motif_list
 
-    # TODO: combine hierarchical motifs here
-
     with open(str(target), 'wb') as f:
         writer = csv.writer(f)
         writer.writerows(izip([motif.upper() for motif in motif_list], mutabilities.ravel()))

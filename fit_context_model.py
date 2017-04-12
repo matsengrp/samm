@@ -233,6 +233,8 @@ def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_rati
         # sample random categories from our validation variable
         val_categories = set(random.sample(categories, val_size))
         train_categories = categories - val_categories
+        log.info("train_categories %s" % train_categories)
+        log.info("val_categories %s" % val_categories)
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
@@ -339,8 +341,8 @@ def main(args=sys.argv[1:]):
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-    # log.info("Data statistics:")
-    # log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
+    log.info("Data statistics:")
+    log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
     # log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
