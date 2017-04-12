@@ -82,7 +82,6 @@ def main(args=sys.argv[1:]):
                     flanks = itertools.product(["a", "c", "g", "t"], repeat=diff_len)
                     for f in flanks:
                         full_m = "".join(f[:diff_len/2]) + m + "".join(f[diff_len/2:])
-                        print "m", m, "full_m", full_m
                         full_m_idx = full_motif_dict[full_m]
                         full_theta[full_m_idx] += m_theta
             start_idx += len(motif_list)
