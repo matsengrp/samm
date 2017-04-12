@@ -18,6 +18,11 @@ seq <- read.csv(seq.file)
 genes <- read.csv(gene.file)
 seq_genes <- merge(seq, genes, by="germline_name")
 
+orig_num_seqs <- nrow(seq_genes)
+filter_mask <- slideWindowDb(db = seq_genes, sequenceColumn="sequence_name", germlineColumn="germline_sequence", mutThresh=6, windowSize=10)
+print(paste("Original number of sequences", orig_num_seqs))
+print(paste("Post-Filter number of sequences", orig_num_seqs - sum(filter_mask)))
+
 shm_model_type <- "RS"
 # Create model using only silent mutations
 # shm_model_type <- "S"
