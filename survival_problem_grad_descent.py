@@ -200,7 +200,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             for f_idx, f_list in enumerate(new_feat_idxs):
                 pos_feat_matrix[f_idx + 1 + num_old, f_list] = 1
 
-            features_per_step_matrices.append(csr_matrix(pos_feat_matrix))
+            features_per_step_matrices.append(csr_matrix(pos_feat_matrix, dtype=np.int8))
             features_sign_updates.append(
                 np.reshape(np.concatenate([-1 * np.ones(num_old + 1), np.ones(num_new)]), (num_old + num_new + 1, 1))
             )
@@ -248,18 +248,13 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param theta: the theta to evaluate the gradient at
         @param sample_data: SamplePrecalcData
         """
-        denominators = [
-            (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
-        ]
-        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(theta))
+        prev_denom = pos_exp_theta.sum()
+        denominators = [prev_denom]
 
-        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)
-        denominator = pos_exp_theta.sum()
-        prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.T * pos_exp_theta
-
-        risk_group_grads = [prev_risk_group_grad/denominator]
-        risk_group_grad_tot = prev_risk_group_grad/denominator
-        prev_denominator = denominator
+        prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
+        risk_group_grads = [prev_risk_group_grad/prev_denom]
+        risk_group_grad_tot = prev_risk_group_grad/prev_denom
         for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(theta))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
