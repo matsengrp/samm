@@ -12,10 +12,10 @@ NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "acgt"
 NUCLEOTIDE_SET = set(["a", "c", "g", "t"])
 NUCLEOTIDE_DICT = {
-    "a": 0,
-    "c": 1,
-    "g": 2,
-    "t": 3,
+    "a": 1,
+    "c": 2,
+    "g": 3,
+    "t": 4,
 }
 ZSCORE = 1.65
 ZERO_THRES = 1e-6

@@ -174,7 +174,8 @@ def parse_args():
     # Determine sampler
     args.sampler_cls = MutationOrderGibbsSampler
     if args.per_target_model:
-        args.theta_num_col = NUM_NUCLEOTIDES
+        # First column is the median theta value and the remaining columns are the offset for that target nucleotide
+        args.theta_num_col = NUM_NUCLEOTIDES + 1
     else:
         args.theta_num_col = 1
 
