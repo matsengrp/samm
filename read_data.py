@@ -9,14 +9,13 @@ import glob
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
-import utils
+from utils import add_implicit_info, process_input_line
 import glutils
 
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
-sys.path.append('./gctree/bin')
-from gctree import phylip_parse
+from gctree.bin.gctree import phylip_parse
 
 from common import *
 from models import ObservedSequenceMutations
@@ -27,13 +26,13 @@ from Bio.Phylo.TreeConstruction import ParsimonyScorer, NNITreeSearcher, Parsimo
 from ete3 import Tree
 from itertools import izip
 
-GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/igh/ighv.fasta'
-SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
+GERMLINE_PARAM_FILE = 'partis/data/germlines/human/igh/ighv.fasta'
+SAMPLE_PARTIS_ANNOTATIONS = 'partis/test/reference-results/partition-new-simu-cluster-annotations.csv'
 
 SAMPLE_RANDOM = 2
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=True, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=False, use_immunized=True, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -94,8 +93,8 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
                     if len(line['input_seqs']) == 0:
                         # sometimes data will have empty clusters
                         continue
-                    utils.process_input_line(line)
-                    utils.add_implicit_info(glfo, line)
+                    process_input_line(line)
+                    add_implicit_info(glfo, line)
                     good_seq_idx = [i for i, is_good in enumerate(good_seq(line)) if is_good]
                     if not good_seq_idx:
                         # no nonproductive sequences... skip
