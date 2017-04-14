@@ -17,6 +17,7 @@ class SamplePrecalcData:
     def __init__(self, init_feat_counts, features_per_step_matrices, features_sign_updates, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
         self.init_feat_counts = init_feat_counts
         self.features_per_step_matrices = features_per_step_matrices
+        self.features_per_step_matricesT = [m.transpose() for m in features_per_step_matrices]
         self.features_sign_updates = features_sign_updates
         self.init_grad_vector = init_grad_vector
         self.mutating_pos_feat_vals_rows = mutating_pos_feat_vals_rows
@@ -199,7 +200,7 @@ class SurvivalProblemCustom(SurvivalProblem):
             for f_idx, f_list in enumerate(new_feat_idxs):
                 pos_feat_matrix[f_idx + 1 + num_old, f_list] = 1
 
-            features_per_step_matrices.append(csr_matrix(pos_feat_matrix))
+            features_per_step_matrices.append(csr_matrix(pos_feat_matrix, dtype=np.int8))
             features_sign_updates.append(
                 np.reshape(np.concatenate([-1 * np.ones(num_old + 1), np.ones(num_new)]), (num_old + num_new + 1, 1))
             )
@@ -222,10 +223,8 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         Calculate the log likelihood of this sample
         """
-        denominators = [
-            (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
-        ]
-        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(theta))).sum()
+        denominators = [prev_denom]
         for pos_feat_matrix, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(theta))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
@@ -247,25 +246,20 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param theta: the theta to evaluate the gradient at
         @param sample_data: SamplePrecalcData
         """
-        denominators = [
-            (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
-        ]
-        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(theta))
+        prev_denom = pos_exp_theta.sum()
+        denominators = [prev_denom]
 
-        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)
-        denominator = pos_exp_theta.sum()
-        prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.T * pos_exp_theta
-
-        risk_group_grads = [prev_risk_group_grad/denominator]
-        risk_group_grad_tot = prev_risk_group_grad/denominator
-        prev_denominator = denominator
-        for pos_feat_matrix, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_sign_updates):
+        prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
+        risk_group_grads = [prev_risk_group_grad/prev_denom]
+        risk_group_grad_tot = prev_risk_group_grad/prev_denom
+        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(theta))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
 
             new_denom = prev_denom + signed_exp_thetas.sum()
             denominators.append(new_denom)
-            grad_update = pos_feat_matrix.transpose().dot(signed_exp_thetas)
+            grad_update = pos_feat_matrixT.dot(signed_exp_thetas)
             risk_group_grad = prev_risk_group_grad + grad_update
             risk_group_grads.append(risk_group_grad/new_denom)
             risk_group_grad_tot += risk_group_grad/new_denom

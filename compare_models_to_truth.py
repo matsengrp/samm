@@ -99,7 +99,7 @@ class ModelStats:
         self.theta_pearsonr.append(p_corr[0])
         theta_err1 = np.linalg.norm(true_theta - fitted_theta, ord=1)
         self.theta_err1.append(theta_err1)
-        theta_err2 = np.linalg.norm(true_theta - fitted_theta, ord=2)
+        theta_err2 = np.linalg.norm(true_theta - fitted_theta, ord=2)/np.linalg.norm(fitted_theta, ord=2)
         self.theta_err2.append(theta_err2)
 
         # if true_model[1] is not None:
