@@ -223,10 +223,8 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         Calculate the log likelihood of this sample
         """
-        denominators = [
-            (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
-        ]
-        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start * theta)).sum()
+        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(theta))).sum()
+        denominators = [prev_denom]
         for pos_feat_matrix, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(theta))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
