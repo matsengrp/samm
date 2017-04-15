@@ -241,11 +241,10 @@ class SurvivalProblemCustom(SurvivalProblem):
             denominators.append(new_denom)
             prev_denom = new_denom
 
-        numerators = theta[sample_data.mutating_pos_feat_vals_rows, 0, None]
+        numerators = theta[sample_data.mutating_pos_feat_vals_rows, 0]
         if per_target_model:
             numerators = numerators + theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
-        print "denominators", denominators
-        print "numerators", numerators
+
         log_lik = numerators.sum() - np.log(denominators).sum()
         return log_lik
 
@@ -259,20 +258,28 @@ class SurvivalProblemCustom(SurvivalProblem):
         @param theta: the theta to evaluate the gradient at
         @param sample_data: SamplePrecalcData
         """
-        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(theta))
+        merged_thetas = theta[:,0, None]
+        if per_target_model:
+            merged_thetas = merged_thetas + theta[:,1:]
+        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
         prev_denom = pos_exp_theta.sum()
         denominators = [prev_denom]
 
         prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
+        if per_target_model:
+            prev_risk_group_grad = np.hstack([prev_risk_group_grad.sum(axis=1, keepdims=True), prev_risk_group_grad])
         risk_group_grads = [prev_risk_group_grad/prev_denom]
         risk_group_grad_tot = prev_risk_group_grad/prev_denom
         for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
-            exp_thetas = np.exp(pos_feat_matrix.dot(theta))
+            exp_thetas = np.exp(pos_feat_matrix.dot(merged_thetas))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
 
             new_denom = prev_denom + signed_exp_thetas.sum()
+
             denominators.append(new_denom)
             grad_update = pos_feat_matrixT.dot(signed_exp_thetas)
+            if per_target_model:
+                grad_update = np.hstack([grad_update.sum(axis=1, keepdims=True), grad_update])
             risk_group_grad = prev_risk_group_grad + grad_update
             risk_group_grads.append(risk_group_grad/new_denom)
             risk_group_grad_tot += risk_group_grad/new_denom
