@@ -122,6 +122,7 @@ class MCMC_EM:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
             elif log_lik_diff < diff_thres:
+                log.info("log_lik_diff %f" % log_lik_diff)
                 # if penalized log likelihood is increasing but not by very much
                 break
 
