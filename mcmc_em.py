@@ -49,7 +49,6 @@ class MCMC_EM:
         init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in observed_data]
         all_traces = []
         # burn in only at the very beginning
-        prev_pen_exp_log_lik = None
         for run in range(max_em_iters):
             prev_theta = theta
             num_e_samples = self.base_num_e_samples
@@ -113,20 +112,15 @@ class MCMC_EM:
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < 0)
-                log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
+                log.info("lower_bound_is_negative %d, lower_bound %f" % (lower_bound_is_negative, lower_bound))
 
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-            if lower_bound_is_negative:
+            if lower_bound_is_negative or lower_bound < diff_thres:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
-            elif prev_pen_exp_log_lik is not None and pen_exp_log_lik - prev_pen_exp_log_lik < diff_thres:
-                log.info("Diff too small: prev_pen_exp_log_lik %f, pen_exp_log_lik %f" % (prev_pen_exp_log_lik, pen_exp_log_lik))
-                # if penalized log likelihood is increasing but not by very much
-                break
-            prev_pen_exp_log_lik = pen_exp_log_lik
-            log.info("official pen_exp_log_lik %f" % pen_exp_log_lik)
+            log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
         return theta, all_traces
