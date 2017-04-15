@@ -25,6 +25,7 @@ class MultinomialSolver:
         @return MLE of a multinomial distribution
         """
         motif_len = feat_generator.motif_len
+        half_motif_len = feat_generator.half_motif_len
         motif_list = feat_generator.motif_list
 
         motif_classes = []
@@ -36,8 +37,8 @@ class MultinomialSolver:
                 fused_idxs = [motif_idx1]
                 # now look for other motifs that it is fused with
                 for index_delta, m2 in enumerate(motif_list[motif_idx1 + 1:]):
-                    # Must have the same center nucleotide
-                    if m1[motif_len/2] != m2[motif_len/2]:
+                    # Must have the same mutating nucleotide
+                    if m1[half_motif_len] != m2[half_motif_len]:
                         continue
 
                     motif_idx2 = motif_idx1 + 1 + index_delta
