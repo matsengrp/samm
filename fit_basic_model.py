@@ -59,6 +59,10 @@ def parse_args():
         type=int,
         help='length of motif (must be odd)',
         default=5)
+    parser.add_argument('--mutating-positions',
+        type=str,
+        help='which position in the motif is mutating; can be one of combination of -1, 0, 1 for 5\'/left end, central, or 3\'/right end',
+        default='0')
     parser.add_argument('--theta-file',
         type=str,
         help='file with pickled true context model (default: None, for no truth)',
@@ -89,7 +93,13 @@ def main(args=sys.argv[1:]):
     np.random.seed(args.seed)
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
 
-    obs_data, metadata = read_gene_seq_csv_data(args.input_genes, args.input_seqs, motif_len=args.motif_len, sample=args.sample_regime)
+    obs_data, metadata = read_gene_seq_csv_data(
+            args.input_genes,
+            args.input_seqs,
+            motif_len=args.motif_len,
+            mutating_positions=[args.mutating_positions],
+            sample=args.sample_regime
+        )
 
     motif_list = feat_generator.motif_list
 

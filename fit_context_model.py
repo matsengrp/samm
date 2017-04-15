@@ -77,6 +77,10 @@ def parse_args():
         type=str,
         help='length of motif (must be odd)',
         default='5')
+    parser.add_argument('--mutating-positions',
+        type=str,
+        help='which position in the motif is mutating; can be one of combination of -1, 0, 1 for 5\'/left end, central, or 3\'/right end',
+        default='0')
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -181,6 +185,10 @@ def parse_args():
     args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_lens:
         assert(m % 2 == 1)
+
+    args.mutating_positions = [int(pos) for pos in args.mutating_positions.split(',')]
+    for m in args.mutating_positions:
+        assert(m in [-1, 0, 1])
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -317,13 +325,17 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
+    feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=args.motif_lens,
+            mutating_positions=args.mutating_positions,
+        )
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
             args.input_genes,
             args.input_seqs,
             motif_len=max(args.motif_lens),
+            mutating_positions=args.mutating_positions,
             sample=args.sample_regime,
             locus=args.locus,
             species=args.species,
@@ -347,12 +359,15 @@ def main(args=sys.argv[1:]):
     log.info("Running EM")
 
     motif_list = feat_generator.motif_list
+    mutating_pos_list = feat_generator.mutating_pos_list
+
+    print mutating_pos_list
 
     # Run EM on the lasso parameters from largest to smallest
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
     theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
-    theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape)
+    theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape, mutating_pos_list)
 
     true_theta = None
     if args.theta_file != "":
@@ -431,7 +446,7 @@ def main(args=sys.argv[1:]):
                 pickle.dump(results_list, f)
 
             log.info("==== FINAL theta, %s====" % curr_model_results)
-            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.motif_len))
+            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.mutating_pos_list))
 
             if best_model_in_list is None or log_lik_ratio > 0:
                 best_model_in_list = curr_model_results
