@@ -28,9 +28,10 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         """
         Check that the gradient calculation speed up is the same as the old basic gradient calculation
         """
+        per_target = theta_num_col == NUM_NUCLEOTIDES + 1
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
         theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
-        prob_solver = SurvivalProblemCustom(feat_gen, [sample], [1], theta_num_col == NUM_NUCLEOTIDES, theta_mask)
+        prob_solver = SurvivalProblemCustom(feat_gen, [sample], [1], per_target, theta_mask)
         sample_data = prob_solver.precalc_data[0]
 
         # Basic gradient calculation
@@ -40,6 +41,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         fast_grad = SurvivalProblemCustom.get_gradient_log_lik_per_sample(
             theta,
             sample_data,
+            per_target,
         )
         self.assertTrue(np.allclose(fast_grad, old_grad))
 
@@ -52,10 +54,11 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         """
         Check that the log likelihood calculation speed up is the same as the old basic log likelihood calculation
         """
+        per_target = theta_num_col == NUM_NUCLEOTIDES + 1
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
 
         theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
-        prob_solver = SurvivalProblemCustom(feat_gen, [sample], [1], theta_num_col == NUM_NUCLEOTIDES, theta_mask)
+        prob_solver = SurvivalProblemCustom(feat_gen, [sample], [1], per_target, theta_mask)
         sample_data = prob_solver.precalc_data[0]
 
         feat_mut_steps = feat_gen.create_for_mutation_steps(sample)
@@ -71,30 +74,33 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         self._compare_log_likelihood_calculation(self.feat_gen_hier, self.sample_hier, NUM_NUCLEOTIDES)
 
     def calculate_grad_slow(self, theta, feat_gen, sample):
-        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
+        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES + 1
 
         grad = np.zeros(theta.shape)
         seq_str = sample.obs_seq_mutation.start_seq
         denoms = []
         for i in range(len(sample.mutation_order)):
             mutating_pos = sample.mutation_order[i]
-            col_idx = 0
-            if per_target_model:
-                col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
+
             feature_dict = feat_gen.create_for_sequence(
                 seq_str,
                 sample.obs_seq_mutation.left_flank,
                 sample.obs_seq_mutation.right_flank,
                 set(range(sample.obs_seq_mutation.seq_len)) - set(sample.mutation_order[:i])
             )
-
-            grad[feature_dict[mutating_pos], col_idx] += 1
+            grad[feature_dict[mutating_pos], 0] += 1
+            if per_target_model:
+                col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]] + 1
+                grad[feature_dict[mutating_pos], col_idx] += 1
 
             grad_log_sum_exp = np.zeros(theta.shape)
-            denom = np.exp([theta[f,:].sum(axis=0) for f in feature_dict.values()]).sum()
+            denom = np.exp([
+                theta[f,0].sum() + theta[f,1:].sum(axis=0) for f in feature_dict.values()
+            ]).sum()
             denoms.append(denom)
             for f in feature_dict.values():
-                grad_log_sum_exp[f, :] += np.exp(theta[f, :].sum(axis=0))
+                grad_log_sum_exp[f, 1:] = np.exp(theta[f, 0].sum() + theta[f, 1:].sum(axis=0))
+                grad_log_sum_exp[f, 0] = np.exp(theta[f, 0].sum() + theta[f, 1:].sum(axis=0)).sum()
             grad -= grad_log_sum_exp/denom
 
             seq_str = mutate_string(
@@ -105,7 +111,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         return grad
 
     def calculate_log_likelihood_slow(self, theta, feat_gen, sample):
-        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
+        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES + 1
 
         obj = 0
         denoms = []
