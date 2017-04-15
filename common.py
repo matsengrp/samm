@@ -69,7 +69,7 @@ FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
-def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5):
+def compute_known_hot_and_cold(hot_or_cold_dicts, half_motif_len=2):
     """
     Known hot and cold spots were constructed on a 5mer model, so "N" pad
     longer motifs and subset shorter ones
@@ -77,13 +77,13 @@ def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5):
     kmer_list = []
     hot_or_cold_list = []
     for spot in hot_or_cold_dicts:
-        if len(spot['left_flank']) > motif_len/2 or \
-            len(spot['right_flank']) > motif_len/2:
+        if len(spot['left_flank']) > half_motif_len or \
+            len(spot['right_flank']) > half_motif_len:
                 # this hot/cold spot is not a part of our motif size
                 continue
 
-        left_pad = spot['left_flank'].rjust(motif_len/2, 'N')
-        right_pad = spot['right_flank'].ljust(motif_len/2, 'N')
+        left_pad = spot['left_flank'].rjust(half_motif_len, 'N')
+        right_pad = spot['right_flank'].ljust(half_motif_len, 'N')
         kmer_list.append(left_pad + spot['central'] + right_pad)
         hot_or_cold_list.append(spot['hot_or_cold'])
 
@@ -123,26 +123,28 @@ def is_re_match(regex, submotif):
     match_res = re.match(regex, submotif)
     return match_res is not None
 
-def get_nonzero_theta_print_lines(theta, motif_list, motif_len):
+def get_nonzero_theta_print_lines(theta, motif_list, mutating_pos_list):
     """
     @return a string that summarizes the theta vector/matrix
     """
     lines = []
-    known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len)
+    mutating_pos_set = list(set(mutating_pos_list))
+    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, half_motif_len) for half_motif_len in mutating_pos_set]
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 # print the whole line if any element in the theta is nonzero
                 motif = motif_list[i]
+                pos_idx = mutating_pos_set.index(mutating_pos_list[i])
                 hot_cold_matches = ""
-                for spot_name, spot_regex in known_hot_cold:
+                for spot_name, spot_regex in known_hot_cold[pos_idx]:
                     if is_re_match(spot_regex, motif):
                         hot_cold_matches = " -- " + spot_name
                         break
                 thetas = theta[i,]
                 lines.append((
                     thetas[np.isfinite(thetas)].sum(),
-                    "%s (%s%s)" % (thetas, motif_list[i], hot_cold_matches),
+                    "%s (%s%s) pos %s" % (thetas, motif_list[i], hot_cold_matches, mutating_pos_list[i]),
                 ))
                 break
     sorted_lines = sorted(lines, key=lambda s: s[0])
@@ -154,10 +156,11 @@ def print_known_cold_hot_spot(motif, known_hot_cold_regexs):
             return spot_name
     return None
 
-def get_possible_motifs_to_targets(motif_list, mask_shape):
+def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
     """
     @param motif_list: list of motifs - assumes that the first few theta rows correspond to these motifs
     @param mask_shape: shape of the theta matrix
+    @param mutating_pos_list: list of mutating positions
 
     @return a boolean matrix with possible mutations as True, impossible mutations as False
     """
@@ -169,7 +172,7 @@ def get_possible_motifs_to_targets(motif_list, mask_shape):
     # Estimating a different theta vector for different target nucleotides
     # We cannot have a motif mutate to the same center nucleotide
     for i in range(len(motif_list)):
-        center_motif_idx = len(motif_list[i])/2
+        center_motif_idx = mutating_pos_list[i]
         center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
         theta_mask[i, center_nucleotide_idx] = False
     return theta_mask
