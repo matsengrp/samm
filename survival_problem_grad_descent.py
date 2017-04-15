@@ -103,7 +103,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         rand_seed = get_randint()
         worker_list = [
-            ObjectiveValueWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
+            ObjectiveValueWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.pool is not None:
             multiproc_manager = MultiprocessingManager(
@@ -127,7 +127,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         rand_seed = get_randint()
         worker_list = [
-            GradientWorker(rand_seed + i, sample_data) for i, sample_data in enumerate(self.precalc_data)
+            GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
         if self.pool is not None:
             multiproc_manager = MultiprocessingManager(
@@ -163,14 +163,17 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         mutating_pos_feat_vals_rows = np.array([])
         mutating_pos_feat_vals_cols = np.array([])
-        num_targets = NUM_NUCLEOTIDES if per_target_model else 1
+        num_targets = NUM_NUCLEOTIDES + 1 if per_target_model else 1
         base_grad = np.zeros((num_features, num_targets))
         # get the grad component from grad of psi * theta
         for i, feat_mut_step in enumerate(feat_mut_steps):
-            col_idx = get_target_col(sample.obs_seq_mutation, sample.mutation_order[i]) if per_target_model else 0
-            base_grad[feat_mut_step.mutating_pos_feats, col_idx] += 1
+            base_grad[feat_mut_step.mutating_pos_feats, 0] += 1
+            if per_target_model:
+                col_idx = get_target_col(sample.obs_seq_mutation, sample.mutation_order[i])
+                base_grad[feat_mut_step.mutating_pos_feats, col_idx] += 1
             mutating_pos_feat_vals_rows = np.append(mutating_pos_feat_vals_rows, feat_mut_step.mutating_pos_feats)
-            mutating_pos_feat_vals_cols = np.append(mutating_pos_feat_vals_cols, [col_idx] * len(feat_mut_step.mutating_pos_feats))
+            if per_target_model:
+                mutating_pos_feat_vals_cols = np.append(mutating_pos_feat_vals_cols, [col_idx] * len(feat_mut_step.mutating_pos_feats))
 
         # Get the grad component from grad of log(sum(exp(psi * theta)))
         features_per_step_matrices = []
@@ -219,25 +222,35 @@ class SurvivalProblemCustom(SurvivalProblem):
         )
 
     @staticmethod
-    def calculate_per_sample_log_lik(theta, sample_data):
+    def calculate_per_sample_log_lik(theta, sample_data, per_target_model):
         """
         Calculate the log likelihood of this sample
         """
-        prev_denom = (np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(theta))).sum()
+        theta_summed = sample_data.obs_seq_mutation.feat_matrix_start.dot(theta[:,0, None])
+        if per_target_model:
+            theta_summed = theta_summed + sample_data.obs_seq_mutation.feat_matrix_start.dot(theta[:,1:])
+        prev_denom = (np.exp(theta_summed)).sum()
         denominators = [prev_denom]
         for pos_feat_matrix, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_sign_updates):
-            exp_thetas = np.exp(pos_feat_matrix.dot(theta))
+            theta_summed = pos_feat_matrix.dot(theta[:,0, None])
+            if per_target_model:
+                theta_summed = theta_summed + pos_feat_matrix.dot(theta[:,1:])
+            exp_thetas = np.exp(theta_summed)
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
             new_denom = prev_denom + signed_exp_thetas.sum()
             denominators.append(new_denom)
             prev_denom = new_denom
 
-        numerators = theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
+        numerators = theta[sample_data.mutating_pos_feat_vals_rows, 0, None]
+        if per_target_model:
+            numerators = numerators + theta[sample_data.mutating_pos_feat_vals_rows, sample_data.mutating_pos_feat_vals_cols]
+        print "denominators", denominators
+        print "numerators", numerators
         log_lik = numerators.sum() - np.log(denominators).sum()
         return log_lik
 
     @staticmethod
-    def get_gradient_log_lik_per_sample(theta, sample_data):
+    def get_gradient_log_lik_per_sample(theta, sample_data, per_target_model):
         """
         Calculate the gradient of the log likelihood of this sample
         All the gradients for each step are the gradient of psi * theta - log(sum(exp(theta * psi)))
@@ -296,19 +309,20 @@ class GradientWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, seed, sample_data):
+    def __init__(self, seed, sample_data, per_target_model):
         """
         @param sample_data: class SamplePrecalcData
         """
         self.seed = seed
         self.sample_data = sample_data
+        self.per_target_model = per_target_model
 
     def run_worker(self, theta):
         """
         @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
         @return the gradient of the log likelihood for this sample
         """
-        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(theta, self.sample_data)
+        return SurvivalProblemCustom.get_gradient_log_lik_per_sample(theta, self.sample_data, self.per_target_model)
 
     def __str__(self):
         return "GradientWorker %s" % self.sample_data.init_feat_counts
@@ -317,19 +331,20 @@ class ObjectiveValueWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
     """
-    def __init__(self, seed, sample_data):
+    def __init__(self, seed, sample_data, per_target_model):
         """
         @param sample: SamplePrecalcData
         """
         self.seed = seed
         self.sample_data = sample_data
+        self.per_target_model = per_target_model
 
     def run_worker(self, theta):
         """
         @param exp_theta: the exp of theta
         @return the log likelihood for this sample
         """
-        return SurvivalProblemCustom.calculate_per_sample_log_lik(theta, self.sample_data)
+        return SurvivalProblemCustom.calculate_per_sample_log_lik(theta, self.sample_data, self.per_target_model)
 
     def __str__(self):
         return "ObjectiveValueWorker %s" % self.sample_data.init_feat_counts

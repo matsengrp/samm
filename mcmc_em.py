@@ -30,7 +30,7 @@ class MCMC_EM:
         self.pool = pool
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
-        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES
+        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
 
     def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """

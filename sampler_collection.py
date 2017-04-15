@@ -107,7 +107,7 @@ class Sampler:
         if not self.per_target_model:
             self.exp_theta_sum = np.exp(theta).sum(axis=1)
         else:
-            theta_summed = theta[:,0].reshape((theta.shape[0], 1)) + theta[:,1:]
+            theta_summed = theta[:,0,None] + theta[:,1:]
             self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
         self.feature_generator = feature_generator
         self.motif_len = self.feature_generator.motif_len

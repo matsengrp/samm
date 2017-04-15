@@ -12,10 +12,10 @@ NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "acgt"
 NUCLEOTIDE_SET = set(["a", "c", "g", "t"])
 NUCLEOTIDE_DICT = {
-    "a": 1,
-    "c": 2,
-    "g": 3,
-    "t": 4,
+    "a": 0,
+    "c": 1,
+    "g": 2,
+    "t": 3,
 }
 ZSCORE = 1.65
 ZERO_THRES = 1e-6
@@ -170,7 +170,10 @@ def get_possible_motifs_to_targets(motif_list, mask_shape):
     # We cannot have a motif mutate to the same center nucleotide
     for i in range(len(motif_list)):
         center_motif_idx = len(motif_list[i])/2
-        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
+        if mask_shape[1] == NUM_NUCLEOTIDES:
+            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
+        else:
+            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]] + 1
         theta_mask[i, center_nucleotide_idx] = False
     return theta_mask
 
@@ -380,4 +383,4 @@ def get_target_col(sample, mutation_pos):
     @param sample: ObservedSequenceMutations
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
-    return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]]
+    return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
