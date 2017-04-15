@@ -28,6 +28,10 @@ def parse_args():
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
         default='3,5,7')
+    parser.add_argument('--mutating-positions',
+        type=str,
+        help='which position in the motif is mutating; can be one of combination of -1, 0, 1 for 5\'/left end, central, or 3\'/right end',
+        default='-1,0,1')
     parser.add_argument('--output-svg',
         type=str,
         help='svg file to save output to',
@@ -37,18 +41,20 @@ def parse_args():
 
     return args
 
-def convert_to_csv(target, mutabilities, motif_lens):
+def convert_to_csv(target, mutabilities, motif_lens, mutating_positions):
     """
     Take pickle file and convert to csv for use in R
     """
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
+    feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=motif_lens,
+            mutating_positions=mutating_positions,
+        )
     motif_list = feat_generator.motif_list
-
-    # TODO: combine hierarchical motifs here
+    mutating_pos_list = feat_generator.mutating_pos_list
 
     with open(str(target), 'wb') as f:
         writer = csv.writer(f)
-        writer.writerows(izip([motif.upper() for motif in motif_list], mutabilities.ravel()))
+        writer.writerows(izip([motif.upper() for motif in motif_list], mutating_pos_list, mutabilities.ravel()))
 
 def main(args=sys.argv[1:]):
 
@@ -58,7 +64,14 @@ def main(args=sys.argv[1:]):
     for m in motif_len_vals:
         assert(m % 2 == 1)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_len_vals)
+    mutating_pos_vals = [int(pos) for pos in args.mutating_positions.split(',')]
+    for m in mutating_pos_vals:
+        assert(m in [-1, 0, 1])
+
+    feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=motif_len_vals,
+            mutating_positions=mutating_pos_vals,
+        )
     max_motif_len = max(motif_len_vals)
     full_motif_dict = feat_generator.feat_gens[-1].motif_dict
 
@@ -72,23 +85,22 @@ def main(args=sys.argv[1:]):
         start_idx = 0
         for f in feat_generator.feat_gens[:len(motif_len_vals)]:
             motif_list = f.motif_list
-            diff_len = max_motif_len - f.motif_len
             for m_idx, m in enumerate(motif_list):
                 m_theta = theta[start_idx + m_idx]
-                if diff_len == 0:
+                if f.offset == 0:
                     full_m_idx = full_motif_dict[m]
                     full_theta[full_m_idx] += m_theta
                 else:
-                    flanks = itertools.product(["a", "c", "g", "t"], repeat=diff_len)
+                    flanks = itertools.product(["a", "c", "g", "t"], repeat=2*f.offset)
                     for f in flanks:
-                        full_m = "".join(f[:diff_len/2]) + m + "".join(f[diff_len/2:])
+                        full_m = "".join(f[:f.left_offset]) + m + "".join(f[f.right_offset:])
                         full_m_idx = full_motif_dict[full_m]
                         full_theta[full_m_idx] += m_theta
             start_idx += len(motif_list)
     else:
         full_theta = theta
 
-    convert_to_csv(args.output_csv, full_theta, [max_motif_len])
+    convert_to_csv(args.output_csv, full_theta, [max_motif_len], mutating_pos_vals)
 
     # Call Rscript
     command = 'Rscript'
