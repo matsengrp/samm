@@ -283,11 +283,20 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, locus='', species=''):
+def read_gene_seq_csv_data(
+        gene_file_name,
+        seq_file_name,
+        motif_len=1,
+        mutating_positions=[0],
+        sample=1,
+        locus='',
+        species='',
+        ):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
+    @param mutating_positions: positions that will be mutating so flanks are calculated correctly
     @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
     @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
     @param subset_vals: list of values of these variables to subset on (e.g., ['k', 'mouse'])
@@ -320,6 +329,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
                     start_seq=start_seq,
                     end_seq=end_seq,
                     motif_len=motif_len,
+                    mutating_positions=mutating_positions,
             )
 
             if obs_seq_mutation.num_mutations > 0:
@@ -336,6 +346,7 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
                         start_seq=start_seq,
                         end_seq=end_seq,
                         motif_len=motif_len,
+                        mutating_positions=mutating_positions,
                 )
 
                 if sample == 1 and obs_seq_mutation.num_mutations > 0:
