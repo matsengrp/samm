@@ -92,7 +92,7 @@ class SamplerPoolWorker(ParallelWorker):
         return sampler_res
 
     def __str__(self):
-        return "SamplerPoolWorker %s" % self.sampler.obs_seq_mutation
+        return "SamplerPoolWorker %s" % self.obs_seq
 
 class Sampler:
     def __init__(self, theta, feature_generator, obs_seq_mutation):

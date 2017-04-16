@@ -262,24 +262,19 @@ class SurvivalProblemCustom(SurvivalProblem):
         prev_denom = pos_exp_theta.sum()
 
         prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
-        if per_target_model:
-            prev_risk_group_grad = np.hstack([prev_risk_group_grad.sum(axis=1, keepdims=True), prev_risk_group_grad])
 
         risk_group_grad_tot = prev_risk_group_grad/prev_denom
         for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(merged_thetas))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
 
+            prev_risk_group_grad += pos_feat_matrixT.dot(signed_exp_thetas)
+
             prev_denom += signed_exp_thetas.sum()
-
-            if per_target_model:
-                signed_exp_thetas = np.hstack([signed_exp_thetas.sum(axis=1, keepdims=True), signed_exp_thetas])
-            grad_update = pos_feat_matrixT.dot(signed_exp_thetas)
-
-            prev_risk_group_grad += grad_update
-
-            risk_group_grad_tot += prev_risk_group_grad/prev_denom
-
+            prev_denom_inv = 1.0/prev_denom
+            risk_group_grad_tot += prev_risk_group_grad * prev_denom_inv
+        if per_target_model:
+            risk_group_grad_tot = np.hstack([np.sum(risk_group_grad_tot, axis=1, keepdims=True), risk_group_grad_tot])
         return sample_data.init_grad_vector - risk_group_grad_tot
 
 class PrecalcDataWorker(ParallelWorker):
