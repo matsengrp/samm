@@ -94,8 +94,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         return ll_vec1 - ll_vec2
 
 
-    def _get_log_lik_parallel(self, theta, batch_factor=2):
+    def _get_log_lik_parallel(self, theta):
         """
+        JUST KIDDING - parallel is not faster
         @param theta: the theta to calculate the likelihood for
         @param batch_factor: When using multiprocessing, we batch the samples together for speed
                             We make `num_threads` * `batch_factor` batches
@@ -105,20 +106,12 @@ class SurvivalProblemCustom(SurvivalProblem):
         worker_list = [
             ObjectiveValueWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
-        if self.pool is not None:
-            multiproc_manager = MultiprocessingManager(
-                self.pool,
-                worker_list,
-                shared_obj=theta,
-                num_approx_batches=self.pool._processes * batch_factor,
-            )
-            ll = multiproc_manager.run()
-        else:
-            ll = [worker.run(theta) for worker in worker_list]
+        ll = [worker.run(theta) for worker in worker_list]
         return np.array(ll)
 
-    def _get_gradient_log_lik(self, theta, batch_factor=2):
+    def _get_gradient_log_lik(self, theta):
         """
+        JUST KIDDING - parallel is not faster
         @param theta: the theta to calculate the likelihood for
         @param batch_factor: When using multiprocessing, we batch the samples together for speed
                             We make `num_threads` * `batch_factor` batches
@@ -129,17 +122,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         worker_list = [
             GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
-        if self.pool is not None:
-            multiproc_manager = MultiprocessingManager(
-                self.pool,
-                worker_list,
-                shared_obj=theta,
-                num_approx_batches=self.pool._processes * batch_factor,
-            )
-            l = multiproc_manager.run()
-        else:
-            l = [worker.run(theta) for worker in worker_list]
-
+        l = [worker.run(theta) for worker in worker_list]
         grad_ll_dtheta = np.sum(l, axis=0)
         return -1.0/self.num_samples * grad_ll_dtheta
 
