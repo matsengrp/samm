@@ -65,6 +65,9 @@ def main(args=sys.argv[1:]):
                     full_theta[full_m_idx,:] += m_theta
         start_idx += len(motif_list)
 
+    if theta.shape[1] > 1:
+        full_theta[:,1:] += full_theta[:,0,None]
+
     theta_zipped = zip(full_theta.tolist(), feat_generator.feat_gens[-1].motif_list)
     if theta.shape[1] > 1:
         sort_lambda = lambda t: t[0][0]
