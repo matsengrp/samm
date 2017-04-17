@@ -178,11 +178,14 @@ class MutationOrderGibbsSampler(Sampler):
             # correct the full ordering probability by taking away the old terms
             full_ordering_log_prob += -log_numerators[i] - log_numerators[i + 1] + np.log(denominators[i + 1])
 
-            col_idx_earlier = get_target_col(self.obs_seq_mutation, position) if self.per_target_model else 0
-            log_numerators[i] = self.theta[first_mutation_feats, col_idx_earlier].sum()
+            log_numerators[i] = self.theta[first_mutation_feats, 0].sum()
+            log_numerators[i + 1] = self.theta[second_feat_mut_step.mutating_pos_feats, 0].sum()
+            if self.per_target_model:
+                col_idx_earlier = get_target_col(self.obs_seq_mutation, position)
+                log_numerators[i] += self.theta[first_mutation_feats, col_idx_earlier].sum()
 
-            col_idx_later = get_target_col(self.obs_seq_mutation, shuffled_position) if self.per_target_model else 0
-            log_numerators[i + 1] = self.theta[second_feat_mut_step.mutating_pos_feats, col_idx_later].sum()
+                col_idx_later = get_target_col(self.obs_seq_mutation, shuffled_position)
+                log_numerators[i + 1] += self.theta[second_feat_mut_step.mutating_pos_feats, col_idx_later].sum()
             denominators[i + 1] = self._get_denom_update(denominators[i], first_mutation_feats, second_feat_mut_step)
 
             # correct the full ordering probability by adding back the new terms
@@ -273,10 +276,19 @@ class MutationOrderGibbsSampler(Sampler):
         # Get the components -- numerators and the denominators
         log_numerators = []
         for i, mut_step in enumerate(feat_mutation_steps):
-            col_idx = get_target_col(self.obs_seq_mutation, curr_order[i]) if self.per_target_model else 0
-            log_numerators.append(self.theta[mut_step.mutating_pos_feats, col_idx].sum())
+            theta_sum = self.theta[mut_step.mutating_pos_feats, 0].sum()
+            if self.per_target_model:
+                col_idx = get_target_col(self.obs_seq_mutation, curr_order[i])
+                theta_sum += self.theta[mut_step.mutating_pos_feats, col_idx].sum()
+
+            log_numerators.append(theta_sum)
+
+        merged_thetas = self.theta[:,0,None]
+        if self.per_target_model:
+            merged_thetas = merged_thetas + self.theta[:,1:]
+
         denominators = [
-            (np.exp(self.obs_seq_mutation.feat_matrix_start * self.theta)).sum()
+            (np.exp(self.obs_seq_mutation.feat_matrix_start * merged_thetas)).sum()
         ]
         prev_feat_mut_step = feat_mutation_steps[0]
         for i, feat_mut_step in enumerate(feat_mutation_steps[1:]):
@@ -306,8 +318,11 @@ class MutationOrderGibbsSampler(Sampler):
         # Use gibbs_step_base to update denoms and numerators
         log_numerators = gibbs_step_base.log_numerators[:update_step_start]
         for i, mut_step in enumerate(feat_mutation_steps):
-            col_idx = get_target_col(self.obs_seq_mutation, curr_order[update_step_start + i]) if self.per_target_model else 0
-            log_numerators.append(self.theta[mut_step.mutating_pos_feats, col_idx].sum())
+            theta_sum = self.theta[mut_step.mutating_pos_feats, 0].sum()
+            if self.per_target_model:
+                col_idx = get_target_col(self.obs_seq_mutation, curr_order[update_step_start + i])
+                theta_sum += self.theta[mut_step.mutating_pos_feats, col_idx].sum()
+            log_numerators.append(theta_sum)
 
         denominators = gibbs_step_base.denominators[:update_step_start + 1]
         prev_feat_mut_step = feat_mutation_steps[0]
@@ -328,10 +343,16 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        if len(prev_feat_idxs) > 0:
-            old_feat_theta_sums = [self.theta[feat_idxs,].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_theta_sums = [self.theta[feat_idxs,].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
-            return old_denominator - np.exp(self.theta[prev_feat_idxs,:].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
+        if len(prev_feat_idxs) > 1:
+            if not self.per_target_model:
+                old_feat_theta_sums = [self.theta[feat_idxs].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+                new_feat_theta_sums = [self.theta[feat_idxs].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+                return old_denominator - np.exp(self.theta[prev_feat_idxs].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
+            else:
+                old_feat_theta_sums = [self.theta[feat_idxs,0].sum() + self.theta[feat_idxs, 1:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+                new_feat_theta_sums = [self.theta[feat_idxs,0].sum() + self.theta[feat_idxs, 1:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+                prev_theta_sum = self.theta[prev_feat_idxs,0].sum() + self.theta[prev_feat_idxs,1:].sum(axis=0)
+                return old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
             old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
             new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]

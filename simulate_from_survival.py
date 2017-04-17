@@ -136,36 +136,50 @@ def _read_mutability_probability_params(motif_list, args):
 
     if args.per_target_model:
         # Create the S5F target matrix and use this as our true theta
-        theta = np.diag(np.exp(theta)) * np.matrix(probability_matrix)
-        nonzero_mask = np.where(theta != 0)
-        zero_mask = np.where(theta == 0)
-        theta[nonzero_mask] = np.log(theta[nonzero_mask])
-        theta[zero_mask] = -np.inf
-        theta = np.array(theta)
-        probability_matrix = None
-    num_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
+        theta = np.diag(np.exp(theta)) * np.hstack([np.ones((len(motif_list), 1)), np.matrix(probability_matrix)])
+        theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
+        theta[~theta_mask] = 1 # set to 1 so i can take a log
+        theta = np.log(theta)
+        theta[~theta_mask] = -np.inf # set to -inf since cannot transition to this target nucleotide
+
+    num_cols = NUM_NUCLEOTIDES + 1 if args.per_target_model else 1
     return theta.reshape((len(motif_list), num_cols)), probability_matrix
 
-def _generate_hierarchical_params(motif_list, motif_len):
-    true_theta = np.zeros((len(motif_list), 1))
+def _random_generate_thetas(motif_list, motif_lens, per_target_model):
+    """
+    Returns back an aggregated theta vector corresponding to the motif_list as well as the raw theta vector
+    """
+    max_motif_len = max(motif_lens)
+    num_theta_cols = NUM_NUCLEOTIDES + 1 if per_target_model else 1
 
-    motif_lens = range(3, motif_len + 1, 2)
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
+    true_theta = np.zeros((len(motif_list), num_theta_cols))
+    full_raw_theta = np.zeros((feat_generator.feature_vec_len, num_theta_cols))
+
     theta_scaling = 1.0
+    start_idx = 0
     for f in feat_generator.feat_gens:
         motif_list = f.motif_list
-        sub_theta = theta_scaling * (2 * np.random.rand(len(motif_list), 1) - 1)
+        sub_theta = theta_scaling * (2 * np.random.rand(len(motif_list)) - 1)
+        full_raw_theta[start_idx : start_idx + f.feature_vec_len, 0] = sub_theta
+        if per_target_model:
+            sub_target_theta = theta_scaling * 0.1 * np.random.randn(f.feature_vec_len, NUM_NUCLEOTIDES)
+            sub_target_theta_mask = get_possible_motifs_to_targets(motif_list, sub_target_theta.shape)
+            sub_target_theta[~sub_target_theta_mask] = -np.inf
+            full_raw_theta[start_idx : start_idx + f.feature_vec_len, 1:] = sub_target_theta
+        start_idx += f.feature_vec_len
         for i, motif in enumerate(motif_list):
-            flank_len = motif_len - f.motif_len
+            flank_len = max_motif_len - f.motif_len
             motif_flanks = itertools.product(*([NUCLEOTIDES] * flank_len))
             for flank in motif_flanks:
                 full_motif = "".join(flank[:flank_len/2]) + motif + "".join(flank[-flank_len/2:])
-                # print "full_motif", full_motif
                 full_motif_idx = feat_generator.feat_gens[-1].motif_dict[full_motif]
-                true_theta[full_motif_idx] += sub_theta[i] * theta_scaling
-        theta_scaling *= 0.8
+                true_theta[full_motif_idx, 0] += sub_theta[i]
+                if per_target_model:
+                    true_theta[full_motif_idx, 1:] += sub_target_theta[i,:]
+        theta_scaling *= 0.5
 
-    return true_theta
+    return true_theta, full_raw_theta
 
 def _generate_true_parameters(motif_list, args):
     """
@@ -173,22 +187,23 @@ def _generate_true_parameters(motif_list, args):
     Make a sparse version if sparsity_ratio > 0
     """
     nonzero_motifs = motif_list
-    if args.motif_len == 3 and not args.per_target_model:
-        true_theta = 2 * np.random.rand(len(motif_list), 1) - 1
-        probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
-        for idx, m in enumerate(motif_list):
-            center_nucleotide_idx = NUCLEOTIDE_DICT[m[args.motif_len/2]]
-            probability_matrix[idx, center_nucleotide_idx] = 0
-    elif args.hierarchical and not args.per_target_model:
-        true_theta = _generate_hierarchical_params(motif_list, args.motif_len)
-        probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
-        for idx, m in enumerate(motif_list):
-            center_nucleotide_idx = NUCLEOTIDE_DICT[m[args.motif_len/2]]
-            probability_matrix[idx, center_nucleotide_idx] = 0
-    elif args.motif_len == 5 and not args.hierarchical:
+    if args.motif_len == 5 and not args.hierarchical:
         true_theta, probability_matrix = _read_mutability_probability_params(motif_list, args)
+        raw_theta = true_theta
     else:
-        raise NotImplementedError()
+        if args.hierarchical:
+            motif_lens = range(3, args.motif_len + 1, 2)
+        else:
+            motif_lens = [args.motif_len]
+        true_theta, raw_theta = _random_generate_thetas(motif_list, motif_lens, args.per_target_model)
+
+        if not args.per_target_model:
+            probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
+            for idx, m in enumerate(motif_list):
+                center_nucleotide_idx = NUCLEOTIDE_DICT[m[args.motif_len/2]]
+                probability_matrix[idx, center_nucleotide_idx] = 0
+        else:
+            probability_matrix = None
 
     if args.sparsity_ratio > 0:
         # Let's zero out some motifs now
@@ -205,7 +220,7 @@ def _generate_true_parameters(motif_list, args):
                 probability_matrix[idx, :] = 1./3
                 probability_matrix[idx, center_nucleotide_idx] = 0
         nonzero_motifs = list(set(motif_list) - zero_motifs)
-    return true_theta, probability_matrix, nonzero_motifs
+    return true_theta, probability_matrix, nonzero_motifs, raw_theta
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.random_gene_len > 0:
@@ -234,9 +249,9 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
 
     return germline_nucleotides, germline_genes
 
-def dump_parameters(true_thetas, probability_matrix, args, motif_list):
+def dump_parameters(true_thetas, probability_matrix, raw_theta, args, motif_list):
     # Dump a pickle file of simulation parameters
-    pickle.dump([true_thetas, probability_matrix], open(args.output_true_theta, 'w'))
+    pickle.dump([true_thetas, probability_matrix, raw_theta], open(args.output_true_theta, 'w'))
 
     # Dump a text file of theta for easy viewing
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
@@ -262,7 +277,7 @@ def main(args=sys.argv[1:]):
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
     motif_list = feat_generator.motif_list
 
-    true_thetas, probability_matrix, nonzero_motifs = _generate_true_parameters(motif_list, args)
+    true_thetas, probability_matrix, nonzero_motifs, raw_theta = _generate_true_parameters(motif_list, args)
 
     germline_nucleotides, germline_genes = _get_germline_nucleotides(args, nonzero_motifs)
 
@@ -271,7 +286,7 @@ def main(args=sys.argv[1:]):
     else:
         simulator = SurvivalModelSimulatorSingleColumn(true_thetas, probability_matrix, feat_generator, lambda0=args.lambda0)
 
-    dump_parameters(true_thetas, probability_matrix, args, motif_list)
+    dump_parameters(true_thetas, probability_matrix, raw_theta, args, motif_list)
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
 

@@ -30,7 +30,7 @@ class MCMC_EM:
         self.pool = pool
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
-        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES
+        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
 
     def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """
@@ -99,7 +99,7 @@ class MCMC_EM:
                     pool=self.pool,
                 )
 
-                theta, pen_exp_log_lik, log_lik_diff, lower_bound = problem.solve(
+                theta, pen_exp_log_lik, lower_bound = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                 )
@@ -112,19 +112,15 @@ class MCMC_EM:
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < 0)
-                log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
+                log.info("lower_bound_is_negative %d, lower_bound %f" % (lower_bound_is_negative, lower_bound))
 
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-            if lower_bound_is_negative:
+            if lower_bound_is_negative or lower_bound < diff_thres:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
-            elif log_lik_diff < diff_thres:
-                # if penalized log likelihood is increasing but not by very much
-                break
-
-            log.info("official pen_exp_log_lik %f" % pen_exp_log_lik)
+            log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
         return theta, all_traces
