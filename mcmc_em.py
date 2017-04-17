@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import logging as log
+import pickle
 
 from models import *
 from common import *
@@ -117,6 +118,12 @@ class MCMC_EM:
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
+
+            # Save the e-step samples if we want to analyze later on
+            e_sample_file_name = "%s/e_samples_%d.pkl" % (self.scratch_dir, run)
+            log.info("Pickling E-step samples %s" % e_sample_file_name)
+            with open(e_sample_file_name, "w") as f:
+                pickle.dump(e_step_samples, f)
 
             if lower_bound_is_negative or lower_bound < diff_thres:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case

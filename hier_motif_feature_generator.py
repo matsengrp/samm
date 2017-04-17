@@ -44,6 +44,13 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         obs_seq_mutation.set_start_feats(feat_vec_dict, full_feat_mat)
         return obs_seq_mutation
 
+    def count_mutated_motifs(self, seq_mut_order):
+        mutated_motifs = []
+        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
+            curr_mutated_motifs = feat_gen.count_mutated_motifs(seq_mut_order)
+            mutated_motifs.append(curr_mutated_motifs)
+        return mutated_motifs
+
     def create_for_mutation_steps(self, seq_mut_order):
         feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations)]
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
