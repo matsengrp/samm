@@ -28,9 +28,9 @@ def parse_args():
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
         default='3,5,7')
-    parser.add_argument('--output-svg',
+    parser.add_argument('--output-png',
         type=str,
-        help='svg file to save output to',
+        help='png file to save output to',
         default='_output/out.png')
 
     args = parser.parse_args()
@@ -72,7 +72,7 @@ def main(args=sys.argv[1:]):
             motif_list = f.motif_list
             diff_len = max_motif_len - f.motif_len
             for m_idx, m in enumerate(motif_list):
-                m_theta = theta[start_idx + m_idx]
+                m_theta = theta[start_idx + m_idx,0]
                 if diff_len == 0:
                     full_m_idx = full_motif_dict[m]
                     full_theta[full_m_idx] += m_theta
@@ -92,7 +92,7 @@ def main(args=sys.argv[1:]):
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, args.output_csv, str(max_motif_len), args.output_svg]
+    cmd = [command, script_file, args.output_csv, str(max_motif_len), args.output_png]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
