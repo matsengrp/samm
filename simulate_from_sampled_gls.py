@@ -246,28 +246,43 @@ def simulate(args):
         seq_file.writerow(['germline_name','sequence_name','sequence'])
         seq_anc_file = csv.writer(outseqswithanc)
         seq_anc_file.writerow(['germline_name','sequence_name','sequence'])
-        for run, (gene, sequence) in \
+        for run, (gene_name, germline_sequence) in \
                 enumerate(zip(germline_genes, germline_nucleotides)):
+            print "run ================ %d" % run
+            prefix = "clone%d-" % run
+            germline_name = "%s%s" % (prefix, gene_name)
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
-            gl_file.writerow([gene,sequence])
-            tree = run_gctree(args, sequence, mutation_model)
+            print "germline_name", germline_name
+            gl_file.writerow([germline_name, germline_sequence])
+            tree = run_gctree(args, germline_sequence, mutation_model)
             for idx, descendant in enumerate(tree.traverse('preorder')):
                 # internal nodes will have frequency zero, so for providing output
                 # along a branch we need to consider these cases! otherwise the leaves
                 # should have nonzero frequency
-                seq_name = 'Run{0}-Sequence{1}'.format(run, idx)
+                seq_name = 'seq%d' % idx
                 if descendant.is_root():
-                    descendant.name = gene
-                    gl_anc_file.writerow([descendant.name,descendant.sequence.lower()])
+                    # Add a name to this node
+                    descendant.name = germline_name
+                    print "descendant.name", descendant.name
+                    gl_anc_file.writerow([descendant.name, descendant.sequence.lower()])
                 else:
+                    # Add a name to this node
                     descendant.name = '-'.join([descendant.up.name, seq_name])
+                    # Write the internal node to the tree branch germline file
+                    # Note: this will write repeats, but that's okay.
                     gl_anc_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
                     if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
-                        seq_anc_file.writerow([descendant.up.name, seq_name, descendant.sequence.lower()])
-                    if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), sequence) != 0:
-                        seq_file.writerow([gene, seq_name, descendant.sequence.lower()])
+                        # write into the true tree branches file
+                        print("descendant.up.name" + descendant.up.name)
+                        print("descendant.name" + descendant.name)
+                        seq_anc_file.writerow([descendant.up.name, descendant.name, descendant.sequence.lower()])
+                    if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), germline_sequence) != 0:
+                        # we are at the leaf of the tree and can write into the "observed data" file
+                        obs_seq_name = "%s%s" % (prefix, seq_name)
+                        print(obs_seq_name)
+                        seq_file.writerow([germline_name, obs_seq_name, descendant.sequence.lower()])
 
 def main(args=sys.argv[1:]):
     ''' run program '''
