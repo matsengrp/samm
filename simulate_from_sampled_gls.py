@@ -248,13 +248,11 @@ def simulate(args):
         seq_anc_file.writerow(['germline_name','sequence_name','sequence'])
         for run, (gene_name, germline_sequence) in \
                 enumerate(zip(germline_genes, germline_nucleotides)):
-            print "run ================ %d" % run
             prefix = "clone%d-" % run
             germline_name = "%s%s" % (prefix, gene_name)
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
-            print "germline_name", germline_name
             gl_file.writerow([germline_name, germline_sequence])
             tree = run_gctree(args, germline_sequence, mutation_model)
             for idx, descendant in enumerate(tree.traverse('preorder')):
