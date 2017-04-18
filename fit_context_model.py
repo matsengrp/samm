@@ -189,6 +189,7 @@ def parse_args():
     else:
         args.fuse_windows = []
 
+    args.intermediate_out_dir = os.path.dirname(args.out_file)
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
     args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
@@ -376,6 +377,7 @@ def main(args=sys.argv[1:]):
         base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         scratch_dir=args.scratch_dir,
+        intermediate_dir=args.intermediate_out_dir,
         pool=all_runs_pool,
     )
 
