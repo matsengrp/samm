@@ -386,12 +386,12 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
         avg_seq_len += float(obs_seq.seq_len) / n_sequences
         avg_mutation_frequency += (float(obs_seq.num_mutations) / obs_seq.seq_len) / n_sequences
         motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
-        motif_set.update(motifs.values())
-        for mutation_pos, _ in obs_seq.mutation_pos_dict.iteritems():
-            central_base_mutes[motifs[mutation_pos]] += 1
-            for pos in range(max(mutation_pos-feat_generator.half_motif_len, 0),
-                    min(mutation_pos+feat_generator.half_motif_len+1, obs_seq.seq_len)):
-                any_mutes[motifs[pos]] += 1
+        motif_set.update([item for sublist in motifs.values() for item in sublist])
+        # for mutation_pos, _ in obs_seq.mutation_pos_dict.iteritems():
+        #     central_base_mutes[motifs[mutation_pos]] += 1
+        #     for pos in range(max(mutation_pos-feat_generator.half_motif_len, 0),
+        #             min(mutation_pos+feat_generator.half_motif_len+1, obs_seq.seq_len)):
+        #         any_mutes[motifs[pos]] += 1
 
     return '\n'.join([
                 '  Number of sequences: %d' % n_sequences,
@@ -400,8 +400,8 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
                 '  Average sequence length: %f' % avg_seq_len,
                 '  Average mutation frequency: %f' % avg_mutation_frequency,
                 '  Number of motifs in dataset: %d' % len(motif_set),
-                '  Number of motifs w/ >1 central base mutation: %d' % len([val for val in central_base_mutes if val > 0]),
-                '  Number of motifs w/ <20 mutes in central base: %d' % len([val for val in central_base_mutes if val < 20]),
-                '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
+                # '  Number of motifs w/ >1 central base mutation: %d' % len([val for val in central_base_mutes if val > 0]),
+                # '  Number of motifs w/ <20 mutes in central base: %d' % len([val for val in central_base_mutes if val < 20]),
+                # '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
             ]
         )
