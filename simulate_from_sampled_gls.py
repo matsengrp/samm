@@ -265,7 +265,6 @@ def simulate(args):
                 if descendant.is_root():
                     # Add a name to this node
                     descendant.name = germline_name
-                    print "descendant.name", descendant.name
                     gl_anc_file.writerow([descendant.name, descendant.sequence.lower()])
                 else:
                     # Add a name to this node
@@ -275,13 +274,10 @@ def simulate(args):
                     gl_anc_file.writerow([descendant.up.name,descendant.up.sequence.lower()])
                     if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
                         # write into the true tree branches file
-                        print("descendant.up.name" + descendant.up.name)
-                        print("descendant.name" + descendant.name)
                         seq_anc_file.writerow([descendant.up.name, descendant.name, descendant.sequence.lower()])
                     if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), germline_sequence) != 0:
                         # we are at the leaf of the tree and can write into the "observed data" file
-                        obs_seq_name = "%s%s" % (prefix, seq_name)
-                        print(obs_seq_name)
+                        obs_seq_name = "%s-%s" % (germline_name, seq_name)
                         seq_file.writerow([germline_name, obs_seq_name, descendant.sequence.lower()])
 
 def main(args=sys.argv[1:]):
