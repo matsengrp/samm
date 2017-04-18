@@ -18,8 +18,11 @@ base = {'nreps': localenv['NREPS'],
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-sim_size_dict = [{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50},
-                 {'size': 'big', 'n_taxa': 10, 'n_germlines': 100, 'germline_size': 200}]
+sim_size_dict = [
+    #{'size': 'mini', 'n_taxa': 5, 'n_germlines': 50, 'germline_size': 50},
+    #{'size': 'big', 'n_taxa': 10, 'n_germlines': 200, 'germline_size': 250},
+    {'size': 'bigger', 'n_taxa': 10, 'n_germlines': 500, 'germline_size': 250},
+]
 
 nest.add(
     'simulation_size',
@@ -54,14 +57,14 @@ def generate(env, outdir, c):
                 '--output-seqs ${TARGETS[2]}',
                 '--output-per-branch-genes ${TARGETS[3]}',
                 '--output-per-branch-seqs ${TARGETS[4]}',
-                '&&',
-                'python preprocess_data.py',
-                '--input-genes ${TARGETS[1]}',
-                '--input-seqs ${TARGETS[2]}',
-                '--impute-ancestors',
-                '--output-genes ${TARGETS[5]}',
-                '--output-seqs ${TARGETS[6]}']
-
+                #'&&',
+                #'python preprocess_data.py',
+                #'--input-genes ${TARGETS[1]}',
+                #'--input-seqs ${TARGETS[2]}',
+                #'--impute-ancestors',
+                #'--output-genes ${TARGETS[5]}',
+                #'--output-seqs ${TARGETS[6]}']
+    ]
     return env.Command(
         [join(outdir, 'true_theta.pkl'), join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
          join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv'),
@@ -87,15 +90,15 @@ nest.add(
 nest.add(
     'model_extra_options',
     lambda c: ['' if c['model_options']=='basic' else \
-        '--em-max-iters 5 --penalty-params 0.001,0.0001 --num-cpu-threads 6 --num-jobs 30 --burn-in 5 --num-e-samples 2'],
+        '--em-max-iters 5 --penalty-params 0.0001,0.00001 --num-cpu-threads 6 --num-jobs 30 --burn-in 5 --num-e-samples 2'],
     create_dir=False)
 
 data_options = [
     'true_ancestors',
-    'all_data',
-    'sample_random',
-    'sample_highly_mutated',
-    'impute_ancestors'
+    #'all_data',
+    #'sample_random',
+    #'sample_highly_mutated',
+    #'impute_ancestors'
 ]
 
 nest.add(
