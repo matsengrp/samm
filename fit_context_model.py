@@ -200,8 +200,10 @@ def parse_args():
 
 def load_true_model(file_name):
     with open(file_name, "rb") as f:
-        true_theta, probability_matrix = pickle.load(f)
-        return true_theta, probability_matrix
+        real_params = pickle.load(f)
+        true_theta = real_params[2] if len(real_params) > 2 else real_params[0]
+        probability_matrix = real_params[1]
+    return true_theta, probability_matrix
 
 def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_ratio, validation_column):
     """
