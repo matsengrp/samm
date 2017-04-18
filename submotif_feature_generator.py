@@ -97,6 +97,42 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return obs_seq_mutation
 
+    def count_mutated_motifs(self, seq_mut_order):
+        """
+        Just return back the motifs that mutated for this mutation order
+
+        @param seq_mut_order: ImputedSequenceMutations
+
+        @return list of motifs
+        """
+        mutated_motifs = []
+
+        old_mutation_pos = None
+        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq
+
+        left_flank = seq_mut_order.obs_seq_mutation.left_flank
+        right_flank = seq_mut_order.obs_seq_mutation.right_flank
+        offset = (seq_mut_order.obs_seq_mutation.motif_len - self.motif_len)/2
+        assert(offset >= 0)
+        if offset > 0:
+            left_flank = left_flank[offset:]
+            right_flank = right_flank[:-offset]
+
+        seq_len = seq_mut_order.obs_seq_mutation.seq_len
+        feat_dict_prev = dict()
+        already_mutated_pos = set()
+        for pos in seq_mut_order.mutation_order:
+            motif_idx = self._create_feature_vec_for_pos(pos, intermediate_seq, seq_len, left_flank, right_flank)
+            mutated_motifs.append(self.motif_list[motif_idx])
+            # Apply mutation
+            intermediate_seq = mutate_string(
+                intermediate_seq,
+                pos,
+                seq_mut_order.obs_seq_mutation.end_seq[pos]
+            )
+
+        return mutated_motifs
+
     def create_for_mutation_steps(self, seq_mut_order):
         """
         Calculate the feature values for the mutation steps

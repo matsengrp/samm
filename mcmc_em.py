@@ -1,6 +1,7 @@
 import time
 import numpy as np
 import logging as log
+import pickle
 
 from models import *
 from common import *
@@ -8,7 +9,7 @@ from sampler_collection import SamplerCollection
 from profile_support import profile
 
 class MCMC_EM:
-    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', pool=None):
+    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', intermediate_dir="", pool=None):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
@@ -30,6 +31,7 @@ class MCMC_EM:
         self.pool = pool
         self.theta_mask = theta_mask
         self.scratch_dir = scratch_dir
+        self.intermediate_dir = intermediate_dir
         self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
 
     def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
@@ -117,6 +119,12 @@ class MCMC_EM:
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
+
+            # Save the e-step samples if we want to analyze later on
+            e_sample_file_name = "%s/e_samples_%d.pkl" % (self.intermediate_dir, run)
+            log.info("Pickling E-step samples %s" % e_sample_file_name)
+            with open(e_sample_file_name, "w") as f:
+                pickle.dump(e_step_samples, f)
 
             if lower_bound_is_negative or lower_bound < diff_thres:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
