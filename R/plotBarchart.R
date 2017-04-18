@@ -68,7 +68,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     } else {
         grep_exp <- list(
             c('.[AT]A..','..T[AT].', 'WA/TW'),
-            c('[AT][GA]C..','..G[CT][AT]', 'WRC/GYW'),
+            c('[AT][GA]C..','..G[CT][AT]', 'WRCY/RGYW'),
             c('[CG][CT]C..','..G[GA][CG]', 'SYC/GRS'))
         # number of dots we need to add to each end
         n_extra <- (motif_len - 5)/2
@@ -79,7 +79,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
             mut_df$motif[grepl(combined_grep, mut_df$word,
                 perl = TRUE)] <- grep_val[3]
         }
-        grep_levels <- c('WA/TW', 'WRC/GYW', 'SYC/GRS', 'Neutral')
+        grep_levels <- c('WA/TW', 'WRCY/RGYW', 'SYC/GRS', 'Neutral')
     }
     mut_df$motif <- factor(mut_df$motif, levels = grep_levels)
     mut_df <- mut_df[mut_df[,center_nuc_col] %in% nucleotides, ]
