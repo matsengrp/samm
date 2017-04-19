@@ -48,31 +48,16 @@ def convert_to_csv(target, mutabilities, motif_lens):
         writer = csv.writer(f)
         writer.writerows(izip([motif.upper() for motif in motif_list], mutabilities.ravel()))
 
-def main(args=sys.argv[1:]):
-
-    args = parse_args()
-
-    motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
-    for m in motif_len_vals:
-        assert(m % 2 == 1)
-
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_len_vals)
-    max_motif_len = max(motif_len_vals)
-    full_motif_dict = feat_generator.feat_gens[-1].motif_dict
-
-    # Load fitted theta file
-    with open(args.input_pkl, "r") as f:
-        theta = pickle.load(f)[0]
-
-    if len(motif_len_vals) > 1:
+def plot_theta(args, feat_generator, full_motif_dict, theta, output_png):
+    if len(args.motif_len_vals) > 1:
         # Combine the hierarchical thetas if that is the case
-        full_theta = np.zeros(4**max_motif_len)
+        full_theta = np.zeros(4**args.max_motif_len)
         start_idx = 0
-        for f in feat_generator.feat_gens[:len(motif_len_vals)]:
+        for f in feat_generator.feat_gens[:len(args.motif_len_vals)]:
             motif_list = f.motif_list
-            diff_len = max_motif_len - f.motif_len
+            diff_len = args.max_motif_len - f.motif_len
             for m_idx, m in enumerate(motif_list):
-                m_theta = theta[start_idx + m_idx,0]
+                m_theta = theta[start_idx + m_idx]
                 if diff_len == 0:
                     full_m_idx = full_motif_dict[m]
                     full_theta[full_m_idx] += m_theta
@@ -86,15 +71,35 @@ def main(args=sys.argv[1:]):
     else:
         full_theta = theta
 
-    convert_to_csv(args.output_csv, full_theta, [max_motif_len])
+    convert_to_csv(args.output_csv, full_theta, [args.max_motif_len])
 
     # Call Rscript
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, args.output_csv, str(max_motif_len), args.output_png]
+    cmd = [command, script_file, args.output_csv, str(args.max_motif_len), output_png]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
+
+def main(args=sys.argv[1:]):
+
+    args = parse_args()
+
+    args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
+    for m in args.motif_len_vals:
+        assert(m % 2 == 1)
+
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_len_vals)
+    args.max_motif_len = max(args.motif_len_vals)
+    full_motif_dict = feat_generator.feat_gens[-1].motif_dict
+
+    # Load fitted theta file
+    with open(args.input_pkl, "r") as f:
+        theta = pickle.load(f)[0]
+
+    for col_idx in range(theta.shape[1]):
+        output_png = args.output_png.replace(".png", "%d.png" % col_idx)
+        plot_theta(args, feat_generator, full_motif_dict, theta[:,col_idx], output_png)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
