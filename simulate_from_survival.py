@@ -145,7 +145,7 @@ def _read_mutability_probability_params(motif_list, args):
     num_cols = NUM_NUCLEOTIDES + 1 if args.per_target_model else 1
     return theta.reshape((len(motif_list), num_cols)), probability_matrix
 
-def _random_generate_thetas(motif_list, motif_lens, per_target_model):
+def random_generate_thetas(motif_list, motif_lens, per_target_model):
     """
     Returns back an aggregated theta vector corresponding to the motif_list as well as the raw theta vector
     """
@@ -195,7 +195,7 @@ def _generate_true_parameters(motif_list, args):
             motif_lens = range(3, args.motif_len + 1, 2)
         else:
             motif_lens = [args.motif_len]
-        true_theta, raw_theta = _random_generate_thetas(motif_list, motif_lens, args.per_target_model)
+        true_theta, raw_theta = random_generate_thetas(motif_list, motif_lens, args.per_target_model)
 
         if not args.per_target_model:
             probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
