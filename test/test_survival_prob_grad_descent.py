@@ -15,7 +15,6 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
     def setUpClass(cls):
         np.random.seed(10)
         cls.motif_len = 5
-        cls.BURN_IN = 10
 
         cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
 
