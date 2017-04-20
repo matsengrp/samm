@@ -303,6 +303,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     @staticmethod
     def get_hessian_per_sample(theta, sample_data, per_target_model):
         """
+        Calculates the second derivative of the log likelihood for the complete data
         """
         merged_thetas = theta[:,0, None]
         if per_target_model:
@@ -315,8 +316,10 @@ class SurvivalProblemCustom(SurvivalProblem):
             features = sample_data.obs_seq_mutation.feat_matrix_start[pos,:].nonzero()[1]
             for f1 in features:
                 for f2 in features:
+                    # The first column in a per-target model appears in all other columns. Hence we need a sum of all the exp_thetas
                     dd_matrices[0][f1, f2] += exp_theta_psi.sum()
                     for j in range(1, theta.shape[1]):
+                        # The rest of the theta values for the per-target model only appear once in the exp_theta vector
                         dd_matrices[j][f1, f2] += exp_theta_psi[j - 1]
 
         pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
@@ -324,6 +327,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
         if per_target_model:
+            # Deal with the fact that the first column is special in a per-target model
             aug_prev_risk_group_grad = np.hstack([np.sum(prev_risk_group_grad, axis=1, keepdims=True), prev_risk_group_grad])
             aug_prev_risk_group_grad = aug_prev_risk_group_grad.reshape((aug_prev_risk_group_grad.size, 1), order="F")
         else:
@@ -331,11 +335,13 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         block_diag_dd = sp.linalg.block_diag(*dd_matrices)
         for i in range(theta.shape[1] - 1):
+            # Recall that the first column in a per-target model appears in all the exp_theta expressions. So we need to add in these values
+            # to the off-diagonal blocks of the second-derivative matrix
             block_diag_dd[(i + 1) * theta.shape[0]:(i + 2) * theta.shape[0], 0:theta.shape[0]] = dd_matrices[i + 1]
             block_diag_dd[0:theta.shape[0], (i + 1) * theta.shape[0]:(i + 2) * theta.shape[0]] = dd_matrices[i + 1]
 
         risk_group_hessian = aug_prev_risk_group_grad * aug_prev_risk_group_grad.T * np.power(prev_denom, -2) - np.power(prev_denom, -1) * block_diag_dd
-        for pos_feat_matrix, pos_feat_matrixT, features_sign_update, feat_mut_step in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates, sample_data.feat_mut_steps[1:]):
+        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(merged_thetas))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
 
@@ -343,6 +349,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
             prev_denom += signed_exp_thetas.sum()
 
+            # Now update the dd_matrix after the previous mutation step
             for i in range(pos_feat_matrix.shape[0]):
                 feature_vals = pos_feat_matrix[i,:].nonzero()[1]
                 for f1 in feature_vals:
