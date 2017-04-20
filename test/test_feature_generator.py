@@ -59,7 +59,6 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        # (position 2 mutates last)
         base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
         self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 16 * 0 + 4 * 0 + 1 * 3)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
@@ -74,7 +73,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
     def test_create_upstream(self):
         motif_len = 3
-        mutating_position = -1
+        mutating_position = 'left'
         feat_generator = SubmotifFeatureGenerator(motif_len=motif_len, mutating_position=mutating_position)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
@@ -90,14 +89,21 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        # (position 2 mutates last)
         base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
         self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 16 * 0 + 4 * 3  + 1 * 3)
+        self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
+        self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
         self.assertEqual(base_feat_mut_steps[1].mutating_pos_feats, 16 * 3 + 4 * 3 + 1 * 0)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_old[2], 16 * 3 + 4 * 3 + 1 * 0)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new[2], 16 * 3 + 4 * 3 + 1 * 0)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_old[3], 16 * 3 + 4 * 0 + 1 * 3)
+        self.assertEqual(base_feat_mut_steps[1].neighbors_feat_new[3], 16 * 3 + 4 * 0 + 1 * 3)
+        self.assertEqual(base_feat_mut_steps[4].neighbors_feat_new.keys(), [6,7])
+        self.assertEqual(base_feat_mut_steps[4].neighbors_feat_old.keys(), [6,7])
 
     def test_create_downstream(self):
         motif_len = 3
-        mutating_position = 1
+        mutating_position = 'right'
         feat_generator = SubmotifFeatureGenerator(motif_len=motif_len, mutating_position=mutating_position)
         obs_seq_mut = feat_generator.create_base_features(
             ObservedSequenceMutations(
@@ -113,10 +119,57 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        # (position 2 mutates last)
         base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
         self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 16 * 0 + 4 * 0  + 1 * 0)
+        self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
+        self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
         self.assertEqual(base_feat_mut_steps[1].mutating_pos_feats, 16 * 0 + 4 * 3 + 1 * 3)
+        self.assertEqual(len(base_feat_mut_steps[1].neighbors_feat_new), 0)
+        self.assertEqual(len(base_feat_mut_steps[1].neighbors_feat_old), 0)
+        self.assertEqual(base_feat_mut_steps[4].neighbors_feat_old.keys(), [3])
+        self.assertEqual(base_feat_mut_steps[4].neighbors_feat_new.keys(), [3])
+
+    def test_create_all(self):
+        motif_len = 3
+        mutating_positions = ['left', 'center']
+        feat_generator1 = SubmotifFeatureGenerator(motif_len=motif_len, mutating_position='left',
+                mutating_positions=mutating_positions)
+        obs_seq_mut1 = feat_generator1.create_base_features(
+            ObservedSequenceMutations(
+                start_seq="aaattatgaatgc",
+                end_seq=  "aatgcaagatagc",
+                motif_len=3,
+                mutating_positions=mutating_positions,
+            )
+        )
+        ordered_seq_mut1 = ImputedSequenceMutations(
+            obs_seq_mut1,
+            obs_seq_mut1.mutation_pos_dict.keys()
+        )
+        base_feat_mut_steps1 = feat_generator1.create_for_mutation_steps(ordered_seq_mut1)
+
+        feat_generator2 = SubmotifFeatureGenerator(motif_len=motif_len, mutating_position='center',
+                mutating_positions=mutating_positions)
+        obs_seq_mut2 = feat_generator2.create_base_features(
+            ObservedSequenceMutations(
+                start_seq="aaattatgaatgc",
+                end_seq=  "aatgcaagatagc",
+                motif_len=3,
+                mutating_positions=mutating_positions,
+            )
+        )
+        ordered_seq_mut2 = ImputedSequenceMutations(
+            obs_seq_mut2,
+            obs_seq_mut2.mutation_pos_dict.keys()
+        )
+
+        # Create the base_feat_vec_dicts and base_intermediate_seqs
+        base_feat_mut_steps1 = feat_generator1.create_for_mutation_steps(ordered_seq_mut1)
+        base_feat_mut_steps2 = feat_generator2.create_for_mutation_steps(ordered_seq_mut2)
+        self.assertEqual(base_feat_mut_steps1[0].mutating_pos_feats, 16 * 0 + 4 * 3  + 1 * 3)
+        self.assertEqual(base_feat_mut_steps2[0].mutating_pos_feats, 16 * 0 + 4 * 0  + 1 * 3)
+        self.assertEqual(base_feat_mut_steps1[1].neighbors_feat_old[0], 16 * 0 + 4 * 0  + 1 * 3)
+        self.assertEqual(base_feat_mut_steps1[1].neighbors_feat_new[0], 16 * 0 + 4 * 3  + 1 * 3)
 
     def test_update(self):
         motif_len = 3
