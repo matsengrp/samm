@@ -133,7 +133,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         sorted_sample_labels = np.sort(np.array(list(set(self.sample_labels))))
         expected_scores = {label: 0 for label in sorted_sample_labels}
         for g, sample_label in zip(grad_log_lik, self.sample_labels):
-            g = g.reshape((g.size, 1))
+            g = g.reshape((g.size, 1), order="F")
             expected_scores[sample_label] += g
             score_score += g * g.T
 
