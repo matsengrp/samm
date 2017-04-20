@@ -379,7 +379,6 @@ def main(args=sys.argv[1:]):
         base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         scratch_dir=args.scratch_dir,
-        intermediate_dir=args.intermediate_out_dir,
         pool=all_runs_pool,
     )
 
@@ -402,7 +401,8 @@ def main(args=sys.argv[1:]):
                 max_em_iters=args.em_max_iters,
                 fuse_windows=args.fuse_windows,
                 fuse_center_only=args.fuse_center_only,
-                train_and_val=False
+                train_and_val=False,
+                intermed_file_prefix="%s/e_samples_%s_" % (args.intermediate_out_dir, penalty_param_str),
             )
 
             if args.tuning_sample_ratio > 0:
@@ -425,7 +425,8 @@ def main(args=sys.argv[1:]):
                         burn_in=burn_in,
                         penalty_params=penalty_params,
                         max_em_iters=args.em_max_iters,
-                        train_and_val=True
+                        train_and_val=True,
+                        intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
                     )
 
             # Get the probabilities of the target nucleotides
@@ -486,8 +487,10 @@ def main(args=sys.argv[1:]):
             theta=best_model.theta,
             burn_in=burn_in,
             penalty_params=best_model.penalty_params,
-            max_em_iters=args.em_max_iters,
-            train_and_val=True
+            max_em_iters=args.em_max_iters + 10,
+            train_and_val=True,
+            intermed_file_prefix="%s/e_samples_%s_final_" % (args.intermediate_out_dir, penalty_param_str),
+            get_hessian=True,
         )
         best_fitted_prob_vector = None#MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
         best_model = MethodResults(
