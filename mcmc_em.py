@@ -125,7 +125,6 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
                 if get_hessian:
-                    print "asdjfkasjdfkladf", len(e_step_samples)/num_data
                     ci_maker = ConfidenceIntervalMaker()
                     conf_ints = ci_maker.run(theta, e_step_samples, problem, len(e_step_samples)/num_data)
 
