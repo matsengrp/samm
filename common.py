@@ -69,29 +69,35 @@ FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
-def compute_known_hot_and_cold(hot_or_cold_dicts, half_motif_len=2):
+def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2):
     """
     Known hot and cold spots were constructed on a 5mer model, so "N" pad
     longer motifs and subset shorter ones
     """
     kmer_list = []
     hot_or_cold_list = []
+    hot_or_cold_complements = []
     for spot in hot_or_cold_dicts:
+        hot_or_cold_complements.append({'central': return_complement(spot['central']),
+                'left_flank': return_complement(spot['right_flank']),
+                'right_flank': return_complement(spot['left_flank']),
+                'hot_or_cold': spot['hot_or_cold']})
+
+    for spot in hot_or_cold_dicts + hot_or_cold_complements:
         if len(spot['left_flank']) > half_motif_len or \
-            len(spot['right_flank']) > half_motif_len:
+            len(spot['right_flank']) > motif_len - half_motif_len - 1:
                 # this hot/cold spot is not a part of our motif size
                 continue
 
         left_pad = spot['left_flank'].rjust(half_motif_len, 'N')
-        right_pad = spot['right_flank'].ljust(half_motif_len, 'N')
+        right_pad = spot['right_flank'].ljust(motif_len - half_motif_len - 1, 'N')
         kmer_list.append(left_pad + spot['central'] + right_pad)
         hot_or_cold_list.append(spot['hot_or_cold'])
 
     hot_cold_regs = []
     for kmer, hot_or_cold in zip(kmer_list, hot_or_cold_list):
-        for km_or_com in (kmer, return_complement(kmer)):
-            hot_cold_regs.append([' - '.join([km_or_com.replace('N', ''), hot_or_cold]),
-                ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in km_or_com])])
+        hot_cold_regs.append([' - '.join([kmer.replace('N', ''), hot_or_cold]),
+            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in kmer])])
     return hot_cold_regs
 
 def contains_degenerate_base(seq_str):
@@ -123,13 +129,13 @@ def is_re_match(regex, submotif):
     match_res = re.match(regex, submotif)
     return match_res is not None
 
-def get_nonzero_theta_print_lines(theta, motif_list, mutating_pos_list):
+def get_nonzero_theta_print_lines(theta, motif_list, mutating_pos_list, motif_len):
     """
     @return a string that summarizes the theta vector/matrix
     """
     lines = []
     mutating_pos_set = list(set(mutating_pos_list))
-    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, half_motif_len) for half_motif_len in mutating_pos_set]
+    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
