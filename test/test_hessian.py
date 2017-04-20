@@ -33,7 +33,7 @@ class Hessian_TestCase(unittest.TestCase):
 
         featured_obs_seq_mut = feat_gen.create_base_features(self.obs_seq_mut)
         sample = ImputedSequenceMutations(featured_obs_seq_mut, self.mutation_order)
-        problem = SurvivalProblemCustom(feat_gen, [sample], [0], per_target, theta_mask)
+        problem = SurvivalProblemCustom(feat_gen, [sample], [1], [0], per_target, theta_mask)
 
         sample_obs_information, sample_hessian = problem.get_hessian(theta)
         for i in featured_obs_seq_mut.feat_matrix_start.nonzero()[1][:5]:
