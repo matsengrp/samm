@@ -29,9 +29,9 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         @param verbose: whether to print out the status at each iteration
         @return final fitted value of theta and penalized log likelihood
         """
-        theta, current_value, diff, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, min_iters, verbose)
+        theta, current_value, upper_bound = self._solve(init_theta, max_iters, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, min_iters, verbose)
 
-        return theta, -current_value, diff, -upper_bound
+        return theta, -current_value, -upper_bound
 
     def _get_value_parallel(self, theta):
         """
@@ -102,6 +102,4 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                     break
 
         log.info("final PROX iter %d, val %f, time %d" % (i, current_value, time.time() - st))
-        # We return diff because we want to ensure if the loss is increasing then it's not by much
-        # by comparing later to -diff < some_threshold
-        return theta, current_value, diff, upper_bound
+        return theta, current_value, upper_bound

@@ -179,7 +179,10 @@ def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
     # We cannot have a motif mutate to the same center nucleotide
     for i in range(len(motif_list)):
         center_motif_idx = mutating_pos_list[i]
-        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
+        if mask_shape[1] == NUM_NUCLEOTIDES:
+            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
+        else:
+            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]] + 1
         theta_mask[i, center_nucleotide_idx] = False
     return theta_mask
 
@@ -389,4 +392,4 @@ def get_target_col(sample, mutation_pos):
     @param sample: ObservedSequenceMutations
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
-    return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]]
+    return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1

@@ -178,7 +178,8 @@ def parse_args():
     # Determine sampler
     args.sampler_cls = MutationOrderGibbsSampler
     if args.per_target_model:
-        args.theta_num_col = NUM_NUCLEOTIDES
+        # First column is the median theta value and the remaining columns are the offset for that target nucleotide
+        args.theta_num_col = NUM_NUCLEOTIDES + 1
     else:
         args.theta_num_col = 1
 
@@ -196,6 +197,7 @@ def parse_args():
     else:
         args.fuse_windows = []
 
+    args.intermediate_out_dir = os.path.dirname(args.out_file)
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
     args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
@@ -206,8 +208,10 @@ def parse_args():
 
 def load_true_model(file_name):
     with open(file_name, "rb") as f:
-        true_theta, probability_matrix = pickle.load(f)
-        return true_theta, probability_matrix
+        real_params = pickle.load(f)
+        true_theta = real_params[2] if len(real_params) > 2 else real_params[0]
+        probability_matrix = real_params[1]
+    return true_theta, probability_matrix
 
 def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_ratio, validation_column):
     """
@@ -241,6 +245,8 @@ def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_rati
         # sample random categories from our validation variable
         val_categories = set(random.sample(categories, val_size))
         train_categories = categories - val_categories
+        log.info("train_categories %s" % train_categories)
+        log.info("val_categories %s" % val_categories)
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
@@ -351,9 +357,9 @@ def main(args=sys.argv[1:]):
     obs_seq_feat_base = []
     for obs_seq_mutation in obs_data:
         obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-    # log.info("Data statistics:")
-    # log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
-    # log.info(get_data_statistics_print_lines(obs_data, feat_generator))
+    log.info("Data statistics:")
+    log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
+    log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
@@ -386,6 +392,7 @@ def main(args=sys.argv[1:]):
         base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         scratch_dir=args.scratch_dir,
+        intermediate_dir=args.intermediate_out_dir,
         pool=all_runs_pool,
     )
 

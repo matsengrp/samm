@@ -1,6 +1,6 @@
 plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
                           style = c("hedgehog", "bar"), size = 1,
-                          bar.size = 0, ...) 
+                          bar.size = 0, ...)
 {
     # Plots bar chart of mutabilities
     #
@@ -46,29 +46,29 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     base_theme <- theme_bw() +
                   theme(panel.margin = grid::unit(0, "lines"),
                         panel.background = element_blank()) +
-                  theme(axis.text = element_text(margin = grid::unit(0, "lines"))) + 
+                  theme(axis.text = element_text(margin = grid::unit(0, "lines"))) +
                   theme(text = element_text(size = 10 * size),
-                        title = element_text(size = 10 * size), 
-                        legend.margin = grid::unit(0, "lines"), 
+                        title = element_text(size = 10 * size),
+                        legend.margin = grid::unit(0, "lines"),
                         legend.background = element_blank())
     score_offset <- 0
     score_scale <- 15
     text_offset <- -5.6
-    motif_colors <- setNames(c("#4daf4a", "#e41a1c", "#094d85", 
-        "#999999"), c("WA/TW", "WRC/GYW", "SYC/GRS", "Neutral"))
-    dna_colors <- setNames(c("#7bce77", "#ff9b39", "#f04949", 
+    motif_colors <- setNames(c("#4daf4a", "#e41a1c", "#094d85",
+        "#999999"), c("WA/TW", "WRCY/RGYW", "SYC/GRS", "Neutral"))
+    dna_colors <- setNames(c("#7bce77", "#ff9b39", "#f04949",
         "#5796ca", "#c4c4c4"), c("A", "C", "G", "T", "N"))
 
     # Recognizing known hot/cold spots
     mut_df$motif <- "Neutral"
     if (motif_len == 3) {
-        mut_df$motif[grepl("([AT]A.)|(.T[AT])", mut_df$word, 
+        mut_df$motif[grepl("([AT]A.)|(.T[AT])", mut_df$word,
             perl = TRUE)] <- "WA/TW"
         grep_levels <- c('WA/TW', 'Neutral')
     } else {
         grep_exp <- list(
             c('.[AT]A..','..T[AT].', 'WA/TW'),
-            c('[AT][GA]C..','..G[CT][AT]', 'WRC/GYW'),
+            c('[AT][GA]C..','..G[CT][AT]', 'WRCY/RGYW'),
             c('[CG][CT]C..','..G[GA][CG]', 'SYC/GRS'))
         # number of dots we need to add to each end
         n_extra <- (motif_len - 5)/2
@@ -76,10 +76,10 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
             combined_grep <- paste0('(',
                 rep('.', n_extra), grep_val[1], rep('.', n_extra), ')|(',
                 rep('.', n_extra), grep_val[2], rep('.', n_extra), ')')
-            mut_df$motif[grepl(combined_grep, mut_df$word, 
+            mut_df$motif[grepl(combined_grep, mut_df$word,
                 perl = TRUE)] <- grep_val[3]
         }
-        grep_levels <- c('WA/TW', 'WRC/GYW', 'SYC/GRS', 'Neutral')
+        grep_levels <- c('WA/TW', 'WRCY/RGYW', 'SYC/GRS', 'Neutral')
     }
     mut_df$motif <- factor(mut_df$motif, levels = grep_levels)
     mut_df <- mut_df[mut_df[,center_nuc_col] %in% nucleotides, ]
@@ -162,10 +162,10 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
         p1 <- ggplot(sub_df) +
               base_theme +
               xlab("") +
-              ylab("") + 
+              ylab("") +
               scale_color_manual(name = "Motif",
                                  values = c(motif_colors, dna_colors),
-                                 breaks = names(motif_colors)) + 
+                                 breaks = names(motif_colors)) +
               scale_fill_manual(name = "",
                                 values = c(motif_colors, dna_colors),
                                 guide = FALSE) +
@@ -197,10 +197,10 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
             for (flank in 1:min(motif_half_len, 2)) {
                 p1 <- p1 +
                       geom_text(data = sub_text[[flank]],
-                                mapping = aes_string(x = "text_x", 
+                                mapping = aes_string(x = "text_x",
                                                      y = "text_y",
                                                      label = "text_label"),
-                                color = "black", 
+                                color = "black",
                                 hjust = 0.5,
                                 vjust = 0.5,
                                 size = 2 * size)
@@ -210,7 +210,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
             for (flank in rev(1 + motif_len - 1:min(motif_half_len, 2))) {
                 p1 <- p1 +
                       geom_text(data = sub_text[[flank]],
-                                mapping = aes_string(x = "text_x", 
+                                mapping = aes_string(x = "text_x",
                                                      y = "text_y",
                                                      label = "text_label"),
                                 color = "black",
@@ -255,12 +255,12 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
             sub_colors <- motif_colors[names(motif_colors) %in% sub_df$motif]
             p1 <- p1 +
                   theme(plot.margin = grid::unit(c(1, 1, 1, 1), "lines"),
-                        panel.grid = element_blank(), 
+                        panel.grid = element_blank(),
                         panel.border = element_rect(color = "black"),
                         axis.text.x = element_blank(),
                         axis.ticks.x = element_blank(),
                         legend.position = "top") +
-                  guides(color = guide_legend(override.aes = list(fill = sub_colors, 
+                  guides(color = guide_legend(override.aes = list(fill = sub_colors,
                                                                   linetype = 0))) +
                   ylab("Mutability") +
                   scale_x_continuous(expand = c(0, 1)) +
@@ -268,7 +268,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
                                      breaks = y_breaks,
                                      expand = c(0, 0.5),
                                      labels = function(x)
-                                         scales::scientific(.invert_score(x))) + 
+                                         scales::scientific(.invert_score(x))) +
                   geom_bar(data = sub_df,
                            mapping = aes_string(x = "x",
                                                 y = "score",
@@ -286,4 +286,3 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     }
     return(plot_list)
 }
-

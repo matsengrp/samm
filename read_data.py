@@ -9,14 +9,13 @@ import glob
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
-import utils
+from utils import add_implicit_info, process_input_line
 import glutils
 
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
-sys.path.append('./gctree/bin')
-from gctree import phylip_parse
+from gctree.bin.gctree import phylip_parse
 
 from common import *
 from models import ObservedSequenceMutations
@@ -27,13 +26,13 @@ from Bio.Phylo.TreeConstruction import ParsimonyScorer, NNITreeSearcher, Parsimo
 from ete3 import Tree
 from itertools import izip
 
-GERMLINE_PARAM_FILE = PARTIS_PATH + '/data/germlines/human/igh/ighv.fasta'
-SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
+GERMLINE_PARAM_FILE = 'partis/data/germlines/human/igh/ighv.fasta'
+SAMPLE_PARTIS_ANNOTATIONS = 'partis/test/reference-results/partition-new-simu-cluster-annotations.csv'
 
 SAMPLE_RANDOM = 2
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=False, use_immunized=True, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -41,6 +40,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
     @param metadata: csv file of metadata; if None defaults will be used for chain/species
     @param use_v: use just the V gene or use the whole sequence?
     @param use_np: use nonproductive sequences only
+    @param use_immunized: use immunized mice only
     @param inferred_gls: list of paths to partis-inferred germlines
 
     @write genes to output_genes and seqs to output_seqs
@@ -60,6 +60,8 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
             current_info['locus'] = line['locus']
             current_info['species'] = line['species']
             current_info['group'] = line['group']
+            if use_immunized and current_info['group'] != 'immunized':
+                continue
             current_info['subject'] = line['subject']
             partition_info.append(current_info)
 
@@ -91,8 +93,8 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
                     if len(line['input_seqs']) == 0:
                         # sometimes data will have empty clusters
                         continue
-                    utils.process_input_line(line)
-                    utils.add_implicit_info(glfo, line)
+                    process_input_line(line)
+                    add_implicit_info(glfo, line)
                     good_seq_idx = [i for i, is_good in enumerate(good_seq(line)) if is_good]
                     if not good_seq_idx:
                         # no nonproductive sequences... skip
@@ -395,12 +397,12 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
         avg_seq_len += float(obs_seq.seq_len) / n_sequences
         avg_mutation_frequency += (float(obs_seq.num_mutations) / obs_seq.seq_len) / n_sequences
         motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
-        motif_set.update(motifs.values())
-        for mutation_pos, _ in obs_seq.mutation_pos_dict.iteritems():
-            central_base_mutes[motifs[mutation_pos]] += 1
-            for pos in range(max(mutation_pos-feat_generator.half_motif_len, 0),
-                    min(mutation_pos+feat_generator.half_motif_len+1, obs_seq.seq_len)):
-                any_mutes[motifs[pos]] += 1
+        motif_set.update([item for sublist in motifs.values() for item in sublist])
+        # for mutation_pos, _ in obs_seq.mutation_pos_dict.iteritems():
+        #     central_base_mutes[motifs[mutation_pos]] += 1
+        #     for pos in range(max(mutation_pos-feat_generator.half_motif_len, 0),
+        #             min(mutation_pos+feat_generator.half_motif_len+1, obs_seq.seq_len)):
+        #         any_mutes[motifs[pos]] += 1
 
     return '\n'.join([
                 '  Number of sequences: %d' % n_sequences,
@@ -409,8 +411,8 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
                 '  Average sequence length: %f' % avg_seq_len,
                 '  Average mutation frequency: %f' % avg_mutation_frequency,
                 '  Number of motifs in dataset: %d' % len(motif_set),
-                '  Number of motifs w/ >1 central base mutation: %d' % len([val for val in central_base_mutes if val > 0]),
-                '  Number of motifs w/ <20 mutes in central base: %d' % len([val for val in central_base_mutes if val < 20]),
-                '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
+                # '  Number of motifs w/ >1 central base mutation: %d' % len([val for val in central_base_mutes if val > 0]),
+                # '  Number of motifs w/ <20 mutes in central base: %d' % len([val for val in central_base_mutes if val < 20]),
+                # '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
             ]
         )

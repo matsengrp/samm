@@ -81,7 +81,7 @@ class LikelihoodComparer:
         self.theta_ref = theta_ref
         self.num_samples = num_samples
         self.feat_generator = feat_generator
-        self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES
+        self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES + 1
         self.pool = pool
 
         log.info("Creating likelihood comparer")

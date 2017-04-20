@@ -92,7 +92,7 @@ class SamplerPoolWorker(ParallelWorker):
         return sampler_res
 
     def __str__(self):
-        return "SamplerPoolWorker %s" % self.sampler.obs_seq_mutation
+        return "SamplerPoolWorker %s" % self.obs_seq
 
 class Sampler:
     def __init__(self, theta, feature_generator, obs_seq_mutation):
@@ -103,8 +103,12 @@ class Sampler:
         """
         self.theta = theta
         self.exp_theta = np.exp(theta)
-        self.exp_theta_sum = np.exp(theta).sum(axis=1)
-        self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES
+        self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES + 1
+        if not self.per_target_model:
+            self.exp_theta_sum = np.exp(theta).sum(axis=1)
+        else:
+            theta_summed = theta[:,0,None] + theta[:,1:]
+            self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
         self.feature_generator = feature_generator
         self.motif_len = self.feature_generator.motif_len
         self.obs_seq_mutation = obs_seq_mutation

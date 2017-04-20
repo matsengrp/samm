@@ -99,7 +99,7 @@ class ModelStats:
         self.theta_pearsonr.append(p_corr[0])
         theta_err1 = np.linalg.norm(true_theta - fitted_theta, ord=1)
         self.theta_err1.append(theta_err1)
-        theta_err2 = np.linalg.norm(true_theta - fitted_theta, ord=2)
+        theta_err2 = np.linalg.norm(true_theta - fitted_theta, ord=2)/np.linalg.norm(fitted_theta, ord=2)
         self.theta_err2.append(theta_err2)
 
         # if true_model[1] is not None:
@@ -138,7 +138,7 @@ def main(args=sys.argv[1:]):
         theta_file_name = os.path.join(args.compare_folder, "%02d" % i, args.theta_file)
         true_model = load_true_model(theta_file_name)
         num_cols = true_model[0].shape[1]
-        is_per_target = num_cols == NUM_NUCLEOTIDES
+        is_per_target = num_cols == NUM_NUCLEOTIDES + 1
 
         for model_type in args.model_types:
             fitted_file_name = os.path.join(args.compare_folder, "%02d" % i, model_type, args.model_fit_file)

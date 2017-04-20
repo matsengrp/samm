@@ -32,9 +32,9 @@ def parse_args():
         type=str,
         help='which position in the motif is mutating; can be one of combination of ["left", "right", "center"] for 5\'/left end, central, or 3\'/right end',
         default='center')
-    parser.add_argument('--output-svg',
+    parser.add_argument('--output-png',
         type=str,
-        help='svg file to save output to',
+        help='png file to save output to',
         default='_output/out.png')
 
     args = parser.parse_args()
@@ -56,34 +56,12 @@ def convert_to_csv(target, mutabilities, motif_lens, mutating_positions):
         writer = csv.writer(f)
         writer.writerows(izip([motif.upper() for motif in motif_list], mutating_pos_list, mutabilities.ravel()))
 
-def main(args=sys.argv[1:]):
-
-    args = parse_args()
-
-    motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
-    for m in motif_len_vals:
-        assert(m % 2 == 1)
-
-    mutating_pos_vals = [int(pos) for pos in args.mutating_positions.split(',')]
-    for m in mutating_pos_vals:
-        assert(m in [-1, 0, 1])
-
-    feat_generator = HierarchicalMotifFeatureGenerator(
-            motif_lens=motif_len_vals,
-            mutating_positions=mutating_pos_vals,
-        )
-    max_motif_len = max(motif_len_vals)
-    full_motif_dict = feat_generator.feat_gens[-1].motif_dict
-
-    # Load fitted theta file
-    with open(args.input_pkl, "r") as f:
-        theta = pickle.load(f)[0]
-
-    if len(motif_len_vals) > 1:
+def plot_theta(args, feat_generator, full_motif_dict, theta, output_png):
+    if len(args.motif_len_vals) > 1:
         # Combine the hierarchical thetas if that is the case
-        full_theta = np.zeros(4**max_motif_len)
+        full_theta = np.zeros(4**args.max_motif_len)
         start_idx = 0
-        for f in feat_generator.feat_gens[:len(motif_len_vals)]:
+        for f in feat_generator.feat_gens[:len(args.motif_len_vals)]:
             motif_list = f.motif_list
             for m_idx, m in enumerate(motif_list):
                 m_theta = theta[start_idx + m_idx]
@@ -100,15 +78,43 @@ def main(args=sys.argv[1:]):
     else:
         full_theta = theta
 
-    convert_to_csv(args.output_csv, full_theta, [max_motif_len], mutating_pos_vals)
+    convert_to_csv(args.output_csv, full_theta, [args.max_motif_len], args.mutating_pos_vals)
 
     # Call Rscript
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, args.output_csv, str(max_motif_len), args.output_svg]
+    cmd = [command, script_file, args.output_csv, str(args.max_motif_len), output_png]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
+
+def main(args=sys.argv[1:]):
+
+    args = parse_args()
+
+    args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
+    for m in args.motif_len_vals:
+        assert(m % 2 == 1)
+        
+    mutating_pos_vals = [int(pos) for pos in args.mutating_positions.split(',')]
+    for m in mutating_pos_vals:
+        assert(m in [-1, 0, 1])
+
+    feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=args.motif_len_vals,
+            mutating_positions=args.mutating_pos_vals,
+        )
+    
+    args.max_motif_len = max(args.motif_len_vals)
+    full_motif_dict = feat_generator.feat_gens[-1].motif_dict
+
+    # Load fitted theta file
+    with open(args.input_pkl, "r") as f:
+        theta = pickle.load(f)[0]
+
+    for col_idx in range(theta.shape[1]):
+        output_png = args.output_png.replace(".png", "%d.png" % col_idx)
+        plot_theta(args, feat_generator, full_motif_dict, theta[:,col_idx], output_png)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

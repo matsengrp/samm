@@ -25,7 +25,9 @@ class Gibbs_TestCase(unittest.TestCase):
 
     def _test_compute_log_probs(self, feat_gen, per_target_model):
         if per_target_model:
-            theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
+            theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES + 1)
+            possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
+            theta[~possible_motif_mask] = -np.inf
         else:
             theta = np.random.rand(feat_gen.feature_vec_len, 1) * 2
         obs_seq_m = feat_gen.create_base_features(self.obs)
@@ -41,8 +43,11 @@ class Gibbs_TestCase(unittest.TestCase):
         seq_str = obs_seq_m.start_seq
         for i in range(len(order)):
             mutating_pos = order[i]
-            col_idx = NUCLEOTIDE_DICT[obs_seq_m.end_seq[mutating_pos]] if per_target_model else 0
-            log_num = theta[feat_mut_steps[i].mutating_pos_feats, col_idx].sum()
+            log_num = theta[feat_mut_steps[i].mutating_pos_feats, 0].sum()
+            if per_target_model:
+                col_idx = NUCLEOTIDE_DICT[obs_seq_m.end_seq[mutating_pos]] + 1
+                log_num += theta[feat_mut_steps[i].mutating_pos_feats, col_idx].sum()
+
             feature_dict = feat_gen.create_for_sequence(
                 seq_str,
                 obs_seq_m.left_flank,
@@ -51,7 +56,7 @@ class Gibbs_TestCase(unittest.TestCase):
             )
             # Calculates denominators from scratch - sum(exp(psi * theta))
             denom = np.exp([
-                theta[feat_idx, :].sum(axis=0) for feat_idx in feature_dict.values()
+                theta[feat_idx, 0].sum() + theta[feat_idx, 1:].sum(axis=0) for feat_idx in feature_dict.values()
             ]).sum()
             self.assertEqual(log_num, log_numerators[i])
             self.assertTrue(np.isclose(denom, denominators[i]))
@@ -63,12 +68,16 @@ class Gibbs_TestCase(unittest.TestCase):
             )
 
     def test_compute_log_probs(self):
-        self._test_compute_log_probs(self.feat_gen_hier, False)
+        # self._test_compute_log_probs(self.feat_gen_hier, False)
         self._test_compute_log_probs(self.feat_gen_hier, True)
 
-    def _test_compute_log_probs_with_reference(self, feat_gen):
+    def _test_compute_log_probs_with_reference(self, feat_gen, per_target_model):
         obs_seq_m = feat_gen.create_base_features(self.obs)
-        theta = np.random.rand(feat_gen.feature_vec_len, 1) * 2
+        if per_target_model:
+            num_cols = NUM_NUCLEOTIDES + 1
+        else:
+            num_cols = 1
+        theta = np.random.rand(feat_gen.feature_vec_len, num_cols) * 2
         sampler = MutationOrderGibbsSampler(theta, feat_gen, obs_seq_m)
 
         prev_order = obs_seq_m.mutation_pos_dict.keys()
@@ -96,8 +105,9 @@ class Gibbs_TestCase(unittest.TestCase):
         self.assertTrue(np.allclose(curr_log_numerators, fast_log_numerators))
 
     def test_compute_log_probs_with_reference(self):
-        self._test_compute_log_probs_with_reference(self.feat_gen)
-        self._test_compute_log_probs_with_reference(self.feat_gen_hier)
+        for per_target_model in [False, True]:
+            self._test_compute_log_probs_with_reference(self.feat_gen, per_target_model)
+            self._test_compute_log_probs_with_reference(self.feat_gen_hier, per_target_model)
 
     def _test_joint_distribution(self, feat_gen, theta):
         """
@@ -112,7 +122,7 @@ class Gibbs_TestCase(unittest.TestCase):
         NUM_TOP_COMMON = 20
         NUM_OBS_SAMPLES=8000
 
-        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES
+        per_target_model = theta.shape[1] == NUM_NUCLEOTIDES + 1
         if not per_target_model:
             probability_matrix = np.ones((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))/3.0
             possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list, (feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
@@ -182,17 +192,17 @@ class Gibbs_TestCase(unittest.TestCase):
         """
         def _make_multi_theta(feat_gen):
             # This generates a theta with random entries
-            multi_theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
+            multi_theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES + 1)
             theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, multi_theta.shape)
             multi_theta[~theta_mask] = -np.inf
             return multi_theta
 
         multi_theta = _make_multi_theta(self.feat_gen)
         rho, pval = self._test_joint_distribution(self.feat_gen, multi_theta)
-        self.assertTrue(rho > 0.96)
-        self.assertTrue(pval < 1e-37)
+        self.assertTrue(rho > 0.97)
+        self.assertTrue(pval < 1e-44)
 
         multi_theta = _make_multi_theta(self.feat_gen_hier)/2
         rho, pval = self._test_joint_distribution(self.feat_gen_hier, multi_theta)
         self.assertTrue(rho > 0.92)
-        self.assertTrue(pval < 1e-28)
+        self.assertTrue(pval < 1e-26)

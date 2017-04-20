@@ -134,7 +134,8 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
             nucleotide_to_mutate = intermediate_seq[p]
             for theta_idx, target_nucleotide in enumerate(NUCLEOTIDES):
                 if target_nucleotide != nucleotide_to_mutate:
-                    hazard_weights.append(np.exp(self.thetas[motif_idxs, theta_idx].sum(axis=0)))
+                    exp_theta = np.exp(self.thetas[motif_idxs, 0].sum() + self.thetas[motif_idxs, theta_idx + 1].sum())
+                    hazard_weights.append(exp_theta)
                     target_nucleotides.append(target_nucleotide)
                     mutate_positions.append(p)
 
