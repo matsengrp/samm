@@ -79,8 +79,8 @@ def parse_args():
         default='5')
     parser.add_argument('--mutating-positions',
         type=str,
-        help='which position in the motif is mutating; can be one of combination of -1, 0, 1 for 5\'/left end, central, or 3\'/right end',
-        default='0')
+        help='which position in the motif is mutating; can be one of combination of ["left", "right", "center"] for 5\'/left end, central, or 3\'/right end',
+        default='center')
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -186,9 +186,9 @@ def parse_args():
     for m in args.motif_lens:
         assert(m % 2 == 1)
 
-    args.mutating_positions = [int(pos) for pos in args.mutating_positions.split(',')]
+    args.mutating_positions = [str(pos) for pos in args.mutating_positions.split(',')]
     for m in args.mutating_positions:
-        assert(m in [-1, 0, 1])
+        assert(m in ['left', 'center', 'right'])
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -361,8 +361,6 @@ def main(args=sys.argv[1:]):
     motif_list = feat_generator.motif_list
     mutating_pos_list = feat_generator.mutating_pos_list
 
-    print mutating_pos_list
-
     # Run EM on the lasso parameters from largest to smallest
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
@@ -446,7 +444,7 @@ def main(args=sys.argv[1:]):
                 pickle.dump(results_list, f)
 
             log.info("==== FINAL theta, %s====" % curr_model_results)
-            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.mutating_pos_list))
+            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.mutating_pos_list, feat_generator.motif_len))
 
             if best_model_in_list is None or log_lik_ratio > 0:
                 best_model_in_list = curr_model_results

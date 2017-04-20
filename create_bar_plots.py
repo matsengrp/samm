@@ -30,8 +30,8 @@ def parse_args():
         default='3,5,7')
     parser.add_argument('--mutating-positions',
         type=str,
-        help='which position in the motif is mutating; can be one of combination of -1, 0, 1 for 5\'/left end, central, or 3\'/right end',
-        default='-1,0,1')
+        help='which position in the motif is mutating; can be one of combination of ["left", "right", "center"] for 5\'/left end, central, or 3\'/right end',
+        default='center')
     parser.add_argument('--output-svg',
         type=str,
         help='svg file to save output to',

@@ -4,10 +4,11 @@ from scipy.sparse import hstack
 from itertools import product
 
 class HierarchicalMotifFeatureGenerator(FeatureGenerator):
-    def __init__(self, motif_lens=[3,5], mutating_positions=[0]):
+    def __init__(self, motif_lens=[3,5], mutating_positions=['center']):
         """
         @param motif_lens: list of odd-numbered motif lengths
-        @param mutating_positions: list of which positions to mutate: 0 for central base, -1 for 5' end, 1 for 3' end
+        @param mutating_positions: list of which positions to mutate: 'center' for central base,
+            'left' for 5' end, 'right' for 3' end
         """
         self.motif_lens = motif_lens
         self.mutating_positions = mutating_positions
@@ -15,7 +16,7 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         self.max_motif_len = max(motif_lens)
         self.motif_len = self.max_motif_len
 
-        self.feat_gens = [SubmotifFeatureGenerator(m_len, m_pos, self.max_motif_len) for m_len, m_pos in product(motif_lens, mutating_positions)]
+        self.feat_gens = [SubmotifFeatureGenerator(m_len, m_pos, self.max_motif_len, mutating_positions) for m_len, m_pos in product(motif_lens, mutating_positions)]
         feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
 

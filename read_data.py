@@ -287,7 +287,7 @@ def read_gene_seq_csv_data(
         gene_file_name,
         seq_file_name,
         motif_len=1,
-        mutating_positions=[0],
+        mutating_positions=['center'],
         sample=1,
         locus='',
         species='',

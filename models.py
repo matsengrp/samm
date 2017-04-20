@@ -2,13 +2,12 @@ from common import mutate_string
 import numpy as np
 
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq, motif_len=1, mutating_positions=[0]):
+    def __init__(self, start_seq, end_seq, motif_len=1, mutating_positions=['center']):
         """
         @param start_seq: start sequence
         @param end_seq: ending sequence with mutations
         @param motif_len: needed to determine flanking ends/mutations to trim sequence
-        @param mutating_positions: 0 for central base, -1 for 5'/left end, 1 for 3'/right end, or
-            any combination
+        @param mutating_positions: 'center', 'left', 'right' or any combination
 
         TODO: do we want any intermediate up/downstream motifs?
 
@@ -30,20 +29,11 @@ class ObservedSequenceMutations:
         start_idx = 0
         end_idx = len(start_seq)
 
-        start_flank_lens = []
-        end_flank_lens = []
-        if 0 in mutating_positions:
-            start_flank_lens.append(motif_len/2)
-            end_flank_lens.append(motif_len/2)
-        if -1 in mutating_positions:
-            start_flank_lens.append(0)
-            end_flank_lens.append(motif_len - 1)
-        if 1 in mutating_positions:
-            start_flank_lens.append(motif_len - 1)
-            end_flank_lens.append(0)
+        start_flank_lens = {'center': motif_len/2, 'left': 0, 'right': motif_len - 1}
+        end_flank_lens = {'center': motif_len/2, 'left': motif_len - 1, 'right': 0}
 
-        start_flank_len = max(start_flank_lens)
-        end_flank_len = max(end_flank_lens)
+        start_flank_len = max([start_flank_lens[pos] for pos in mutating_positions])
+        end_flank_len = max([end_flank_lens[pos] for pos in mutating_positions])
 
         skipped_mutations = 0
 
