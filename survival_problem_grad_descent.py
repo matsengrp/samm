@@ -30,17 +30,23 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
+    def __init__(self, feat_generator, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
         """
-        @param theta_mask: these theta values are some finite number
+        @param sample_labels: only used for calculating the Hessian
+        @param possible_theta_mask: these theta values are some finite number
         @param zero_theta_mask: these theta values are forced to be zero
         """
         self.feature_generator = feat_generator
         self.samples = samples
         self.possible_theta_mask = possible_theta_mask
         self.zero_theta_mask = zero_theta_mask
-        self.per_target_model = per_target_model
+
         self.num_samples = len(self.samples)
+        self.sample_labels = sample_labels
+        if self.sample_labels is not None:
+            self.num_reps_per_obs = self.num_samples/len(set(sample_labels))
+
+        self.per_target_model = per_target_model
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
         self.fuse_center_only = fuse_center_only
@@ -114,16 +120,26 @@ class SurvivalProblemCustom(SurvivalProblem):
         return np.array(ll)
 
     def get_hessian(self, theta):
+        """
+        Uses Louis's method to calculate the information matrix of the observed data
+        @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
+        """
         rand_seed = get_randint()
         worker_list = [
             GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
         grad_log_lik = [worker.run(theta) for worker in worker_list]
         score_score = 0
-        for g in grad_log_lik:
+        sorted_sample_labels = np.sort(np.array(list(set(self.sample_labels))))
+        expected_scores = {label: 0 for label in sorted_sample_labels}
+        for g, sample_label in zip(grad_log_lik, self.sample_labels):
             g = g.reshape((g.size, 1))
+            expected_scores[sample_label] += g
             score_score += g * g.T
-        # score_score = 1.0/self.num_samples * score_score
+
+        tot_cross_expected_scores = 0
+        for i, label1 in enumerate(sorted_sample_labels):
+            tot_cross_expected_scores += expected_scores[label1] * expected_scores[label1].T
 
         worker_list = [
             HessianWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
@@ -132,8 +148,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         hessian_sum = 0
         for h in hessian_log_lik:
             hessian_sum += h
-        # tot_hessian = -1.0/self.num_samples * hessian_sum
-        return - hessian_sum - score_score, - hessian_sum, -1.0/self.num_samples * hessian_sum
+
+        fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - score_score) + np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
+        return fisher_info, -1.0/self.num_samples * hessian_sum
 
     def _get_gradient_log_lik(self, theta):
         """
