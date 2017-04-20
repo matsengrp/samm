@@ -13,9 +13,9 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     """
     This makes motifs of the same length (must be odd).
     """
-    def __init__(self, motif_len=1, mutating_position=0, max_motif_len=None):
+    def __init__(self, motif_len=1, mutating_position='center', max_motif_len=None, mutating_positions=None):
         assert(motif_len % 2 == 1)
-        assert(mutating_position in [-1, 0, 1])
+        assert(mutating_position in ['left', 'right', 'center'])
 
         self.motif_len = motif_len
         self.mutating_position = mutating_position
@@ -25,21 +25,25 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         else:
             self.offset = 0
 
-        if mutating_position is 0:
-            # central base
-            self.half_motif_len = motif_len/2
-            self.left_offset = self.offset
-            self.right_offset = self.offset
-        elif mutating_position is -1:
-            # 5'/left end
-            self.half_motif_len = 0
-            self.left_offset = 0
-            self.right_offset = 2*self.offset
-        elif mutating_position is 1:
-            # 3'/right end
-            self.half_motif_len = motif_len - 1
-            self.left_offset = 2*self.offset
-            self.right_offset = 0
+        if mutating_positions is None:
+            self.mutating_positions = [mutating_position]
+        else:
+            self.mutating_positions = mutating_positions
+
+        half_lens = {'center': motif_len/2, 'left': 0, 'right': motif_len - 1}
+        l_offsets = {'center': self.offset, 'left': 0, 'right': 2*self.offset}
+        r_offsets = {'center': self.offset, 'left': 2*self.offset, 'right': 0}
+
+        self.half_motif_len = half_lens[mutating_position]
+        self.left_offset = l_offsets[mutating_position]
+        self.right_offset = r_offsets[mutating_position]
+
+        # so feature vector indices are correct
+        self.mut_pos_offset = max([half_lens[pos] for pos in self.mutating_positions]) - self.half_motif_len
+
+        # to get feature vector update
+        self.left_update_region = max([half_lens[pos] + l_offsets[pos] for pos in self.mutating_positions])
+        self.right_update_region = max([motif_len - half_lens[pos] - 1 + r_offsets[pos] for pos in self.mutating_positions])
 
         self.feature_vec_len = np.power(4, motif_len)
 
@@ -75,7 +79,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
-            submotif = obs_seq_mutation.start_seq_with_flanks[pos + self.left_offset: pos + self.motif_len + self.right_offset]
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos + self.mut_pos_offset + self.left_offset: pos + self.mut_pos_offset + self.motif_len + self.right_offset]
             feat_idx = self.motif_dict[submotif]
             feat_dict[pos] = feat_idx
             indptr.append(pos + 1)
@@ -103,7 +107,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
-            submotif = obs_seq_mutation.start_seq_with_flanks[pos: pos + self.motif_len]
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos + self.mut_pos_offset: pos + self.mut_pos_offset + self.motif_len]
             feat_idx = self.motif_dict[submotif]
             feat_dict[pos] = feat_idx
             indptr.append(pos + 1)
@@ -156,7 +160,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Apply mutation
             intermediate_seq = mutate_string(
                 intermediate_seq,
-                mutation_pos + self.half_motif_len,
+                mutation_pos + self.half_motif_len + self.mut_pos_offset,
                 seq_mut_order.obs_seq_mutation.end_seq[mutation_pos]
             )
             already_mutated_pos.add(mutation_pos)
@@ -292,7 +296,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             2. a dict with the positions next to the previous mutation and their feature index
             3. a dict with the positions next to the current mutation and their feature index
         """
-        mutating_pos_motif = intermediate_seq[mutation_pos: mutation_pos + self.motif_len]
+        mutating_pos_motif = intermediate_seq[mutation_pos + self.mut_pos_offset: mutation_pos + self.mut_pos_offset + self.motif_len]
         mutating_pos_feat = self.motif_dict[mutating_pos_motif]
 
         feat_dict_curr = dict()
@@ -335,13 +339,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @return a dict with the positions next to the given position and their feature index
         """
         feat_dict = dict()
-        start_region_idx = max(position - self.half_motif_len - self.left_offset, 0)
-        end_region_idx = min(position + self.motif_len - self.half_motif_len - 1 + self.right_offset, seq_len - 1)
+        start_region_idx = max(position - self.left_update_region, 0)
+        end_region_idx = min(position + self.right_update_region, seq_len - 1)
         update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx + 1)
         for pos in update_positions:
             if pos not in already_mutated_pos:
                 # Only update the positions that are in the risk group (the ones that haven't mutated yet)
-                submotif = intermediate_seq[pos: pos + self.motif_len]
+                submotif = intermediate_seq[pos + self.mut_pos_offset: pos + self.mut_pos_offset + self.motif_len]
                 feat_dict[pos] = self.motif_dict[submotif]
         return feat_dict
 
