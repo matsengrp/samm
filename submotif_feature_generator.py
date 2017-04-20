@@ -396,7 +396,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         # if motif length is one then submotifs will be single nucleotides and position remains unchanged
         if pos < self.half_motif_len:
-            submotif = left_flank[pos:] + intermediate_seq[:self.half_motif_len + pos + 1]
+            submotif = left_flank[pos + self.mut_pos_offset:] + intermediate_seq[:pos + self.motif_len - self.half_motif_len]
         elif pos >= seq_len - (self.motif_len - self.half_motif_len - 1):
             submotif = intermediate_seq[pos - self.half_motif_len:] + right_flank[:pos + self.motif_len - self.half_motif_len - seq_len]
         else:
