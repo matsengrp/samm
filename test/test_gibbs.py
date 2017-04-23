@@ -40,7 +40,6 @@ class Gibbs_TestCase(unittest.TestCase):
 
         self.assertEqual(len(log_numerators), len(order))
         self.assertEqual(len(denominators), len(order))
-        print "denominators!!!!!", denominators
         seq_str = obs_seq_m.start_seq
         for i in range(len(order)):
             mutating_pos = order[i]
@@ -55,7 +54,6 @@ class Gibbs_TestCase(unittest.TestCase):
                 obs_seq_m.right_flank,
                 set(range(obs_seq_m.seq_len)) - set(order[:i])
             )
-            print "feature_dict", feature_dict
             # Calculates denominators from scratch - sum(exp(psi * theta))
             if not per_target_model:
                 denom = np.exp([
@@ -65,7 +63,6 @@ class Gibbs_TestCase(unittest.TestCase):
                 denom = np.exp([
                     theta[feat_idx, 0].sum() + theta[feat_idx, 1:].sum(axis=0) for feat_idx in feature_dict.values()
                 ]).sum()
-            print "denom!!!!!", denom
             self.assertEqual(log_num, log_numerators[i])
             self.assertTrue(np.isclose(denom, denominators[i]))
 
@@ -76,8 +73,9 @@ class Gibbs_TestCase(unittest.TestCase):
             )
 
     def test_compute_log_probs(self):
-        self._test_compute_log_probs(self.feat_gen_hier, False)
-        self._test_compute_log_probs(self.feat_gen_hier, True)
+        for per_target_model in [False, True]:
+            self._test_compute_log_probs(self.feat_gen, per_target_model)
+            self._test_compute_log_probs(self.feat_gen_hier, per_target_model)
 
     def _test_compute_log_probs_with_reference(self, feat_gen, per_target_model):
         obs_seq_m = feat_gen.create_base_features(self.obs)
