@@ -186,8 +186,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         if len(feat_mutation_steps) != seq_mut_order.obs_seq_mutation.num_mutations:
             raise AssertionError("%d vs %d" % (len(feat_mutation_steps), seq_mut_order.obs_seq_mutation.num_mutations))
-        # for i, (pos, f) in enumerate(zip(seq_mut_order.mutation_order, feat_mutation_steps)):
-        #     print i, pos, str(f)
         return feat_mutation_steps
 
     def create_remaining_mutation_steps(

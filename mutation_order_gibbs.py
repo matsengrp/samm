@@ -353,7 +353,7 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        if len(prev_feat_idxs) > 1:
+        if len(self.feature_generator.motif_lens) > 1:
             if not self.per_target_model:
                 old_feat_theta_sums = [self.theta[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
                 new_feat_theta_sums = [self.theta[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]

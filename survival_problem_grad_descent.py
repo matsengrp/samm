@@ -178,13 +178,11 @@ class SurvivalProblemCustom(SurvivalProblem):
             # Remove old feature values
             old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
             for f_idx, f_list in enumerate(old_feat_idxs):
-                assert(len(f_list) > 0) # TODO: not really an assert - i just want to see what happens
                 pos_feat_matrix[f_idx + 1, f_list] = 1
 
             # Add new feature values
             new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
             for f_idx, f_list in enumerate(new_feat_idxs):
-                assert(len(f_list) > 0) # TODO: not really an assert - i just want to see what happens
                 pos_feat_matrix[f_idx + 1 + num_old, f_list] = 1
 
             features_per_step_matrices.append(csr_matrix(pos_feat_matrix, dtype=np.int8))

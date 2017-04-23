@@ -40,6 +40,7 @@ class Gibbs_TestCase(unittest.TestCase):
 
         self.assertEqual(len(log_numerators), len(order))
         self.assertEqual(len(denominators), len(order))
+        print "denominators!!!!!", denominators
         seq_str = obs_seq_m.start_seq
         for i in range(len(order)):
             mutating_pos = order[i]
