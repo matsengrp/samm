@@ -54,10 +54,17 @@ class Gibbs_TestCase(unittest.TestCase):
                 obs_seq_m.right_flank,
                 set(range(obs_seq_m.seq_len)) - set(order[:i])
             )
+            print "feature_dict", feature_dict
             # Calculates denominators from scratch - sum(exp(psi * theta))
-            denom = np.exp([
-                theta[feat_idx, 0].sum() + theta[feat_idx, 1:].sum(axis=0) for feat_idx in feature_dict.values()
-            ]).sum()
+            if not per_target_model:
+                denom = np.exp([
+                    theta[feat_idx, 0].sum() for feat_idx in feature_dict.values()
+                ]).sum()
+            else:
+                denom = np.exp([
+                    theta[feat_idx, 0].sum() + theta[feat_idx, 1:].sum(axis=0) for feat_idx in feature_dict.values()
+                ]).sum()
+            print "denom!!!!!", denom
             self.assertEqual(log_num, log_numerators[i])
             self.assertTrue(np.isclose(denom, denominators[i]))
 
@@ -68,7 +75,7 @@ class Gibbs_TestCase(unittest.TestCase):
             )
 
     def test_compute_log_probs(self):
-        # self._test_compute_log_probs(self.feat_gen_hier, False)
+        self._test_compute_log_probs(self.feat_gen_hier, False)
         self._test_compute_log_probs(self.feat_gen_hier, True)
 
     def _test_compute_log_probs_with_reference(self, feat_gen, per_target_model):
@@ -172,6 +179,7 @@ class Gibbs_TestCase(unittest.TestCase):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
         return rho, pval
 
+    @unittest.skip("asdf")
     def test_joint_distribution_simple(self):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
@@ -186,6 +194,7 @@ class Gibbs_TestCase(unittest.TestCase):
         self.assertTrue(rho > 0.95)
         self.assertTrue(pval < 1e-33)
 
+    @unittest.skip("asdf")
     def test_joint_distribution_per_target_model(self):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)

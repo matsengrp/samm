@@ -323,7 +323,8 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
+    motifs_to_remove = ["aaa", "aac", "aag", "aat", "acc", "acg", "act", "atg", "att", "ccc", "cgc", "cgt", "ctt", "ttc", "ttg", "ttt"]
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens, motifs_to_remove=motifs_to_remove)
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
@@ -358,6 +359,8 @@ def main(args=sys.argv[1:]):
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
     theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
+    print "theta_shape", theta_shape
+    # TODO: also filter out per-target columns?? I think I just keep them zero throughout - no filtering
     theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape)
 
     true_theta = None

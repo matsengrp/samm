@@ -68,30 +68,36 @@ class MultiFeatureMutationStep:
         @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
         @param feat_mut_step: FeatureMutationStep
         """
-        self.neighbors_feat_old = dict()
-        self.neighbors_feat_new = dict()
         if mutating_pos_feat is not None:
             self.mutating_pos_feats = np.array([mutating_pos_feat], dtype=int)
-            self._merge_dicts(self.neighbors_feat_old, neighbors_feat_old, feature_offset=0)
-            self._merge_dicts(self.neighbors_feat_new, neighbors_feat_new, feature_offset=0)
         else:
             self.mutating_pos_feats = np.array([], dtype=int)
+        self.neighbors_feat_old = dict()
+        self.neighbors_feat_new = dict()
+        if neighbors_feat_old is not None:
+            self._merge_dicts(self.neighbors_feat_old, neighbors_feat_old, feature_offset=0)
+        if neighbors_feat_new is not None:
+            self._merge_dicts(self.neighbors_feat_new, neighbors_feat_new, feature_offset=0)
 
     def update(self, feat_mut_step, feature_offset):
         """
         @param feat_mut_step: MultiFeatureMutationStep
         """
-        self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feats + feature_offset)
+        if feat_mut_step.mutating_pos_feats is not None:
+            self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feats + feature_offset)
         self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
         self._merge_dicts(self.neighbors_feat_new, feat_mut_step.neighbors_feat_new, feature_offset)
 
     def _merge_dicts(self, my_dict, new_dict, feature_offset):
         for k in new_dict.keys():
-            new_feature = new_dict[k] + feature_offset
-            if k not in my_dict:
-                my_dict[k] = np.array([new_feature], dtype=int)
+            if new_dict[k] is not None:
+                new_feature = new_dict[k] + feature_offset
+                if k not in my_dict:
+                    my_dict[k] = np.array([new_feature], dtype=int)
+                else:
+                    my_dict[k] = np.append(my_dict[k], new_feature)
             else:
-                my_dict[k] = np.append(my_dict[k], new_feature)
+                my_dict[k] = np.array([], dtype=int)
 
     def __str__(self):
         return "(%s, old: %s, new: %s)" % (self.mutating_pos_feats, self.neighbors_feat_old, self.neighbors_feat_new)

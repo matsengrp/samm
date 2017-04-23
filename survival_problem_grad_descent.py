@@ -14,8 +14,7 @@ class SamplePrecalcData:
     """
     Stores data for gradient calculations
     """
-    def __init__(self, init_feat_counts, features_per_step_matrices, features_sign_updates, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
-        self.init_feat_counts = init_feat_counts
+    def __init__(self, features_per_step_matrices, features_sign_updates, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
         self.features_per_step_matrices = features_per_step_matrices
         self.features_per_step_matricesT = [m.transpose() for m in features_per_step_matrices]
         self.features_sign_updates = features_sign_updates
@@ -179,11 +178,13 @@ class SurvivalProblemCustom(SurvivalProblem):
             # Remove old feature values
             old_feat_idxs = feat_mut_step.neighbors_feat_old.values()
             for f_idx, f_list in enumerate(old_feat_idxs):
+                assert(len(f_list) > 0) # TODO: not really an assert - i just want to see what happens
                 pos_feat_matrix[f_idx + 1, f_list] = 1
 
             # Add new feature values
             new_feat_idxs = feat_mut_step.neighbors_feat_new.values()
             for f_idx, f_list in enumerate(new_feat_idxs):
+                assert(len(f_list) > 0) # TODO: not really an assert - i just want to see what happens
                 pos_feat_matrix[f_idx + 1 + num_old, f_list] = 1
 
             features_per_step_matrices.append(csr_matrix(pos_feat_matrix, dtype=np.int8))
@@ -194,7 +195,6 @@ class SurvivalProblemCustom(SurvivalProblem):
             prev_feat_mut_step = feat_mut_step
 
         return SamplePrecalcData(
-            sample.obs_seq_mutation.feat_counts,
             features_per_step_matrices,
             features_sign_updates,
             base_grad,
@@ -304,7 +304,7 @@ class GradientWorker(ParallelWorker):
         return SurvivalProblemCustom.get_gradient_log_lik_per_sample(theta, self.sample_data, self.per_target_model)
 
     def __str__(self):
-        return "GradientWorker %s" % self.sample_data.init_feat_counts
+        return "GradientWorker %s" % self.sample_data.obs_seq_mutation
 
 class ObjectiveValueWorker(ParallelWorker):
     """
@@ -326,4 +326,4 @@ class ObjectiveValueWorker(ParallelWorker):
         return SurvivalProblemCustom.calculate_per_sample_log_lik(theta, self.sample_data, self.per_target_model)
 
     def __str__(self):
-        return "ObjectiveValueWorker %s" % self.sample_data.init_feat_counts
+        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
