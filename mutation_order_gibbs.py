@@ -127,7 +127,8 @@ class MutationOrderGibbsSampler(Sampler):
                 gibbs_step_info,
                 update_step_start=pos_order_idx,
             )
-
+        print "denominators", denominators
+        1/0
         full_ordering_log_prob = np.sum(log_numerators) - (np.log(denominators)).sum()
 
         # Add the log probability of the position mutating last
@@ -272,6 +273,7 @@ class MutationOrderGibbsSampler(Sampler):
                 curr_order,
             )
         )
+        print "curr_order", curr_order
 
         # Get the components -- numerators and the denominators
         log_numerators = []
@@ -286,7 +288,9 @@ class MutationOrderGibbsSampler(Sampler):
         merged_thetas = self.theta[:,0,None]
         if self.per_target_model:
             merged_thetas = merged_thetas + self.theta[:,1:]
-
+        # print "self.obs_seq_mutation", self.obs_seq_mutation
+        print "self.obs_seq_mutation.feat_matrix_start", self.obs_seq_mutation.feat_matrix_start
+        print "merged_thetas", merged_thetas.max()
         denominators = [
             (np.exp(self.obs_seq_mutation.feat_matrix_start * merged_thetas)).sum()
         ]
