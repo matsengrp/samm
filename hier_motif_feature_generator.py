@@ -20,6 +20,14 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         for f in self.feat_gens:
             self.motif_list += f.motif_list
 
+        # construct motif dictionary too!
+        self.motif_dict = dict()
+        for i, f in enumerate(self.feat_gens):
+            for motif in f.motif_list:
+                raw_motif_idx = f.motif_dict[motif]
+                if raw_motif_idx is not None:
+                    self.motif_dict[motif] = raw_motif_idx + self.feat_offsets[i]
+
     def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))

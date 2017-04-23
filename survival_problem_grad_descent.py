@@ -28,12 +28,17 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     Our own implementation to solve the survival problem
     """
-    print_iter = 5 # print status every `print_iter` iterations
+    print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, pool=None):
+    def __init__(self, feat_generator, samples, penalty_params, per_target_model, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
+        """
+        @param theta_mask: these theta values are some finite number
+        @param zero_theta_mask: these theta values are forced to be zero
+        """
         self.feature_generator = feat_generator
         self.samples = samples
-        self.theta_mask = theta_mask
+        self.possible_theta_mask = possible_theta_mask
+        self.zero_theta_mask = zero_theta_mask
         self.per_target_model = per_target_model
         self.num_samples = len(self.samples)
         self.penalty_params = penalty_params
@@ -123,6 +128,11 @@ class SurvivalProblemCustom(SurvivalProblem):
         ]
         l = [worker.run(theta) for worker in worker_list]
         grad_ll_dtheta = np.sum(l, axis=0)
+
+        # Zero out all gradients that affect the constant theta values.
+        if self.zero_theta_mask is not None:
+            grad_ll_dtheta[self.zero_theta_mask] = 0
+
         return -1.0/self.num_samples * grad_ll_dtheta
 
     @staticmethod
