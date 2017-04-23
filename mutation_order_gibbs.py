@@ -354,6 +354,6 @@ class MutationOrderGibbsSampler(Sampler):
                 prev_theta_sum = self.theta[prev_feat_idxs,0].sum() + self.theta[prev_feat_idxs,1:].sum(axis=0)
                 return old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
-            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
             return old_denominator - self.exp_theta_sum[prev_feat_idxs].sum() - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)

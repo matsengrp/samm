@@ -193,7 +193,6 @@ class Gibbs_TestCase(unittest.TestCase):
         self.assertTrue(rho > 0.95)
         self.assertTrue(pval < 1e-33)
 
-    @unittest.skip("asdf")
     def test_joint_distribution_per_target_model(self):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
