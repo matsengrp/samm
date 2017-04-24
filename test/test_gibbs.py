@@ -121,13 +121,12 @@ class Gibbs_TestCase(unittest.TestCase):
         from the survival model vs. when we generate mutation orders given the mutation positions from the
         gibbs sampler
         """
-        np.random.seed(10)
         START_SEQ = "attcgc" # MUST BE LESS THAN TEN, Includes flanks!
         BURN_IN = 15
         CENSORING_TIME = 2.0
         LAMBDA0 = 0.1
         NUM_TOP_COMMON = 20
-        NUM_OBS_SAMPLES=80#00
+        NUM_OBS_SAMPLES=8000
 
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES + 1
         if not per_target_model:
@@ -179,7 +178,6 @@ class Gibbs_TestCase(unittest.TestCase):
             print "%s (%d) \t %s (%d)" % (t[0], t[1], g[0], g[1])
         return rho, pval
 
-    @unittest.skip("asdf")
     def test_joint_distribution_simple(self):
         """
         Test the joint distributions match for a single column theta (not a per-target-nucleotide model)
