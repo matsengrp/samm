@@ -42,13 +42,13 @@ nest.add(
     ])
 
 # Nest for processing data
+# Not imputing so we don't need to pass motif length---this way data will only
+# be processed once
 @nest.add_target_with_env(localenv)
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--data-path',
                c['data_path'],
-               '--motif-len',
-               5,
                '--read-from-partis',
                '--metadata-path',
                c['data_path'] + '/meta.csv',
@@ -86,18 +86,23 @@ nest.add(
 nest.add(
     'model_options',
     [
-        #'survival_L',
-        'shmulate'
+        'survival_L',
+        #'shmulate'
     ])
 
+motif_params_dict = [
+    {'motif_length': '5', 'left_motif_flanks': '2'},
+    {'motif_length': '3,5,7', 'left_motif_flanks': '1:2:3'},
+    {'motif_length': '5', 'left_motif_flanks': '0,2,4'},
+    {'motif_length': '3,5,7', 'left_motif_flanks': '0,1,2:0,2,4:0,3,6'},
+]
+
 nest.add(
-    'motif_length',
-    [5, ",".join(map(str, [3,5,7]))],
-    label_func='{0}mers'.format
-)
+    'motif_params',
+    motif_params_dict,
+    label_func=lambda c: 'motif-' + c['motif_length'].replace(',','-') +
+        '-flank-' + c['left_motif_flanks'].replace(',', '-').replace(':', '--'))
 
-
-#
 nest.add(
     'per_target',
     [
@@ -118,12 +123,20 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def tune_parameters(env, outdir, c):
     cmd = []
+    motif_len = c['motif_params']['motif_length']
+    left_flanks = c['motif_params']['left_motif_flanks']
     if c["model_options"].startswith("survival"):
         solver = 'L'
         if c["per_target"]:
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-3.25, -7.0, step=-0.25)).tolist()))
+            if left_flanks == '2':
+                penalty_params = ",".join(map(str, np.power(10, np.arange(-3.25, -7.0, step=-0.25)).tolist()))
+            else:
+                penalty_params = ",".join(map(str, np.power(10, np.arange(-1.25, -4.0, step=-0.25)).tolist()))
         else:
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
+            if left_flanks == '2':
+                penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
+            else:
+                penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -4.0, step=-0.5)).tolist()))
 
         cmd = ['python fit_context_model.py',
                '--input-genes ${SOURCES[0]}',
@@ -135,7 +148,9 @@ def tune_parameters(env, outdir, c):
                '--seed',
                c['seed'],
                '--motif-lens',
-               c['motif_length'],
+               motif_len,
+               '--left-flank-lens',
+               left_flanks,
                '--solver',
                solver,
                '--penalty-params',
@@ -166,7 +181,7 @@ def tune_parameters(env, outdir, c):
             cmd += ['--sample-regime', 2]
         if c["per_target"]:
             cmd += ['--per-target-model']
-    elif c["model_options"] == "shmulate" and not c["per_target"] and c['motif_length'] == 5:
+    elif c["model_options"] == "shmulate" and not c["per_target"] and motif_len == '5' and left_flanks == '2':
         cmd = ['python fit_shmulate_model.py',
                '--input-file ${SOURCES[0]}',
                '--input-genes ${SOURCES[1]}',
