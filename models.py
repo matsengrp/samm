@@ -2,12 +2,13 @@ from common import mutate_string
 import numpy as np
 
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq, motif_len=1, mutating_positions=['center']):
+    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=1, right_flank_len=1):
         """
         @param start_seq: start sequence
         @param end_seq: ending sequence with mutations
         @param motif_len: needed to determine flanking ends/mutations to trim sequence
-        @param mutating_positions: 'center', 'left', 'right' or any combination
+        @param left_flank_len: maximum left flank length for this motif length
+        @param right_flank_len: maximum right flank length for this motif length
 
         TODO: do we want any intermediate up/downstream motifs?
 
@@ -29,41 +30,29 @@ class ObservedSequenceMutations:
         start_idx = 0
         end_idx = len(start_seq)
 
-        start_flank_lens = {'center': motif_len/2, 'left': 0, 'right': motif_len - 1}
-        end_flank_lens = {'center': motif_len/2, 'left': motif_len - 1, 'right': 0}
-
-        start_flank_len = max([start_flank_lens[pos] for pos in mutating_positions])
-        end_flank_len = max([end_flank_lens[pos] for pos in mutating_positions])
-
         skipped_mutations = 0
 
         # Go through half the sequence forward to find beginning conserved nucleotides
         for flank_start_idx in range(len(start_seq)/2):
-            if start_flank_len is 0:
-                # only doing 5' end so skip this trimming
+            if start_idx + left_flank_len == flank_start_idx:
                 break
-            if start_seq[flank_start_idx] != end_seq[flank_start_idx]:
+            elif start_seq[flank_start_idx] != end_seq[flank_start_idx]:
                 start_idx = flank_start_idx + 1
                 skipped_mutations += 1
-            elif start_idx + start_flank_len - 1 == flank_start_idx:
-                break
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides
         for flank_end_idx in reversed(range(len(start_seq)/2, len(start_seq))):
-            if end_flank_len is 0:
-                # only doing 3' end so skip this trimming
+            if end_idx - right_flank_len - 1 == flank_end_idx:
                 break
-            if start_seq[flank_end_idx] != end_seq[flank_end_idx]:
-                end_idx = flank_end_idx
+            elif start_seq[flank_end_idx] != end_seq[flank_end_idx]:
+                end_idx = flank_end_idx + 1
                 skipped_mutations += 1
-            elif end_idx - end_flank_len == flank_end_idx:
-                break
 
-        self.left_flank = start_seq[start_idx:start_idx + start_flank_len]
-        self.right_flank = start_seq[end_idx - end_flank_len:end_idx]
+        self.left_flank = start_seq[start_idx:start_idx + left_flank_len]
+        self.right_flank = start_seq[end_idx - right_flank_len:end_idx]
 
-        start_seq = start_seq[start_idx + start_flank_len:end_idx - end_flank_len]
-        end_seq = end_seq[start_idx + start_flank_len:end_idx - end_flank_len]
+        start_seq = start_seq[start_idx + left_flank_len:end_idx - right_flank_len]
+        end_seq = end_seq[start_idx + left_flank_len:end_idx - right_flank_len]
 
         self.mutation_pos_dict = dict()
         for i in range(len(start_seq)):
