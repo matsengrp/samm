@@ -37,8 +37,10 @@ class ConfidenceIntervalMaker:
                 return standard_errors, conf_ints
             else:
                 log.info("Confidence interval: variance estimates are negative")
+                log.info("variance %s" % np.diag(variance_est))
         else:
             log.info("Confidence interval: observation matrix is singular")
+            log.info("np.linalg.eigvals %s" % np.linalg.eigvals(sample_obs_information))
         return None, None
 
     def _create_confidence_intervals(self, standard_errors, theta, z=1.96):
