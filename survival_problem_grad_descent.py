@@ -30,8 +30,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-<<<<<<< HEAD
-    def __init__(self, feat_generator, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
+    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
         """
         @param sample_labels: only used for calculating the Hessian
         @param possible_theta_mask: these theta values are some finite number
@@ -42,23 +41,11 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.possible_theta_mask = possible_theta_mask
         self.zero_theta_mask = zero_theta_mask
 
-=======
-    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
-        """
-        @param sample_labels: only used for calculating the Hessian
-        """
-        self.feature_generator = feat_generator
-        self.samples = samples
->>>>>>> 9ba70a5899c27275014faac0ee58641fc07c92c7
         self.num_samples = len(self.samples)
         self.sample_labels = sample_labels
         if self.sample_labels is not None:
             self.num_reps_per_obs = self.num_samples/len(set(sample_labels))
 
-<<<<<<< HEAD
-=======
-        self.theta_mask = theta_mask
->>>>>>> 9ba70a5899c27275014faac0ee58641fc07c92c7
         self.per_target_model = per_target_model
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
