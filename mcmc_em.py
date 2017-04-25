@@ -7,9 +7,10 @@ from models import *
 from common import *
 from sampler_collection import SamplerCollection
 from profile_support import profile
+from confidence_interval_maker import ConfidenceIntervalMaker
 
 class MCMC_EM:
-    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', intermediate_dir="", pool=None):
+    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, possible_theta_mask, zero_theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', pool=None):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
@@ -30,12 +31,12 @@ class MCMC_EM:
         self.problem_solver_cls = problem_solver_cls
         self.num_jobs = num_jobs
         self.pool = pool
-        self.theta_mask = theta_mask
+        self.possible_theta_mask = possible_theta_mask
+        self.zero_theta_mask = zero_theta_mask
         self.scratch_dir = scratch_dir
-        self.intermediate_dir = intermediate_dir
-        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
+        self.per_target_model = possible_theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
 
-    def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
+    def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False, intermed_file_prefix="", get_hessian=False):
         """
         @param theta: initial value for theta in MCMC-EM
         @param penalty_params: the coefficient(s) for the penalty function
@@ -66,6 +67,7 @@ class MCMC_EM:
             )
 
             e_step_samples = []
+            e_step_labels = []
             lower_bound_is_negative = True
             while len(e_step_samples)/num_data < max_e_samples and lower_bound_is_negative:
                 ## Keep grabbing samples until it is highly likely we have increased the penalized log likelihood
@@ -87,6 +89,7 @@ class MCMC_EM:
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
+                e_step_labels += [i for i in range(len(init_orders)) for k in range(num_e_samples)]
 
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
@@ -94,9 +97,11 @@ class MCMC_EM:
                 problem = self.problem_solver_cls(
                     self.feat_generator,
                     e_step_samples,
+                    e_step_labels,
                     penalty_params,
                     self.per_target_model,
-                    self.theta_mask,
+                    possible_theta_mask=self.possible_theta_mask,
+                    zero_theta_mask=self.zero_theta_mask,
                     fuse_windows=fuse_windows,
                     fuse_center_only=fuse_center_only,
                     pool=self.pool,
@@ -121,8 +126,14 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
+            if get_hessian:
+                ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
+                theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
+            else:
+                theta_standard_error = None
+
             # Save the e-step samples if we want to analyze later on
-            e_sample_file_name = "%s/e_samples_%d.pkl" % (self.intermediate_dir, run)
+            e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
             log.info("Pickling E-step samples %s" % e_sample_file_name)
             with open(e_sample_file_name, "w") as f:
                 pickle.dump(e_step_samples, f)
@@ -132,4 +143,4 @@ class MCMC_EM:
                 break
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
-        return theta, all_traces
+        return theta, theta_standard_error, all_traces

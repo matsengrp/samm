@@ -14,8 +14,7 @@ class SamplePrecalcData:
     """
     Stores data for gradient calculations
     """
-    def __init__(self, init_feat_counts, features_per_step_matrices, features_sign_updates, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
-        self.init_feat_counts = init_feat_counts
+    def __init__(self, features_per_step_matrices, features_sign_updates, init_grad_vector, mutating_pos_feat_vals_rows, mutating_pos_feat_vals_cols, obs_seq_mutation, feat_mut_steps):
         self.features_per_step_matrices = features_per_step_matrices
         self.features_per_step_matricesT = [m.transpose() for m in features_per_step_matrices]
         self.features_sign_updates = features_sign_updates
@@ -29,14 +28,27 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     Our own implementation to solve the survival problem
     """
-    print_iter = 5 # print status every `print_iter` iterations
+    print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, penalty_params, per_target_model, theta_mask, fuse_windows=[], fuse_center_only=False, pool=None):
+    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
+        """
+        @param sample_labels: only used for calculating the Hessian
+        @param possible_theta_mask: these theta values are some finite number
+        @param zero_theta_mask: these theta values are forced to be zero
+        """
         self.feature_generator = feat_generator
         self.samples = samples
-        self.theta_mask = theta_mask
-        self.per_target_model = per_target_model
+        self.possible_theta_mask = possible_theta_mask
+        self.zero_theta_mask = zero_theta_mask
+        if zero_theta_mask is not None and possible_theta_mask is not None:
+            self.theta_mask_flat = (possible_theta_mask & ~zero_theta_mask).reshape((zero_theta_mask.size,), order="F")
+
         self.num_samples = len(self.samples)
+        self.sample_labels = sample_labels
+        if self.sample_labels is not None:
+            self.num_reps_per_obs = self.num_samples/len(set(sample_labels))
+
+        self.per_target_model = per_target_model
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
         self.fuse_center_only = fuse_center_only
@@ -109,6 +121,40 @@ class SurvivalProblemCustom(SurvivalProblem):
         ll = [worker.run(theta) for worker in worker_list]
         return np.array(ll)
 
+    def get_hessian(self, theta):
+        """
+        Uses Louis's method to calculate the information matrix of the observed data
+        @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
+        """
+        rand_seed = get_randint()
+        worker_list = [
+            GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
+        ]
+        grad_log_lik = [worker.run(theta) for worker in worker_list]
+        score_score = 0
+        sorted_sample_labels = np.sort(np.array(list(set(self.sample_labels))))
+        expected_scores = {label: 0 for label in sorted_sample_labels}
+        for g, sample_label in zip(grad_log_lik, self.sample_labels):
+            g = g.reshape((g.size, 1), order="F")
+            expected_scores[sample_label] += g
+            score_score += g * g.T
+
+        tot_cross_expected_scores = 0
+        for i, label1 in enumerate(sorted_sample_labels):
+            for label2 in sorted_sample_labels[i + 1:]:
+                tot_cross_expected_scores += expected_scores[label1] * expected_scores[label2].T
+
+        worker_list = [
+            HessianWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
+        ]
+        hessian_log_lik = [worker.run(theta) for worker in worker_list]
+        hessian_sum = 0
+        for h in hessian_log_lik:
+            hessian_sum += h
+
+        fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
+        return fisher_info, -1.0/self.num_samples * hessian_sum
+
     def _get_gradient_log_lik(self, theta):
         """
         JUST KIDDING - parallel is not faster
@@ -124,6 +170,11 @@ class SurvivalProblemCustom(SurvivalProblem):
         ]
         l = [worker.run(theta) for worker in worker_list]
         grad_ll_dtheta = np.sum(l, axis=0)
+
+        # Zero out all gradients that affect the constant theta values.
+        if self.zero_theta_mask is not None:
+            grad_ll_dtheta[self.zero_theta_mask] = 0
+
         return -1.0/self.num_samples * grad_ll_dtheta
 
     @staticmethod
@@ -194,7 +245,6 @@ class SurvivalProblemCustom(SurvivalProblem):
             prev_feat_mut_step = feat_mut_step
 
         return SamplePrecalcData(
-            sample.obs_seq_mutation.feat_counts,
             features_per_step_matrices,
             features_sign_updates,
             base_grad,
@@ -260,6 +310,78 @@ class SurvivalProblemCustom(SurvivalProblem):
             risk_group_grad_tot = np.hstack([np.sum(risk_group_grad_tot, axis=1, keepdims=True), risk_group_grad_tot])
         return sample_data.init_grad_vector - risk_group_grad_tot
 
+    @staticmethod
+    def get_hessian_per_sample(theta, sample_data, per_target_model):
+        """
+        Calculates the second derivative of the log likelihood for the complete data
+        """
+        merged_thetas = theta[:,0, None]
+        if per_target_model:
+            merged_thetas = merged_thetas + theta[:,1:]
+
+        # Create base dd matrix.
+        dd_matrices = [np.zeros((theta.shape[0], theta.shape[0])) for i in range(theta.shape[1])]
+        for pos in range(sample_data.obs_seq_mutation.seq_len):
+            exp_theta_psi = np.exp(np.array(sample_data.obs_seq_mutation.feat_matrix_start[pos,:] * merged_thetas).flatten())
+            features = sample_data.obs_seq_mutation.feat_matrix_start[pos,:].nonzero()[1]
+            for f1 in features:
+                for f2 in features:
+                    # The first column in a per-target model appears in all other columns. Hence we need a sum of all the exp_thetas
+                    dd_matrices[0][f1, f2] += exp_theta_psi.sum()
+                    for j in range(1, theta.shape[1]):
+                        # The rest of the theta values for the per-target model only appear once in the exp_theta vector
+                        dd_matrices[j][f1, f2] += exp_theta_psi[j - 1]
+
+        pos_exp_theta = np.exp(sample_data.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
+        prev_denom = pos_exp_theta.sum()
+
+        prev_risk_group_grad = sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
+        if per_target_model:
+            # Deal with the fact that the first column is special in a per-target model
+            aug_prev_risk_group_grad = np.hstack([np.sum(prev_risk_group_grad, axis=1, keepdims=True), prev_risk_group_grad])
+            aug_prev_risk_group_grad = aug_prev_risk_group_grad.reshape((aug_prev_risk_group_grad.size, 1), order="F")
+        else:
+            aug_prev_risk_group_grad = prev_risk_group_grad.reshape((prev_risk_group_grad.size, 1), order="F")
+
+        block_diag_dd = sp.linalg.block_diag(*dd_matrices)
+        for i in range(theta.shape[1] - 1):
+            # Recall that the first column in a per-target model appears in all the exp_theta expressions. So we need to add in these values
+            # to the off-diagonal blocks of the second-derivative matrix
+            block_diag_dd[(i + 1) * theta.shape[0]:(i + 2) * theta.shape[0], 0:theta.shape[0]] = dd_matrices[i + 1]
+            block_diag_dd[0:theta.shape[0], (i + 1) * theta.shape[0]:(i + 2) * theta.shape[0]] = dd_matrices[i + 1]
+
+        risk_group_hessian = aug_prev_risk_group_grad * aug_prev_risk_group_grad.T * np.power(prev_denom, -2) - np.power(prev_denom, -1) * block_diag_dd
+        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
+            exp_thetas = np.exp(pos_feat_matrix.dot(merged_thetas))
+            signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
+
+            prev_risk_group_grad += pos_feat_matrixT.dot(signed_exp_thetas)
+
+            prev_denom += signed_exp_thetas.sum()
+
+            # Now update the dd_matrix after the previous mutation step
+            for i in range(pos_feat_matrix.shape[0]):
+                feature_vals = pos_feat_matrix[i,:].nonzero()[1]
+                for f1 in feature_vals:
+                    for f2 in feature_vals:
+                        dd_matrices[0][f1, f2] += signed_exp_thetas[i,:].sum()
+                        for j in range(1, theta.shape[1]):
+                            dd_matrices[j][f1, f2] += signed_exp_thetas[i,j - 1]
+
+            if per_target_model:
+                aug_prev_risk_group_grad = np.hstack([np.sum(prev_risk_group_grad, axis=1, keepdims=True), prev_risk_group_grad])
+                aug_prev_risk_group_grad = aug_prev_risk_group_grad.reshape((aug_prev_risk_group_grad.size, 1), order="F")
+            else:
+                aug_prev_risk_group_grad = prev_risk_group_grad.reshape((prev_risk_group_grad.size, 1), order="F")
+
+            block_diag_dd = sp.linalg.block_diag(*dd_matrices)
+            for i in range(theta.shape[1] - 1):
+                block_diag_dd[(i + 1) * theta.shape[0]:(i + 2) * theta.shape[0], 0:theta.shape[0]] = dd_matrices[i + 1]
+                block_diag_dd[0:theta.shape[0], (i + 1) * theta.shape[0]:(i + 2) * theta.shape[0]] = dd_matrices[i + 1]
+
+            risk_group_hessian += aug_prev_risk_group_grad * aug_prev_risk_group_grad.T * np.power(prev_denom, -2) - np.power(prev_denom, -1) * block_diag_dd
+        return risk_group_hessian
+
 class PrecalcDataWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
@@ -304,6 +426,50 @@ class GradientWorker(ParallelWorker):
         return SurvivalProblemCustom.get_gradient_log_lik_per_sample(theta, self.sample_data, self.per_target_model)
 
     def __str__(self):
+        return "GradientWorker %s" % self.sample_data.obs_seq_mutation
+
+class HessianWorker(ParallelWorker):
+    """
+    Stores the information for calculating gradient
+    """
+    def __init__(self, seed, sample_data, per_target_model):
+        """
+        @param sample_data: class SamplePrecalcData
+        """
+        self.seed = seed
+        self.sample_data = sample_data
+        self.per_target_model = per_target_model
+
+    def run_worker(self, theta):
+        """
+        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
+        @return the gradient of the log likelihood for this sample
+        """
+        return SurvivalProblemCustom.get_hessian_per_sample(theta, self.sample_data, self.per_target_model)
+
+    def __str__(self):
+        return "GradientWorker %s" % self.sample_data.init_feat_counts
+
+class HessianWorker(ParallelWorker):
+    """
+    Stores the information for calculating gradient
+    """
+    def __init__(self, seed, sample_data, per_target_model):
+        """
+        @param sample_data: class SamplePrecalcData
+        """
+        self.seed = seed
+        self.sample_data = sample_data
+        self.per_target_model = per_target_model
+
+    def run_worker(self, theta):
+        """
+        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
+        @return the gradient of the log likelihood for this sample
+        """
+        return SurvivalProblemCustom.get_hessian_per_sample(theta, self.sample_data, self.per_target_model)
+
+    def __str__(self):
         return "GradientWorker %s" % self.sample_data.init_feat_counts
 
 class ObjectiveValueWorker(ParallelWorker):
@@ -326,4 +492,4 @@ class ObjectiveValueWorker(ParallelWorker):
         return SurvivalProblemCustom.calculate_per_sample_log_lik(theta, self.sample_data, self.per_target_model)
 
     def __str__(self):
-        return "ObjectiveValueWorker %s" % self.sample_data.init_feat_counts
+        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation

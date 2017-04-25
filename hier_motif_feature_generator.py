@@ -4,9 +4,10 @@ from scipy.sparse import hstack
 from itertools import product
 
 class HierarchicalMotifFeatureGenerator(FeatureGenerator):
-    def __init__(self, motif_lens=[3,5], left_motif_flank_len_list=None):
+    def __init__(self, motif_lens=[3,5], motifs_to_remove=[], left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
+        @param motifs_to_remove: list of motifs (strings) that have been zeroed out (completely - all targets are zeroed out)
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
         """
 
@@ -35,6 +36,7 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
                 self.feat_gens.append(
                         SubmotifFeatureGenerator(
                             motif_len=motif_len,
+                            motifs_to_remove=motifs_to_remove,
                             left_motif_flank_len=left_motif_flank_len,
                             hier_offset=self.max_left_motif_flank_len - left_motif_flank_len,
                             left_update_region=self.max_left_motif_flank_len,
@@ -53,30 +55,33 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             # pass mutating positions along with motifs
             self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
 
+        # construct motif dictionary too!
+        self.motif_dict = dict()
+        for i, f in enumerate(self.feat_gens):
+            for motif in f.motif_list:
+                raw_motif_idx = f.motif_dict[motif]
+                if raw_motif_idx is not None:
+                    self.motif_dict[motif] = raw_motif_idx + self.feat_offsets[i]
+
     def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
-        feat_vec_dict = dict()
+        if do_feat_vec_pos is None:
+            do_feat_vec_pos = range(len(seq_str))
+        feat_vec_dict = {pos:[] for pos in do_feat_vec_pos}
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
             f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos)
-            for pos, feat in f_dict.iteritems():
-                if pos in feat_vec_dict:
+            for pos in do_feat_vec_pos:
+                feat = f_dict[pos]
+                if feat is not None:
                     feat_vec_dict[pos].append(feat + offset)
-                else:
-                    feat_vec_dict[pos] = [feat + offset]
         return feat_vec_dict
 
     def create_base_features(self, obs_seq_mutation):
-        feat_vec_dict = dict()
         feat_mats = []
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            f_dict, feat_mat = feat_gen._get_base_features(obs_seq_mutation)
-            for pos, feat in f_dict.iteritems():
-                if pos in feat_vec_dict:
-                    feat_vec_dict[pos].append(feat + offset)
-                else:
-                    feat_vec_dict[pos] = [feat + offset]
+            feat_mat = feat_gen._get_base_features(obs_seq_mutation)
             feat_mats.append(feat_mat)
         full_feat_mat = hstack(feat_mats, format="csr")
-        obs_seq_mutation.set_start_feats(feat_vec_dict, full_feat_mat)
+        obs_seq_mutation.set_start_feats(full_feat_mat)
         return obs_seq_mutation
 
     def count_mutated_motifs(self, seq_mut_order):
@@ -112,7 +117,8 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
                 flanked_seq[left_flank_start:],
                 already_mutated_pos,
             )
-            first_mut_feats.append(mut_pos_feat + offset)
+            if mut_pos_feat is not None:
+                first_mut_feats.append(mut_pos_feat + offset)
             multi_feat_mut_step.update(mut_step, offset)
         return first_mut_feats, multi_feat_mut_step
 

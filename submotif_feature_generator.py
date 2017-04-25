@@ -16,6 +16,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
     def __init__(
             self,
             motif_len=3,
+            motifs_to_remove=[],
             left_motif_flank_len=1,
             hier_offset=0,
             left_update_region=1,
@@ -23,6 +24,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         ):
         """
         @param motif_len: length of motif
+        @param motifs_to_remove: motifs to remove
         @param left_motif_flank_len: length of region to the left of the mutating position
         @param hier_offset: where to offset sequence if we are using hierarchical motifs
         @param left_update_region: number of positions to consider left of mutating position to update
@@ -30,7 +32,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @param right_update_region: number of positions to consider right of mutating position to update
             features correctly
         """
-
         assert(motif_len % 2 == 1)
         assert(left_motif_flank_len in range(motif_len))
 
@@ -45,8 +46,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         self.feature_vec_len = np.power(4, motif_len)
 
-        self.motif_list = self._get_motif_list()
+        motifs_to_remove = [m for m in motifs_to_remove if len(m) == motif_len]
+        self.motif_list = self._get_motif_list(motifs_to_remove)
         self.motif_dict = {motif: i for i, motif in enumerate(self.motif_list)}
+        for m in motifs_to_remove:
+            self.motif_dict[m] = None
+
+        self.feature_vec_len = len(self.motif_list)
 
         self.motifs_fused_lasso1 = []
         self.motifs_fused_lasso2 = []
@@ -72,24 +78,25 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @return ObservedSequenceMutations augmented with a feature matrix and dictionary
         """
         indices = []
-        indptr = [0]
+        start_idx = 0
+        indptr = [start_idx]
         num_entries = 0
 
-        feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
             submotif = obs_seq_mutation.start_seq_with_flanks[pos + self.hier_offset: pos + self.hier_offset + self.motif_len]
             feat_idx = self.motif_dict[submotif]
-            feat_dict[pos] = feat_idx
-            indptr.append(pos + 1)
-            indices.append(feat_idx)
+            if feat_idx is not None:
+                start_idx += 1
+                indices.append(feat_idx)
+            indptr.append(start_idx)
 
-        data = [True] * obs_seq_mutation.seq_len
+        data = [True] * start_idx
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
             shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
             dtype=bool,
         )
-        return feat_dict, feat_matrix
+        return feat_matrix
 
     def create_base_features(self, obs_seq_mutation):
         """
@@ -100,25 +107,26 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         assert(obs_seq_mutation.motif_len == self.motif_len)
         indices = []
-        indptr = [0]
+        start_idx = 0
+        indptr = [start_idx]
         num_entries = 0
 
-        feat_dict = dict()
         for pos in range(obs_seq_mutation.seq_len):
             submotif = obs_seq_mutation.start_seq_with_flanks[pos: pos + self.motif_len]
             feat_idx = self.motif_dict[submotif]
-            feat_dict[pos] = feat_idx
-            indptr.append(pos + 1)
-            indices.append(feat_idx)
+            if feat_idx is not None:
+                start_idx += 1
+                indices.append(feat_idx)
+            indptr.append(start_idx)
 
-        data = [True] * obs_seq_mutation.seq_len
+        data = [True] * start_idx
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
             shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
             dtype=bool,
         )
 
-        obs_seq_mutation.set_start_feats(feat_dict, feat_matrix)
+        obs_seq_mutation.set_start_feats(feat_matrix)
 
         return obs_seq_mutation
 
@@ -237,6 +245,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 flanked_seq,
                 already_mutated_pos,
             )
+            # print mutation_step, "mutating_pos_feat, feat_dict_curr, feat_dict_future", mutating_pos_feat, feat_dict_curr, feat_dict_future
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat,
                 neighbors_feat_old=feat_dict_prev,
@@ -378,7 +387,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             if pos not in already_mutated_pos:
                 # Only update the positions that are in the risk group (the ones that haven't mutated yet)
                 submotif = intermediate_seq[pos: pos + self.motif_len]
-                feat_dict[pos] = self.motif_dict[submotif]
+                feat_idx = self.motif_dict[submotif]
+                feat_dict[pos] = feat_idx
         return feat_dict
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
@@ -400,9 +410,15 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return self.motif_dict[submotif]
 
-    def _get_motif_list(self):
+    def _get_motif_list(self, motifs_to_remove):
         motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
-        return ["".join(m) for m in motif_list]
+        filtered_motif_list = []
+        for m in motif_list:
+            motif = "".join(m)
+            if motif not in motifs_to_remove:
+                filtered_motif_list.append(motif)
+
+        return filtered_motif_list
 
     def get_similar_motifs(self, fuse_windows=[3,4], fuse_center_only=False):
         """

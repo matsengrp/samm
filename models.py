@@ -68,13 +68,8 @@ class ObservedSequenceMutations:
         self.seq_len = len(self.start_seq)
         assert(self.seq_len > 0)
 
-    def set_start_feats(self, feat_dict, feat_matrix):
+    def set_start_feats(self, feat_matrix):
         self.feat_matrix_start = feat_matrix
-
-        num_feats = feat_matrix.shape[1]
-        self.feat_counts = np.zeros((1, num_feats), dtype=int)
-        for pos, feat in feat_dict.iteritems():
-            self.feat_counts[0, feat] += 1
 
     def __str__(self):
         return "Seq %s, Mutations %s" % (

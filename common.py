@@ -162,6 +162,26 @@ def print_known_cold_hot_spot(motif, known_hot_cold_regexs):
             return spot_name
     return None
 
+def get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape):
+    """
+    Combines `target_pairs_to_remove` from `read_zero_motif_csv` and with the feature generator
+
+    @return a boolean matrix with fixed zero theta values True, others as False
+    """
+    zero_theta_mask = np.zeros(theta_shape, dtype=bool)
+    if theta_shape[1] == 1:
+        return zero_theta_mask
+
+    for motif, targets in target_pairs_to_remove.iteritems():
+        for nuc in targets:
+            if motif in feat_generator.motif_dict:
+                motif_idx = feat_generator.motif_dict[motif]
+                if nuc == "n":
+                    zero_theta_mask[motif_idx, 0] = 1
+                else:
+                    zero_theta_mask[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = 1
+    return zero_theta_mask
+
 def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
     """
     @param motif_list: list of motifs - assumes that the first few theta rows correspond to these motifs
