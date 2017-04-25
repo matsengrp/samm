@@ -18,15 +18,18 @@ class Gibbs_TestCase(unittest.TestCase):
     def setUpClass(cls):
         np.random.seed(10)
         cls.motif_len = 3
+        cls.flank_len = 1
         cls.BURN_IN = 10
-        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[3])
-        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[1,3])
-        cls.obs = ObservedSequenceMutations("attcaaatgatatac", "ataaatagggtttac", cls.motif_len)
+        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[3], left_motif_flank_len_list=[[1]])
+        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[1,3], left_motif_flank_len_list=[[0],[1]])
+        cls.obs = ObservedSequenceMutations("attcaaatgatatac", "ataaatagggtttac", cls.motif_len, left_flank_len=cls.flank_len, right_flank_len=cls.flank_len)
 
     def _test_compute_log_probs(self, feat_gen, per_target_model):
         if per_target_model:
             theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES + 1)
-            possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
+            possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list,
+                    theta.shape,
+                    feat_gen.mutating_pos_list)
             theta[~possible_motif_mask] = -np.inf
         else:
             theta = np.random.rand(feat_gen.feature_vec_len, 1) * 2
@@ -125,7 +128,9 @@ class Gibbs_TestCase(unittest.TestCase):
         per_target_model = theta.shape[1] == NUM_NUCLEOTIDES + 1
         if not per_target_model:
             probability_matrix = np.ones((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))/3.0
-            possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list, (feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
+            possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list,
+                    (feat_gen.feature_vec_len, NUM_NUCLEOTIDES),
+                    feat_gen.mutating_pos_list)
             probability_matrix[~possible_motif_mask] = 0
             surv_simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, feat_gen, lambda0=LAMBDA0)
         else:
@@ -141,7 +146,9 @@ class Gibbs_TestCase(unittest.TestCase):
                 ObservedSequenceMutations(
                     m.left_flank + m.start_seq + m.right_flank,
                     m.left_flank + m.end_seq + m.right_flank,
-                    motif_len=3,
+                    motif_len=self.motif_len,
+                    left_flank_len=self.flank_len,
+                    right_flank_len=self.flank_len,
                 )
             ) for m in full_seq_muts
         ]
@@ -193,7 +200,9 @@ class Gibbs_TestCase(unittest.TestCase):
         def _make_multi_theta(feat_gen):
             # This generates a theta with random entries
             multi_theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES + 1)
-            theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, multi_theta.shape)
+            theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list,
+                    multi_theta.shape,
+                    feat_gen.mutating_pos_list)
             multi_theta[~theta_mask] = -np.inf
             return multi_theta
 
