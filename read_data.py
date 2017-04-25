@@ -288,8 +288,9 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
 def read_gene_seq_csv_data(
         gene_file_name,
         seq_file_name,
-        motif_len=1,
-        mutating_positions=['center'],
+        motif_len=3,
+        left_flank_len=1,
+        right_flank_len=1,
         sample=1,
         locus='',
         species='',
@@ -298,7 +299,8 @@ def read_gene_seq_csv_data(
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
-    @param mutating_positions: positions that will be mutating so flanks are calculated correctly
+    @param left_flank_len: maximum left flank length for this motif length
+    @param right_flank_len: maximum right flank length for this motif length
     @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
     @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
     @param subset_vals: list of values of these variables to subset on (e.g., ['k', 'mouse'])
@@ -331,7 +333,8 @@ def read_gene_seq_csv_data(
                     start_seq=start_seq,
                     end_seq=end_seq,
                     motif_len=motif_len,
-                    mutating_positions=mutating_positions,
+                    left_flank_len=left_flank_len,
+                    right_flank_len=right_flank_len,
             )
 
             if obs_seq_mutation.num_mutations > 0:
@@ -348,7 +351,8 @@ def read_gene_seq_csv_data(
                         start_seq=start_seq,
                         end_seq=end_seq,
                         motif_len=motif_len,
-                        mutating_positions=mutating_positions,
+                        left_flank_len=left_flank_len,
+                        right_flank_len=right_flank_len,
                 )
 
                 if sample == 1 and obs_seq_mutation.num_mutations > 0:
