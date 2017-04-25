@@ -106,6 +106,7 @@ class Sampler:
         self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES + 1
 
         if len(feature_generator.motif_lens) == 1:
+            self.exp_theta_num_cols = 1 if not self.per_target_model else NUM_NUCLEOTIDES
             if not self.per_target_model:
                 self.exp_theta_sum = np.exp(theta).sum(axis=1)
             else:

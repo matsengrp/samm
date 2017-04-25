@@ -70,7 +70,7 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
                 for i in range(NUM_NUCLEOTIDES):
                     if int(row[2 + i]) == 1:
                         zero_thetas.append(NUCLEOTIDES[i])
-                if len(zero_thetas) == NUM_NUCLEOTIDES + 1:
+                if len(zero_thetas) >= NUM_NUCLEOTIDES:
                     motifs_to_remove.append(motif)
                 else:
                     target_pairs_to_remove[motif] = zero_thetas

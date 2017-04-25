@@ -410,7 +410,7 @@ def main(args=sys.argv[1:]):
 
             theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
 
-            theta, _ = em_algo.run(
+            theta, _, _ = em_algo.run(
                 theta=theta,
                 burn_in=burn_in,
                 penalty_params=penalty_params,
@@ -499,7 +499,7 @@ def main(args=sys.argv[1:]):
     if not args.full_train:
         log.info("Begin a final training of the model")
         # If we didn't do a full training for this best model, do it now
-        best_theta, _ = em_algo.run(
+        best_theta, theta_standard_error, _ = em_algo.run(
             theta=best_model.theta,
             burn_in=burn_in,
             penalty_params=best_model.penalty_params,
@@ -513,6 +513,7 @@ def main(args=sys.argv[1:]):
             best_model.penalty_params,
             best_theta,
             best_fitted_prob_vector,
+            theta_standard_error,
         )
 
     if all_runs_pool is not None:
@@ -521,7 +522,7 @@ def main(args=sys.argv[1:]):
         all_runs_pool.join()
 
     with open(args.out_file, "w") as f:
-        pickle.dump((best_model.theta, best_model.fitted_prob_vector), f)
+        pickle.dump((best_model.theta, best_model.fitted_prob_vector, theta_standard_error), f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
