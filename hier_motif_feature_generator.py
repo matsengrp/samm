@@ -109,7 +109,7 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             mut_pos_feat, mut_step = feat_gen.get_shuffled_mutation_steps_delta(
                 seq_mut_order,
                 update_step,
-                flanked_seq[left_flank_start:]
+                flanked_seq[left_flank_start:],
                 already_mutated_pos,
             )
             first_mut_feats.append(mut_pos_feat + offset)
