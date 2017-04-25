@@ -28,12 +28,13 @@ class Hessian_TestCase(unittest.TestCase):
             theta_num_col = 1
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
-        theta[~theta_mask] = -np.inf
+        possible_theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
+        theta[~possible_theta_mask] = -np.inf
+        zero_theta_mask = np.zeros((feat_gen.feature_vec_len, theta_num_col), dtype=bool)
 
         featured_obs_seq_mut = feat_gen.create_base_features(self.obs_seq_mut)
         sample = ImputedSequenceMutations(featured_obs_seq_mut, self.mutation_order)
-        problem = SurvivalProblemCustom(feat_gen, [sample], [1], [0], per_target, theta_mask)
+        problem = SurvivalProblemCustom(feat_gen, [sample], [1], [0], per_target, possible_theta_mask, zero_theta_mask)
 
         sample_obs_information, sample_hessian = problem.get_hessian(theta)
         for i in featured_obs_seq_mut.feat_matrix_start.nonzero()[1][:5]:

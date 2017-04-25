@@ -125,7 +125,7 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
                 if True: #get_hessian:
-                    ci_maker = ConfidenceIntervalMaker()
+                    ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
                     theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
 
             # Save the e-step samples if we want to analyze later on

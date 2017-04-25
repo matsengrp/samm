@@ -40,7 +40,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.samples = samples
         self.possible_theta_mask = possible_theta_mask
         self.zero_theta_mask = zero_theta_mask
-        self.zero_theta_mask_flat = self.zero_theta_mask.reshape((self.zero_theta_mask.size,), order="F")
+        self.theta_mask_flat = (possible_theta_mask & ~zero_theta_mask).reshape((zero_theta_mask.size,), order="F")
 
         self.num_samples = len(self.samples)
         self.sample_labels = sample_labels
@@ -134,8 +134,6 @@ class SurvivalProblemCustom(SurvivalProblem):
         sorted_sample_labels = np.sort(np.array(list(set(self.sample_labels))))
         expected_scores = {label: 0 for label in sorted_sample_labels}
         for g, sample_label in zip(grad_log_lik, self.sample_labels):
-            # Take only entries of interest
-            g = g[~self.zero_theta_mask]
             g = g.reshape((g.size, 1), order="F")
             expected_scores[sample_label] += g
             score_score += g * g.T
@@ -150,8 +148,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         hessian_log_lik = [worker.run(theta) for worker in worker_list]
         hessian_sum = 0
         for h in hessian_log_lik:
-            # Take only entries of interest
-            hessian_sum += (h[~self.zero_theta_mask_flat,:])[:,~self.zero_theta_mask_flat]
+            hessian_sum += h
 
         fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - score_score) + np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
         return fisher_info, -1.0/self.num_samples * hessian_sum

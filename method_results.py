@@ -2,7 +2,7 @@ import numpy as np
 from common import *
 
 class MethodResults:
-    def __init__(self, penalty_params, theta, fitted_prob_vector, theta_standard_error):
+    def __init__(self, penalty_params, theta, fitted_prob_vector, theta_standard_error=None):
         self.penalty_params = penalty_params
         self.theta = theta
         self.fitted_prob_vector = fitted_prob_vector
