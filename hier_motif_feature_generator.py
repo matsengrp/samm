@@ -4,7 +4,7 @@ from scipy.sparse import hstack
 from itertools import product
 
 class HierarchicalMotifFeatureGenerator(FeatureGenerator):
-    def __init__(self, motif_lens=[3,5], left_motif_flank_len_list=[[1],[2]]):
+    def __init__(self, motif_lens=[3,5], left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
@@ -14,6 +14,13 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
 
         self.max_motif_len = max(motif_lens)
         self.motif_len = self.max_motif_len
+
+        if left_motif_flank_len_list is None:
+            # default to central base mutating
+            left_motif_flank_len_list = []
+            for motif_len in motif_lens:
+                left_motif_flank_len_list.append([motif_len/2])
+
         # Find the maximum left and right motif flank lengths to pass to SubmotifFeatureGenerator
         # in order to update all the relevant features
         for motif_len, left_flanks in zip(self.motif_lens, left_motif_flank_len_list):
