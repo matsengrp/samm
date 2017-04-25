@@ -52,6 +52,10 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
     """
     motifs_to_remove = []
     target_pairs_to_remove = dict()
+
+    if csv_file_name == "":
+        return motifs_to_remove, target_pairs_to_remove
+
     with open(csv_file_name, "r") as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:

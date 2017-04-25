@@ -6,6 +6,8 @@ class ConfidenceIntervalMaker:
         sample_obs_information, _ = problem.get_hessian(theta)
 
         print "sample_obs_information eigvals", np.linalg.eigvals(sample_obs_information)
-        variance_est = np.linalg.inv(sample_obs_information)
-        print "np.diag(variance_est)", np.diag(variance_est)
-        # print "standard errors?", np.sqrt(np.diag(variance_est))
+        if np.all(np.abs(np.linalg.eigvals(sample_obs_information))) > 0:
+            variance_est = np.linalg.inv(sample_obs_information)
+            print "np.diag(variance_est)", np.diag(variance_est)
+            if np.all(np.diag(variance_est)) > 0:
+                print "standard errors?", np.sqrt(np.diag(variance_est))
