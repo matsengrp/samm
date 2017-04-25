@@ -124,9 +124,9 @@ class MCMC_EM:
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
-                if get_hessian:
+                if True: #get_hessian:
                     ci_maker = ConfidenceIntervalMaker()
-                    conf_ints = ci_maker.run(theta, e_step_samples, problem, len(e_step_samples)/num_data)
+                    theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
 
             # Save the e-step samples if we want to analyze later on
             e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
@@ -139,4 +139,4 @@ class MCMC_EM:
                 break
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
-        return theta, all_traces
+        return theta, theta_standard_error, all_traces
