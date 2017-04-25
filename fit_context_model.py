@@ -516,6 +516,7 @@ def main(args=sys.argv[1:]):
     )
 
     log.info("=== FINAL Best model: %s" % best_model)
+    theta_standard_error = None
     if not args.full_train:
         log.info("Begin a final training of the model")
         # If we didn't do a full training for this best model, do it now
