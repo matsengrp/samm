@@ -114,7 +114,6 @@ class MutationOrderGibbsSampler(Sampler):
         """
         # A holder for all the log probs - we need to normalize these later to get our sampled order
         all_log_probs = []
-
         # Compute probabilities for the orderings under consideration
         # First consider the full ordering with position under consideration mutating last
         order_last = partial_order + [position]
@@ -128,7 +127,6 @@ class MutationOrderGibbsSampler(Sampler):
                 gibbs_step_info,
                 update_step_start=pos_order_idx,
             )
-
         full_ordering_log_prob = np.sum(log_numerators) - (np.log(denominators)).sum()
 
         # Add the log probability of the position mutating last
@@ -153,6 +151,7 @@ class MutationOrderGibbsSampler(Sampler):
         # iterate through the remaining possible full mutation orders consistent with this partial order
         for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
             possible_full_order = partial_order[:i] + [position] + partial_order[i:]
+
             shuffled_position = partial_order[i]
             already_mutated_pos_set.remove(shuffled_position)
             # Now unmutate the string so that we can figure out the features at the positions
@@ -343,17 +342,18 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        if len(prev_feat_idxs) > 1:
+        if len(self.feature_generator.motif_lens) > 1:
             if not self.per_target_model:
-                old_feat_theta_sums = [self.theta[feat_idxs].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-                new_feat_theta_sums = [self.theta[feat_idxs].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
-                return old_denominator - np.exp(self.theta[prev_feat_idxs].sum(axis=0)).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
+                old_feat_theta_sums = [self.theta[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
+                new_feat_theta_sums = [self.theta[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
+                new_denom = old_denominator - np.exp(self.theta[prev_feat_idxs].sum()).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
             else:
                 old_feat_theta_sums = [self.theta[feat_idxs,0].sum() + self.theta[feat_idxs, 1:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
                 new_feat_theta_sums = [self.theta[feat_idxs,0].sum() + self.theta[feat_idxs, 1:].sum(axis=0) for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
                 prev_theta_sum = self.theta[prev_feat_idxs,0].sum() + self.theta[prev_feat_idxs,1:].sum(axis=0)
-                return old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
+                new_denom = old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
-            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]
-            return old_denominator - self.exp_theta_sum[prev_feat_idxs].sum() - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)
+            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] for feat_idx in feat_mut_step.neighbors_feat_new.values()]
+            new_denom = old_denominator - self.exp_theta_sum[prev_feat_idxs] - sum(old_feat_exp_theta_sums) + sum(new_feat_exp_theta_sums)
+        return np.asscalar(new_denom)

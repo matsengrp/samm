@@ -9,7 +9,7 @@ from sampler_collection import SamplerCollection
 from profile_support import profile
 
 class MCMC_EM:
-    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', intermediate_dir="", pool=None):
+    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, possible_theta_mask, zero_theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', intermediate_dir="", pool=None):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
@@ -29,10 +29,11 @@ class MCMC_EM:
         self.problem_solver_cls = problem_solver_cls
         self.num_jobs = num_jobs
         self.pool = pool
-        self.theta_mask = theta_mask
+        self.possible_theta_mask = possible_theta_mask
+        self.zero_theta_mask = zero_theta_mask
         self.scratch_dir = scratch_dir
         self.intermediate_dir = intermediate_dir
-        self.per_target_model = theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
+        self.per_target_model = possible_theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
 
     def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False):
         """
@@ -95,7 +96,8 @@ class MCMC_EM:
                     e_step_samples,
                     penalty_params,
                     self.per_target_model,
-                    self.theta_mask,
+                    possible_theta_mask=self.possible_theta_mask,
+                    zero_theta_mask=self.zero_theta_mask,
                     fuse_windows=fuse_windows,
                     fuse_center_only=fuse_center_only,
                     pool=self.pool,

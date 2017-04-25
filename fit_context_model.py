@@ -150,6 +150,10 @@ def parse_args():
         choices=('','mouse','human'),
         help="species (mouse or human; default empty)",
         default='')
+    parser.add_argument("--zero-motifs",
+        type=str,
+        help="motifs with constant zero theta value, csv file",
+        default='')
 
     parser.set_defaults(per_target_model=False, full_train=False, chibs=False, fuse_center_only=False)
     args = parser.parse_args()
@@ -278,13 +282,17 @@ def get_penalty_params(pen_param_str, solver):
         pen_params_lists = [[(p,) for p in sorted_pen_params]]
     return pen_params_lists
 
-def initialize_theta(theta_shape, theta_mask):
+def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     """
-    Initialize theta -- start with all zeros
+    Initialize theta
+    @param possible_theta_mask: set the negative of this mask to negative infinity theta values
+    @param zero_theta_mask: set the negative of this mask to negative infinity theta values
     """
     theta = np.random.randn(theta_shape[0], theta_shape[1]) * 1e-3
     # Set the impossible thetas to -inf
-    theta[~theta_mask] = -np.inf
+    theta[~possible_theta_mask] = -np.inf
+    # Set particular thetas to zero upon request
+    theta[zero_theta_mask] = 0
     return theta
 
 def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta, args):
@@ -293,6 +301,8 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
     Most importantly, it calculates the difference between the EM surrogate functions
     It also will calculate the marginal likelihood if args.chibs is True
     It will also compare against the true_theta if it is known and if the true_theta is the same shape
+
+    @param theta_mask: a mask with all the possible theta values (the ones that are not -inf)
     """
     theta_err = None
     if true_theta is not None and true_theta.shape == theta.shape:
@@ -323,7 +333,11 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
+    motifs_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
+    feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=args.motif_lens,
+        motifs_to_remove=motifs_to_remove,
+    )
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
@@ -358,7 +372,8 @@ def main(args=sys.argv[1:]):
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
     theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
-    theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape)
+    possible_theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape)
+    zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape)
 
     true_theta = None
     if args.theta_file != "":
@@ -375,7 +390,8 @@ def main(args=sys.argv[1:]):
         feat_generator,
         args.sampler_cls,
         args.problem_solver_cls,
-        theta_mask = theta_mask,
+        possible_theta_mask = possible_theta_mask,
+        zero_theta_mask=zero_theta_mask,
         base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         scratch_dir=args.scratch_dir,
@@ -393,7 +409,7 @@ def main(args=sys.argv[1:]):
             penalty_param_str = ",".join(map(str, penalty_params))
             log.info("Penalty parameter %s" % penalty_param_str)
 
-            theta = initialize_theta(theta_shape, theta_mask)
+            theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
 
             theta, _ = em_algo.run(
                 theta=theta,
@@ -409,7 +425,7 @@ def main(args=sys.argv[1:]):
                 # Do checks on the validation set
                 log_lik_ratio, _, _ = do_validation_set_checks(
                     theta,
-                    theta_mask,
+                    possible_theta_mask,
                     val_set,
                     val_set_evaluator,
                     feat_generator,

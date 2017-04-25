@@ -114,7 +114,6 @@ class LikelihoodComparer:
             self.samples,
             penalty_params=[0],
             per_target_model=self.per_target_model,
-            theta_mask=None,
             pool=self.pool,
         )
         log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
