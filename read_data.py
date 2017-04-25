@@ -77,7 +77,7 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
     return motifs_to_remove, target_pairs_to_remove
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=False, use_immunized=True, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=True, motif_len=1):
     """
     Function to read partis annotations csv
 
