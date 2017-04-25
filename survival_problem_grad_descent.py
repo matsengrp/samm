@@ -30,6 +30,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
+<<<<<<< HEAD
     def __init__(self, feat_generator, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
         """
         @param sample_labels: only used for calculating the Hessian
@@ -41,11 +42,23 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.possible_theta_mask = possible_theta_mask
         self.zero_theta_mask = zero_theta_mask
 
+=======
+    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
+        """
+        @param sample_labels: only used for calculating the Hessian
+        """
+        self.feature_generator = feat_generator
+        self.samples = samples
+>>>>>>> 9ba70a5899c27275014faac0ee58641fc07c92c7
         self.num_samples = len(self.samples)
         self.sample_labels = sample_labels
         if self.sample_labels is not None:
             self.num_reps_per_obs = self.num_samples/len(set(sample_labels))
 
+<<<<<<< HEAD
+=======
+        self.theta_mask = theta_mask
+>>>>>>> 9ba70a5899c27275014faac0ee58641fc07c92c7
         self.per_target_model = per_target_model
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
@@ -424,6 +437,28 @@ class GradientWorker(ParallelWorker):
 
     def __str__(self):
         return "GradientWorker %s" % self.sample_data.obs_seq_mutation
+
+class HessianWorker(ParallelWorker):
+    """
+    Stores the information for calculating gradient
+    """
+    def __init__(self, seed, sample_data, per_target_model):
+        """
+        @param sample_data: class SamplePrecalcData
+        """
+        self.seed = seed
+        self.sample_data = sample_data
+        self.per_target_model = per_target_model
+
+    def run_worker(self, theta):
+        """
+        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
+        @return the gradient of the log likelihood for this sample
+        """
+        return SurvivalProblemCustom.get_hessian_per_sample(theta, self.sample_data, self.per_target_model)
+
+    def __str__(self):
+        return "GradientWorker %s" % self.sample_data.init_feat_counts
 
 class HessianWorker(ParallelWorker):
     """
