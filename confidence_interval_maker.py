@@ -27,6 +27,8 @@ class ConfidenceIntervalMaker:
         sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
 
         # Make sure that we can take an inverse -- need eigenvalues to be nonzero
+        eigenvals = np.linalg.eigvals(sample_obs_information)
+        log.info("np.linalg.eigvals %s" % eigenvals)
         if np.all(np.abs(np.linalg.eigvals(sample_obs_information)) > 0):
             variance_est = np.linalg.inv(sample_obs_information)
 
@@ -38,11 +40,9 @@ class ConfidenceIntervalMaker:
                 log.info(self._get_confidence_interval_print_lines(conf_ints))
                 return standard_errors
             else:
-                log.info("Confidence interval: variance estimates are negative")
-                log.info("variance %s" % np.diag(variance_est))
+                log.info("Variance estimates are negative %s" % np.diag(variance_est))
         else:
             log.info("Confidence interval: observation matrix is singular")
-            log.info("np.linalg.eigvals %s" % np.linalg.eigvals(sample_obs_information))
         return None
 
     def _create_confidence_intervals(self, standard_errors, theta, z=1.96):
