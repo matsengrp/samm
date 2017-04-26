@@ -152,7 +152,6 @@ class LikelihoodComparer:
                 sample_labels=None,
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
-                theta_mask=None,
                 pool=self.pool,
             )
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
