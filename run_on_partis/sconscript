@@ -48,7 +48,7 @@ def process_data(env, outdir, c):
                '--data-path',
                c['data_path'],
                '--motif-len',
-               5,
+               5, # only used for imputing ancestors
                '--read-from-partis',
                '--metadata-path',
                c['data_path'] + '/meta.csv',

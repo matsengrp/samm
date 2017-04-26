@@ -121,7 +121,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         ll = [worker.run(theta) for worker in worker_list]
         return np.array(ll)
 
-    def get_hessian(self, theta):
+    def get_hessian(self, theta, batch_factor=4):
         """
         Uses Louis's method to calculate the information matrix of the observed data
         @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
@@ -147,7 +147,12 @@ class SurvivalProblemCustom(SurvivalProblem):
         worker_list = [
             HessianWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
-        hessian_log_lik = [worker.run(theta) for worker in worker_list]
+        if self.pool is not None:
+            multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=theta, num_approx_batches=self.pool._processes * batch_factor)
+            hessian_log_lik = multiproc_manager.run()
+        else:
+            hessian_log_lik = [worker.run(theta) for worker in worker_list]
+
         hessian_sum = 0
         for h in hessian_log_lik:
             hessian_sum += h
