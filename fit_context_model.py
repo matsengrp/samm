@@ -459,12 +459,8 @@ def main(args=sys.argv[1:]):
             log.info("==== FINAL theta, %s====" % curr_model_results)
             log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.motif_len))
 
-            if best_model_in_list is None:
-                best_model_in_list = curr_model_results
-                log.info("===== Best model so far %s" % best_model_in_list)
-
             if args.tuning_sample_ratio:
-                if log_lik_ratio > 0:
+                if best_model_in_list is None or log_lik_ratio > 0:
                     best_model_in_list = curr_model_results
                     log.info("===== Best model so far %s" % best_model_in_list)
                     if val_set_evaluator is not None:
@@ -486,6 +482,10 @@ def main(args=sys.argv[1:]):
                     # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
                     log.info("Stop trying penalty parameters for this penalty parameter list")
                     break
+            elif best_model_in_list is None:
+                best_model_in_list = curr_model_results
+                log.info("===== Best model so far %s" % best_model_in_list)
+
         best_models.append(best_model_in_list)
 
     # A greedy comparison
