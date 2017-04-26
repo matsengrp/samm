@@ -46,6 +46,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.num_samples = len(self.samples)
         self.sample_labels = sample_labels
         if self.sample_labels is not None:
+            assert(len(self.sample_labels) == self.num_samples)
             self.num_reps_per_obs = self.num_samples/len(set(sample_labels))
 
         self.per_target_model = per_target_model
@@ -126,38 +127,51 @@ class SurvivalProblemCustom(SurvivalProblem):
         Uses Louis's method to calculate the information matrix of the observed data
         @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
         """
+        def _get_parallel_sum(worker_list, shared_obj):
+            if self.pool is not None:
+                multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=shared_obj, num_approx_batches=self.pool._processes * batch_factor)
+                res = multiproc_manager.run()
+            else:
+                res = [worker.run(shared_obj) for worker in worker_list]
+            tot = 0
+            for r in res:
+                tot += r
+            return tot
+
         rand_seed = get_randint()
         worker_list = [
             GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
         grad_log_lik = [worker.run(theta) for worker in worker_list]
-        score_score = 0
-        sorted_sample_labels = np.sort(np.array(list(set(self.sample_labels))))
+        sorted_sample_labels = sorted(list(set(self.sample_labels)))
+
+        # Get the expected scores
         expected_scores = {label: 0 for label in sorted_sample_labels}
         for g, sample_label in zip(grad_log_lik, self.sample_labels):
             g = g.reshape((g.size, 1), order="F")
             expected_scores[sample_label] += g
-            score_score += g * g.T
 
-        tot_cross_expected_scores = 0
-        for i, label1 in enumerate(sorted_sample_labels):
-            for label2 in sorted_sample_labels[i + 1:]:
-                tot_cross_expected_scores += expected_scores[label1] * expected_scores[label2].T
+        # Calculate the score score (second summand)
+        num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
+        batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
+        score_score_worker_list = [
+            ScoreScoreCalc(rand_seed + i, [grad_log_lik[i] for i in idxs]) for idxs in batched_idxs
+        ]
+        tot_score_score = _get_parallel_sum(score_score_worker_list, None)
 
-        worker_list = [
+        # Calculate the cross scores (third summand)
+        all_pairs = [(label1, label2) for i, label1 in enumerate(sorted_sample_labels) for label2 in sorted_sample_labels[i + 1:]]
+        batched_pairs = get_batched_list(all_pairs, num_batches)
+        expected_score_worker_list = [ScoreCrossCalc(rand_seed + i, pairs) for pairs in batched_pairs]
+        tot_cross_expected_scores = _get_parallel_sum(expected_score_worker_list, expected_scores)
+
+        # Calculate the hessian (first summand)
+        hessian_worker_list = [
             HessianWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
-        if self.pool is not None:
-            multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=theta, num_approx_batches=self.pool._processes * batch_factor)
-            hessian_log_lik = multiproc_manager.run()
-        else:
-            hessian_log_lik = [worker.run(theta) for worker in worker_list]
+        hessian_sum = _get_parallel_sum(hessian_worker_list, theta)
 
-        hessian_sum = 0
-        for h in hessian_log_lik:
-            hessian_sum += h
-
-        fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
+        fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
         return fisher_info, -1.0/self.num_samples * hessian_sum
 
     def _get_gradient_log_lik(self, theta):
@@ -495,6 +509,54 @@ class ObjectiveValueWorker(ParallelWorker):
         @return the log likelihood for this sample
         """
         return SurvivalProblemCustom.calculate_per_sample_log_lik(theta, self.sample_data, self.per_target_model)
+
+    def __str__(self):
+        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
+
+class ScoreScoreCalc(ParallelWorker):
+    """
+    Calculate the product of scores
+    """
+    def __init__(self, seed, grad_log_liks):
+        """
+        @param grad_log_liks: the grad_log_liks to calculate the product of scores
+        """
+        self.seed = seed
+        self.grad_log_liks = grad_log_liks
+
+    def run_worker(self, shared_obj=None):
+        """
+        @return the sum of the product of scores
+        """
+        ss = 0
+        for g in self.grad_log_liks:
+            g = g.reshape((g.size, 1), order="F")
+            ss += g * g.T
+        return ss
+
+    def __str__(self):
+        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
+
+class ScoreCrossCalc(ParallelWorker):
+    """
+    Calculate the product of expected scores between different observations (indexed by idx pairs)
+    """
+    def __init__(self, seed, idx_pair_list):
+        """
+        @param idx_pair_list: a list of pairs to process
+        """
+        self.seed = seed
+        self.idx_pair_list = idx_pair_list
+
+    def run_worker(self, expected_scores):
+        """
+        @param expected_scores: the expected scores
+        @return the sum of the product of expected scores for the given idx_pair_list
+        """
+        s = 0
+        for label1, label2 in self.idx_pair_list:
+            s += expected_scores[label1] * expected_scores[label2].T
+        return s
 
     def __str__(self):
         return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation

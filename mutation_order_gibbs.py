@@ -56,7 +56,7 @@ class MutationOrderGibbsSampler(Sampler):
         if self.num_mutations < 2:
             # If there are zero or one mutations then the same initial order will be returned for
             # every sample
-            samples = [init_order] * (burn_in + num_samples)
+            samples = [init_order] * (num_samples)
         else:
             samples = []
             log.info("Gibbs: num mutations %d, seq len %d" % (self.num_mutations, self.obs_seq_mutation.seq_len))
