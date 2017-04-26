@@ -22,6 +22,7 @@ class ConfidenceIntervalMaker:
 
         @return standard error estimates for the theta parameters
         """
+        log.info("Obtaining Confidence Interval Estimates...")
         sample_obs_information, _ = problem.get_hessian(theta)
         # Need to filter out all the theta values that are constant (negative infinity or zero constants)
         sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
@@ -36,7 +37,6 @@ class ConfidenceIntervalMaker:
             if np.all(np.diag(variance_est) > 0):
                 standard_errors = np.sqrt(np.diag(variance_est))
                 conf_ints = self._create_confidence_intervals(standard_errors, theta, z)
-                log.info("Confidence Interval Estimates:")
                 log.info(self._get_confidence_interval_print_lines(conf_ints))
                 return standard_errors
             else:
