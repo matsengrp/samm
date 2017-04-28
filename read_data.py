@@ -334,8 +334,8 @@ def read_gene_seq_csv_data(
         gene_file_name,
         seq_file_name,
         motif_len=3,
-        left_flank_len=1,
-        right_flank_len=1,
+        left_flank_len=None,
+        right_flank_len=None,
         sample=1,
         locus='',
         species='',
@@ -354,6 +354,11 @@ def read_gene_seq_csv_data(
     """
 
     assert(sample in range(1, 4))
+
+    if left_flank_len is None or right_flank_len is None:
+        # default to central base mutating
+        left_flank_len = motif_len/2
+        right_flank_len = motif_len/2
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
