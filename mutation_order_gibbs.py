@@ -353,8 +353,8 @@ class MutationOrderGibbsSampler(Sampler):
                 prev_theta_sum = self.theta[prev_feat_idxs,0].sum() + self.theta[prev_feat_idxs,1:].sum(axis=0)
                 new_denom = old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
-            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx is not None else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx is not None else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_new.values()]
-            prev_exp_theta_sum = self.exp_theta_sum[prev_feat_idxs] if prev_feat_idxs is not None else self.exp_theta_num_cols
+            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_new.values()]
+            prev_exp_theta_sum = self.exp_theta_sum[prev_feat_idxs] if len(prev_feat_idxs) else self.exp_theta_num_cols
             new_denom = old_denominator - prev_exp_theta_sum - np.sum(old_feat_exp_theta_sums) + np.sum(new_feat_exp_theta_sums)
         return float(new_denom)

@@ -105,13 +105,6 @@ def parse_args():
         type=str,
         help="penalty parameters, comma separated",
         default="0.1, 0.01, 0.001")
-    parser.add_argument("--fuse-windows",
-        type=str,
-        help="shared submotif lengths, comma separated",
-        default="4")
-    parser.add_argument("--fuse-center-only",
-        action='store_true',
-        help="shared submotif lengths, comma separated, should be odd")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -157,7 +150,7 @@ def parse_args():
     parser.add_argument("--get-hessian",
         action='store_true')
 
-    parser.set_defaults(per_target_model=False, full_train=False, chibs=False, fuse_center_only=False, get_hessian=False)
+    parser.set_defaults(per_target_model=False, full_train=False, chibs=False, get_hessian=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -188,12 +181,6 @@ def parse_args():
     args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_lens:
         assert(m % 2 == 1)
-
-    if args.problem_solver_cls != SurvivalProblemLasso:
-        assert(len(args.fuse_windows) > 0)
-        args.fuse_windows = [int(k) for k in args.fuse_windows.split(",")]
-    else:
-        args.fuse_windows = []
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
     args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
@@ -394,7 +381,6 @@ def main(args=sys.argv[1:]):
         args.problem_solver_cls,
         possible_theta_mask = possible_theta_mask,
         zero_theta_mask=zero_theta_mask,
-        base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         scratch_dir=args.scratch_dir,
         pool=all_runs_pool,
@@ -412,13 +398,12 @@ def main(args=sys.argv[1:]):
 
             theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
 
-            theta, _, _ = em_algo.run(
+            theta, _, _, _ = em_algo.run(
                 theta=theta,
                 burn_in=burn_in,
+                base_num_e_samples=args.num_e_samples,
                 penalty_params=penalty_params,
                 max_em_iters=args.em_max_iters,
-                fuse_windows=args.fuse_windows,
-                fuse_center_only=args.fuse_center_only,
                 train_and_val=False,
                 intermed_file_prefix="%s/e_samples_%s_" % (args.intermediate_out_dir, penalty_param_str),
             )
@@ -504,17 +489,27 @@ def main(args=sys.argv[1:]):
     log.info("=== FINAL Best model: %s" % best_model)
     if not args.full_train:
         log.info("Begin a final training of the model")
-        # If we didn't do a full training for this best model, do it now
-        best_theta, theta_standard_error, _ = em_algo.run(
-            theta=best_model.theta,
-            burn_in=burn_in,
-            penalty_params=best_model.penalty_params,
-            max_em_iters=args.em_max_iters,
-            train_and_val=True,
-            intermed_file_prefix="%s/e_samples_%s_final_" % (args.intermediate_out_dir, penalty_param_str),
-            get_hessian=args.get_hessian,
-        )
-        best_fitted_prob_vector = None#MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
+        is_complete_fisher_ok = False
+        best_theta = best_model.theta
+        # If the complete fisher matrix is not singular, try again?
+        num_final_iters = 1 if not args.get_hessian else 5
+        for i in range(num_final_iters):
+            # If we didn't do a full training for this best model, do it now
+            best_theta, theta_standard_error, is_complete_fisher_ok, init_orders = em_algo.run(
+                theta=best_theta,
+                init_orders=None if i == 0 else init_orders, # re-use init_orders if running again
+                burn_in=burn_in,
+                base_num_e_samples=args.num_e_samples * (i + 1),
+                penalty_params=best_model.penalty_params,
+                max_em_iters=args.em_max_iters,
+                train_and_val=True,
+                intermed_file_prefix="%s/e_samples_%s_final%d_" % (args.intermediate_out_dir, penalty_param_str, i),
+                get_hessian=args.get_hessian,
+            )
+            if theta_standard_error is not None:
+                break
+
+        best_fitted_prob_vector = None
         best_model = MethodResults(
             best_model.penalty_params,
             best_theta,

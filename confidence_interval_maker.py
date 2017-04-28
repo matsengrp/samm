@@ -13,6 +13,27 @@ class ConfidenceIntervalMaker:
         self.theta_mask = possible_theta_mask & ~zero_theta_mask
         self.theta_mask_flat = self.theta_mask.reshape((self.theta_mask.size,), order="F")
 
+    def _get_standard_error(self, information_matrix):
+        eigenvals = np.linalg.eigvals(information_matrix)
+        if np.all(np.abs(eigenvals) > 0):
+            variance_est = np.linalg.inv(information_matrix)
+            variance_est = np.diag(variance_est)
+            # Make sure that the variance estimate makes sense -- should be positive values only
+            if np.all(variance_est > 0):
+                standard_errors = np.sqrt(variance_est)
+                return eigenvals, variance_est, standard_errors
+            else:
+                return eigenvals, variance_est, None
+        else:
+            return eigenvals, None, None
+
+    def _print_standard_error_est(self, eigenvals, variance_est, se_est, print_prefix=""):
+        log.info("%s eigvals %f" % (print_prefix, np.min(np.abs(eigenvals))))
+        if variance_est is not None:
+            log.info("%s variance est %f, %f, %f" % (print_prefix, np.median(variance_est), np.max(variance_est), np.min(variance_est)))
+        if se_est is not None:
+            log.info("%s std error est %f, %f, %f" % (print_prefix, np.median(se_est), np.max(se_est), np.min(se_est)))
+
     def run(self, theta, e_step_samples, problem, z=1.96):
         """
         The asymptotic covariance matrix of theta is the inverse of the fisher's information matrix
@@ -23,27 +44,22 @@ class ConfidenceIntervalMaker:
         @return standard error estimates for the theta parameters
         """
         log.info("Obtaining Confidence Interval Estimates...")
-        sample_obs_information, _ = problem.get_hessian(theta)
-        # Need to filter out all the theta values that are constant (negative infinity or zero constants)
-        sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
+        obs_fisher_info, complete_fisher_info, _ = problem.get_hessian(theta)
+        complete_fisher_info = (complete_fisher_info[self.theta_mask_flat,:])[:,self.theta_mask_flat]
+        complete_eigenvals, complete_variance_est, complete_standard_errors = self._get_standard_error(complete_fisher_info)
+        self._print_standard_error_est(complete_eigenvals, complete_variance_est, complete_standard_errors, print_prefix="Complete")
+        is_complete_fisher_ok = complete_standard_errors is not None
 
-        # Make sure that we can take an inverse -- need eigenvalues to be nonzero
-        eigenvals = np.linalg.eigvals(sample_obs_information)
-        log.info("np.linalg.eigvals %s" % eigenvals)
-        if np.all(np.abs(np.linalg.eigvals(sample_obs_information)) > 0):
-            variance_est = np.linalg.inv(sample_obs_information)
+        obs_fisher_info = (obs_fisher_info[self.theta_mask_flat,:])[:,self.theta_mask_flat]
+        obs_eigenvals, obs_variance_est, obs_standard_errors = self._get_standard_error(obs_fisher_info)
+        self._print_standard_error_est(obs_eigenvals, obs_variance_est, obs_standard_errors, print_prefix="Observed")
 
-            # Make sure that the variance estimate makes sense -- should be positive values only
-            if np.all(np.diag(variance_est) > 0):
-                standard_errors = np.sqrt(np.diag(variance_est))
-                conf_ints = self._create_confidence_intervals(standard_errors, theta, z)
-                log.info(self._get_confidence_interval_print_lines(conf_ints))
-                return standard_errors
-            else:
-                log.info("Variance estimates are negative %s" % np.diag(variance_est))
-        else:
-            log.info("Confidence interval: observation matrix is singular")
-        return None
+        if obs_standard_errors is not None:
+            conf_ints = self._create_confidence_intervals(obs_standard_errors, theta, z)
+            log.info(self._get_confidence_interval_print_lines(conf_ints))
+            return obs_standard_errors, is_complete_fisher_ok
+
+        return None, is_complete_fisher_ok
 
     def _create_confidence_intervals(self, standard_errors, theta, z=1.96):
         """

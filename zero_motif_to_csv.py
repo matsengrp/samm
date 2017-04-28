@@ -50,6 +50,7 @@ def main(args=sys.argv[1:]):
         theta = pickle.load(f)[0]
 
     # Construct the lines in the csv file
+    assert(theta.shape[0] == len(feat_generator.motif_list))
     csv_lines = []
     for i in range(theta.shape[0]):
         motif = feat_generator.motif_list[i]

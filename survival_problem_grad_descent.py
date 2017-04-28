@@ -155,6 +155,11 @@ class SurvivalProblemCustom(SurvivalProblem):
             g = g.reshape((g.size, 1), order="F")
             expected_scores[sample_label] += g
 
+        tot_grad_log_lik = 0
+        for g in grad_log_lik:
+            tot_grad_log_lik += g
+        log.info("tot_grad_log_lik %f" % np.linalg.norm(tot_grad_log_lik))
+
         # Calculate the score score (second summand)
         num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
         batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
@@ -180,7 +185,8 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained Hessian %s" % (time.time() - st))
 
         fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
-        return fisher_info, -1.0/self.num_samples * hessian_sum
+        complete_fisher_info = -1.0/self.num_reps_per_obs * hessian_sum
+        return fisher_info, complete_fisher_info, -1.0/self.num_samples * hessian_sum
 
     def _get_gradient_log_lik(self, theta):
         """

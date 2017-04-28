@@ -10,7 +10,7 @@ from profile_support import profile
 from confidence_interval_maker import ConfidenceIntervalMaker
 
 class MCMC_EM:
-    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, possible_theta_mask, zero_theta_mask, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', pool=None):
+    def __init__(self, train_data, val_data, feat_generator, sampler_cls, problem_solver_cls, possible_theta_mask, zero_theta_mask, max_m_iters=500, num_jobs=1, scratch_dir='_output', pool=None):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param feat_generator: an instance of a FeatureGenerator
@@ -24,7 +24,6 @@ class MCMC_EM:
         self.val_data = val_data
         self.feat_generator = feat_generator
         self.motif_list = self.feat_generator.motif_list
-        self.base_num_e_samples = base_num_e_samples
         self.max_m_iters = max_m_iters
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
@@ -35,7 +34,7 @@ class MCMC_EM:
         self.scratch_dir = scratch_dir
         self.per_target_model = possible_theta_mask.shape[1] == NUM_NUCLEOTIDES + 1
 
-    def run(self, theta, penalty_params=[1], fuse_windows=[], fuse_center_only=False, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, train_and_val=False, intermed_file_prefix="", get_hessian=False):
+    def run(self, theta, penalty_params=[1], init_orders=None, max_em_iters=10, burn_in=1, base_num_e_samples=10, diff_thres=1e-6, max_e_samples=20, train_and_val=False, intermed_file_prefix="", get_hessian=False):
         """
         @param theta: initial value for theta in MCMC-EM
         @param penalty_params: the coefficient(s) for the penalty function
@@ -45,11 +44,14 @@ class MCMC_EM:
         @param max_e_samples: maximum number of e-samples to grab per observed sequence
         @param train_and_val: whether to train on both train and validation data
         """
+        self.base_num_e_samples = base_num_e_samples
+
         st = time.time()
         observed_data = self.train_data + self.val_data if train_and_val else self.train_data
         num_data = len(observed_data)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
-        init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in observed_data]
+        if init_orders is None:
+            init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in observed_data]
         all_traces = []
         # burn in only at the very beginning
         for run in range(max_em_iters):
@@ -101,8 +103,6 @@ class MCMC_EM:
                     self.per_target_model,
                     possible_theta_mask=self.possible_theta_mask,
                     zero_theta_mask=self.zero_theta_mask,
-                    fuse_windows=fuse_windows,
-                    fuse_center_only=fuse_center_only,
                     pool=self.pool,
                 )
 
@@ -125,7 +125,6 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-
             # Save the e-step samples if we want to analyze later on
             e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
             log.info("Pickling E-step samples %s" % e_sample_file_name)
@@ -139,7 +138,8 @@ class MCMC_EM:
 
         if get_hessian:
             ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
-            theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
+            theta_standard_error, is_complete_fisher_ok = ci_maker.run(theta, e_step_samples, problem)
         else:
             theta_standard_error = None
-        return theta, theta_standard_error, all_traces
+            is_complete_fisher_ok = None
+        return theta, theta_standard_error, is_complete_fisher_ok, init_orders
