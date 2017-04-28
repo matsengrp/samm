@@ -63,8 +63,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
         # we'll absorb most of our offsetting into changing the left flank starting position
-        left_flank_start = len(left_flank) - self.left_motif_flank_len
-        left_flank = left_flank[left_flank_start:]
+        left_flank = left_flank[self.hier_offset:]
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
         for pos in do_feat_vec_pos:
             feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str, seq_len, left_flank, right_flank)
@@ -145,9 +144,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         left_flank = seq_mut_order.obs_seq_mutation.left_flank
         right_flank = seq_mut_order.obs_seq_mutation.right_flank
-        left_flank_start = len(left_flank) - self.left_motif_flank_len
-        assert(left_flank_start >= 0)
-        left_flank = left_flank[left_flank_start:]
+        assert(self.hier_offset >= 0)
+        left_flank = left_flank[self.hier_offset:]
 
         seq_len = seq_mut_order.obs_seq_mutation.seq_len
         feat_dict_prev = dict()
@@ -176,9 +174,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         feat_mutation_steps = []
 
         old_mutation_pos = None
-        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq_with_flanks
-        left_flank_start = len(seq_mut_order.obs_seq_mutation.left_flank) - self.left_motif_flank_len
-        intermediate_seq = intermediate_seq[left_flank_start:]
+        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq_with_flanks[self.hier_offset:]
 
         feat_dict_prev = dict()
         already_mutated_pos = set()
@@ -231,8 +227,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         old_mutation_pos = None
         feat_dict_prev = dict()
         flanked_seq = seq_mut_order.get_seq_at_step(update_step_start, flanked=True)
-        left_flank_start = len(seq_mut_order.obs_seq_mutation.left_flank) - self.left_motif_flank_len
-        flanked_seq = flanked_seq[left_flank_start:]
+        flanked_seq = flanked_seq[self.hier_offset:]
 
         already_mutated_pos = set(seq_mut_order.mutation_order[:update_step_start])
         for mutation_step in range(update_step_start, seq_mut_order.obs_seq_mutation.num_mutations):

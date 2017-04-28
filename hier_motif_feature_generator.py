@@ -24,10 +24,8 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
 
         # Find the maximum left and right motif flank lengths to pass to SubmotifFeatureGenerator
         # in order to update all the relevant features
-        for motif_len, left_flanks in zip(self.motif_lens, left_motif_flank_len_list):
-            if motif_len == self.max_motif_len:
-                self.max_left_motif_flank_len = max(left_flanks)
-                self.max_right_motif_flank_len = self.motif_len - min(left_flanks) - 1
+        self.max_left_motif_flank_len = max(sum(left_motif_flank_len_list, []))
+        self.max_right_motif_flank_len = self.motif_len - min(sum(left_motif_flank_len_list, [])) - 1
 
         # Create list of feature generators for different motif lengths and different flank lengths
         self.feat_gens = []
@@ -109,12 +107,10 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         first_mut_feats = []
         multi_feat_mut_step = MultiFeatureMutationStep()
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            # determine where the left flank should start for this particular feature generator
-            left_flank_start = len(seq_mut_order.obs_seq_mutation.left_flank) - feat_gen.left_motif_flank_len
             mut_pos_feat, mut_step = feat_gen.get_shuffled_mutation_steps_delta(
                 seq_mut_order,
                 update_step,
-                flanked_seq[left_flank_start:],
+                flanked_seq[feat_gen.hier_offset:],
                 already_mutated_pos,
             )
             if mut_pos_feat is not None:

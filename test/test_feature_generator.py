@@ -143,6 +143,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         left_motif_flank_len = 1
         feat_generator1 = SubmotifFeatureGenerator(motif_len=motif_len,
                 left_motif_flank_len=left_motif_flank_len,
+                hier_offset=max(left_flank_lens) - left_motif_flank_len,
                 left_update_region=max(left_flank_lens),
                 right_update_region=motif_len - 1 - min(left_flank_lens))
         obs_seq_mut1 = feat_generator1.create_base_features(
@@ -162,6 +163,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         left_motif_flank_len = 2
         feat_generator2 = SubmotifFeatureGenerator(motif_len=motif_len,
                 left_motif_flank_len=left_motif_flank_len,
+                hier_offset=max(left_flank_lens) - left_motif_flank_len,
                 left_update_region=max(left_flank_lens),
                 right_update_region=motif_len - 1 - min(left_flank_lens))
         obs_seq_mut2 = feat_generator2.create_base_features(
