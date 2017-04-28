@@ -1,13 +1,12 @@
 """
 Given a pickled output file with theta values, convert to a zero motif csv file
 """
+import os
 import numpy as np
-import subprocess
 import sys
 import argparse
 import pickle
 import csv
-import itertools
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from common import ZERO_THRES
@@ -22,15 +21,17 @@ def parse_args():
         help='pickle file with theta values')
     parser.add_argument('--output-csv',
         type=str,
-        help='where to put csv output file',
-        default='_output/zero_motifs.csv')
+        help='where to put csv output file - will be in the same folder',
+        default='zero_motifs.csv')
     parser.add_argument('--motif-lens',
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
         default='3,5,7')
 
     args = parser.parse_args()
-
+    args.output_path = os.path.dirname(os.path.realpath(args.input_pkl))
+    args.output_csv = os.path.join(args.output_path, args.output_csv)
+    print "Output csv file", args.output_csv
     return args
 
 def main(args=sys.argv[1:]):

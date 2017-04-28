@@ -154,8 +154,10 @@ def parse_args():
         type=str,
         help="motifs with constant zero theta value, csv file",
         default='')
+    parser.add_argument("--get-hessian",
+        action='store_true')
 
-    parser.set_defaults(per_target_model=False, full_train=False, chibs=False, fuse_center_only=False)
+    parser.set_defaults(per_target_model=False, full_train=False, chibs=False, fuse_center_only=False, get_hessian=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -457,29 +459,33 @@ def main(args=sys.argv[1:]):
             log.info("==== FINAL theta, %s====" % curr_model_results)
             log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.motif_len))
 
-            if best_model_in_list is None or log_lik_ratio > 0:
+            if args.tuning_sample_ratio:
+                if best_model_in_list is None or log_lik_ratio > 0:
+                    best_model_in_list = curr_model_results
+                    log.info("===== Best model so far %s" % best_model_in_list)
+                    if val_set_evaluator is not None:
+                        num_val_samples = val_set_evaluator.num_samples
+                    else:
+                        num_val_samples = args.num_val_samples
+
+                    val_set_evaluator = LikelihoodComparer(
+                        val_set,
+                        feat_generator,
+                        theta_ref=best_model_in_list.theta,
+                        num_samples=num_val_samples,
+                        burn_in=args.num_val_burnin,
+                        num_jobs=args.num_jobs,
+                        scratch_dir=args.scratch_dir,
+                        pool=all_runs_pool,
+                    )
+                elif log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
+                    # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
+                    log.info("Stop trying penalty parameters for this penalty parameter list")
+                    break
+            elif best_model_in_list is None:
                 best_model_in_list = curr_model_results
                 log.info("===== Best model so far %s" % best_model_in_list)
 
-                if val_set_evaluator is not None:
-                    num_val_samples = val_set_evaluator.num_samples
-                else:
-                    num_val_samples = args.num_val_samples
-
-                val_set_evaluator = LikelihoodComparer(
-                    val_set,
-                    feat_generator,
-                    theta_ref=best_model_in_list.theta,
-                    num_samples=num_val_samples,
-                    burn_in=args.num_val_burnin,
-                    num_jobs=args.num_jobs,
-                    scratch_dir=args.scratch_dir,
-                    pool=all_runs_pool,
-                )
-            elif args.tuning_sample_ratio and log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
-                # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
-                log.info("Stop trying penalty parameters for this penalty parameter list")
-                break
         best_models.append(best_model_in_list)
 
     # A greedy comparison
@@ -506,7 +512,7 @@ def main(args=sys.argv[1:]):
             max_em_iters=args.em_max_iters,
             train_and_val=True,
             intermed_file_prefix="%s/e_samples_%s_final_" % (args.intermediate_out_dir, penalty_param_str),
-            get_hessian=True,
+            get_hessian=args.get_hessian,
         )
         best_fitted_prob_vector = None#MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
         best_model = MethodResults(

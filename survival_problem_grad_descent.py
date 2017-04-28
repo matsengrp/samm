@@ -125,6 +125,8 @@ class SurvivalProblemCustom(SurvivalProblem):
     def get_hessian(self, theta, batch_factor=4):
         """
         Uses Louis's method to calculate the information matrix of the observed data
+        IMPORTANT: all the parallel workers that produce square matrices pre-batch jobs! We do this because otherwise memory consumption will go crazy.
+
         @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
         """
         def _get_parallel_sum(worker_list, shared_obj):
@@ -138,12 +140,14 @@ class SurvivalProblemCustom(SurvivalProblem):
                 tot += r
             return tot
 
+        st = time.time()
         rand_seed = get_randint()
         worker_list = [
             GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
         grad_log_lik = [worker.run(theta) for worker in worker_list]
         sorted_sample_labels = sorted(list(set(self.sample_labels)))
+        log.info("Obtained gradients %s" % (time.time() - st))
 
         # Get the expected scores
         expected_scores = {label: 0 for label in sorted_sample_labels}
@@ -155,21 +159,25 @@ class SurvivalProblemCustom(SurvivalProblem):
         num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
         batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
         score_score_worker_list = [
-            ScoreScoreCalc(rand_seed + i, [grad_log_lik[i] for i in idxs]) for idxs in batched_idxs
+            ScoreScoreWorker(rand_seed + i, [grad_log_lik[j] for j in idxs]) for i, idxs in enumerate(batched_idxs)
         ]
         tot_score_score = _get_parallel_sum(score_score_worker_list, None)
+        log.info("Obtained score scores %s" % (time.time() - st))
 
         # Calculate the cross scores (third summand)
         all_pairs = [(label1, label2) for i, label1 in enumerate(sorted_sample_labels) for label2 in sorted_sample_labels[i + 1:]]
         batched_pairs = get_batched_list(all_pairs, num_batches)
-        expected_score_worker_list = [ScoreCrossCalc(rand_seed + i, pairs) for pairs in batched_pairs]
+        expected_score_worker_list = [ScoreCrossWorker(rand_seed + i, pairs) for pairs in batched_pairs]
         tot_cross_expected_scores = _get_parallel_sum(expected_score_worker_list, expected_scores)
+        log.info("Obtained cross scores %s" % (time.time() - st))
 
         # Calculate the hessian (first summand)
+        assert(len(self.precalc_data) == len(grad_log_lik))
         hessian_worker_list = [
-            HessianWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
+            HessianWorker(rand_seed + i, [self.precalc_data[j] for j in idxs], self.per_target_model) for i, idxs in enumerate(batched_idxs)
         ]
         hessian_sum = _get_parallel_sum(hessian_worker_list, theta)
+        log.info("Obtained Hessian %s" % (time.time() - st))
 
         fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
         return fisher_info, -1.0/self.num_samples * hessian_sum
@@ -447,50 +455,6 @@ class GradientWorker(ParallelWorker):
     def __str__(self):
         return "GradientWorker %s" % self.sample_data.obs_seq_mutation
 
-class HessianWorker(ParallelWorker):
-    """
-    Stores the information for calculating gradient
-    """
-    def __init__(self, seed, sample_data, per_target_model):
-        """
-        @param sample_data: class SamplePrecalcData
-        """
-        self.seed = seed
-        self.sample_data = sample_data
-        self.per_target_model = per_target_model
-
-    def run_worker(self, theta):
-        """
-        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
-        @return the gradient of the log likelihood for this sample
-        """
-        return SurvivalProblemCustom.get_hessian_per_sample(theta, self.sample_data, self.per_target_model)
-
-    def __str__(self):
-        return "GradientWorker %s" % self.sample_data.init_feat_counts
-
-class HessianWorker(ParallelWorker):
-    """
-    Stores the information for calculating gradient
-    """
-    def __init__(self, seed, sample_data, per_target_model):
-        """
-        @param sample_data: class SamplePrecalcData
-        """
-        self.seed = seed
-        self.sample_data = sample_data
-        self.per_target_model = per_target_model
-
-    def run_worker(self, theta):
-        """
-        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
-        @return the gradient of the log likelihood for this sample
-        """
-        return SurvivalProblemCustom.get_hessian_per_sample(theta, self.sample_data, self.per_target_model)
-
-    def __str__(self):
-        return "GradientWorker %s" % self.sample_data.init_feat_counts
-
 class ObjectiveValueWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
@@ -513,7 +477,30 @@ class ObjectiveValueWorker(ParallelWorker):
     def __str__(self):
         return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
 
-class ScoreScoreCalc(ParallelWorker):
+class HessianWorker(ParallelWorker):
+    """
+    Stores the information for calculating gradient
+    """
+    def __init__(self, seed, sample_datas, per_target_model):
+        """
+        @param sample_data: class SamplePrecalcData
+        """
+        self.seed = seed
+        self.sample_datas = sample_datas
+        self.per_target_model = per_target_model
+
+    def run_worker(self, theta):
+        """
+        @param exp_thetaT: theta is where to take the gradient of the total log likelihood, exp_thetaT is exp(theta).T
+        @return the gradient of the log likelihood for this sample
+        """
+        tot_hessian = 0
+        for s in self.sample_datas:
+            h = SurvivalProblemCustom.get_hessian_per_sample(theta, s, self.per_target_model)
+            tot_hessian += h
+        return tot_hessian
+
+class ScoreScoreWorker(ParallelWorker):
     """
     Calculate the product of scores
     """
@@ -534,10 +521,7 @@ class ScoreScoreCalc(ParallelWorker):
             ss += g * g.T
         return ss
 
-    def __str__(self):
-        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
-
-class ScoreCrossCalc(ParallelWorker):
+class ScoreCrossWorker(ParallelWorker):
     """
     Calculate the product of expected scores between different observations (indexed by idx pairs)
     """
@@ -557,6 +541,3 @@ class ScoreCrossCalc(ParallelWorker):
         for label1, label2 in self.idx_pair_list:
             s += expected_scores[label1] * expected_scores[label2].T
         return s
-
-    def __str__(self):
-        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
