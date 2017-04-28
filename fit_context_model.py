@@ -77,10 +77,14 @@ def parse_args():
         type=str,
         help='length of motif (must be odd)',
         default='5')
-    parser.add_argument('--left-flank-lens',
+    parser.add_argument('--positions-mutating',
         type=str,
-        help='length of left motif flank determining which position is mutating; comma-separated within a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will 3mer with first and second mutating position and 5mer with first, second and third',
-        default='2')
+        help="""
+        length of left motif flank determining which position is mutating; comma-separated within
+        a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
+        be a 3mer with first and second mutating position and 5mer with first, second and third
+        """,
+        default=None)
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -193,15 +197,20 @@ def parse_args():
 
     args.max_motif_len = max(args.motif_lens)
 
-    # Find the maximum left and right flanks of the motif with the largest length in the
-    # hierarchy in order to process the data correctly
-    args.left_flank_lens = [[int(m) for m in left_flanks.split(',')] for left_flanks in args.left_flank_lens.split(':')]
-    for motif_len, left_flanks in zip(args.motif_lens, args.left_flank_lens):
-        if motif_len == args.max_motif_len:
-            args.max_left_flank = max(left_flanks)
-            args.max_right_flank = motif_len - 1 - min(left_flanks)
-        for m in left_flanks:
-            assert(m in range(motif_len))
+    if args.positions_mutating is None:
+        # default to central base mutating
+        args.max_left_flank = None
+        args.max_right_flank = None
+    else:
+        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
+        for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+
+        # Find the maximum left and right flanks of the motif with the largest length in the
+        # hierarchy in order to process the data correctly
+        args.max_left_flank = max(sum(args.positions_mutating, []))
+        args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -353,7 +362,7 @@ def main(args=sys.argv[1:]):
     feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=args.motif_lens,
         motifs_to_remove=motifs_to_remove,
-        left_motif_flank_len_list=args.left_flank_lens,
+        left_motif_flank_len_list=args.positions_mutating,
     )
 
     log.info("Reading data")
