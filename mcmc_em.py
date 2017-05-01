@@ -89,7 +89,7 @@ class MCMC_EM:
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
-                e_step_labels += [i for i in range(len(init_orders)) for k in range(num_e_samples)]
+                e_step_labels += [i for i, orders in enumerate(sampled_orders_list) for o in orders]
 
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
@@ -126,11 +126,6 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-            if get_hessian:
-                ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
-                theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
-            else:
-                theta_standard_error = None
 
             # Save the e-step samples if we want to analyze later on
             e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
@@ -143,4 +138,9 @@ class MCMC_EM:
                 break
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
+        if get_hessian:
+            ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
+            theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
+        else:
+            theta_standard_error = None
         return theta, theta_standard_error, all_traces

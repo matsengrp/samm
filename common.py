@@ -66,6 +66,15 @@ INT8_MAX = 127
 
 FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
 
+def get_batched_list(my_list, num_batches):
+    batch_size = max(len(my_list)/num_batches, 1)
+    batched_list = []
+    for i in range(num_batches + 1):
+        additional_batch = my_list[i * batch_size: (i+1) * batch_size]
+        if len(additional_batch):
+            batched_list.append(additional_batch)
+    return batched_list
+
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
