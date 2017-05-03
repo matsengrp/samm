@@ -1,6 +1,7 @@
 plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
                           style = c("hedgehog", "bar"), size = 1,
-                          bar.size = 0, ...)
+                          bar.size = 0,
+                          mutating.position = NULL, ...)
 {
     # Plots bar chart of mutabilities
     #
@@ -36,9 +37,17 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
         stop("Motif length must be odd and greater than one.")
     }
     data_cols <- paste0("pos", 1:motif_len)
-    motif_half_len <- motif_len/2 - .5
-    center_nuc_col <- paste0('pos', motif_half_len+1)
-    flank_cols <- data_cols[-motif_half_len-1]
+    # !! change
+    if(is.null(mutating.position)) {
+        # mutate center nucleotide
+        left_motif_len <- motif_len %/% 2
+        center_nuc_col <- paste0('pos', left_motif_len+1)
+        flank_cols <- data_cols[-left_motif_len-1]
+    } else {
+        left_motif_len <- mutating.position
+        center_nuc_col <- paste0('pos', left_motif_len+1)
+        flank_cols <- data_cols[-left_motif_len-1]
+    }
     colnames(mut_positions) <- data_cols
     mut_df <- data.frame(word = mut_words, score = mut_scores, mut_positions)
 
@@ -55,7 +64,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     score_scale <- 15
     text_offset <- -5.6
     motif_colors <- setNames(c("#4daf4a", "#e41a1c", "#094d85",
-        "#999999"), c("WA/TW", "WRCY/RGYW", "SYC/GRS", "Neutral"))
+        "#999999"), c("WA/TW", "WRC/GYW", "SYC/GRS", "Neutral"))
     dna_colors <- setNames(c("#7bce77", "#ff9b39", "#f04949",
         "#5796ca", "#c4c4c4"), c("A", "C", "G", "T", "N"))
 
@@ -68,7 +77,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     } else {
         grep_exp <- list(
             c('.[AT]A..','..T[AT].', 'WA/TW'),
-            c('[AT][GA]C..','..G[CT][AT]', 'WRCY/RGYW'),
+            c('[AT][GA]C..','..G[CT][AT]', 'WRC/GYW'),
             c('[CG][CT]C..','..G[GA][CG]', 'SYC/GRS'))
         # number of dots we need to add to each end
         n_extra <- (motif_len - 5)/2
@@ -79,7 +88,8 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
             mut_df$motif[grepl(combined_grep, mut_df$word,
                 perl = TRUE)] <- grep_val[3]
         }
-        grep_levels <- c('WA/TW', 'WRCY/RGYW', 'SYC/GRS', 'Neutral')
+
+        grep_levels <- c('WA/TW', 'WRC/GYW', 'SYC/GRS', 'Neutral')
     }
     mut_df$motif <- factor(mut_df$motif, levels = grep_levels)
     mut_df <- mut_df[mut_df[,center_nuc_col] %in% nucleotides, ]
@@ -98,13 +108,13 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     plot_list <- list()
     for (center_nuc in nucleotides) {
         sub_df <- mut_df[mut_df[,center_nuc_col] == center_nuc, ]
-        if (center_nuc %in% c("A", "C")) {
-            # 3' for A/C
+        if ((center_nuc %in% c("A", "C") & left_motif_len == motif_len %/% 2) | left_motif_len < motif_len %/% 2) {
+            # 3' for A/C or offset
             sub_df <- dplyr::arrange_(sub_df, .dots = flank_cols)
             sub_df$x <- -.5 + 1:nrow(sub_df)
         }
-        else if (center_nuc %in% c("G", "T")) {
-            # 5' for G/T
+        else if ((center_nuc %in% c("G", "T") & left_motif_len == motif_len %/% 2) | left_motif_len > motif_len %/% 2) {
+            # 5' for G/T or offset
             sub_df <- dplyr::arrange_(sub_df, .dots = rev(flank_cols))
             sub_df$x <- -.5 + 1:nrow(sub_df)
         }
@@ -182,7 +192,7 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
 
         # Plot nucleotide characters in their corresponding rectangles
         p1 <- p1 +
-              geom_text(data = sub_text[[motif_half_len+1]],
+              geom_text(data = sub_text[[left_motif_len+1]],
                         mapping = aes_string(x = "text_x",
                                              y = "text_y",
                                              label = "text_label"),
@@ -193,8 +203,8 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
                         fontface = 2)
 
         # Only plot at most two levels of text---otherwise a little busy
-        if (center_nuc %in% c("A", "C")) {
-            for (flank in 1:min(motif_half_len, 2)) {
+        if ((center_nuc %in% c("A", "C") & left_motif_len == motif_len %/% 2)) {
+            for (flank in 1:min(left_motif_len, 2)) {
                 p1 <- p1 +
                       geom_text(data = sub_text[[flank]],
                                 mapping = aes_string(x = "text_x",
@@ -206,8 +216,8 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
                                 size = 2 * size)
             }
         }
-        else if (center_nuc %in% c("G", "T")) {
-            for (flank in rev(1 + motif_len - 1:min(motif_half_len, 2))) {
+        else if ((center_nuc %in% c("G", "T") & left_motif_len == motif_len %/% 2)) {
+            for (flank in rev(1 + motif_len - 1:min(left_motif_len, 2))) {
                 p1 <- p1 +
                       geom_text(data = sub_text[[flank]],
                                 mapping = aes_string(x = "text_x",
