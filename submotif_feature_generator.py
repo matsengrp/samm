@@ -34,6 +34,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         assert(motif_len % 2 == 1)
         assert(left_motif_flank_len in range(motif_len))
+        assert(self.hier_offset >= 0)
 
         self.motif_len = motif_len
         self.left_motif_flank_len = left_motif_flank_len
@@ -144,7 +145,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         left_flank = seq_mut_order.obs_seq_mutation.left_flank
         right_flank = seq_mut_order.obs_seq_mutation.right_flank
-        assert(self.hier_offset >= 0)
         left_flank = left_flank[self.hier_offset:]
 
         seq_len = seq_mut_order.obs_seq_mutation.seq_len

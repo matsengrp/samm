@@ -44,6 +44,7 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
 
         feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
+        self.num_feat_gens = len(self.feat_gens)
 
         self.feature_vec_len = np.sum(feat_offsets)
         self.motif_list = []

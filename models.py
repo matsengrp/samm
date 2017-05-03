@@ -2,15 +2,13 @@ from common import mutate_string
 import numpy as np
 
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=1, right_flank_len=1):
+    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=None, right_flank_len=None):
         """
         @param start_seq: start sequence
         @param end_seq: ending sequence with mutations
         @param motif_len: needed to determine flanking ends/mutations to trim sequence
         @param left_flank_len: maximum left flank length for this motif length
         @param right_flank_len: maximum right flank length for this motif length
-
-        TODO: do we want any intermediate up/downstream motifs?
 
         This class goes through half the sequence forward and finds the position where
         there are motif_len/2 conserved nucleotides, and does the same in reverse.
@@ -26,6 +24,11 @@ class ObservedSequenceMutations:
 
         assert(len(start_seq) == len(end_seq))
         self.motif_len = motif_len
+
+        if left_flank_len is None:
+            left_flank_len = motif_len/2
+        if right_flank_len is None:
+            right_flank_len = motif_len/2
 
         start_idx = 0
         end_idx = len(start_seq)
@@ -60,6 +63,7 @@ class ObservedSequenceMutations:
                 self.mutation_pos_dict[i] = end_seq[i]
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
+        self.left_flank_len = len(self.left_flank)
         self.skipped_mutations = skipped_mutations
         self.start_seq = start_seq
         self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank

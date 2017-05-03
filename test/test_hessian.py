@@ -28,7 +28,7 @@ class Hessian_TestCase(unittest.TestCase):
             theta_num_col = 1
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        possible_theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
+        possible_theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape, feat_gen.mutating_pos_list)
         theta[~possible_theta_mask] = -np.inf
         zero_theta_mask = np.zeros((feat_gen.feature_vec_len, theta_num_col), dtype=bool)
 
