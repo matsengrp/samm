@@ -141,5 +141,5 @@ class MCMC_EM:
             ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
             variance_est = ci_maker.run(theta, e_step_samples, problem)
         else:
-            theta_standard_error = None
+            variance_est = None
         return theta, variance_est, all_traces
