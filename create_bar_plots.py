@@ -12,7 +12,7 @@ import itertools
 from itertools import izip
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from read_data import read_zero_motif_csv
-from common import ZSCORE_95
+from common import *
 
 def parse_args():
     ''' parse command line arguments '''
@@ -34,10 +34,10 @@ def parse_args():
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
         default='3,5,7')
-    parser.add_argument('--output-png',
+    parser.add_argument('--output-svg',
         type=str,
-        help='png file to save output to',
-        default='_output/out.png')
+        help='svg file to save output to',
+        default='_output/out.svg')
     parser.add_argument('--per-target-model',
         action='store_true')
 
@@ -62,7 +62,7 @@ def convert_to_csv(target, theta_vals, theta_lower, theta_upper, motif_lens):
             theta_upper.ravel(),
         ))
 
-def plot_theta(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx, output_png):
+def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx):
     full_theta_size = 4**args.max_motif_len
     full_theta = np.zeros(full_theta_size)
     theta_lower = np.zeros(full_theta_size)
@@ -111,7 +111,6 @@ def plot_theta(args, feat_generator, full_feat_generator, theta, covariance_est,
             standard_err_est = np.sqrt(var_est)
             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
             theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
-
     else:
         for i, m in enumerate(full_feat_generator.motif_list):
             if m in feat_generator.motif_dict:
@@ -120,14 +119,16 @@ def plot_theta(args, feat_generator, full_feat_generator, theta, covariance_est,
                 standard_err_est = np.sqrt(covariance_est[theta_idx, theta_idx])
                 theta_lower[i] = theta[theta_idx] - ZSCORE_95 * standard_err_est
                 theta_upper[i] = theta[theta_idx] + ZSCORE_95 * standard_err_est
+    return full_theta, theta_lower, theta_upper
 
+def plot_theta(args, full_theta, theta_lower, theta_upper, output_svg):
     convert_to_csv(args.output_csv, full_theta, theta_lower, theta_upper, [args.max_motif_len])
 
     # Call Rscript
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, args.output_csv, str(args.max_motif_len), output_png]
+    cmd = [command, script_file, args.output_csv, str(args.max_motif_len), output_svg]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
@@ -155,9 +156,21 @@ def main(args=sys.argv[1:]):
         covariance_est = pickle.load(f)[2]
         assert(theta.shape[0] == feat_generator.feature_vec_len)
 
+    # with open("_output/fisher_info_obs.pkl", "r") as f:
+    #     fisher_info1 = pickle.load(f)
+    #
+    #     possible_theta_mask = get_possible_motifs_to_targets(feat_generator.motif_list, theta.shape)
+    #     zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta.shape)
+    #     theta_mask = possible_theta_mask & ~zero_theta_mask
+    #     theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
+    #
+    #     sample_obs_information = (fisher_info1[theta_mask_flat,:])[:,theta_mask_flat]
+    #     covariance_est = np.linalg.inv(sample_obs_information)
+
     for col_idx in range(theta.shape[1]):
-        output_png = args.output_png.replace(".png", "%d.png" % col_idx)
-        plot_theta(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx, output_png)
+        output_svg = args.output_svg.replace(".png", "%d.png" % col_idx)
+        full_theta, theta_lower, theta_upper = get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx)
+        plot_theta(args, full_theta, theta_lower, theta_upper, output_svg)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -279,7 +279,8 @@ plotBarchart <- function (model, model_lower, model_upper, nucleotides = c("A", 
                     mapping = aes_string(x = "x",
                                          ymin = "lower",
                                          ymax = "upper"),
-                    width=.2
+                    width=0,
+                    size=0.25
                 )
         }
 
