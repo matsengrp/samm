@@ -139,7 +139,7 @@ class MCMC_EM:
 
         if get_hessian:
             ci_maker = ConfidenceIntervalMaker(self.feat_generator.motif_list, self.per_target_model, self.possible_theta_mask, self.zero_theta_mask)
-            theta_standard_error = ci_maker.run(theta, e_step_samples, problem)
+            variance_est = ci_maker.run(theta, e_step_samples, problem)
         else:
-            theta_standard_error = None
-        return theta, theta_standard_error, all_traces
+            variance_est = None
+        return theta, variance_est, all_traces
