@@ -1,4 +1,4 @@
-plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
+plotBarchart <- function (model, model_lower, model_upper, nucleotides = c("A", "C", "G", "T"),
                           style = c("hedgehog", "bar"), size = 1,
                           bar.size = 0, y_lim = c(-5, 5), rect_height=0.5, ...)
 {
@@ -40,7 +40,13 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
     center_nuc_col <- paste0('pos', motif_half_len+1)
     flank_cols <- data_cols[-motif_half_len-1]
     colnames(mut_positions) <- data_cols
-    mut_df <- data.frame(word = mut_words, score = mut_scores, mut_positions)
+    mut_df <- data.frame(
+        word = mut_words,
+        score = mut_scores,
+        lower = model_lower,
+        upper = model_upper,
+        mut_positions
+    )
 
     # Setting up plotting environment
     base_theme <- theme_bw() +
@@ -267,7 +273,14 @@ plotBarchart <- function (model, nucleotides = c("A", "C", "G", "T"),
                          stat = "identity",
                          position = "identity",
                          size = bar.size,
-                         width = 0.7)
+                         width = 0.7) +
+                geom_errorbar(
+                    data = sub_df[sub_df$lower != 0,],
+                    mapping = aes_string(x = "x",
+                                         ymin = "lower",
+                                         ymax = "upper"),
+                    width=.2
+                )
         }
 
         # Add plots to list

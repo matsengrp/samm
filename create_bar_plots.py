@@ -11,6 +11,8 @@ import itertools
 
 from itertools import izip
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from read_data import read_zero_motif_csv
+from common import ZSCORE_95
 
 def parse_args():
     ''' parse command line arguments '''
@@ -24,6 +26,10 @@ def parse_args():
         type=str,
         help='where to put csv output file',
         default='_output/out.csv')
+    parser.add_argument('--zero-motifs',
+        type=str,
+        help='where to put csv output file',
+        default='_output/zero_motifs.csv')
     parser.add_argument('--motif-lens',
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
@@ -32,12 +38,15 @@ def parse_args():
         type=str,
         help='png file to save output to',
         default='_output/out.png')
+    parser.add_argument('--per-target-model',
+        action='store_true')
+
 
     args = parser.parse_args()
 
     return args
 
-def convert_to_csv(target, mutabilities, motif_lens):
+def convert_to_csv(target, theta_vals, theta_lower, theta_upper, motif_lens):
     """
     Take pickle file and convert to csv for use in R
     """
@@ -46,32 +55,73 @@ def convert_to_csv(target, mutabilities, motif_lens):
 
     with open(str(target), 'wb') as f:
         writer = csv.writer(f)
-        writer.writerows(izip([motif.upper() for motif in motif_list], mutabilities.ravel()))
+        writer.writerows(izip(
+            [motif.upper() for motif in motif_list],
+            theta_vals.ravel(),
+            theta_lower.ravel(),
+            theta_upper.ravel(),
+        ))
 
-def plot_theta(args, feat_generator, full_motif_dict, theta, output_png):
+def plot_theta(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx, output_png):
+    full_theta_size = 4**args.max_motif_len
+    full_theta = np.zeros(full_theta_size)
+    theta_lower = np.zeros(full_theta_size)
+    theta_upper = np.zeros(full_theta_size)
+
     if len(args.motif_len_vals) > 1:
         # Combine the hierarchical thetas if that is the case
-        full_theta = np.zeros(4**args.max_motif_len)
+        theta_index_matches = {i:[] for i in range(full_theta_size)}
+
         start_idx = 0
         for f in feat_generator.feat_gens[:len(args.motif_len_vals)]:
             motif_list = f.motif_list
             diff_len = args.max_motif_len - f.motif_len
             for m_idx, m in enumerate(motif_list):
-                m_theta = theta[start_idx + m_idx]
+                raw_theta_idx = start_idx + m_idx
+                m_theta = theta[raw_theta_idx, 0]
+                if col_idx != 0:
+                    m_theta += theta[raw_theta_idx, col_idx]
+
                 if diff_len == 0:
-                    full_m_idx = full_motif_dict[m]
+                    full_m_idx = full_feat_generator.motif_dict[m]
                     full_theta[full_m_idx] += m_theta
+
+                    theta_index_matches[full_m_idx].append(raw_theta_idx)
+                    if col_idx != 0:
+                        theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
                 else:
                     flanks = itertools.product(["a", "c", "g", "t"], repeat=diff_len)
                     for f in flanks:
                         full_m = "".join(f[:diff_len/2]) + m + "".join(f[diff_len/2:])
-                        full_m_idx = full_motif_dict[full_m]
+                        full_m_idx = full_feat_generator.motif_dict[full_m]
                         full_theta[full_m_idx] += m_theta
-            start_idx += len(motif_list)
-    else:
-        full_theta = theta
 
-    convert_to_csv(args.output_csv, full_theta, [args.max_motif_len])
+                        theta_index_matches[full_m_idx].append(raw_theta_idx)
+                        if col_idx != 0:
+                            theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
+
+            start_idx += len(motif_list)
+
+        for full_theta_idx, matches in theta_index_matches.iteritems():
+            var_est = 0
+            for i in matches:
+                for j in matches:
+                    var_est += covariance_est[i,j]
+
+            standard_err_est = np.sqrt(var_est)
+            theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
+            theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
+
+    else:
+        for i, m in enumerate(full_feat_generator.motif_list):
+            if m in feat_generator.motif_dict:
+                theta_idx = feat_generator.motif_dict[m]
+                full_theta[i] = theta[theta_idx]
+                standard_err_est = np.sqrt(covariance_est[theta_idx, theta_idx])
+                theta_lower[i] = theta[theta_idx] - ZSCORE_95 * standard_err_est
+                theta_upper[i] = theta[theta_idx] + ZSCORE_95 * standard_err_est
+
+    convert_to_csv(args.output_csv, full_theta, theta_lower, theta_upper, [args.max_motif_len])
 
     # Call Rscript
     command = 'Rscript'
@@ -88,18 +138,26 @@ def main(args=sys.argv[1:]):
     args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_len_vals:
         assert(m % 2 == 1)
-
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_len_vals)
     args.max_motif_len = max(args.motif_len_vals)
-    full_motif_dict = feat_generator.feat_gens[-1].motif_dict
+
+    motifs_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
+    feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=args.motif_len_vals,
+        motifs_to_remove=motifs_to_remove,
+    )
+    full_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[args.max_motif_len],
+    )
 
     # Load fitted theta file
     with open(args.input_pkl, "r") as f:
         theta = pickle.load(f)[0]
+        covariance_est = pickle.load(f)[2]
+        assert(theta.shape[0] == feat_generator.feature_vec_len)
 
     for col_idx in range(theta.shape[1]):
         output_png = args.output_png.replace(".png", "%d.png" % col_idx)
-        plot_theta(args, feat_generator, full_motif_dict, theta[:,col_idx], output_png)
+        plot_theta(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx, output_png)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

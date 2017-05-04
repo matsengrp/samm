@@ -21,8 +21,9 @@ motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 # Read data and convert to format plotBarchart wants
 raw_data <- read.table(data_path, sep=',')
 log_mutabilities <- unlist(raw_data['V2'])
+log_mut_lower <- unlist(raw_data['V3'])
+log_mut_upper <- unlist(raw_data['V4'])
 names(log_mutabilities) <- unlist(raw_data['V1'])
-log_mutabilities <- log_mutabilities[!grepl("N", names(log_mutabilities))]
 
 # Plot for multiple nucleotides
 png(filename=output_file,
@@ -33,9 +34,9 @@ png(filename=output_file,
     res=128)
 center_nuc <- c('A', 'T', 'G', 'C')
 y_lim <- c(
-    floor(min(log_mutabilities)),
-    ceiling(max(log_mutabilities))
+    floor(min(log_mut_lower)),
+    ceiling(max(log_mut_upper))
 )
-plot_list <- plotBarchart(log_mutabilities, center_nuc, 'bar', bar.size=.25, y_lim = y_lim, rect_height = 0.45)
+plot_list <- plotBarchart(log_mutabilities, log_mut_lower, log_mut_upper, center_nuc, 'bar', bar.size=.25, y_lim = y_lim, rect_height = 0.45)
 do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
 dev.off()
