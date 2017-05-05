@@ -258,7 +258,7 @@ plotBarchart <- function (model, model_lower, model_upper, nucleotides = c("A", 
                       legend.position = "top") +
                 guides(color = guide_legend(override.aes = list(fill = sub_colors,
                                                                 linetype = 0))) +
-                ylab("Mutability") +
+                ylab("Theta") +
                 scale_x_continuous(expand = c(0, 1)) +
                 scale_y_continuous(limits = y_limits,
                                    breaks = y_breaks,
