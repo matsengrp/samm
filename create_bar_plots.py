@@ -168,7 +168,7 @@ def main(args=sys.argv[1:]):
     #     covariance_est = np.linalg.inv(sample_obs_information)
 
     for col_idx in range(theta.shape[1]):
-        output_svg = args.output_svg.replace(".png", "%d.png" % col_idx)
+        output_svg = args.output_svg.replace(".svg", "_col%d.svg" % col_idx)
         full_theta, theta_lower, theta_upper = get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx)
         plot_theta(args, full_theta, theta_lower, theta_upper, output_svg)
 
