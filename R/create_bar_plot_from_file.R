@@ -21,44 +21,16 @@ motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 # Read data and convert to format plotBarchart wants
 raw_data <- read.table(data_path, sep=',')
 log_mutabilities <- unlist(raw_data['V2'])
+log_mut_lower <- unlist(raw_data['V3'])
+log_mut_upper <- unlist(raw_data['V4'])
 names(log_mutabilities) <- unlist(raw_data['V1'])
-log_mutabilities <- log_mutabilities[!grepl("N", names(log_mutabilities))]
-
-# For hierarchical motif model, get the values of the max-mer by adding
-if (length(motif_lens) > 1) {
-    max_len <- max(motif_lens)
-    filtered_log_mutes <-
-        log_mutabilities[
-            sapply(names(log_mutabilities),
-                   function(mute_name) nchar(mute_name) == max_len)
-            ]
-    for (mute in names(filtered_log_mutes)) {
-        for (sub_len in head(motif_lens, -1)) {
-            filtered_log_mutes[mute] <-
-                filtered_log_mutes[mute] +
-                log_mutabilities[substr(mute,
-                                        max_len %/% 2 - sub_len %/% 2,
-                                        max_len %/% 2 + sub_len %/% 2)]
-        }
-    }
-    # We're plotting mutabilities, so we exponentiate and scale them
-    filtered_mutes <- exp(filtered_log_mutes) /
-        sum(exp(filtered_log_mutes), na.rm=TRUE)
-} else {
-    # We're plotting mutabilities, so we exponentiate and scale them
-    filtered_mutes <- exp(log_mutabilities) /
-        sum(exp(log_mutabilities), na.rm=TRUE)
-}
 
 # Plot for multiple nucleotides
-png(filename=output_file,
-    units="in", 
-    width=20, 
-    height=5, 
-    pointsize=12, 
-    res=128)
 center_nuc <- c('A', 'T', 'G', 'C')
-plot_list <- plotBarchart(filtered_mutes, center_nuc, 'bar', bar.size=.25)
-do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
-dev.off()
-
+y_lim <- c(
+    floor(min(log_mut_lower)),
+    ceiling(max(log_mut_upper))
+)
+plot_list <- plotBarchart(log_mutabilities, log_mut_lower, log_mut_upper, center_nuc, 'bar', bar.size=.25, y_lim = y_lim, rect_height = 0.45)
+image <- do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
+ggsave(file=output_file, plot=image, width=40, height=8)

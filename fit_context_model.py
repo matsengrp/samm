@@ -441,7 +441,7 @@ def main(args=sys.argv[1:]):
 
             theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
 
-            theta, _, _ = em_algo.run(
+            theta, variance_est, _ = em_algo.run(
                 theta=theta,
                 burn_in=burn_in,
                 penalty_params=penalty_params,
@@ -467,7 +467,7 @@ def main(args=sys.argv[1:]):
                     log.info("Comparing validation log likelihood for penalty param %s, log ratio: %f" % (penalty_param_str, log_lik_ratio))
 
                 if args.full_train:
-                    theta, _ = em_algo.run(
+                    theta, variance_est, _ = em_algo.run(
                         theta=theta,
                         burn_in=burn_in,
                         penalty_params=penalty_params,
@@ -478,7 +478,7 @@ def main(args=sys.argv[1:]):
 
             # Get the probabilities of the target nucleotides
             fitted_prob_vector = None #MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
-            curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector)
+            curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector, variance_est)
 
             # We save the final theta (potentially trained over all the data)
             results_list.append(curr_model_results)
@@ -535,7 +535,7 @@ def main(args=sys.argv[1:]):
     if not args.full_train:
         log.info("Begin a final training of the model")
         # If we didn't do a full training for this best model, do it now
-        best_theta, theta_standard_error, _ = em_algo.run(
+        best_theta, variance_est, _ = em_algo.run(
             theta=best_model.theta,
             burn_in=burn_in,
             penalty_params=best_model.penalty_params,
@@ -549,7 +549,7 @@ def main(args=sys.argv[1:]):
             best_model.penalty_params,
             best_theta,
             best_fitted_prob_vector,
-            theta_standard_error,
+            variance_est,
         )
 
     if all_runs_pool is not None:
@@ -558,7 +558,7 @@ def main(args=sys.argv[1:]):
         all_runs_pool.join()
 
     with open(args.out_file, "w") as f:
-        pickle.dump((best_model.theta, best_model.fitted_prob_vector, theta_standard_error), f)
+        pickle.dump((best_model.theta, best_model.fitted_prob_vector, best_model.variance_est), f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
