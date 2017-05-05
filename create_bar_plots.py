@@ -29,7 +29,7 @@ def parse_args():
     parser.add_argument('--zero-motifs',
         type=str,
         help='where to put csv output file',
-        default='_output/zero_motifs.csv')
+        default='')
     parser.add_argument('--motif-lens',
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
@@ -40,7 +40,10 @@ def parse_args():
         default='_output/out.pdf')
     parser.add_argument('--per-target-model',
         action='store_true')
-
+    parser.add_argument('--center-median',
+        action='store_true')
+    parser.add_argument('--no-conf-int',
+        action='store_true')
 
     args = parser.parse_args()
 
@@ -151,8 +154,15 @@ def main(args=sys.argv[1:]):
 
     # Load fitted theta file
     with open(args.input_pkl, "r") as f:
-        theta = pickle.load(f)[0]
-        covariance_est = pickle.load(f)[2]
+        pickled_tup = pickle.load(f)
+        theta = pickled_tup[0]
+        if args.center_median:
+            theta -= np.median(theta)
+
+        if args.no_conf_int:
+            covariance_est = np.zeros((theta.size, theta.size))
+        else:
+            covariance_est = pickled_tup[2]
         assert(theta.shape[0] == feat_generator.feature_vec_len)
 
     # with open("_output/fisher_info_obs.pkl", "r") as f:
