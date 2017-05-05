@@ -46,17 +46,10 @@ def parse_args():
 
     return args
 
-def convert_to_csv(target, theta_vals, theta_lower, theta_upper, motif_lens):
+def convert_to_csv(target, theta_vals, motif_list, theta_lower, theta_upper, motif_lens):
     """
     Take pickle file and convert to csv for use in R
     """
-    feat_generator = HierarchicalMotifFeatureGenerator(
-            motif_lens=motif_lens,
-            mutating_positions=mutating_positions,
-        )
-    motif_list = feat_generator.motif_list
-    mutating_pos_list = feat_generator.mutating_pos_list
-
     with open(str(target), 'wb') as f:
         writer = csv.writer(f)
         writer.writerows(izip(
@@ -77,8 +70,8 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
         theta_index_matches = {i:[] for i in range(full_theta_size)}
 
         start_idx = 0
-        for f in feat_generator.feat_gens[:len(args.motif_len_vals)]:
-            motif_list = f.motif_list
+        for feat_gen in feat_generator.feat_gens[:len(args.motif_len_vals)]:
+            motif_list = feat_gen.motif_list
             for m_idx, m in enumerate(motif_list):
 
                 raw_theta_idx = start_idx + m_idx
@@ -86,6 +79,7 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                 if col_idx != 0:
                     m_theta += theta[raw_theta_idx, col_idx]
 
+                diff_len = full_feat_generator.motif_lens[0] - feat_gen.motif_len
                 if diff_len == 0:
                     full_m_idx = full_feat_generator.motif_dict[m]
                     full_theta[full_m_idx] += m_theta
@@ -94,7 +88,7 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                     if col_idx != 0:
                         theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
                 else:
-                    flanks = itertools.product(["a", "c", "g", "t"], repeat=2*f.offset)
+                    flanks = itertools.product(["a", "c", "g", "t"], repeat=diff_len)
                     for f in flanks:
                         full_m = "".join(f[:diff_len/2]) + m + "".join(f[diff_len/2:])
                         full_m_idx = full_feat_generator.motif_dict[full_m]
@@ -125,8 +119,8 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                 theta_upper[i] = theta[theta_idx] + ZSCORE_95 * standard_err_est
     return full_theta, theta_lower, theta_upper
 
-def plot_theta(args, full_theta, theta_lower, theta_upper, output_pdf):
-    convert_to_csv(args.output_csv, full_theta, theta_lower, theta_upper, [args.max_motif_len])
+def plot_theta(args, full_theta, full_feat_generator, theta_lower, theta_upper, output_pdf):
+    convert_to_csv(args.output_csv, full_theta, full_feat_generator.motif_list, theta_lower, theta_upper, [args.max_motif_len])
 
     # Call Rscript
     command = 'Rscript'
@@ -164,7 +158,7 @@ def main(args=sys.argv[1:]):
     # with open("_output/fisher_info_obs.pkl", "r") as f:
     #     fisher_info1 = pickle.load(f)
     #
-    #     possible_theta_mask = get_possible_motifs_to_targets(feat_generator.motif_list, theta.shape)
+    #     possible_theta_mask = get_possible_motifs_to_targets(feat_generator.motif_list, theta.shape, feat_generator.mutating_pos_list)
     #     zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta.shape)
     #     theta_mask = possible_theta_mask & ~zero_theta_mask
     #     theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
@@ -175,7 +169,7 @@ def main(args=sys.argv[1:]):
     for col_idx in range(theta.shape[1]):
         output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
         full_theta, theta_lower, theta_upper = get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx)
-        plot_theta(args, full_theta, theta_lower, theta_upper, output_pdf)
+        plot_theta(args, full_theta, full_feat_generator, theta_lower, theta_upper, output_pdf)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
