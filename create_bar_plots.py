@@ -152,19 +152,19 @@ def main(args=sys.argv[1:]):
     # Load fitted theta file
     with open(args.input_pkl, "r") as f:
         theta = pickle.load(f)[0]
-        # covariance_est = pickle.load(f)[2]
+        covariance_est = pickle.load(f)[2]
         assert(theta.shape[0] == feat_generator.feature_vec_len)
 
-    with open("_output/fisher_info_obs.pkl", "r") as f:
-        fisher_info1 = pickle.load(f)
-
-        possible_theta_mask = get_possible_motifs_to_targets(feat_generator.motif_list, theta.shape, feat_generator.mutating_pos_list)
-        zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta.shape)
-        theta_mask = possible_theta_mask & ~zero_theta_mask
-        theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
-
-        sample_obs_information = (fisher_info1[theta_mask_flat,:])[:,theta_mask_flat]
-        covariance_est = np.linalg.inv(sample_obs_information)
+    # with open("_output/fisher_info_obs.pkl", "r") as f:
+    #     fisher_info1 = pickle.load(f)
+    #
+    #     possible_theta_mask = get_possible_motifs_to_targets(feat_generator.motif_list, theta.shape, feat_generator.mutating_pos_list)
+    #     zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta.shape)
+    #     theta_mask = possible_theta_mask & ~zero_theta_mask
+    #     theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
+    #
+    #     sample_obs_information = (fisher_info1[theta_mask_flat,:])[:,theta_mask_flat]
+    #     covariance_est = np.linalg.inv(sample_obs_information)
 
     for col_idx in range(theta.shape[1]):
         output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
