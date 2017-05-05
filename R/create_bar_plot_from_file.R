@@ -33,4 +33,4 @@ y_lim <- c(
 )
 plot_list <- plotBarchart(log_mutabilities, log_mut_lower, log_mut_upper, center_nuc, 'bar', bar.size=.25, y_lim = y_lim, rect_height = 0.45)
 image <- do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
-ggsave(file=output_file, plot=image, width=40, height=8)
+ggsave(file=output_file, plot=image, width=30, height=8)

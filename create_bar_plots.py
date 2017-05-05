@@ -34,10 +34,10 @@ def parse_args():
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
         default='3,5,7')
-    parser.add_argument('--output-svg',
+    parser.add_argument('--output-pdf',
         type=str,
-        help='svg file to save output to',
-        default='_output/out.svg')
+        help='pdf file to save output to',
+        default='_output/out.pdf')
     parser.add_argument('--per-target-model',
         action='store_true')
 
@@ -125,14 +125,14 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                 theta_upper[i] = theta[theta_idx] + ZSCORE_95 * standard_err_est
     return full_theta, theta_lower, theta_upper
 
-def plot_theta(args, full_theta, theta_lower, theta_upper, output_svg):
+def plot_theta(args, full_theta, theta_lower, theta_upper, output_pdf):
     convert_to_csv(args.output_csv, full_theta, theta_lower, theta_upper, [args.max_motif_len])
 
     # Call Rscript
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, args.output_csv, str(args.max_motif_len), output_svg]
+    cmd = [command, script_file, args.output_csv, str(args.max_motif_len), output_pdf]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
@@ -173,9 +173,9 @@ def main(args=sys.argv[1:]):
     #     covariance_est = np.linalg.inv(sample_obs_information)
 
     for col_idx in range(theta.shape[1]):
-        output_svg = args.output_svg.replace(".svg", "_col%d.svg" % col_idx)
+        output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
         full_theta, theta_lower, theta_upper = get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx)
-        plot_theta(args, full_theta, theta_lower, theta_upper, output_svg)
+        plot_theta(args, full_theta, theta_lower, theta_upper, output_pdf)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
