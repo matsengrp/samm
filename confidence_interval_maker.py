@@ -38,7 +38,7 @@ class ConfidenceIntervalMaker:
                 standard_errors = np.sqrt(np.diag(variance_est))
                 conf_ints = self._create_confidence_intervals(standard_errors, theta, z)
                 log.info(self._get_confidence_interval_print_lines(conf_ints))
-                return standard_errors
+                return variance_est
             else:
                 log.info("Variance estimates are negative %s" % np.diag(variance_est))
         else:

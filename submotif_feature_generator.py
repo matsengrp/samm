@@ -34,7 +34,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         assert(motif_len % 2 == 1)
         assert(left_motif_flank_len in range(motif_len))
-        assert(self.hier_offset >= 0)
+        assert(hier_offset >= 0)
 
         self.motif_len = motif_len
         self.left_motif_flank_len = left_motif_flank_len
