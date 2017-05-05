@@ -83,8 +83,8 @@ def plot_theta(args, feat_generator, full_motif_dict, theta, output_pdf):
                 else:
                     flanks = itertools.product(["a", "c", "g", "t"], repeat=2*f.hier_offset)
                     for f in flanks:
-                        # !!
-                        full_m = "".join(f[:f.hier_offset]) + m + "".join(f[f.right_offset:])
+                        # assume for now hierarchical will just have center mutating
+                        full_m = "".join(f[:f.hier_offset]) + m + "".join(f[f.hier_offset:])
                         full_m_idx = full_motif_dict[full_m]
                         full_theta[full_m_idx] += m_theta
             start_idx += len(motif_list)
@@ -113,7 +113,7 @@ def main(args=sys.argv[1:]):
         # default to central base mutating
         args.max_left_flank = None
         args.max_right_flank = None
-        args.positions_mutating = [[max(args.motif_lens)/2]]
+        args.positions_mutating = [[m/2] for m in args.motif_lens]
     else:
         args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
         for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
