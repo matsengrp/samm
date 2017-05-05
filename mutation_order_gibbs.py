@@ -221,7 +221,9 @@ class MutationOrderGibbsSampler(Sampler):
 
         @return tuple of GibbsStepInfo and log likelihood of the sampled mutation order
         """
-        all_probs = np.exp(all_log_probs)
+
+        # for tiny probabilities shift by subtracting negative
+        all_probs = np.exp(all_log_probs - min(all_log_probs))
         sampled_idx = sample_multinomial(all_probs)
 
         # Now reconstruct our decision
