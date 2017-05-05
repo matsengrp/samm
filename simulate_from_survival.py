@@ -249,14 +249,14 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
 
     return germline_nucleotides, germline_genes
 
-def dump_parameters(true_thetas, probability_matrix, raw_theta, args, motif_list):
+def dump_parameters(true_thetas, probability_matrix, args, motif_list, mutating_pos_list):
     # Dump a pickle file of simulation parameters
     pickle.dump([true_thetas, probability_matrix, raw_theta], open(args.output_true_theta, 'w'))
 
     # Dump a text file of theta for easy viewing
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
-        lines = get_nonzero_theta_print_lines(true_thetas, motif_list, args.motif_len)
+        lines = get_nonzero_theta_print_lines(true_thetas, motif_list, mutating_pos_list, feat_generator.motif_len)
         f.write(lines)
 
 def dump_germline_data(germline_nucleotides, germline_genes, args):
@@ -276,6 +276,7 @@ def main(args=sys.argv[1:]):
 
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
     motif_list = feat_generator.motif_list
+    mutating_pos_list = feat_generator.mutating_pos_list
 
     true_thetas, probability_matrix, nonzero_motifs, raw_theta = _generate_true_parameters(motif_list, args)
 
@@ -286,7 +287,7 @@ def main(args=sys.argv[1:]):
     else:
         simulator = SurvivalModelSimulatorSingleColumn(true_thetas, probability_matrix, feat_generator, lambda0=args.lambda0)
 
-    dump_parameters(true_thetas, probability_matrix, raw_theta, args, motif_list)
+    dump_parameters(true_thetas, probability_matrix, args, motif_list, mutating_pos_list)
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
 

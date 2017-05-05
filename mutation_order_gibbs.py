@@ -144,7 +144,7 @@ class MutationOrderGibbsSampler(Sampler):
         # Now unmutate the string by one mutation step so that we can figure out the features at the positions
         flanked_seq = unmutate_string(
             self.obs_seq_mutation.end_seq_with_flanks,
-            unmutate_pos=self.motif_len/2 + position,
+            unmutate_pos=self.obs_seq_mutation.left_flank_len + position,
             orig_nuc=self.obs_seq_mutation.start_seq[position]
         )
         already_mutated_pos_set = set(partial_order)
@@ -158,7 +158,7 @@ class MutationOrderGibbsSampler(Sampler):
             # right before the i-th mutation step occured
             flanked_seq = unmutate_string(
                 flanked_seq,
-                unmutate_pos=self.motif_len/2 + shuffled_position,
+                unmutate_pos=self.obs_seq_mutation.left_flank_len + shuffled_position,
                 orig_nuc=self.obs_seq_mutation.start_seq[shuffled_position]
             )
             # Now get the features - we only need the feature of the mutating position at the ith step
@@ -221,7 +221,9 @@ class MutationOrderGibbsSampler(Sampler):
 
         @return tuple of GibbsStepInfo and log likelihood of the sampled mutation order
         """
-        all_probs = np.exp(all_log_probs)
+
+        # for tiny probabilities shift by subtracting negative
+        all_probs = np.exp(all_log_probs - min(all_log_probs))
         sampled_idx = sample_multinomial(all_probs)
 
         # Now reconstruct our decision
@@ -342,7 +344,7 @@ class MutationOrderGibbsSampler(Sampler):
         @param old_log_numerator: the numerator from the previous mutation step
         @param feat_mut_step: the features that differed for this next mutation step
         """
-        if len(self.feature_generator.motif_lens) > 1:
+        if self.feature_generator.num_feat_gens > 1:
             if not self.per_target_model:
                 old_feat_theta_sums = [self.theta[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_old.values()]
                 new_feat_theta_sums = [self.theta[feat_idxs].sum() for feat_idxs in feat_mut_step.neighbors_feat_new.values()]

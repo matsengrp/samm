@@ -11,12 +11,41 @@ from profile_support import profile
 
 class SubmotifFeatureGenerator(FeatureGenerator):
     """
-    This makes motifs of the same length (must be odd).
+    This makes motifs of the same length (must be odd) and same left flank length
     """
-    def __init__(self, motif_len=1, motifs_to_remove=[]):
+    def __init__(
+            self,
+            motif_len=3,
+            motifs_to_remove=[],
+            left_motif_flank_len=1,
+            hier_offset=0,
+            left_update_region=1,
+            right_update_region=1
+        ):
+        """
+        @param motif_len: length of motif
+        @param motifs_to_remove: motifs to remove
+        @param left_motif_flank_len: length of region to the left of the mutating position
+        @param hier_offset: where to offset sequence if we are using hierarchical motifs
+        @param left_update_region: number of positions to consider left of mutating position to update
+            features correctly
+        @param right_update_region: number of positions to consider right of mutating position to update
+            features correctly
+        """
         assert(motif_len % 2 == 1)
+        assert(left_motif_flank_len in range(motif_len))
+        assert(hier_offset >= 0)
+
         self.motif_len = motif_len
-        self.half_motif_len = motif_len/2
+        self.left_motif_flank_len = left_motif_flank_len
+        self.right_motif_flank_len = motif_len - left_motif_flank_len - 1
+
+        self.hier_offset = hier_offset
+
+        self.left_update_region = left_update_region
+        self.right_update_region = right_update_region
+
+        self.feature_vec_len = np.power(4, motif_len)
 
         motifs_to_remove = [m for m in motifs_to_remove if len(m) == motif_len]
         self.motif_list = self._get_motif_list(motifs_to_remove)
@@ -29,14 +58,13 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         self.motifs_fused_lasso1 = []
         self.motifs_fused_lasso2 = []
 
-    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None, offset=0):
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
         feat_vec_dict = dict()
         seq_len = len(seq_str)
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
-        if offset > 0:
-            left_flank = left_flank[offset:]
-            right_flank = right_flank[:-offset]
+        # we'll absorb most of our offsetting into changing the left flank starting position
+        left_flank = left_flank[self.hier_offset:]
         # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
         for pos in do_feat_vec_pos:
             feat_vec_dict[pos] = self._create_feature_vec_for_pos(pos, seq_str, seq_len, left_flank, right_flank)
@@ -54,9 +82,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         indptr = [start_idx]
         num_entries = 0
 
-        offset = (obs_seq_mutation.motif_len - self.motif_len)/2
         for pos in range(obs_seq_mutation.seq_len):
-            submotif = obs_seq_mutation.start_seq_with_flanks[pos + offset: pos + self.motif_len + offset]
+            submotif = obs_seq_mutation.start_seq_with_flanks[pos + self.hier_offset: pos + self.hier_offset + self.motif_len]
             feat_idx = self.motif_dict[submotif]
             if feat_idx is not None:
                 start_idx += 1
@@ -118,11 +145,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         left_flank = seq_mut_order.obs_seq_mutation.left_flank
         right_flank = seq_mut_order.obs_seq_mutation.right_flank
-        offset = (seq_mut_order.obs_seq_mutation.motif_len - self.motif_len)/2
-        assert(offset >= 0)
-        if offset > 0:
-            left_flank = left_flank[offset:]
-            right_flank = right_flank[:-offset]
+        left_flank = left_flank[self.hier_offset:]
 
         seq_len = seq_mut_order.obs_seq_mutation.seq_len
         feat_dict_prev = dict()
@@ -151,10 +174,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         feat_mutation_steps = []
 
         old_mutation_pos = None
-        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq_with_flanks
-        offset = (seq_mut_order.obs_seq_mutation.motif_len - self.motif_len)/2
-        if offset > 0:
-            intermediate_seq = intermediate_seq[offset:-offset]
+        intermediate_seq = seq_mut_order.obs_seq_mutation.start_seq_with_flanks[self.hier_offset:]
 
         feat_dict_prev = dict()
         already_mutated_pos = set()
@@ -166,7 +186,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 seq_mut_order,
                 intermediate_seq,
                 already_mutated_pos,
-                extension=offset,
             )
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat,
@@ -177,7 +196,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Apply mutation
             intermediate_seq = mutate_string(
                 intermediate_seq,
-                mutation_pos + self.half_motif_len,
+                mutation_pos + self.left_motif_flank_len,
                 seq_mut_order.obs_seq_mutation.end_seq[mutation_pos]
             )
             already_mutated_pos.add(mutation_pos)
@@ -208,9 +227,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         old_mutation_pos = None
         feat_dict_prev = dict()
         flanked_seq = seq_mut_order.get_seq_at_step(update_step_start, flanked=True)
-        offset = (seq_mut_order.obs_seq_mutation.motif_len - self.motif_len)/2
-        if offset > 0:
-            flanked_seq = flanked_seq[offset:-offset]
+        flanked_seq = flanked_seq[self.hier_offset:]
 
         already_mutated_pos = set(seq_mut_order.mutation_order[:update_step_start])
         for mutation_step in range(update_step_start, seq_mut_order.obs_seq_mutation.num_mutations):
@@ -222,7 +239,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 seq_mut_order,
                 flanked_seq,
                 already_mutated_pos,
-                extension=offset,
             )
             # print mutation_step, "mutating_pos_feat, feat_dict_curr, feat_dict_future", mutating_pos_feat, feat_dict_curr, feat_dict_future
             feat_mutation_steps.append(MultiFeatureMutationStep(
@@ -234,7 +250,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # Apply mutation
             flanked_seq = mutate_string(
                 flanked_seq,
-                mutation_pos + self.half_motif_len,
+                mutation_pos + self.left_motif_flank_len,
                 seq_mut_order.obs_seq_mutation.end_seq[mutation_pos]
             )
             already_mutated_pos.add(mutation_pos)
@@ -248,7 +264,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         update_step,
         flanked_seq,
         already_mutated_pos,
-        extension=0
     ):
         """
         @param seq_mut_order: a list of the positions in the mutation order
@@ -269,13 +284,12 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             seq_mut_order,
             flanked_seq,
             already_mutated_pos,
-            extension=extension,
         )
 
         # Apply mutation
         flanked_seq = mutate_string(
             flanked_seq,
-            first_mutation_pos + self.half_motif_len,
+            first_mutation_pos + self.left_motif_flank_len,
             seq_mut_order.obs_seq_mutation.end_seq[first_mutation_pos]
         )
 
@@ -287,7 +301,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             flanked_seq,
             already_mutated_pos,
             calc_future_dict=False,
-            extension=extension,
         )
 
         return first_mut_pos_feat, MultiFeatureMutationStep(
@@ -305,7 +318,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             intermediate_seq,
             already_mutated_pos,
             calc_future_dict=True,
-            extension=0,
         ):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
@@ -334,7 +346,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 intermediate_seq,
                 seq_mut_order.obs_seq_mutation.seq_len,
                 already_mutated_pos,
-                extension=extension,
             )
 
         # Calculate the features in these special positions for updating the next mutation step's risk group
@@ -345,7 +356,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                 intermediate_seq,
                 seq_mut_order.obs_seq_mutation.seq_len,
                 already_mutated_pos,
-                extension=extension,
             )
         return mutating_pos_feat, feat_dict_curr, feat_dict_future
 
@@ -355,7 +365,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         intermediate_seq,
         seq_len,
         already_mutated_pos,
-        extension=0,
     ):
         """
         @param position: the position around which to calculate the feature indices for
@@ -366,8 +375,8 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @return a dict with the positions next to the given position and their feature index
         """
         feat_dict = dict()
-        start_region_idx = max(position - self.half_motif_len - extension, 0)
-        end_region_idx = min(position + self.half_motif_len + extension, seq_len - 1)
+        start_region_idx = max(position - self.left_update_region, 0)
+        end_region_idx = min(position + self.right_update_region, seq_len - 1)
         update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx + 1)
         for pos in update_positions:
             if pos not in already_mutated_pos:
@@ -379,7 +388,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
     def _create_feature_vec_for_pos(self, pos, intermediate_seq, seq_len, left_flank, right_flank):
         """
-        @param pos: central mutating position
+        @param pos: mutating position
         @param intermediate_seq: intermediate sequence to determine motif, flanks removed
         @param left flank: left flank nucleotide information
         @param right flank: right flank nucleotide information
@@ -387,12 +396,12 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         Create features for subsequence using information from flanks.
         """
         # if motif length is one then submotifs will be single nucleotides and position remains unchanged
-        if pos < self.half_motif_len:
-            submotif = left_flank[pos:] + intermediate_seq[:self.half_motif_len + pos + 1]
-        elif pos >= seq_len - self.half_motif_len:
-            submotif = intermediate_seq[pos - self.half_motif_len:] + right_flank[:pos + self.half_motif_len - seq_len + 1]
+        if pos < self.left_motif_flank_len:
+            submotif = left_flank[pos:] + intermediate_seq[:pos + self.right_motif_flank_len + 1]
+        elif pos >= seq_len - self.right_motif_flank_len:
+            submotif = intermediate_seq[pos - self.left_motif_flank_len:] + right_flank[:pos - seq_len + self.right_motif_flank_len + 1]
         else:
-            submotif = intermediate_seq[pos - self.half_motif_len: pos + self.half_motif_len + 1]
+            submotif = intermediate_seq[pos - self.left_motif_flank_len: pos + self.right_motif_flank_len + 1]
 
         return self.motif_dict[submotif]
 
@@ -444,7 +453,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
                         fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + window_len])
                         _add_grouped_motifs(linked_motifs, fuse_motif_dict)
                 elif window_len % 2 == 1:
-                    start_idx = self.motif_len/2 - window_len/2
+                    start_idx = self.left_motif_flank_len - window_len/2
                     fuse_motif_dict = _get_fuse_motifs(lambda m: m[start_idx:start_idx + window_len])
                     _add_grouped_motifs(linked_motifs, fuse_motif_dict)
 

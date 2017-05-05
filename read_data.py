@@ -330,11 +330,22 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1, locus='', species=''):
+def read_gene_seq_csv_data(
+        gene_file_name,
+        seq_file_name,
+        motif_len=3,
+        left_flank_len=None,
+        right_flank_len=None,
+        sample=1,
+        locus='',
+        species='',
+        ):
     """
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
     @param motif_len: length of motif we're using; used to collapse series of "n"s
+    @param left_flank_len: maximum left flank length for this motif length
+    @param right_flank_len: maximum right flank length for this motif length
     @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
     @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
     @param subset_vals: list of values of these variables to subset on (e.g., ['k', 'mouse'])
@@ -343,6 +354,11 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
     """
 
     assert(sample in range(1, 4))
+
+    if left_flank_len is None or right_flank_len is None:
+        # default to central base mutating
+        left_flank_len = motif_len/2
+        right_flank_len = motif_len/2
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
@@ -367,6 +383,8 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
                     start_seq=start_seq,
                     end_seq=end_seq,
                     motif_len=motif_len,
+                    left_flank_len=left_flank_len,
+                    right_flank_len=right_flank_len,
             )
 
             if obs_seq_mutation.num_mutations > 0:
@@ -383,6 +401,8 @@ def read_gene_seq_csv_data(gene_file_name, seq_file_name, motif_len=1, sample=1,
                         start_seq=start_seq,
                         end_seq=end_seq,
                         motif_len=motif_len,
+                        left_flank_len=left_flank_len,
+                        right_flank_len=right_flank_len,
                 )
 
                 if sample == 1 and obs_seq_mutation.num_mutations > 0:

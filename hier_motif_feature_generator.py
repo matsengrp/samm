@@ -1,24 +1,58 @@
 from feature_generator import *
 from submotif_feature_generator import SubmotifFeatureGenerator
 from scipy.sparse import hstack
+from itertools import product
 
 class HierarchicalMotifFeatureGenerator(FeatureGenerator):
-    def __init__(self, motif_lens=[3,5], motifs_to_remove=[]):
+    def __init__(self, motif_lens=[3,5], motifs_to_remove=[], left_motif_flank_len_list=None):
         """
+        @param motif_lens: list of odd-numbered motif lengths
         @param motifs_to_remove: list of motifs (strings) that have been zeroed out (completely - all targets are zeroed out)
+        @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
         """
+
         self.motif_lens = motif_lens
+
         self.max_motif_len = max(motif_lens)
         self.motif_len = self.max_motif_len
 
-        self.feat_gens = [SubmotifFeatureGenerator(m_len, motifs_to_remove=motifs_to_remove) for m_len in motif_lens]
+        if left_motif_flank_len_list is None:
+            # default to central base mutating
+            left_motif_flank_len_list = []
+            for motif_len in motif_lens:
+                left_motif_flank_len_list.append([motif_len/2])
+
+        # Find the maximum left and right motif flank lengths to pass to SubmotifFeatureGenerator
+        # in order to update all the relevant features
+        self.max_left_motif_flank_len = max(sum(left_motif_flank_len_list, []))
+        self.max_right_motif_flank_len = self.motif_len - min(sum(left_motif_flank_len_list, [])) - 1
+
+        # Create list of feature generators for different motif lengths and different flank lengths
+        self.feat_gens = []
+        for motif_len, left_motif_flank_lens in zip(motif_lens, left_motif_flank_len_list):
+            for left_motif_flank_len in left_motif_flank_lens:
+                self.feat_gens.append(
+                        SubmotifFeatureGenerator(
+                            motif_len=motif_len,
+                            motifs_to_remove=motifs_to_remove,
+                            left_motif_flank_len=left_motif_flank_len,
+                            hier_offset=self.max_left_motif_flank_len - left_motif_flank_len,
+                            left_update_region=self.max_left_motif_flank_len,
+                            right_update_region=self.max_right_motif_flank_len,
+                        )
+                    )
+
         feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
+        self.num_feat_gens = len(self.feat_gens)
 
         self.feature_vec_len = np.sum(feat_offsets)
         self.motif_list = []
+        self.mutating_pos_list = []
         for f in self.feat_gens:
             self.motif_list += f.motif_list
+            # pass mutating positions along with motifs
+            self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
 
         # construct motif dictionary too!
         self.motif_dict = dict()
@@ -33,8 +67,7 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             do_feat_vec_pos = range(len(seq_str))
         feat_vec_dict = {pos:[] for pos in do_feat_vec_pos}
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            seq_offset = (self.max_motif_len - feat_gen.motif_len)/2
-            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos, offset=seq_offset)
+            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos)
             for pos in do_feat_vec_pos:
                 feat = f_dict[pos]
                 if feat is not None:
@@ -75,13 +108,11 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         first_mut_feats = []
         multi_feat_mut_step = MultiFeatureMutationStep()
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            seq_offset = (seq_mut_order.obs_seq_mutation.motif_len - feat_gen.motif_len)/2
             mut_pos_feat, mut_step = feat_gen.get_shuffled_mutation_steps_delta(
                 seq_mut_order,
                 update_step,
-                flanked_seq[seq_offset:-seq_offset] if seq_offset > 0 else flanked_seq,
+                flanked_seq[feat_gen.hier_offset:],
                 already_mutated_pos,
-                extension=seq_offset,
             )
             if mut_pos_feat is not None:
                 first_mut_feats.append(mut_pos_feat + offset)

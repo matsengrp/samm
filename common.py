@@ -62,6 +62,7 @@ HOT_COLD_SPOT_REGS = [
         {'central': 'G', 'left_flank': 'R', 'right_flank': 'YW', 'hot_or_cold': 'hot'},
         {'central': 'A', 'left_flank': 'W', 'right_flank': '', 'hot_or_cold': 'hot'},
         {'central': 'C', 'left_flank': 'SY', 'right_flank': '', 'hot_or_cold': 'cold'},
+        {'central': 'G', 'left_flank': '', 'right_flank': 'YW', 'hot_or_cold': 'hot'},
 ]
 INT8_MAX = 127
 
@@ -79,29 +80,35 @@ def get_batched_list(my_list, num_batches):
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
-def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5):
+def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2):
     """
     Known hot and cold spots were constructed on a 5mer model, so "N" pad
     longer motifs and subset shorter ones
     """
     kmer_list = []
     hot_or_cold_list = []
+    hot_or_cold_complements = []
     for spot in hot_or_cold_dicts:
-        if len(spot['left_flank']) > motif_len/2 or \
-            len(spot['right_flank']) > motif_len/2:
+        hot_or_cold_complements.append({'central': return_complement(spot['central']),
+                'left_flank': return_complement(spot['right_flank']),
+                'right_flank': return_complement(spot['left_flank']),
+                'hot_or_cold': spot['hot_or_cold']})
+
+    for spot in hot_or_cold_dicts + hot_or_cold_complements:
+        if len(spot['left_flank']) > half_motif_len or \
+            len(spot['right_flank']) > motif_len - half_motif_len - 1:
                 # this hot/cold spot is not a part of our motif size
                 continue
 
-        left_pad = spot['left_flank'].rjust(motif_len/2, 'N')
-        right_pad = spot['right_flank'].ljust(motif_len/2, 'N')
+        left_pad = spot['left_flank'].rjust(half_motif_len, 'N')
+        right_pad = spot['right_flank'].ljust(motif_len - half_motif_len - 1, 'N')
         kmer_list.append(left_pad + spot['central'] + right_pad)
         hot_or_cold_list.append(spot['hot_or_cold'])
 
     hot_cold_regs = []
     for kmer, hot_or_cold in zip(kmer_list, hot_or_cold_list):
-        for km_or_com in (kmer, return_complement(kmer)):
-            hot_cold_regs.append([' - '.join([km_or_com.replace('N', ''), hot_or_cold]),
-                ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in km_or_com])])
+        hot_cold_regs.append([' - '.join([kmer.replace('N', ''), hot_or_cold]),
+            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in kmer])])
     return hot_cold_regs
 
 def contains_degenerate_base(seq_str):
@@ -133,26 +140,28 @@ def is_re_match(regex, submotif):
     match_res = re.match(regex, submotif)
     return match_res is not None
 
-def get_nonzero_theta_print_lines(theta, motif_list, motif_len):
+def get_nonzero_theta_print_lines(theta, motif_list, mutating_pos_list, motif_len):
     """
     @return a string that summarizes the theta vector/matrix
     """
     lines = []
-    known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len)
+    mutating_pos_set = list(set(mutating_pos_list))
+    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 # print the whole line if any element in the theta is nonzero
                 motif = motif_list[i]
+                pos_idx = mutating_pos_set.index(mutating_pos_list[i])
                 hot_cold_matches = ""
-                for spot_name, spot_regex in known_hot_cold:
+                for spot_name, spot_regex in known_hot_cold[pos_idx]:
                     if is_re_match(spot_regex, motif):
                         hot_cold_matches = " -- " + spot_name
                         break
                 thetas = theta[i,]
                 lines.append((
                     thetas[np.isfinite(thetas)].sum(),
-                    "%s (%s%s)" % (thetas, motif_list[i], hot_cold_matches),
+                    "%s (%s%s) pos %s" % (thetas, motif_list[i], hot_cold_matches, mutating_pos_list[i]),
                 ))
                 break
     sorted_lines = sorted(lines, key=lambda s: s[0])
@@ -184,10 +193,11 @@ def get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape):
                     zero_theta_mask[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = 1
     return zero_theta_mask
 
-def get_possible_motifs_to_targets(motif_list, mask_shape):
+def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
     """
     @param motif_list: list of motifs - assumes that the first few theta rows correspond to these motifs
     @param mask_shape: shape of the theta matrix
+    @param mutating_pos_list: list of mutating positions
 
     @return a boolean matrix with possible mutations as True, impossible mutations as False
     """
@@ -199,7 +209,7 @@ def get_possible_motifs_to_targets(motif_list, mask_shape):
     # Estimating a different theta vector for different target nucleotides
     # We cannot have a motif mutate to the same center nucleotide
     for i in range(len(motif_list)):
-        center_motif_idx = len(motif_list[i])/2
+        center_motif_idx = mutating_pos_list[i]
         if mask_shape[1] == NUM_NUCLEOTIDES:
             center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
         else:

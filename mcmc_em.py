@@ -115,7 +115,7 @@ class MCMC_EM:
                 num_unique = get_num_unique_theta(theta)
                 log.info("Current Theta, num_nonzero %d, unique %d" % (num_nonzero, num_unique))
                 log.info(
-                    get_nonzero_theta_print_lines(theta, self.motif_list, self.feat_generator.motif_len)
+                    get_nonzero_theta_print_lines(theta, self.motif_list, self.feat_generator.mutating_pos_list, self.feat_generator.motif_len)
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < 0)

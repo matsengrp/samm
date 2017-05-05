@@ -77,6 +77,14 @@ def parse_args():
         type=str,
         help='length of motif (must be odd)',
         default='5')
+    parser.add_argument('--positions-mutating',
+        type=str,
+        help="""
+        length of left motif flank determining which position is mutating; comma-separated within
+        a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
+        be a 3mer with first and second mutating position and 5mer with first, second and third
+        """,
+        default=None)
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -188,6 +196,23 @@ def parse_args():
     args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_lens:
         assert(m % 2 == 1)
+
+    args.max_motif_len = max(args.motif_lens)
+
+    if args.positions_mutating is None:
+        # default to central base mutating
+        args.max_left_flank = None
+        args.max_right_flank = None
+    else:
+        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
+        for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+
+        # Find the maximum left and right flanks of the motif with the largest length in the
+        # hierarchy in order to process the data correctly
+        args.max_left_flank = max(sum(args.positions_mutating, []))
+        args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
     if args.problem_solver_cls != SurvivalProblemLasso:
         assert(len(args.fuse_windows) > 0)
@@ -339,13 +364,16 @@ def main(args=sys.argv[1:]):
     feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=args.motif_lens,
         motifs_to_remove=motifs_to_remove,
+        left_motif_flank_len_list=args.positions_mutating,
     )
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
             args.input_genes,
             args.input_seqs,
-            motif_len=max(args.motif_lens),
+            motif_len=args.max_motif_len,
+            left_flank_len=args.max_left_flank,
+            right_flank_len=args.max_right_flank,
             sample=args.sample_regime,
             locus=args.locus,
             species=args.species,
@@ -369,12 +397,13 @@ def main(args=sys.argv[1:]):
     log.info("Running EM")
 
     motif_list = feat_generator.motif_list
+    mutating_pos_list = feat_generator.mutating_pos_list
 
     # Run EM on the lasso parameters from largest to smallest
     pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
 
     theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
-    possible_theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape)
+    possible_theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape, mutating_pos_list)
     zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape)
 
     true_theta = None
@@ -457,7 +486,7 @@ def main(args=sys.argv[1:]):
                 pickle.dump(results_list, f)
 
             log.info("==== FINAL theta, %s====" % curr_model_results)
-            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.motif_len))
+            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.mutating_pos_list, feat_generator.motif_len))
 
             if args.tuning_sample_ratio:
                 if best_model_in_list is None or log_lik_ratio > 0:
@@ -502,6 +531,7 @@ def main(args=sys.argv[1:]):
     )
 
     log.info("=== FINAL Best model: %s" % best_model)
+    theta_standard_error = None
     if not args.full_train:
         log.info("Begin a final training of the model")
         # If we didn't do a full training for this best model, do it now

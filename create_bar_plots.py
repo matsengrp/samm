@@ -50,8 +50,12 @@ def convert_to_csv(target, theta_vals, theta_lower, theta_upper, motif_lens):
     """
     Take pickle file and convert to csv for use in R
     """
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
+    feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=motif_lens,
+            mutating_positions=mutating_positions,
+        )
     motif_list = feat_generator.motif_list
+    mutating_pos_list = feat_generator.mutating_pos_list
 
     with open(str(target), 'wb') as f:
         writer = csv.writer(f)
@@ -75,8 +79,8 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
         start_idx = 0
         for f in feat_generator.feat_gens[:len(args.motif_len_vals)]:
             motif_list = f.motif_list
-            diff_len = args.max_motif_len - f.motif_len
             for m_idx, m in enumerate(motif_list):
+
                 raw_theta_idx = start_idx + m_idx
                 m_theta = theta[raw_theta_idx, 0]
                 if col_idx != 0:
@@ -90,7 +94,7 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                     if col_idx != 0:
                         theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
                 else:
-                    flanks = itertools.product(["a", "c", "g", "t"], repeat=diff_len)
+                    flanks = itertools.product(["a", "c", "g", "t"], repeat=2*f.offset)
                     for f in flanks:
                         full_m = "".join(f[:diff_len/2]) + m + "".join(f[diff_len/2:])
                         full_m_idx = full_feat_generator.motif_dict[full_m]
@@ -139,6 +143,7 @@ def main(args=sys.argv[1:]):
     args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_len_vals:
         assert(m % 2 == 1)
+
     args.max_motif_len = max(args.motif_len_vals)
 
     motifs_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)

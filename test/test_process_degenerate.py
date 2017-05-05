@@ -14,13 +14,13 @@ class Degenerate_TestCase(unittest.TestCase):
         MOTIF_LEN = 5
 
         START_SEQ = "tagacgntac...a.....acnntcgggaaaacannn"
-        END_SEQ =   "nnnttgntgc......c..acnntaggtaacaaannn"
+        END_SEQ =   "nnnatgntgc......c..acnntaggtaacaaannn"
 
         # what they should be processed as
         random.seed(1533)
 
         PROC_START = "acgntacnnacnntcgggaaaaca"
-        PROC_END =   "ttgntgcnnacnntaggtaacaaa"
+        PROC_END =   "atgntgcnnacnntaggtaacaaa"
         for match in re.compile('n').finditer(PROC_START):
             random_nuc = random.choice(NUCLEOTIDES)
             PROC_START = mutate_string(PROC_START, match.start(), random_nuc)
@@ -37,7 +37,7 @@ class Degenerate_TestCase(unittest.TestCase):
         # use the same seed to get the same random nucleotides
         random.seed(1533)
 
-        start_processed, end_processed = trim_degenerates_and_collapse(START_SEQ, END_SEQ, MOTIF_LEN)
+        start_processed, end_processed = process_degenerates_and_impute_nucleotides(START_SEQ, END_SEQ, MOTIF_LEN)
         self.assertEquals(PROC_START, start_processed)
         self.assertEquals(PROC_END, end_processed)
 

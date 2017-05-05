@@ -49,21 +49,20 @@ def main(args=sys.argv[1:]):
     start_idx = 0
     for f in feat_generator.feat_gens:
         motif_list = f.motif_list
-        diff_len = max_motif_len - f.motif_len
         for m_idx, m in enumerate(motif_list):
             m_theta = theta[start_idx + m_idx]
-            if diff_len == 0:
+            if f.offset == 0:
                 full_m_idx = full_motif_dict[m]
                 full_theta[full_m_idx] += m_theta
             else:
-                flanks = itertools.product(["a", "c", "g", "t"], repeat=diff_len)
+                flanks = itertools.product(["a", "c", "g", "t"], repeat=2*f.offset)
                 for f in flanks:
-                    full_m = "".join(f[:diff_len/2]) + m + "".join(f[diff_len/2:])
+                    full_m = "".join(f[:f.left_offset]) + m + "".join(f[f.right_offset:])
                     full_m_idx = full_motif_dict[full_m]
                     full_theta[full_m_idx] += m_theta
         start_idx += len(motif_list)
 
-    known_hot_cold_regexs = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, max_motif_len)
+    known_hot_cold_regexs = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, half_motif_len=max_motif_len/2)
 
     # Also print out the top-most mutable and least-most mutable
     sorted_theta_idx = full_theta.argsort(axis=None)
@@ -71,6 +70,7 @@ def main(args=sys.argv[1:]):
     print "Top 10"
     for i in top10_idx:
         motif = motif_list[i]
+        mutating_pos = mutating_pos[i]
         known_spot = print_known_cold_hot_spot(motif, known_hot_cold_regexs)
         print "%s: %f (%s)" % (motif, full_theta[i], known_spot)
 
@@ -78,6 +78,7 @@ def main(args=sys.argv[1:]):
     print "Bottom 10"
     for i in bottom10_idx:
         motif = motif_list[i]
+        mutating_pos = mutating_pos[i]
         known_spot = print_known_cold_hot_spot(motif, known_hot_cold_regexs)
         print "%s: %f (%s)" % (motif, full_theta[i], known_spot)
 
