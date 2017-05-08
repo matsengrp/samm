@@ -15,25 +15,28 @@ data_path <- arg[1]
 # comma-separated motif lengths list
 motif_str <- arg[2]
 output_file <- arg[3]
+target_nucs <- unlist(strsplit(arg[4], ','))
 
 motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 
 # Read data and convert to format plotBarchart wants
+raw_data <- read.table(data_path, sep=',', header=TRUE)
 
-raw_data <- read.table(data_path, sep=',')
-log_mutabilities <- unlist(raw_data['V2'])
-names(log_mutabilities) <- gsub('N', 'Z', unlist(raw_data['V1']))
-
-log_mut_lower <- unlist(raw_data['V3'])
-log_mut_upper <- unlist(raw_data['V4'])
-names(log_mutabilities) <- unlist(raw_data['V1'])
+# N->Z for ordering in plot
+raw_data['motif'] <- apply(raw_data['motif'], 2, function(motif) gsub('N', 'Z', motif))
 
 # Plot for multiple nucleotides
-center_nuc <- c('A', 'T', 'G', 'C')
+center_nucs <- c('A', 'T', 'G', 'C')
 y_lim <- c(
-    floor(min(log_mut_lower)),
-    ceiling(max(log_mut_upper))
+    floor(min(raw_data['theta_lower'])),
+    ceiling(max(raw_data['theta_upper']))
 )
-plot_list <- plotBarchart(log_mutabilities, log_mut_lower, log_mut_upper, center_nuc, 'bar', bar.size=.25, y_lim = y_lim, rect_height = 0.45)
-image <- do.call('grid.arrange', args = c(plot_list, ncol = length(plot_list)))
-ggsave(file=output_file, plot=image, width=30, height=8)
+plot_list <- plotBarchart(raw_data,
+                          nucleotides=center_nucs,
+                          target=target_nucs,
+                          style='bar',
+                          bar.size=.25,
+                          y_lim=y_lim,
+                          rect_height=0.15)
+image <- do.call('grid.arrange', args = c(plot_list, ncol = length(center_nucs)))
+ggsave(file=output_file, plot=image, width=30, height=8*length(target_nucs))
