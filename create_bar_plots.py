@@ -111,7 +111,7 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                     if col_idx != 0:
                         theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
                 else:
-                    flanks = itertools.product(["a", "c", "g", "t"], repeat=2*f.hier_offset)
+                    flanks = itertools.product(["a", "c", "g", "t"], repeat=2*feat_gen.hier_offset)
                     for f in flanks:
                         # assume for now hierarchical will just have center mutating
                         full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
@@ -133,6 +133,7 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
             standard_err_est = np.sqrt(var_est)
             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
             theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
+
     elif num_mut_pos > 1 and len(args.motif_len_vals) == 1:
         # Combine the hierarchical thetas if that is the case
         theta_index_matches = {i:[] for i in range(full_theta_size)}
@@ -176,6 +177,7 @@ def get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covaria
                 standard_err_est = np.sqrt(covariance_est[theta_idx, theta_idx])
                 theta_lower[i] = theta[theta_idx] - ZSCORE_95 * standard_err_est
                 theta_upper[i] = theta[theta_idx] + ZSCORE_95 * standard_err_est
+
     return full_theta, theta_lower, theta_upper
 
 def plot_theta(args, full_theta, motif_list, theta_lower, theta_upper, output_pdf, mutating_pos_list, targets, feat_generator, num_mut_pos):
@@ -259,9 +261,17 @@ def main(args=sys.argv[1:]):
     #     sample_obs_information = (fisher_info1[theta_mask_flat,:])[:,theta_mask_flat]
     #     covariance_est = np.linalg.inv(sample_obs_information)
 
-    full_theta = np.zeros(theta.shape)
-    theta_lower = np.zeros(theta.shape)
-    theta_upper = np.zeros(theta.shape)
+    if len(args.motif_len_vals) > 1:
+        # hierarchical model combines values
+        full_theta = np.zeros((len(motif_list), theta.shape[1]))
+        theta_lower = np.zeros((len(motif_list), theta.shape[1]))
+        theta_upper = np.zeros((len(motif_list), theta.shape[1]))
+    else:
+        # otherwise just use shape of theta
+        full_theta = np.zeros(theta.shape)
+        theta_lower = np.zeros(theta.shape)
+        theta_upper = np.zeros(theta.shape)
+
     for col_idx in range(theta.shape[1]):
         full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = \
                 get_theta_conf_int(args, feat_generator, full_feat_generator, theta, covariance_est, col_idx, num_mut_pos)
