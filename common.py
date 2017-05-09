@@ -140,10 +140,14 @@ def is_re_match(regex, submotif):
     match_res = re.match(regex, submotif)
     return match_res is not None
 
-def get_nonzero_theta_print_lines(theta, motif_list, mutating_pos_list, motif_len):
+def get_nonzero_theta_print_lines(theta, feat_gen):
     """
     @return a string that summarizes the theta vector/matrix
     """
+    motif_list = feat_gen.motif_list
+    motif_len = feat_gen.motif_len
+    mutating_pos_list = feat_gen.mutating_pos_list
+
     lines = []
     mutating_pos_set = list(set(mutating_pos_list))
     known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]
@@ -424,3 +428,12 @@ def get_target_col(sample, mutation_pos):
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
     return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
+
+def make_zero_theta_refit_mask(theta, feat_generator, theta_num_col):
+    zeroed_thetas = np.abs(theta) < ZERO_THRES
+    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
+    motifs_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta_num_col
+    motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
+
+    zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
+    return zero_theta_mask_refit, motifs_to_remove

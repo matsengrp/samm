@@ -29,7 +29,7 @@ class GreedyLikelihoodComparer:
         val_set_evaluator = LikelihoodComparer(
             val_set,
             feat_generator,
-            theta_ref=best_model.theta,
+            theta_ref=best_model.penalized_theta,
             num_samples=num_samples,
             burn_in=burn_in,
             num_jobs=num_jobs,
@@ -37,14 +37,14 @@ class GreedyLikelihoodComparer:
             pool=pool,
         )
         for model in sorted_models[1:]:
-            log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(model.theta)
+            log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(model.penalized_theta)
             log.info("  Greedy search: ratio %f, model %s" % (log_lik_ratio, model))
             if log_lik_ratio > 0:
                 best_model = model
                 val_set_evaluator = LikelihoodComparer(
                     val_set,
                     feat_generator,
-                    theta_ref=best_model.theta,
+                    theta_ref=best_model.penalized_theta,
                     num_samples=num_samples,
                     burn_in=burn_in,
                     num_jobs=num_jobs,
