@@ -131,9 +131,8 @@ def fit_context_model(env, outdir, c):
 
     cmd = []
     if c["model_options"].startswith("survival_"):
-        motif_lens = [5]
         if c["model_options"] == "survival_L5":
-            penalty_params = np.power(10, np.arange(-3.0, -7.0, step=-1.0)).tolist()
+            penalty_params = np.power(10, np.arange(-2.0, -7.0, step=-1.0)).tolist()
         elif c["model_options"] == "survival_none5":
             penalty_params = [0]
 
@@ -141,9 +140,11 @@ def fit_context_model(env, outdir, c):
                '--seed',
                c['seed'],
                '--motif-lens',
-               ",".join(map(str, motif_lens)),
+               5,
+               '--positions-mutating',
+               2,
                '--em-max-iters',
-               15,
+               10,
                '--penalty-params',
                ",".join(map(str, penalty_params)),
                '--num-cpu-threads',
@@ -151,9 +152,9 @@ def fit_context_model(env, outdir, c):
                '--num-jobs',
                20,
                '--burn-in',
-               1,
-               '--num-e-samples',
                2,
+               '--num-e-samples',
+               4,
                '--solver',
                "L",
                '--tuning-sample-ratio',
