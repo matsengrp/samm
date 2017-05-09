@@ -451,7 +451,7 @@ def main(args=sys.argv[1:]):
                     zero_theta_mask=zero_theta_mask_refit,
                     burn_in=burn_in,
                     penalty_params=(0,), # now fit with no penalty
-                    max_em_iters=args.em_max_iters,
+                    max_em_iters=args.em_max_iters * 2,
                     intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
                     get_hessian=True,
                 )
