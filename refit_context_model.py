@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Fit a context-sensitive motif model via MCMC-EM
+Fit a context-sensitive un-penalized version motif model via MCMC-EM
 """
 
 import sys

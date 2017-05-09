@@ -10,7 +10,7 @@ class MethodResults:
 
     def set_penalized_theta(self, penalized_theta, log_lik_ratio, reference_model=None):
         """
-        @param penalized_theta: a theta from the penalized version
+        Store the model from the penalized stage
         """
         self.penalized_theta = penalized_theta
         self.log_lik_ratio = log_lik_ratio
@@ -22,7 +22,7 @@ class MethodResults:
 
     def set_refit_theta(self, refit_theta, variance_est, motifs_to_remove, zero_theta_mask):
         """
-        @param penalized_theta: a theta from the penalized version
+        Store the model from the refit stage
         """
         self.refit_theta = refit_theta
         self.variance_est = variance_est
