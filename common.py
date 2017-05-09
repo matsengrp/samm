@@ -442,4 +442,4 @@ def make_zero_theta_refit_mask(theta, feat_generator):
     motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
 
     zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
-    return zero_theta_mask_refit, motifs_to_remove
+    return zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask

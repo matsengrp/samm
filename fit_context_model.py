@@ -324,8 +324,6 @@ def main(args=sys.argv[1:]):
         args.tuning_sample_ratio,
         args.validation_column,
     )
-    base_train_obs = feat_generator.create_base_features_for_list(train_set)
-    base_val_obs = feat_generator.create_base_features_for_list(val_set)
 
     log.info("Data statistics:")
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
@@ -373,7 +371,8 @@ def main(args=sys.argv[1:]):
         log.info("==== Penalty parameter %s ====" % penalty_param_str)
 
         init_theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
-
+        base_train_obs = feat_generator.create_base_features_for_list(train_set)
+        base_val_obs = feat_generator.create_base_features_for_list(val_set)
         #### STAGE 1: FIT A PENALIZED MODEL
         penalized_theta, variance_est, _ = em_algo.run(
             base_train_obs,
@@ -423,7 +422,7 @@ def main(args=sys.argv[1:]):
             num_val_samples = val_set_evaluator.num_samples
 
             # STAGE 2: REFIT THE MODEL WITH NO PENALTY
-            zero_theta_mask_refit, motifs_to_remove = make_zero_theta_refit_mask(
+            zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask = make_zero_theta_refit_mask(
                 penalized_theta,
                 feat_generator,
             )
@@ -447,7 +446,7 @@ def main(args=sys.argv[1:]):
                 refit_theta, variance_est, _ = em_algo.run(
                     obs_data_stage2,
                     feat_generator_stage2,
-                    theta=penalized_theta, # initialize from the lasso version
+                    theta=penalized_theta[~motifs_to_remove_mask,:], # initialize from the lasso version
                     possible_theta_mask=possible_theta_mask_refit,
                     zero_theta_mask=zero_theta_mask_refit,
                     burn_in=burn_in,
