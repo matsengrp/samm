@@ -446,7 +446,6 @@ def main(args=sys.argv[1:]):
             zero_theta_mask_refit, motifs_to_remove = make_zero_theta_refit_mask(
                 penalized_theta,
                 feat_generator,
-                args.theta_num_col,
             )
 
             if zero_theta_mask_refit.size > 0:
