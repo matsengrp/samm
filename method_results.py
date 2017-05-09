@@ -8,12 +8,13 @@ class MethodResults:
         """
         self.penalty_params = penalty_params
 
-    def set_penalized_theta(self, penalized_theta, log_lik_ratio, reference_model=None):
+    def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_model=None):
         """
         Store the model from the penalized stage
         """
         self.penalized_theta = penalized_theta
         self.log_lik_ratio = log_lik_ratio
+        self.log_lik_ratio_lower_bound = log_lik_ratio_lower_bound
         if reference_model is not None:
             self.reference_penalty_params = reference_model.penalty_params
         else:

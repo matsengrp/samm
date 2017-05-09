@@ -129,9 +129,6 @@ def parse_args():
         type=int,
         help='number of threads to use for validation calculations',
         default=12)
-    parser.add_argument('--chibs',
-        action='store_true',
-        help='True = estimate the marginal likelihood via Chibs')
     parser.add_argument('--validation-column',
         type=str,
         help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
@@ -149,7 +146,7 @@ def parse_args():
         help="species (mouse or human; default empty)",
         default='')
 
-    parser.set_defaults(per_target_model=False, chibs=False)
+    parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -199,7 +196,6 @@ def parse_args():
         args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
-    args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
     args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
     if not os.path.exists(args.scratch_dir):
@@ -276,11 +272,10 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta, args):
+def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta):
     """
     Does various checks on the model fitted on the training data.
     Most importantly, it calculates the difference between the EM surrogate functions
-    It also will calculate the marginal likelihood if args.chibs is True
     It will also compare against the true_theta if it is known and if the true_theta is the same shape
 
     @param theta_mask: a mask with all the possible theta values (the ones that are not -inf)
@@ -292,22 +287,13 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
         spearman_r, _ = scipy.stats.spearmanr(true_theta[theta_mask], theta[theta_mask])
         log.info("Difference between true and fitted theta %f, pear %f, spear %f" % (theta_err, pearson_r, spearman_r))
 
-    ll_chibs = None
-    if args.chibs:
-        val_chibs = LogLikelihoodEvaluator(
-            val_set,
-            feat_generator,
-            num_jobs=args.num_jobs,
-            scratch_dir=args.scratch_dir,
-        )
-        ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
-        log.info("Chibs log likelihood estimate: %f" % ll_chibs)
-
     ll_ratio_lower_bound = None
+    log_lik_ratio = None
     if val_set_evaluator is not None:
         log_lik_ratio, ll_ratio_lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(theta)
+        log.info("Comparing validation log likelihood, log ratio: %f (lower bound: %f)" % (log_lik_ratio, ll_ratio_lower_bound))
 
-    return ll_ratio_lower_bound, ll_chibs, theta_err
+    return ll_ratio_lower_bound, log_lik_ratio, theta_err
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -404,26 +390,21 @@ def main(args=sys.argv[1:]):
 
         #### STAGE 1.5: DECIDE IF THIS MODEL IS WORTH REFITTING
         #### Right now, we check if the validation log likelihood (EM surrogate) is better
-        log_lik_ratio, _, _ = do_validation_set_checks(
+        log_lik_ratio_lower_bound, log_lik_ratio, _ = do_validation_set_checks(
             penalized_theta,
             possible_theta_mask,
             base_val_obs,
             val_set_evaluator,
             feat_generator,
             true_theta,
-            args,
         )
-        curr_model_results.set_penalized_theta(penalized_theta, log_lik_ratio, reference_model=best_model)
+        curr_model_results.set_penalized_theta(penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_model=best_model)
 
         log.info("==== Penalized theta, %s, nonzero %d ====" % (penalty_param_str, curr_model_results.penalized_num_nonzero))
-        log.info(
-            get_nonzero_theta_print_lines(penalized_theta, feat_generator)
-        )
+        log.info(get_nonzero_theta_print_lines(penalized_theta, feat_generator))
 
-        if log_lik_ratio is not None:
-            log.info("Comparing validation log likelihood for penalty param %s, log ratio: %f" % (penalty_param_str, log_lik_ratio))
-
-        if log_lik_ratio is None or log_lik_ratio >= 0:
+        if log_lik_ratio_lower_bound is None or log_lik_ratio_lower_bound >= 0:
+            # If the model is better than previous models
             best_model = curr_model_results
             log.info("===== Best model (per validation set) %s" % best_model)
 
@@ -441,13 +422,12 @@ def main(args=sys.argv[1:]):
             # grab this many validation samples from now on
             num_val_samples = val_set_evaluator.num_samples
 
-        if log_lik_ratio is None or log_lik_ratio >= 0:
             # STAGE 2: REFIT THE MODEL WITH NO PENALTY
             zero_theta_mask_refit, motifs_to_remove = make_zero_theta_refit_mask(
                 penalized_theta,
                 feat_generator,
             )
-
+            log.info("Refit theta size: %d" % zero_theta_mask_refit.size)
             if zero_theta_mask_refit.size > 0:
                 # Create a feature generator for this shrunken model
                 feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
@@ -455,7 +435,7 @@ def main(args=sys.argv[1:]):
                     motifs_to_remove=motifs_to_remove,
                     left_motif_flank_len_list=args.positions_mutating,
                 )
-                # Get the data ready
+                # Get the data ready - using ALL data
                 obs_data_stage2 = feat_generator_stage2.create_base_features_for_list(obs_data)
                 # Create the theta mask for the shrunken theta
                 possible_theta_mask_refit = get_possible_motifs_to_targets(
@@ -476,24 +456,20 @@ def main(args=sys.argv[1:]):
                     intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
                     get_hessian=True,
                 )
-                # Get the probabilities of the target nucleotides
                 curr_model_results.set_refit_theta(refit_theta, variance_est, motifs_to_remove, zero_theta_mask_refit)
 
                 log.info("==== Refit theta, %s====" % curr_model_results)
-                log.info(
-                    get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2)
-                )
-            else:
-                refit_theta = penalized_theta
-                variance_est = None
-        elif curr_model_results.penalized_num_nonzero > 0:
+                log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))
+
+        # Save model results
+        results_list.append(curr_model_results)
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
+
+        if log_lik_ratio_lower_bound is not None and log_lik_ratio_lower_bound < 0 and curr_model_results.penalized_num_nonzero > 0:
             # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
             log.info("Stop trying penalty parameters for this penalty parameter list")
-
-        results_list.append(curr_model_results)
-        # We save the final theta (potentially trained over all the data)
-        with open(args.intermediate_out_file, "w") as f:
-            pickle.dump(results_list, f)
+            break
 
     if all_runs_pool is not None:
         all_runs_pool.close()
