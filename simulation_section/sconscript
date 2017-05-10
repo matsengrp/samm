@@ -1,0 +1,120 @@
+## Simulation section of the paper
+
+import os
+from os.path import join
+import numpy as np
+from nestly.scons import SConsWrap
+from nestly import Nest
+from matsen_grp_data import SCRATCH_DIR
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {'nreps': localenv['NREPS'],
+        'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'motif_params',
+    [
+        {'motif_len': 3, 'left_motif_flanks': 1, 'n_germline': 50, 'rand_gene_len': 200}
+    ],
+    label_func=lambda c: "%dmer" % c['motif_len'])
+
+nest.add(
+    'sparsity_ratio',
+    [0.75],
+    label_func=lambda c: "sparsity%d" % int(c * 100))
+
+# Nest for replicates
+@nest.add_target_with_env(localenv)
+def generate(env, outdir, c):
+    cmd = ['python generate_theta.py',
+           '--seed',
+           0,
+           '--motif-len',
+           c['motif_params']['motif_len'],
+           '--sparsity-ratio',
+           c['sparsity_ratio'],
+           '--output-model ${TARGETS[0]}']
+    return env.Command(
+        [join(outdir, 'true_model.pkl')],
+        [],
+        ' '.join(map(str, cmd)))
+
+nest.add(
+    'replicate',
+    range(100),
+    label_func='{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
+    create_dir=False)
+
+# Targets for simulating fake data
+
+@nest.add_target_with_env(localenv)
+def simulate(env, outdir, c):
+    cmd = ['python simulate_from_survival.py',
+           '--seed',
+           c['seed'],
+           '--motif-len',
+           c['motif_params']['motif_len'],
+           '--input-model ${SOURCES[0]}',
+           '--n-taxa',
+           1,
+           '--n-germlines',
+           c['motif_params']['n_germline'],
+           '--random-gene-len',
+           c['motif_params']['rand_gene_len'],
+           '--min-censor-time',
+           0.1,
+           '--with-replacement',
+           '--output-file ${TARGETS[0]}',
+           '--output-genes ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def fit_context_model(env, outdir, c):
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -5.0, step=-0.25)).tolist()))
+    cmd = ['python fit_context_model.py',
+           '--seed',
+           c['seed'],
+           '--motif-lens',
+           c['motif_params']['motif_len'],
+           '--positions-mutating',
+           c['motif_params']['left_motif_flanks'],
+           '--penalty-params',
+           penalty_params,
+           '--num-cpu-threads',
+           10,
+           '--num-jobs',
+           20,
+           '--burn-in',
+           2,
+           '--num-e-samples',
+           4,
+           '--em-max-iters',
+           10,
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--num-val-burnin',
+           10,
+           '--tuning-sample-ratio',
+           0,
+           '--input-genes ${SOURCES[0]}',
+           '--input-seqs ${SOURCES[1]}',
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['simulate'],
+        ' '.join(map(str, cmd)))

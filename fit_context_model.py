@@ -22,10 +22,7 @@ from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
-from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
-from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
-from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
 from likelihood_evaluator import *
 from multinomial_solver import MultinomialSolver
 from method_results import MethodResults
@@ -68,11 +65,6 @@ def parse_args():
         type=int,
         help='number of jobs to submit during E-step',
         default=1)
-    parser.add_argument('--solver',
-        type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, SFL = sparse fused lasso,',
-        choices=["CL", "CFL", "L", "FL", "SFL"],
-        default="L")
     parser.add_argument('--motif-lens',
         type=str,
         help='length of motif (must be odd)',
@@ -145,26 +137,14 @@ def parse_args():
         choices=('','mouse','human'),
         help="species (mouse or human; default empty)",
         default='')
+    parser.add_argument('--conf-int-stop',
+        action='store_true')
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
 
     # Determine problem solver
     args.problem_solver_cls = SurvivalProblemLasso
-    if args.solver == "CL":
-        args.problem_solver_cls = SurvivalProblemLassoCVXPY
-    elif args.solver == "CFL":
-        if args.per_target_model:
-            raise NotImplementedError()
-        else:
-            args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
-    elif args.solver == "L":
-        args.problem_solver_cls = SurvivalProblemLasso
-    elif args.solver == "FL" or args.solver == "SFL":
-        if args.per_target_model:
-            raise NotImplementedError()
-        else:
-            args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     # Determine sampler
     args.sampler_cls = MutationOrderGibbsSampler
@@ -249,7 +229,7 @@ def split_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_ratio
     val_set = [obs_data[i] for i in val_idx]
     return train_set, val_set
 
-def get_penalty_params(pen_param_str, solver):
+def get_penalty_params(pen_param_str):
     """
     @param pen_param_str: comma separated list of penalty parameters
     @param solver: the solver requested (L, FL, SFL)
@@ -328,12 +308,13 @@ def main(args=sys.argv[1:]):
 
     log.info("Data statistics:")
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
+    log.info(get_data_statistics_print_lines(feat_generator.create_base_features_for_list(obs_data), feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
 
     # Run EM on the lasso parameters from largest to smallest
-    pen_params_list = get_penalty_params(args.penalty_params, args.solver)
+    pen_params_list = get_penalty_params(args.penalty_params)
 
     theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
     possible_theta_mask = get_possible_motifs_to_targets(
@@ -469,6 +450,10 @@ def main(args=sys.argv[1:]):
         if log_lik_ratio_lower_bound is not None and log_lik_ratio_lower_bound < 0 and curr_model_results.penalized_num_nonzero > 0:
             # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
             log.info("Stop trying penalty parameters for this penalty parameter list")
+            break
+
+        if variance_est is None and args.conf_int_stop:
+            log.info("Stopping since no confidence intervals could be made")
             break
 
     if all_runs_pool is not None:
