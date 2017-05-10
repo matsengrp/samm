@@ -190,6 +190,7 @@ def parse_args():
     # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
+    return args
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -255,6 +256,7 @@ def main(args=sys.argv[1:]):
             reference_pen_param=penalty_param_prev
         )
 
+<<<<<<< HEAD
         if args.tuning_sample_ratio > 0:
             # Create this val set evaluator for next time
             val_set_evaluator = LikelihoodComparer(
@@ -269,6 +271,22 @@ def main(args=sys.argv[1:]):
             )
             # grab this many validation samples from now on
             num_val_samples = val_set_evaluator.num_samples
+=======
+            if args.tuning_sample_ratio > 0:
+                # Create this val set evaluator for next time
+                val_set_evaluator = LikelihoodComparer(
+                    base_val_obs,
+                    feat_generator,
+                    theta_ref=best_model.penalized_theta,
+                    num_samples=num_val_samples,
+                    burn_in=args.num_val_burnin,
+                    num_jobs=args.num_jobs,
+                    scratch_dir=args.scratch_dir,
+                    pool=all_runs_pool,
+                )
+                # grab this many validation samples from now on
+                num_val_samples = val_set_evaluator.num_samples
+>>>>>>> check for num nonzero
 
         # Save model results
         results_list.append(curr_model_results)
@@ -293,7 +311,7 @@ def main(args=sys.argv[1:]):
         num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
 
-        if variance_est is None and args.conf_int_stop:
+        if variance_est is None and args.conf_int_stop and curr_model_results.penalized_num_nonzero > 0:
             log.info("Stopping since no confidence intervals could be made")
             break
 
