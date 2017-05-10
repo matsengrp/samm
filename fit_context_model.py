@@ -141,7 +141,7 @@ def parse_args():
         help="confidence interval z statistic",
         default=1.96)
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -190,8 +190,6 @@ def parse_args():
     # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
-
-    return args
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -294,6 +292,10 @@ def main(args=sys.argv[1:]):
                     break
         num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
+
+        if variance_est is None and args.conf_int_stop:
+            log.info("Stopping since no confidence intervals could be made")
+            break
 
     if all_runs_pool is not None:
         all_runs_pool.close()
