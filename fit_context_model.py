@@ -270,9 +270,10 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
 
     ll_ratio_lower_bound = None
     log_lik_ratio = None
-    if val_set_evaluator is not None:
-        log_lik_ratio, ll_ratio_lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(theta)
-        log.info("Comparing validation log likelihood, log ratio: %f (lower bound: %f)" % (log_lik_ratio, ll_ratio_lower_bound))
+    if len(val_set) > 0:
+        if val_set_evaluator is not None:
+            log_lik_ratio, ll_ratio_lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(theta)
+            log.info("Comparing validation log likelihood, log ratio: %f (lower bound: %f)" % (log_lik_ratio, ll_ratio_lower_bound))
 
     return ll_ratio_lower_bound, log_lik_ratio, theta_err
 
@@ -389,19 +390,20 @@ def main(args=sys.argv[1:]):
             best_model = curr_model_results
             log.info("===== Best model (per validation set) %s" % best_model)
 
-            # Create this val set evaluator for next time
-            val_set_evaluator = LikelihoodComparer(
-                base_val_obs,
-                feat_generator,
-                theta_ref=best_model.penalized_theta,
-                num_samples=num_val_samples,
-                burn_in=args.num_val_burnin,
-                num_jobs=args.num_jobs,
-                scratch_dir=args.scratch_dir,
-                pool=all_runs_pool,
-            )
-            # grab this many validation samples from now on
-            num_val_samples = val_set_evaluator.num_samples
+            if args.tuning_sample_ratio > 0:
+                # Create this val set evaluator for next time
+                val_set_evaluator = LikelihoodComparer(
+                    base_val_obs,
+                    feat_generator,
+                    theta_ref=best_model.penalized_theta,
+                    num_samples=num_val_samples,
+                    burn_in=args.num_val_burnin,
+                    num_jobs=args.num_jobs,
+                    scratch_dir=args.scratch_dir,
+                    pool=all_runs_pool,
+                )
+                # grab this many validation samples from now on
+                num_val_samples = val_set_evaluator.num_samples
 
             # STAGE 2: REFIT THE MODEL WITH NO PENALTY
             zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask = make_zero_theta_refit_mask(
@@ -452,7 +454,7 @@ def main(args=sys.argv[1:]):
             log.info("Stop trying penalty parameters for this penalty parameter list")
             break
 
-        if variance_est is None and args.conf_int_stop:
+        if variance_est is None and args.conf_int_stop and curr_model_results.penalized_num_nonzero > 0:
             log.info("Stopping since no confidence intervals could be made")
             break
 
