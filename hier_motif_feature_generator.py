@@ -74,6 +74,15 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
                     feat_vec_dict[pos].append(feat + offset)
         return feat_vec_dict
 
+    def create_base_features_for_list(self, obs_data):
+        """
+        Calls create_base_features over a list of obs_seq_mutation
+        """
+        obs_data_aug = []
+        for obs in obs_data:
+            obs_data_aug.append(self.create_base_features(obs))
+        return obs_data_aug
+
     def create_base_features(self, obs_seq_mutation):
         feat_mats = []
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
