@@ -368,7 +368,7 @@ def main(args=sys.argv[1:]):
             max_em_iters=args.em_max_iters,
             intermed_file_prefix="%s/e_samples_%s_" % (args.intermediate_out_dir, penalty_param_str),
         )
-        curr_model_results = MethodResults(penalty_params)
+        curr_model_results = MethodResults(penalty_params, args.motif_lens, args.positions_mutating)
 
         #### STAGE 1.5: DECIDE IF THIS MODEL IS WORTH REFITTING
         #### Right now, we check if the validation log likelihood (EM surrogate) is better
@@ -435,7 +435,7 @@ def main(args=sys.argv[1:]):
                     zero_theta_mask=zero_theta_mask_refit,
                     burn_in=burn_in,
                     penalty_params=(0,), # now fit with no penalty
-                    max_em_iters=args.em_max_iters * 2,
+                    max_em_iters=args.em_max_iters,
                     intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
                     get_hessian=True,
                 )

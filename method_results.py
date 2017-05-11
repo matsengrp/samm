@@ -2,11 +2,13 @@ import numpy as np
 from common import *
 
 class MethodResults:
-    def __init__(self, penalty_params):
+    def __init__(self, penalty_params, motif_lens, positions_mutating):
         """
         @param penalized_theta: a theta from the penalized version
         """
         self.penalty_params = penalty_params
+        self.motif_lens = motif_lens
+        self.positions_mutating = positions_mutating
 
     def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_model=None):
         """
