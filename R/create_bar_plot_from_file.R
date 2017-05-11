@@ -23,7 +23,7 @@ motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 raw_data <- read.table(data_path, sep=',', header=TRUE, stringsAsFactors=FALSE)
 raw_data <- do.call(data.frame, lapply(raw_data, function(x) replace(x, is.infinite(x), NA)))
 
-# N->Z for ordering in plot
+#replace target "N" with "Z" so that the plots are properly ordered
 raw_data['motif'] <- apply(raw_data['motif'], 2, function(motif) gsub('N', 'Z', motif))
 
 # Plot for multiple nucleotides
