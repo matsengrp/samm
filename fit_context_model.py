@@ -439,7 +439,13 @@ def main(args=sys.argv[1:]):
                     intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
                     get_hessian=True,
                 )
-                curr_model_results.set_refit_theta(refit_theta, variance_est, motifs_to_remove, zero_theta_mask_refit)
+                curr_model_results.set_refit_theta(
+                    refit_theta,
+                    variance_est,
+                    motifs_to_remove,
+                    motifs_to_remove_mask,
+                    zero_theta_mask_refit,
+                )
 
                 log.info("==== Refit theta, %s====" % curr_model_results)
                 log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))

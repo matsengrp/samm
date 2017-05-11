@@ -21,13 +21,14 @@ class MethodResults:
             self.reference_penalty_params = None
         self.penalized_num_nonzero = get_num_nonzero(self.penalized_theta)
 
-    def set_refit_theta(self, refit_theta, variance_est, motifs_to_remove, zero_theta_mask):
+    def set_refit_theta(self, refit_theta, variance_est, motifs_to_remove, motifs_to_remove_mask, zero_theta_mask):
         """
         Store the model from the refit stage
         """
         self.refit_theta = refit_theta
         self.variance_est = variance_est
         self.motifs_to_remove = motifs_to_remove
+        self.motifs_to_remove_mask = motifs_to_remove_mask
         self.zero_theta_mask = zero_theta_mask
 
     def __str__(self):
