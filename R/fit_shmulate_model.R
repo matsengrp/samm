@@ -29,10 +29,10 @@ seq_genes <- merge(seq, genes, by="germline_name")
 orig_num_seqs <- nrow(seq_genes)
 print(paste("Original number of sequences", orig_num_seqs))
 
-filter_mask <- customSlideWindowDb(db = seq_genes)
 # Filter sequences
-seq_genes <- seq_genes[filter_mask,]
-print(paste("Post-Filter number of sequences", nrow(seq_genes)))
+# filter_mask <- customSlideWindowDb(db = seq_genes)
+# seq_genes <- seq_genes[filter_mask,]
+# print(paste("Post-Filter number of sequences", nrow(seq_genes)))
 
 shm_model_type <- "RS"
 # Create model using only silent mutations

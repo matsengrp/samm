@@ -27,16 +27,22 @@ class ConfidenceIntervalMaker:
         # Need to filter out all the theta values that are constant (negative infinity or zero constants)
         sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
 
+        if sample_obs_information.size == 0:
+            return None
+
         # Make sure that we can take an inverse -- need eigenvalues to be nonzero
         eigenvals = np.linalg.eigvals(sample_obs_information)
-        log.info("np.linalg.eigvals %s" % eigenvals)
         if np.all(np.abs(np.linalg.eigvals(sample_obs_information)) > 0):
             variance_est = np.linalg.inv(sample_obs_information)
+            singular_vals = np.linalg.svd(variance_est, compute_uv=False)
+            condition_num = np.max(singular_vals)/np.min(singular_vals)
+            log.info("Condition number %f" % condition_num)
 
             # Make sure that the variance estimate makes sense -- should be positive values only
             if np.all(np.diag(variance_est) > 0):
                 standard_errors = np.sqrt(np.diag(variance_est))
                 conf_ints = self._create_confidence_intervals(standard_errors, theta, z)
+                log.info("===== Confidence Intervals ======")
                 log.info(self._get_confidence_interval_print_lines(conf_ints))
                 return variance_est
             else:

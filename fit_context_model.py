@@ -112,14 +112,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.1, 0.01, 0.001")
-    parser.add_argument("--fuse-windows",
-        type=str,
-        help="shared submotif lengths, comma separated",
-        default="4")
-    parser.add_argument("--fuse-center-only",
-        action='store_true',
-        help="shared submotif lengths, comma separated, should be odd")
+        default="1, 0.1, 0.01")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
@@ -136,16 +129,10 @@ def parse_args():
         type=int,
         help='number of threads to use for validation calculations',
         default=12)
-    parser.add_argument('--chibs',
-        action='store_true',
-        help='True = estimate the marginal likelihood via Chibs')
     parser.add_argument('--validation-column',
         type=str,
         help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
         default=None)
-    parser.add_argument('--full-train',
-        action='store_true',
-        help='True = train on training data, then evaluate on validation data, then train on all the data, false = train on training data and evaluate on validation data')
     parser.add_argument('--per-target-model',
         action='store_true')
     parser.add_argument("--locus",
@@ -158,14 +145,8 @@ def parse_args():
         choices=('','mouse','human'),
         help="species (mouse or human; default empty)",
         default='')
-    parser.add_argument("--zero-motifs",
-        type=str,
-        help="motifs with constant zero theta value, csv file",
-        default='')
-    parser.add_argument("--get-hessian",
-        action='store_true')
 
-    parser.set_defaults(per_target_model=False, full_train=False, chibs=False, fuse_center_only=False, get_hessian=False)
+    parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -214,14 +195,7 @@ def parse_args():
         args.max_left_flank = max(sum(args.positions_mutating, []))
         args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
-    if args.problem_solver_cls != SurvivalProblemLasso:
-        assert(len(args.fuse_windows) > 0)
-        args.fuse_windows = [int(k) for k in args.fuse_windows.split(",")]
-    else:
-        args.fuse_windows = []
-
     args.intermediate_out_dir = os.path.dirname(args.out_file)
-    args.intermediate_out_file = args.out_file.replace(".pkl", "_intermed.pkl")
 
     args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
     if not os.path.exists(args.scratch_dir):
@@ -236,9 +210,8 @@ def load_true_model(file_name):
         probability_matrix = real_params[1]
     return true_theta, probability_matrix
 
-def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_ratio, validation_column):
+def split_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_ratio, validation_column):
     """
-    @param obs_data: observed mutation data
     @param feat_generator: submotif feature generator
     @param metadata: metadata to include variables to perform validation on
     @param tuning_sample_ratio: ratio of data to place in validation set
@@ -246,10 +219,9 @@ def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_rati
 
     @return training and validation indices
     """
-
+    num_obs = len(obs_data)
     if validation_column is None:
         # For no validation column just sample data randomly
-        num_obs = len(obs_data)
         val_size = int(tuning_sample_ratio * num_obs)
         if tuning_sample_ratio > 0:
             val_size = max(val_size, 1)
@@ -273,21 +245,8 @@ def create_train_val_sets(obs_data, feat_generator, metadata, tuning_sample_rati
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
-    # construct training and validation sets based on CV regime above
-    train_set = []
-    for i in train_idx:
-        train_set.append(
-            feat_generator.create_base_features(obs_data[i])
-        )
-
-    val_set = []
-    for i in val_idx:
-        val_set.append(
-            feat_generator.create_base_features(obs_data[i])
-        )
-
-    if tuning_sample_ratio > 0:
-        assert(len(val_set) > 0)
+    train_set = [obs_data[i] for i in train_idx]
+    val_set = [obs_data[i] for i in val_idx]
     return train_set, val_set
 
 def get_penalty_params(pen_param_str, solver):
@@ -298,16 +257,7 @@ def get_penalty_params(pen_param_str, solver):
     """
     penalty_params = [float(l) for l in pen_param_str.split(",")]
     sorted_pen_params = sorted(penalty_params, reverse=True)
-
-    if solver == "SFL":
-        # first param is lasso, second one is fused
-        pen_params_lists = [[(p, p/i) for i in FUSED_LASSO_PENALTY_RATIO] for p in sorted_pen_params]
-    elif solver == "FL":
-        # first param is lasso, second one is fused
-        pen_params_lists = [[(0, p) for p in sorted_pen_params]]
-    else:
-        pen_params_lists = [[(p,) for p in sorted_pen_params]]
-    return pen_params_lists
+    return [(p,) for p in sorted_pen_params]
 
 def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     """
@@ -322,11 +272,10 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta, args):
+def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat_generator, true_theta):
     """
     Does various checks on the model fitted on the training data.
     Most importantly, it calculates the difference between the EM surrogate functions
-    It also will calculate the marginal likelihood if args.chibs is True
     It will also compare against the true_theta if it is known and if the true_theta is the same shape
 
     @param theta_mask: a mask with all the possible theta values (the ones that are not -inf)
@@ -334,37 +283,26 @@ def do_validation_set_checks(theta, theta_mask, val_set, val_set_evaluator, feat
     theta_err = None
     if true_theta is not None and true_theta.shape == theta.shape:
         theta_err = np.linalg.norm(true_theta[theta_mask] - theta[theta_mask])
-        pearson_r, _ = scipy.stats.pearsonr(true_theta[theta_mask], theta[theta_mask])
-        spearman_r, _ = scipy.stats.spearmanr(true_theta[theta_mask], theta[theta_mask])
-        log.info("Difference between true and fitted theta %f, pear %f, spear %f" % (theta_err, pearson_r, spearman_r))
-
-    ll_chibs = None
-    if args.chibs:
-        val_chibs = LogLikelihoodEvaluator(
-            val_set,
-            feat_generator,
-            num_jobs=args.num_jobs,
-            scratch_dir=args.scratch_dir,
-        )
-        ll_chibs = val_chibs.get_log_lik(theta, burn_in=args.num_val_burnin)
-        log.info("Chibs log likelihood estimate: %f" % ll_chibs)
+        if np.var(theta[theta_mask]) > 0:
+            pearson_r, _ = scipy.stats.pearsonr(true_theta[theta_mask], theta[theta_mask])
+            spearman_r, _ = scipy.stats.spearmanr(true_theta[theta_mask], theta[theta_mask])
+            log.info("Difference between true and fitted theta %f, pear %f, spear %f" % (theta_err, pearson_r, spearman_r))
 
     ll_ratio_lower_bound = None
+    log_lik_ratio = None
     if val_set_evaluator is not None:
         log_lik_ratio, ll_ratio_lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(theta)
+        log.info("Comparing validation log likelihood, log ratio: %f (lower bound: %f)" % (log_lik_ratio, ll_ratio_lower_bound))
 
-    return ll_ratio_lower_bound, ll_chibs, theta_err
+    return ll_ratio_lower_bound, log_lik_ratio, theta_err
 
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    motifs_to_remove, pos_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
     feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=args.motif_lens,
-        motifs_to_remove=motifs_to_remove,
-        pos_to_remove=pos_to_remove,
         left_motif_flank_len_list=args.positions_mutating,
     )
 
@@ -379,33 +317,31 @@ def main(args=sys.argv[1:]):
             locus=args.locus,
             species=args.species,
         )
-    train_set, val_set = create_train_val_sets(
-            obs_data,
-            feat_generator,
-            metadata,
-            args.tuning_sample_ratio,
-            args.validation_column,
-        )
 
-    obs_seq_feat_base = []
-    for obs_seq_mutation in obs_data:
-        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
+    train_set, val_set = split_train_val_sets(
+        obs_data,
+        feat_generator,
+        metadata,
+        args.tuning_sample_ratio,
+        args.validation_column,
+    )
+
     log.info("Data statistics:")
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_set), len(val_set)))
-    log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
 
-    motif_list = feat_generator.motif_list
-    mutating_pos_list = feat_generator.mutating_pos_list
-
     # Run EM on the lasso parameters from largest to smallest
-    pen_params_lists = get_penalty_params(args.penalty_params, args.solver)
+    pen_params_list = get_penalty_params(args.penalty_params, args.solver)
 
     theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
-    possible_theta_mask = get_possible_motifs_to_targets(motif_list, theta_shape, mutating_pos_list)
-    zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape)
+    possible_theta_mask = get_possible_motifs_to_targets(
+        feat_generator.motif_list,
+        theta_shape,
+        feat_generator.mutating_pos_list
+    )
+    zero_theta_mask = np.zeros(theta_shape, dtype=bool)
 
     true_theta = None
     if args.theta_file != "":
@@ -417,149 +353,129 @@ def main(args=sys.argv[1:]):
         all_runs_pool = None
 
     em_algo = MCMC_EM(
-        train_set,
-        val_set,
-        feat_generator,
         args.sampler_cls,
         args.problem_solver_cls,
-        possible_theta_mask = possible_theta_mask,
-        zero_theta_mask=zero_theta_mask,
         base_num_e_samples=args.num_e_samples,
         num_jobs=args.num_jobs,
         scratch_dir=args.scratch_dir,
         pool=all_runs_pool,
+        per_target_model=args.per_target_model,
     )
 
     burn_in = args.burn_in
+    num_val_samples = args.num_val_samples
     results_list = []
-    best_models = []
-    for pen_params_list in pen_params_lists:
-        best_model_in_list = None
-        val_set_evaluator = None
-        for penalty_params in pen_params_list:
-            penalty_param_str = ",".join(map(str, penalty_params))
-            log.info("Penalty parameter %s" % penalty_param_str)
+    val_set_evaluator = None
+    best_model = None
+    for penalty_params in pen_params_list:
+        penalty_param_str = ",".join(map(str, penalty_params))
+        log.info("==== Penalty parameter %s ====" % penalty_param_str)
 
-            theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
-
-            theta, variance_est, _ = em_algo.run(
-                theta=theta,
-                burn_in=burn_in,
-                penalty_params=penalty_params,
-                max_em_iters=args.em_max_iters,
-                fuse_windows=args.fuse_windows,
-                fuse_center_only=args.fuse_center_only,
-                train_and_val=False,
-                intermed_file_prefix="%s/e_samples_%s_" % (args.intermediate_out_dir, penalty_param_str),
-            )
-
-            if args.tuning_sample_ratio > 0:
-                # Do checks on the validation set
-                log_lik_ratio, _, _ = do_validation_set_checks(
-                    theta,
-                    possible_theta_mask,
-                    val_set,
-                    val_set_evaluator,
-                    feat_generator,
-                    true_theta,
-                    args,
-                )
-                if log_lik_ratio is not None:
-                    log.info("Comparing validation log likelihood for penalty param %s, log ratio: %f" % (penalty_param_str, log_lik_ratio))
-
-                if args.full_train:
-                    theta, variance_est, _ = em_algo.run(
-                        theta=theta,
-                        burn_in=burn_in,
-                        penalty_params=penalty_params,
-                        max_em_iters=args.em_max_iters,
-                        train_and_val=True,
-                        intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
-                    )
-
-            # Get the probabilities of the target nucleotides
-            fitted_prob_vector = None #MultinomialSolver.solve(obs_data, feat_generator, theta) if not args.per_target_model else None
-            curr_model_results = MethodResults(penalty_params, theta, fitted_prob_vector, variance_est)
-
-            # We save the final theta (potentially trained over all the data)
-            results_list.append(curr_model_results)
-            with open(args.intermediate_out_file, "w") as f:
-                pickle.dump(results_list, f)
-
-            log.info("==== FINAL theta, %s====" % curr_model_results)
-            log.info(get_nonzero_theta_print_lines(theta, motif_list, feat_generator.mutating_pos_list, feat_generator.motif_len))
-
-            if args.tuning_sample_ratio:
-                if best_model_in_list is None or log_lik_ratio > 0:
-                    best_model_in_list = curr_model_results
-                    log.info("===== Best model so far %s" % best_model_in_list)
-                    if val_set_evaluator is not None:
-                        num_val_samples = val_set_evaluator.num_samples
-                    else:
-                        num_val_samples = args.num_val_samples
-
-                    val_set_evaluator = LikelihoodComparer(
-                        val_set,
-                        feat_generator,
-                        theta_ref=best_model_in_list.theta,
-                        num_samples=num_val_samples,
-                        burn_in=args.num_val_burnin,
-                        num_jobs=args.num_jobs,
-                        scratch_dir=args.scratch_dir,
-                        pool=all_runs_pool,
-                    )
-                elif log_lik_ratio < 0 and curr_model_results.num_nonzero > 0:
-                    # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
-                    log.info("Stop trying penalty parameters for this penalty parameter list")
-                    break
-            elif best_model_in_list is None:
-                best_model_in_list = curr_model_results
-                log.info("===== Best model so far %s" % best_model_in_list)
-
-        best_models.append(best_model_in_list)
-
-    # A greedy comparison
-    best_model = GreedyLikelihoodComparer.do_greedy_search(
-        val_set,
-        feat_generator,
-        best_models,
-        lambda m:get_num_unique_theta(m.theta),
-        args.num_val_burnin,
-        args.num_val_samples,
-        args.num_jobs,
-        args.scratch_dir,
-        pool=all_runs_pool,
-    )
-
-    log.info("=== FINAL Best model: %s" % best_model)
-    theta_standard_error = None
-    if not args.full_train:
-        log.info("Begin a final training of the model")
-        # If we didn't do a full training for this best model, do it now
-        best_theta, variance_est, _ = em_algo.run(
-            theta=best_model.theta,
+        init_theta = initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask)
+        base_train_obs = feat_generator.create_base_features_for_list(train_set)
+        base_val_obs = feat_generator.create_base_features_for_list(val_set)
+        #### STAGE 1: FIT A PENALIZED MODEL
+        penalized_theta, variance_est, _ = em_algo.run(
+            base_train_obs,
+            feat_generator,
+            theta=init_theta,
+            possible_theta_mask=possible_theta_mask,
+            zero_theta_mask=zero_theta_mask,
             burn_in=burn_in,
-            penalty_params=best_model.penalty_params,
+            penalty_params=penalty_params,
             max_em_iters=args.em_max_iters,
-            train_and_val=True,
-            intermed_file_prefix="%s/e_samples_%s_final_" % (args.intermediate_out_dir, penalty_param_str),
-            get_hessian=args.get_hessian,
+            intermed_file_prefix="%s/e_samples_%s_" % (args.intermediate_out_dir, penalty_param_str),
         )
-        best_fitted_prob_vector = None#MultinomialSolver.solve(obs_data, feat_generator, best_theta) if not args.per_target_model else None
-        best_model = MethodResults(
-            best_model.penalty_params,
-            best_theta,
-            best_fitted_prob_vector,
-            variance_est,
+        curr_model_results = MethodResults(penalty_params)
+
+        #### STAGE 1.5: DECIDE IF THIS MODEL IS WORTH REFITTING
+        #### Right now, we check if the validation log likelihood (EM surrogate) is better
+        log_lik_ratio_lower_bound, log_lik_ratio, _ = do_validation_set_checks(
+            penalized_theta,
+            possible_theta_mask,
+            base_val_obs,
+            val_set_evaluator,
+            feat_generator,
+            true_theta,
         )
+        curr_model_results.set_penalized_theta(penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_model=best_model)
+
+        log.info("==== Penalized theta, %s, nonzero %d ====" % (penalty_param_str, curr_model_results.penalized_num_nonzero))
+        log.info(get_nonzero_theta_print_lines(penalized_theta, feat_generator))
+
+        if log_lik_ratio_lower_bound is None or log_lik_ratio_lower_bound >= 0:
+            # If the model is better than previous models
+            best_model = curr_model_results
+            log.info("===== Best model (per validation set) %s" % best_model)
+
+            # Create this val set evaluator for next time
+            val_set_evaluator = LikelihoodComparer(
+                base_val_obs,
+                feat_generator,
+                theta_ref=best_model.penalized_theta,
+                num_samples=num_val_samples,
+                burn_in=args.num_val_burnin,
+                num_jobs=args.num_jobs,
+                scratch_dir=args.scratch_dir,
+                pool=all_runs_pool,
+            )
+            # grab this many validation samples from now on
+            num_val_samples = val_set_evaluator.num_samples
+
+            # STAGE 2: REFIT THE MODEL WITH NO PENALTY
+            zero_theta_mask_refit, motifs_to_remove, pos_to_remove, motifs_to_remove_mask = make_zero_theta_refit_mask(
+                penalized_theta,
+                feat_generator,
+            )
+            log.info("Refit theta size: %d" % zero_theta_mask_refit.size)
+            if zero_theta_mask_refit.size > 0:
+                # Create a feature generator for this shrunken model
+                feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
+                    motif_lens=args.motif_lens,
+                    motifs_to_remove=motifs_to_remove,
+                    pos_to_remove=pos_to_remove,
+                    left_motif_flank_len_list=args.positions_mutating,
+                )
+                # Get the data ready - using ALL data
+                obs_data_stage2 = feat_generator_stage2.create_base_features_for_list(obs_data)
+                # Create the theta mask for the shrunken theta
+                possible_theta_mask_refit = get_possible_motifs_to_targets(
+                    feat_generator_stage2.motif_list,
+                    zero_theta_mask_refit.shape,
+                    feat_generator_stage2.mutating_pos_list,
+                )
+                # Refit over the support from the penalized problem
+                refit_theta, variance_est, _ = em_algo.run(
+                    obs_data_stage2,
+                    feat_generator_stage2,
+                    theta=penalized_theta[~motifs_to_remove_mask,:], # initialize from the lasso version
+                    possible_theta_mask=possible_theta_mask_refit,
+                    zero_theta_mask=zero_theta_mask_refit,
+                    burn_in=burn_in,
+                    penalty_params=(0,), # now fit with no penalty
+                    max_em_iters=args.em_max_iters * 2,
+                    intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
+                    get_hessian=True,
+                )
+                curr_model_results.set_refit_theta(refit_theta, variance_est, motifs_to_remove, pos_to_remove, zero_theta_mask_refit)
+
+                log.info("==== Refit theta, %s====" % curr_model_results)
+                log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))
+
+        # Save model results
+        results_list.append(curr_model_results)
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
+
+        if log_lik_ratio_lower_bound is not None and log_lik_ratio_lower_bound < 0 and curr_model_results.penalized_num_nonzero > 0:
+            # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
+            log.info("Stop trying penalty parameters for this penalty parameter list")
+            break
 
     if all_runs_pool is not None:
         all_runs_pool.close()
         # helpful comment copied over: make sure we don't keep these processes open!
         all_runs_pool.join()
-
-    with open(args.out_file, "w") as f:
-        pickle.dump((best_model.theta, best_model.fitted_prob_vector, best_model.variance_est), f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
