@@ -52,6 +52,13 @@ def main(args=sys.argv[1:]):
             small_true_model = true_model[0].ravel()[motif_mask]
             small_penalized_model = f_model.penalized_theta.ravel()[motif_mask]
 
+            # confidence ellipse?
+            reshape_small_true = small_true_model.reshape((small_true_model.size, 1))
+            var = np.matrix(f_model.variance_est)
+            inv_var = np.linalg.inv(var)
+            stat = np.matrix(f_model.refit_theta - reshape_small_true).T * inv_var * np.matrix(f_model.refit_theta - reshape_small_true)
+            thres = f_model.refit_theta.size * 99./(100-f_model.refit_theta.size) * scipy.stats.f.ppf(0.05, f_model.refit_theta.size, 100 - f_model.refit_theta.size)
+
             se = np.sqrt(np.diag(f_model.variance_est))
             lower = refit_model - args.z * se
             upper = refit_model + args.z * se
@@ -64,6 +71,10 @@ def main(args=sys.argv[1:]):
             print("  refit: spearman %f, %f" % scipy.stats.spearmanr(refit_model, small_true_model))
             print("  penal: pearson %f, %f" % scipy.stats.pearsonr(small_penalized_model, small_true_model))
             print("  penal: spearman %f, %f" % scipy.stats.spearmanr(small_penalized_model, small_true_model))
+            print("  stat < thres? %d (%f %f)" % ((stat < thres), stat, thres))
+
+            if np.mean((lower < 0) & (upper > 0)) > 0.35:
+                break
 
 if __name__ == "__main__":
     main(sys.argv[1:])
