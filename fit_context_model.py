@@ -183,7 +183,7 @@ def parse_args():
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
-    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
     if not os.path.exists(args.scratch_dir):
         os.makedirs(args.scratch_dir)
 
