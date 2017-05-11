@@ -28,7 +28,7 @@ nest.add(
             'penalty_params': ",".join(map(str, np.power(10, np.arange(-0.75, -3.5, step=-0.25)).tolist())),
         }
     ],
-    label_func=lambda c: "%dmer" % c['motif_len'])
+    label_func=lambda c: "%dmer_n%d" % (c['motif_len'], c['n_germline']))
 
 nest.add(
     'sparsity_ratio',
