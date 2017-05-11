@@ -19,8 +19,9 @@ target_nucs <- unlist(strsplit(arg[4], ','))
 
 motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 
-# Read data and convert to format plotBarchart wants
-raw_data <- read.table(data_path, sep=',', header=TRUE)
+# Read data and convert to format plotBarchart wants, and convert -inf to 0
+raw_data <- read.table(data_path, sep=',', header=TRUE, stringsAsFactors=FALSE)
+raw_data <- do.call(data.frame, lapply(raw_data, function(x) replace(x, is.infinite(x), NA)))
 
 # N->Z for ordering in plot
 raw_data['motif'] <- apply(raw_data['motif'], 2, function(motif) gsub('N', 'Z', motif))
@@ -28,8 +29,8 @@ raw_data['motif'] <- apply(raw_data['motif'], 2, function(motif) gsub('N', 'Z', 
 # Plot for multiple nucleotides
 center_nucs <- c('A', 'T', 'G', 'C')
 y_lim <- c(
-    floor(min(raw_data['theta_lower'])),
-    ceiling(max(raw_data['theta_upper']))
+    floor(min(raw_data['theta_lower'], na.rm=TRUE)),
+    ceiling(max(raw_data['theta_upper'], na.rm=TRUE))
 )
 plot_list <- plotBarchart(raw_data,
                           nucleotides=center_nucs,

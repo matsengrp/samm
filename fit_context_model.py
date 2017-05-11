@@ -360,10 +360,11 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    motifs_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
+    motifs_to_remove, pos_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
     feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=args.motif_lens,
         motifs_to_remove=motifs_to_remove,
+        pos_to_remove=pos_to_remove,
         left_motif_flank_len_list=args.positions_mutating,
     )
 
