@@ -1,3 +1,5 @@
+import sys
+import argparse
 import pickle
 import numpy as np
 import scipy.stats
@@ -8,10 +10,6 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description=__doc__)
 
-    parser.add_argument('--seed',
-        type=int,
-        help='rng seed for replicability',
-        default=1533)
     parser.add_argument('--fitted-model',
         type=str,
         help='fitted model pickle',
