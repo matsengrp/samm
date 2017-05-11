@@ -256,7 +256,6 @@ def main(args=sys.argv[1:]):
             reference_pen_param=penalty_param_prev
         )
 
-<<<<<<< HEAD
         if args.tuning_sample_ratio > 0:
             # Create this val set evaluator for next time
             val_set_evaluator = LikelihoodComparer(
@@ -271,22 +270,6 @@ def main(args=sys.argv[1:]):
             )
             # grab this many validation samples from now on
             num_val_samples = val_set_evaluator.num_samples
-=======
-            if args.tuning_sample_ratio > 0:
-                # Create this val set evaluator for next time
-                val_set_evaluator = LikelihoodComparer(
-                    base_val_obs,
-                    feat_generator,
-                    theta_ref=best_model.penalized_theta,
-                    num_samples=num_val_samples,
-                    burn_in=args.num_val_burnin,
-                    num_jobs=args.num_jobs,
-                    scratch_dir=args.scratch_dir,
-                    pool=all_runs_pool,
-                )
-                # grab this many validation samples from now on
-                num_val_samples = val_set_evaluator.num_samples
->>>>>>> check for num nonzero
 
         # Save model results
         results_list.append(curr_model_results)
