@@ -59,7 +59,7 @@ def main(args=sys.argv[1:]):
             print("num nonzero %d" % np.sum(motif_mask))
             print("  lower upper cross zero %f" % np.mean((lower < 0) & (upper > 0)))
             print("  coverage %f" % np.mean((lower < small_true_model) & (upper > small_true_model)))
-            print("  support TP %f" % (np.sum(motif_mask & (truth[0].ravel() != 0))/float(np.sum(motif_mask))))
+            print("  support TP %f" % (np.sum(motif_mask & (true_model[0].ravel() != 0))/float(np.sum(motif_mask))))
             print("  refit: pearson %f, %f" % scipy.stats.pearsonr(refit_model, small_true_model))
             print("  refit: spearman %f, %f" % scipy.stats.spearmanr(refit_model, small_true_model))
             print("  penal: pearson %f, %f" % scipy.stats.pearsonr(small_penalized_model, small_true_model))
