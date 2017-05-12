@@ -17,7 +17,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             self,
             motif_len=3,
             motifs_to_remove=[],
-            pos_to_remove=[],
             left_motif_flank_len=1,
             hier_offset=0,
             left_update_region=1,
@@ -26,7 +25,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         """
         @param motif_len: length of motif
         @param motifs_to_remove: motifs to remove
-        @param pos_to_remove: positions to remove
         @param left_motif_flank_len: length of region to the left of the mutating position
         @param hier_offset: where to offset sequence if we are using hierarchical motifs
         @param left_update_region: number of positions to consider left of mutating position to update
@@ -49,7 +47,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         self.feature_vec_len = np.power(4, motif_len)
 
-        motifs_to_remove = [m for m, l in zip(motifs_to_remove, pos_to_remove) if len(m) == motif_len and l == left_motif_flank_len]
+        motifs_to_remove = [m for m in motifs_to_remove if len(m) == motif_len]
         self.motif_list = self._get_motif_list(motifs_to_remove)
         self.motif_dict = {motif: i for i, motif in enumerate(self.motif_list)}
         for m in motifs_to_remove:

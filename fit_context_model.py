@@ -33,6 +33,7 @@ from common import *
 from read_data import *
 from matsen_grp_data import *
 from multiprocessing import Pool
+from model_truncation import ModelTruncation
 
 def parse_args():
     ''' parse command line arguments '''
@@ -423,17 +424,13 @@ def main(args=sys.argv[1:]):
             num_val_samples = val_set_evaluator.num_samples
 
             # STAGE 2: REFIT THE MODEL WITH NO PENALTY
-            zero_theta_mask_refit, motifs_to_remove, pos_to_remove, motifs_to_remove_mask = make_zero_theta_refit_mask(
-                penalized_theta,
-                feat_generator,
-            )
-            log.info("Refit theta size: %d" % zero_theta_mask_refit.size)
-            if zero_theta_mask_refit.size > 0:
+            model_masks = ModelTruncation(penalized_theta, feat_generator)
+            log.info("Refit theta size: %d" % model_masks.zero_theta_mask_refit.size)
+            if model_masks.zero_theta_mask_refit.size > 0:
                 # Create a feature generator for this shrunken model
                 feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
                     motif_lens=args.motif_lens,
-                    motifs_to_remove=motifs_to_remove,
-                    pos_to_remove=pos_to_remove,
+                    feats_to_remove=model_masks.feats_to_remove,
                     left_motif_flank_len_list=args.positions_mutating,
                 )
                 # Get the data ready - using ALL data
@@ -441,23 +438,23 @@ def main(args=sys.argv[1:]):
                 # Create the theta mask for the shrunken theta
                 possible_theta_mask_refit = get_possible_motifs_to_targets(
                     feat_generator_stage2.motif_list,
-                    zero_theta_mask_refit.shape,
+                    model_masks.zero_theta_mask_refit.shape,
                     feat_generator_stage2.mutating_pos_list,
                 )
                 # Refit over the support from the penalized problem
                 refit_theta, variance_est, _ = em_algo.run(
                     obs_data_stage2,
                     feat_generator_stage2,
-                    theta=penalized_theta[~motifs_to_remove_mask,:], # initialize from the lasso version
+                    theta=penalized_theta[~model_masks.feats_to_remove_mask,:], # initialize from the lasso version
                     possible_theta_mask=possible_theta_mask_refit,
-                    zero_theta_mask=zero_theta_mask_refit,
+                    zero_theta_mask=model_masks.zero_theta_mask_refit,
                     burn_in=burn_in,
                     penalty_params=(0,), # now fit with no penalty
                     max_em_iters=args.em_max_iters * 2,
                     intermed_file_prefix="%s/e_samples_%s_full_" % (args.intermediate_out_dir, penalty_param_str),
                     get_hessian=True,
                 )
-                curr_model_results.set_refit_theta(refit_theta, variance_est, motifs_to_remove, pos_to_remove, zero_theta_mask_refit)
+                curr_model_results.set_refit_theta(refit_theta, variance_est, model_masks.feats_to_remove, model_masks.zero_theta_mask_refit)
 
                 log.info("==== Refit theta, %s====" % curr_model_results)
                 log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))

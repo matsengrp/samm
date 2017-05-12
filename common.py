@@ -188,8 +188,8 @@ def get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape):
         return zero_theta_mask
 
     for motif, target_dict in target_pairs_to_remove.iteritems():
-        if motif in feat_generator.motif_dict:
-            for mut_pos, targets in target_dict:
+        for mut_pos, targets in target_dict:
+            if motif in feat_generator.motif_dict:
                 for nuc in targets:
                     motif_idx = feat_generator.motif_dict[motif][mut_pos]
                     if nuc == "n":
@@ -429,19 +429,3 @@ def get_target_col(sample, mutation_pos):
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
     return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
-
-def make_zero_theta_refit_mask(theta, feat_generator):
-    """
-    @param theta: a fitted theta from which we determine the theta support
-    @param feat_generator: the feature generator
-
-    Figure out what the theta support is from the fitted theta
-    """
-    zeroed_thetas = np.abs(theta) < ZERO_THRES
-    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
-    motifs_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
-    motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
-    pos_to_remove = [feat_generator.left_motif_flank_len for _ in np.where(motifs_to_remove_mask)[0].tolist()]
-
-    zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
-    return zero_theta_mask_refit, motifs_to_remove, pos_to_remove, motifs_to_remove_mask

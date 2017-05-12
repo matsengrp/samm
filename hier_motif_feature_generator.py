@@ -4,11 +4,10 @@ from scipy.sparse import hstack
 from itertools import product
 
 class HierarchicalMotifFeatureGenerator(FeatureGenerator):
-    def __init__(self, motif_lens=[3,5], motifs_to_remove=[], pos_to_remove=[], left_motif_flank_len_list=None):
+    def __init__(self, motif_lens=[3,5], feats_to_remove={}, left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
-        @param motifs_to_remove: list of motifs (strings) that have been zeroed out (completely - all targets are zeroed out)
-        @param pos_to_remove: list of positions (ints) that have been zeroed out (completely - all targets are zeroed out)
+        @param feats_to_remove: dictionary whose keys are left_flank_len values and whose values are lists of motifs (strings) where the motif and left_flank_len have been zeroed out (completely - all targets are zeroed out)
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
         """
 
@@ -25,7 +24,9 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
 
         # Find the maximum left and right motif flank lengths to pass to SubmotifFeatureGenerator
         # in order to update all the relevant features
-        all_right_flanks = [m - l - 1 for m, l_list in zip(motif_lens, left_motif_flank_len_list) for l in l_list]
+        all_right_flanks = [m - flank_len - 1 \
+                for m, flank_len_list in zip(motif_lens, left_motif_flank_len_list) \
+                for flank_len in flank_len_list]
         max_left_flanks = left_motif_flank_len_list[motif_lens.index(self.max_motif_len)]
         self.max_left_motif_flank_len = max(sum(left_motif_flank_len_list, []))
         self.max_right_motif_flank_len = max(all_right_flanks)
@@ -38,11 +39,12 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         self.feat_gens = []
         for motif_len, left_motif_flank_lens in zip(motif_lens, left_motif_flank_len_list):
             for left_motif_flank_len in left_motif_flank_lens:
+                motifs_to_remove = feats_to_remove[left_motif_flank_len] \
+                        if left_motif_flank_len in feats_to_remove.keys() else []
                 self.feat_gens.append(
                         SubmotifFeatureGenerator(
                             motif_len=motif_len,
                             motifs_to_remove=motifs_to_remove,
-                            pos_to_remove=pos_to_remove,
                             left_motif_flank_len=left_motif_flank_len,
                             hier_offset=self.max_left_motif_flank_len - left_motif_flank_len,
                             left_update_region=self.max_left_motif_flank_len,
@@ -54,17 +56,14 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
         self.num_feat_gens = len(self.feat_gens)
 
+        # construct motif dictionary and lists of parameters
         self.feature_vec_len = np.sum(feat_offsets)
         self.motif_list = []
         self.mutating_pos_list = []
-        for f in self.feat_gens:
-            self.motif_list += f.motif_list
-            # pass mutating positions along with motifs
-            self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
-
-        # construct motif dictionary too!
         self.motif_dict = dict()
         for i, f in enumerate(self.feat_gens):
+            self.motif_list += f.motif_list
+            self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
             for motif in f.motif_list:
                 raw_motif_idx = f.motif_dict[motif]
                 if motif not in self.motif_dict.keys():
