@@ -15,12 +15,12 @@ class ModelTruncation:
         self.feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
 
         self.feats_to_remove = dict()
-        for i in np.where(feats_to_remove_mask)[0].tolist():
+        for i in np.where(self.feats_to_remove_mask)[0].tolist():
             motif = feat_generator.motif_list[i]
             mut_pos = feat_generator.mutating_pos_list[i]
             if mut_pos not in self.feats_to_remove.keys():
                 self.feats_to_remove[mut_pos] = []
             self.feats_to_remove[mut_pos].append(motif)
 
-        self.zero_theta_mask_refit = zeroed_thetas[~feats_to_remove_mask,:]
+        self.zero_theta_mask_refit = zeroed_thetas[~self.feats_to_remove_mask,:]
 
