@@ -249,14 +249,14 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
 
     return germline_nucleotides, germline_genes
 
-def dump_parameters(true_thetas, probability_matrix, args, motif_list, mutating_pos_list):
+def dump_parameters(true_thetas, probability_matrix, raw_theta, args, feat_generator):
     # Dump a pickle file of simulation parameters
     pickle.dump([true_thetas, probability_matrix, raw_theta], open(args.output_true_theta, 'w'))
 
     # Dump a text file of theta for easy viewing
     with open(re.sub('.pkl', '.txt', args.output_true_theta), 'w') as f:
         f.write("True Theta\n")
-        lines = get_nonzero_theta_print_lines(true_thetas, motif_list, mutating_pos_list, feat_generator.motif_len)
+        lines = get_nonzero_theta_print_lines(true_thetas, feat_generator)
         f.write(lines)
 
 def dump_germline_data(germline_nucleotides, germline_genes, args):
@@ -287,7 +287,7 @@ def main(args=sys.argv[1:]):
     else:
         simulator = SurvivalModelSimulatorSingleColumn(true_thetas, probability_matrix, feat_generator, lambda0=args.lambda0)
 
-    dump_parameters(true_thetas, probability_matrix, args, motif_list, mutating_pos_list)
+    dump_parameters(true_thetas, probability_matrix, raw_theta, args, feat_generator)
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
 

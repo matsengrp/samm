@@ -140,10 +140,14 @@ def is_re_match(regex, submotif):
     match_res = re.match(regex, submotif)
     return match_res is not None
 
-def get_nonzero_theta_print_lines(theta, motif_list, mutating_pos_list, motif_len):
+def get_nonzero_theta_print_lines(theta, feat_gen):
     """
     @return a string that summarizes the theta vector/matrix
     """
+    motif_list = feat_gen.motif_list
+    motif_len = feat_gen.motif_len
+    mutating_pos_list = feat_gen.mutating_pos_list
+
     lines = []
     mutating_pos_set = list(set(mutating_pos_list))
     known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]

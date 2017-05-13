@@ -2,10 +2,11 @@ import numpy as np
 from common import *
 
 class MethodResults:
-    def __init__(self, penalty_params, motif_lens, positions_mutating):
+    def __init__(self, penalty_params):
+        """
+        @param penalized_theta: a theta from the penalized version
+        """
         self.penalty_params = penalty_params
-        self.motif_lens = motif_lens
-        self.positions_mutating = positions_mutating
 
     def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_model=None):
         """
@@ -30,7 +31,8 @@ class MethodResults:
         self.motifs_to_remove_mask = motifs_to_remove_mask
         self.refit_zero_theta_mask = zero_theta_mask
         self.refit_possible_theta_mask = possible_theta_mask
+        self.zero_theta_mask = zero_theta_mask
 
     def __str__(self):
         pen_param_str = ",".join(map(str, self.penalty_params))
-        return "Pen params %s, nonzero %d, unique %d" % (pen_param_str, self.num_nonzero, self.num_unique)
+        return "Pen params %s" % pen_param_str
