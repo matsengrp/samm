@@ -424,3 +424,31 @@ def get_target_col(sample, mutation_pos):
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
     return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
+
+def make_zero_theta_refit_mask(theta, feat_generator):
+    """
+    @param theta: a fitted theta from which we determine the theta support
+    @param feat_generator: the feature generator
+
+    Figure out what the theta support is from the fitted theta
+    """
+    zeroed_thetas = np.array(np.abs(theta) < ZERO_THRES, dtype=bool)
+    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
+    motifs_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
+    motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
+
+    zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
+    return zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask
+
+def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
+    """
+    Initialize theta
+    @param possible_theta_mask: set the negative of this mask to negative infinity theta values
+    @param zero_theta_mask: set the negative of this mask to negative infinity theta values
+    """
+    theta = np.random.randn(theta_shape[0], theta_shape[1]) * 1e-3
+    # Set the impossible thetas to -inf
+    theta[~possible_theta_mask] = -np.inf
+    # Set particular thetas to zero upon request
+    theta[zero_theta_mask] = 0
+    return theta
