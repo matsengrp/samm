@@ -112,7 +112,6 @@ class ContextModelAlgo:
 
         #### STAGE 1.5: DECIDE IF THIS MODEL IS WORTH REFITTING
         #### Right now, we check if the validation log likelihood (EM surrogate) is better
-        log.info("val_set_evaluator" + str(val_set_evaluator))
         log_lik_ratio_lower_bound, log_lik_ratio = self._do_validation_set_checks(
             penalized_theta,
             val_set_evaluator,
