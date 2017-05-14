@@ -14,6 +14,7 @@ class MethodResults:
         self.positions_mutating = positions_mutating
         self.has_refit_data = False
         self.z_stat = z_stat
+        self.num_not_crossing_zero = 0
 
     def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_penalty_param=None):
         """

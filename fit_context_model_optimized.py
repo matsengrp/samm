@@ -205,8 +205,8 @@ def main(args=sys.argv[1:]):
 
     cmodel_algo = ContextModelAlgo(feat_generator, obs_data, obs_data, args, all_runs_pool)
     model_history = []
-    def min_func(pen_param):
-        fitted_model = cmodel_algo.fit(pen_param)
+    def min_func(log_pen_param):
+        fitted_model = cmodel_algo.fit(np.power(10, log_pen_param))
         model_history.append(fitted_model)
         with open(args.out_file, "w") as f:
             pickle.dump(model_history, f)
@@ -217,7 +217,7 @@ def main(args=sys.argv[1:]):
     # that don't cross zero
     optim_res = scipy.optimize.minimize_scalar(
         min_func,
-        bounds=(args.penalty_param_min, args.penalty_param_max),
+        bounds=(np.log10(args.penalty_param_min), np.log10(args.penalty_param_max)),
         method='bounded',
         options={"maxiter": args.max_search},
     )
