@@ -1,5 +1,6 @@
 import pickle
 import copy
+import logging as log
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
