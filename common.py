@@ -456,3 +456,40 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     # Set particular thetas to zero upon request
     theta[zero_theta_mask] = 0
     return theta
+
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
+    """
+    @param num_obs: number of observations
+    @param feat_generator: submotif feature generator
+    @param metadata: metadata to include variables to perform validation on
+    @param tuning_sample_ratio: ratio of data to place in validation set
+    @param validation_column: variable to perform validation on (if None then sample randomly)
+
+    @return training and validation indices
+    """
+    if validation_column is None:
+        # For no validation column just sample data randomly
+        val_size = int(tuning_sample_ratio * num_obs)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+        permuted_idx = np.random.permutation(num_obs)
+        train_idx = permuted_idx[:num_obs - val_size]
+        val_idx = permuted_idx[num_obs - val_size:]
+    else:
+        # For a validation column, sample the categories randomly based on
+        # tuning_sample_ratio
+        categories = set([elt[validation_column] for elt in metadata])
+        num_categories = len(categories)
+        val_size = int(tuning_sample_ratio * num_categories)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+
+        # sample random categories from our validation variable
+        val_categories = set(random.sample(categories, val_size))
+        train_categories = categories - val_categories
+        log.info("train_categories %s" % train_categories)
+        log.info("val_categories %s" % val_categories)
+        train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
+        val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
+
+    return train_idx, val_idx

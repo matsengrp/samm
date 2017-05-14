@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Fit a context-sensitive motif model via MCMC-EM
+Use bracketing to determine the penalty parameter that maximizes the number of
+confidence intervals that don't cross zero
 """
 
 import sys
@@ -16,12 +18,11 @@ import random
 from multiprocessing import Pool
 
 import numpy as np
-import scipy.stats
+import scipy.optimize
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
-from likelihood_evaluator import LikelihoodComparer
 from common import *
 from read_data import *
 from matsen_grp_data import *
@@ -76,7 +77,7 @@ def parse_args():
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
-        default=20)
+        default=1)
     parser.add_argument('--burn-in',
         type=int,
         help='number of burn-in iterations for E-step',
@@ -97,30 +98,16 @@ def parse_args():
         type=str,
         help='true theta file',
         default='')
-    parser.add_argument("--penalty-params",
-        type=str,
-        help="penalty parameters, comma separated",
-        default="0.5, 0.25")
-    parser.add_argument('--tuning-sample-ratio',
+    parser.add_argument("--penalty-param-min",
         type=float,
-        help='proportion of data to use for tuning the penalty parameter. if zero, doesnt tune',
-        default=0.2)
-    parser.add_argument('--num-val-burnin',
+        default=0.0001)
+    parser.add_argument("--penalty-param-max",
+        type=float,
+        default=1)
+    parser.add_argument("--max-search",
         type=int,
-        help='Number of burn in iterations when estimating likelihood of validation data',
-        default=10)
-    parser.add_argument('--num-val-samples',
-        type=int,
-        help='Number of burn in iterations when estimating likelihood of validation data',
-        default=10)
-    parser.add_argument('--num-val-threads',
-        type=int,
-        help='number of threads to use for validation calculations',
-        default=12)
-    parser.add_argument('--validation-column',
-        type=str,
-        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
-        default=None)
+        help="maximum number of penalty parameters to try",
+        default=4)
     parser.add_argument('--per-target-model',
         action='store_true')
     parser.add_argument("--locus",
@@ -133,12 +120,12 @@ def parse_args():
         choices=('','mouse','human'),
         help="species (mouse or human; default empty)",
         default='')
-    parser.add_argument("--z-stat",
+    parser.add_argument('--z-stat',
         type=float,
-        help="confidence interval z statistic",
+        help="Determines the width of the confidence intervals",
         default=1.96)
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -175,13 +162,9 @@ def parse_args():
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
-    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
     if not os.path.exists(args.scratch_dir):
         os.makedirs(args.scratch_dir)
-
-    # sort penalty params from largest to smallest
-    args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
-    args.penalty_params = sorted(args.penalty_params, reverse=True)
 
     return args
 
@@ -189,10 +172,6 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-
-    true_theta = None
-    if args.theta_file != "":
-        true_theta, _ = load_true_model(args.theta_file)
 
     if args.num_cpu_threads > 1:
         all_runs_pool = Pool(args.num_cpu_threads)
@@ -215,71 +194,39 @@ def main(args=sys.argv[1:]):
         locus=args.locus,
         species=args.species,
     )
-
-    train_idx, val_idx = split_train_val(
-        len(obs_data),
-        metadata,
-        args.tuning_sample_ratio,
-        args.validation_column,
-    )
-    train_set = [obs_data[i] for i in train_idx]
-    val_set = [obs_data[i] for i in val_idx]
-    feat_generator.add_base_features_for_list(train_set)
-    feat_generator.add_base_features_for_list(val_set)
+    feat_generator.add_base_features_for_list(obs_data)
 
     log.info("Data statistics:")
-    log.info("  Number of sequences: Train %d, Val %d" % (len(train_idx), len(val_idx)))
+    log.info("  Number of sequences: %d" % len(obs_data))
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
-    cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
-    # Run EM on the lasso parameters from largest to smallest
-    val_set_evaluator = None
-    penalty_param_prev = None
-    num_val_samples = args.num_val_samples
-    results_list = []
-    for penalty_param in args.penalty_params:
-        log.info("==== Penalty parameter %f ====" % penalty_param)
-        curr_model_results = cmodel_algo.fit(
-            penalty_param,
-            val_set_evaluator,
-            reference_pen_param=penalty_param_prev
-        )
-
-        # Create this val set evaluator for next time
-        val_set_evaluator = LikelihoodComparer(
-            val_set,
-            feat_generator,
-            theta_ref=curr_model_results.penalized_theta,
-            num_samples=num_val_samples,
-            burn_in=args.num_val_burnin,
-            num_jobs=args.num_jobs,
-            scratch_dir=args.scratch_dir,
-            pool=all_runs_pool,
-        )
-        # grab this many validation samples from now on
-        num_val_samples = val_set_evaluator.num_samples
-
-        # Save model results
-        results_list.append(curr_model_results)
+    cmodel_algo = ContextModelAlgo(feat_generator, obs_data, obs_data, args, all_runs_pool)
+    model_history = []
+    def min_func(pen_param):
+        fitted_model = cmodel_algo.fit(pen_param)
+        model_history.append(fitted_model)
         with open(args.out_file, "w") as f:
-            pickle.dump(results_list, f)
+            pickle.dump(model_history, f)
 
-        ll_lower_bound = curr_model_results.log_lik_ratio_lower_bound
-        if ll_lower_bound is not None and ll_lower_bound < 0 and curr_model_results.penalized_num_nonzero > 0:
-            # This model is not better than the previous model. Use a greedy approach and stop trying penalty parameters
-            log.info("Stop trying penalty parameters for this penalty parameter list")
-            break
+        return -fitted_model.num_not_crossing_zero
 
-        penalty_param_prev = penalty_param
+    # Use bracketing to find the penalty parameter that maximizes the number of confidence intervals
+    # that don't cross zero
+    optim_res = scipy.optimize.minimize_scalar(
+        min_func,
+        bounds=(args.penalty_param_min, args.penalty_param_max),
+        method='bounded',
+        options={"maxiter": args.max_search},
+    )
 
     if all_runs_pool is not None:
         all_runs_pool.close()
         # helpful comment copied over: make sure we don't keep these processes open!
         all_runs_pool.join()
-    log.info("Completed!")
+    log.info("Completed. Best penalty parameter %f, Num not crossing zero %d" % (optim_res.x, -optim_res.fun))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
