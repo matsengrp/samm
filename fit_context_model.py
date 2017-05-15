@@ -196,6 +196,11 @@ def parse_args():
         args.max_left_flank = max(sum(args.positions_mutating, []))
         args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
+        # Check if our full feature generator will conform to input
+        max_left_flanks = args.positions_mutating[args.motif_lens.index(args.max_motif_len)]
+        if args.max_left_flank > max(max_left_flanks) or args.max_right_flank > args.max_motif_len - min(max_left_flanks) - 1:
+            raise AssertionError('The maximum length motif does not contain all smaller length motifs.')
+
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
     args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
