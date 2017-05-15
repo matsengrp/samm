@@ -15,6 +15,8 @@ class MethodResults:
         self.has_refit_data = False
         self.z_stat = z_stat
         self.num_not_crossing_zero = 0
+        self.percent_not_crossing_zero = 1
+        self.num_p = 0
 
     def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_penalty_param=None):
         """
@@ -50,8 +52,10 @@ class MethodResults:
         self.motifs_to_remove_mask = motifs_to_remove_mask
         self.refit_zero_theta_mask = zero_theta_mask
         self.refit_possible_theta_mask = possible_theta_mask
+        self.num_p = np.sum(self.refit_possible_theta_mask & ~self.refit_zero_theta_mask)
         self.zero_theta_mask = zero_theta_mask
         self.num_not_crossing_zero = num_not_crossing_zero
+        self.percent_not_crossing_zero = num_not_crossing_zero/float(self.num_p)
 
     def __str__(self):
         pen_param_str = ",".join(map(str, self.penalty_params))

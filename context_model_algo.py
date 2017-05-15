@@ -174,7 +174,6 @@ class ContextModelAlgo:
                     )
                     num_cross_zero = np.sum((conf_int[:,0] <= 0) & (0 <= conf_int[:,2]))
                     num_not_crossing_zero = conf_int.shape[0] - num_cross_zero
-                    log.info("Penalty param %f, Number not crossing zero %d" % (penalty_param, num_not_crossing_zero))
 
                 curr_model_results.set_refit_theta(
                     refit_theta,
@@ -185,5 +184,6 @@ class ContextModelAlgo:
                     zero_theta_mask_refit,
                     num_not_crossing_zero,
                 )
+                log.info("Pen_param %f, Number nonzero %d, Perc nonzero %f" % (penalty_param, curr_model_results.num_not_crossing_zero, curr_model_results.percent_not_crossing_zero))
 
         return curr_model_results

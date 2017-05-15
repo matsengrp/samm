@@ -100,10 +100,10 @@ def parse_args():
         default='')
     parser.add_argument("--penalty-param-min",
         type=float,
-        default=0.0001)
+        default=0.01)
     parser.add_argument("--penalty-param-max",
         type=float,
-        default=1)
+        default=10)
     parser.add_argument("--max-search",
         type=int,
         help="maximum number of penalty parameters to try",
@@ -124,6 +124,10 @@ def parse_args():
         type=float,
         help="Determines the width of the confidence intervals",
         default=1.96)
+    parser.add_argument('--nonzero-ratio',
+        type=float,
+        help="fraction of theta values with conf interval not crossing zero, if zero, just get the one with biggest number of nonzero crossings",
+        default=0.9)
 
     parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
@@ -211,7 +215,14 @@ def main(args=sys.argv[1:]):
         with open(args.out_file, "w") as f:
             pickle.dump(model_history, f)
 
-        return -fitted_model.num_not_crossing_zero
+        if args.nonzero_ratio == 0:
+            # optimize for number not crossing zero
+            func_val = -fitted_model.num_not_crossing_zero
+        else:
+            # optimize for percent not crossing zero and for the percent to be close to the requested value
+            func_val = np.abs(fitted_model.percent_not_crossing_zero - args.nonzero_ratio)
+        log.info("log_pen_param %f, func_val %f" % (log_pen_param, func_val))
+        return func_val
 
     # Use bracketing to find the penalty parameter that maximizes the number of confidence intervals
     # that don't cross zero
@@ -226,7 +237,7 @@ def main(args=sys.argv[1:]):
         all_runs_pool.close()
         # helpful comment copied over: make sure we don't keep these processes open!
         all_runs_pool.join()
-    log.info("Completed. Best penalty parameter %f, Num not crossing zero %d" % (optim_res.x, -optim_res.fun))
+    log.info("Completed. Best penalty parameter %f, opt value %d" % (optim_res.x, -optim_res.fun))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
