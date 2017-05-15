@@ -13,11 +13,11 @@ def parse_args():
     parser.add_argument('--fitted-model',
         type=str,
         help='fitted model pickle',
-        default='_output/fitted_model.pkl')
+        default='_output/context_model.pkl')
     parser.add_argument('--true-model',
         type=str,
         help='true model pickle file',
-        default='')
+        default='_output/true_model.pkl')
     parser.add_argument('--z',
         type=float,
         help="z statistic",
@@ -41,40 +41,34 @@ def main(args=sys.argv[1:]):
         left_motif_flank_len_list=fitted_models[0].positions_mutating,
     )
     for f_model in fitted_models:
-        if hasattr(f_model, 'motifs_to_remove') and hasattr(f_model, 'refit_theta') and hasattr(f_model, 'variance_est') and f_model.variance_est is not None:
+        if f_model.has_refit_data and f_model.variance_est is not None:
             feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
                 motif_lens=f_model.motif_lens,
-                motifs_to_remove=f_model.motifs_to_remove,
+                feats_to_remove=f_model.model_masks.feats_to_remove,
                 left_motif_flank_len_list=f_model.positions_mutating,
             )
-            motif_mask = np.array([m in feat_generator_stage2.motif_list for m in feat_gen.motif_list], dtype=bool)
-            refit_model = f_model.refit_theta.ravel()
-            small_true_model = true_model[0].ravel()[motif_mask]
-            small_penalized_model = f_model.penalized_theta.ravel()[motif_mask]
+            refit_model = f_model.refit_theta
+            motif_mask = ~f_model.model_masks.feats_to_remove_mask
 
-            # confidence ellipse?
-            reshape_small_true = small_true_model.reshape((small_true_model.size, 1))
-            var = np.matrix(f_model.variance_est)
-            inv_var = np.linalg.inv(var)
-            stat = np.matrix(f_model.refit_theta - reshape_small_true).T * inv_var * np.matrix(f_model.refit_theta - reshape_small_true)
-            thres = f_model.refit_theta.size * 99./(100-f_model.refit_theta.size) * scipy.stats.f.ppf(0.05, f_model.refit_theta.size, 100 - f_model.refit_theta.size)
+            small_true_model = true_model[0][motif_mask,:]
+            small_penalized_model = f_model.penalized_theta[motif_mask,:]
+
+            refit_model_flat = refit_model[f_model.refit_possible_theta_mask]
+            small_true_model_flat = small_true_model[f_model.refit_possible_theta_mask]
+            small_penalized_model_flat = small_penalized_model[f_model.refit_possible_theta_mask]
 
             se = np.sqrt(np.diag(f_model.variance_est))
-            lower = refit_model - args.z * se
-            upper = refit_model + args.z * se
+            lower = refit_model_flat - args.z * se
+            upper = refit_model_flat + args.z * se
 
-            print("num nonzero %d" % np.sum(motif_mask))
-            print("  lower upper cross zero %f" % np.mean((lower < 0) & (upper > 0)))
-            print("  coverage %f" % np.mean((lower < small_true_model) & (upper > small_true_model)))
+            print("num nonzero theta %d" % f_model.num_p)
+            print("  num dont cross zero %d" % f_model.num_not_crossing_zero)
+            print("  coverage %f" % np.mean((lower < small_true_model_flat) & (upper > small_true_model_flat)))
             print("  support TP %f" % (np.sum(motif_mask & (true_model[0].ravel() != 0))/float(np.sum(motif_mask))))
-            print("  refit: pearson %f, %f" % scipy.stats.pearsonr(refit_model, small_true_model))
-            print("  refit: spearman %f, %f" % scipy.stats.spearmanr(refit_model, small_true_model))
-            print("  penal: pearson %f, %f" % scipy.stats.pearsonr(small_penalized_model, small_true_model))
-            print("  penal: spearman %f, %f" % scipy.stats.spearmanr(small_penalized_model, small_true_model))
-            print("  stat < thres? %d (%f %f)" % ((stat < thres), stat, thres))
-
-            if np.mean((lower < 0) & (upper > 0)) > 0.35:
-                break
+            print("  refit: pearson %f, %f" % scipy.stats.pearsonr(refit_model_flat, small_true_model_flat))
+            print("  refit: spearman %f, %f" % scipy.stats.spearmanr(refit_model_flat, small_true_model_flat))
+            print("  penal: pearson %f, %f" % scipy.stats.pearsonr(small_penalized_model_flat, small_true_model_flat))
+            print("  penal: spearman %f, %f" % scipy.stats.spearmanr(small_penalized_model_flat, small_true_model_flat))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
