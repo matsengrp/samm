@@ -220,7 +220,7 @@ def main(args=sys.argv[1:]):
             func_val = -fitted_model.num_not_crossing_zero
         else:
             # optimize for percent not crossing zero and for the percent to be close to the requested value
-            func_val = np.abs(fitted_model.percent_not_crossing_zero - args.nonzero_ratio)
+            func_val = np.power(fitted_model.percent_not_crossing_zero - args.nonzero_ratio, 2)
         log.info("log_pen_param %f, func_val %f" % (log_pen_param, func_val))
         return func_val
 
