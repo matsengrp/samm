@@ -35,14 +35,14 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
     """
     Reads a csv file that indicates which motif (and target nucleotides) are zero constants
     The csv file format should be:
-        lowercase motif, bool(theta val is zero for col i) for i in range(theta.shape[1])
+        lowercase motif, mutating position, bool(theta val is zero for col i) for i in range(theta.shape[1])
     Example:
-        aaaaa, 1, 0, 1, 1, 0
-        means "aaaaa" to anything has theta value zero,
-                "aaaaa" to "a" has theta value anything (actually will be set to -inf),
-                "aaaaa" to "c" has theta value zero,
-                "aaaaa" to "g" has theta value zero,
-                "aaaaa" to "t" has theta value anything
+        aaaaa, 2, 1, 0, 1, 1, 0
+        means "aaaaa" central base to anything has theta value zero,
+                "aaaaa" central base to "a" has theta value anything (actually will be set to -inf),
+                "aaaaa" central base to "c" has theta value zero,
+                "aaaaa" central base to "g" has theta value zero,
+                "aaaaa" central base to "t" has theta value anything
 
     @return motifs_to_remove: motifs that should be completely removed from the entire MCMC-EM procedure
                                 since all theta values associated with that motif is zero
@@ -51,30 +51,35 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
                                     (for any-target theta, we indicate it with an "n" - it corresponds to col 0)
     """
     motifs_to_remove = []
+    pos_to_remove = []
     target_pairs_to_remove = dict()
 
     if csv_file_name == "":
-        return motifs_to_remove, target_pairs_to_remove
+        return motifs_to_remove, pos_to_remove, target_pairs_to_remove
 
     with open(csv_file_name, "r") as f:
         csv_reader = csv.reader(f)
         for row in csv_reader:
             motif = row[0]
+            mut_pos = row[1]
             zero_thetas = []
             if not per_target_model:
-                if int(row[1]) == 1:
+                if int(row[2]) == 1:
                     motifs_to_remove.append(motif)
+                    pos_to_remove.append(mut_pos)
             else:
-                if int(row[1]) == 1:
+                if int(row[2]) == 1:
                     zero_thetas.append("n")
                 for i in range(NUM_NUCLEOTIDES):
-                    if int(row[2 + i]) == 1:
+                    if int(row[3 + i]) == 1:
                         zero_thetas.append(NUCLEOTIDES[i])
                 if len(zero_thetas) >= NUM_NUCLEOTIDES:
                     motifs_to_remove.append(motif)
+                    pos_to_remove.append(mut_pos)
                 else:
-                    target_pairs_to_remove[motif] = zero_thetas
-    return motifs_to_remove, target_pairs_to_remove
+                    target_pairs_to_remove[motif] = dict()
+                    target_pairs_to_remove[motif][mut_pos] = zero_thetas
+    return motifs_to_remove, pos_to_remove, target_pairs_to_remove
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
 def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=True, motif_len=1):
