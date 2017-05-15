@@ -22,6 +22,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
 from likelihood_evaluator import LikelihoodComparer
+from method_results import MethodResults
 from common import *
 from read_data import *
 from matsen_grp_data import *
@@ -293,6 +294,10 @@ def main(args=sys.argv[1:]):
                     break
         num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
+
+        if variance_est is None and args.conf_int_stop and curr_model_results.penalized_num_nonzero > 0:
+            log.info("Stopping since no confidence intervals could be made")
+            break
 
     if all_runs_pool is not None:
         all_runs_pool.close()
