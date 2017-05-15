@@ -187,14 +187,15 @@ def get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape):
     if theta_shape[1] == 1:
         return zero_theta_mask
 
-    for motif, targets in target_pairs_to_remove.iteritems():
-        for nuc in targets:
+    for motif, target_dict in target_pairs_to_remove.iteritems():
+        for mut_pos, targets in target_dict:
             if motif in feat_generator.motif_dict:
-                motif_idx = feat_generator.motif_dict[motif]
-                if nuc == "n":
-                    zero_theta_mask[motif_idx, 0] = 1
-                else:
-                    zero_theta_mask[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = 1
+                for nuc in targets:
+                    motif_idx = feat_generator.motif_dict[motif][mut_pos]
+                    if nuc == "n":
+                        zero_theta_mask[motif_idx, 0] = 1
+                    else:
+                        zero_theta_mask[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = 1
     return zero_theta_mask
 
 def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):

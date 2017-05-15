@@ -7,6 +7,7 @@ from mcmc_em import MCMC_EM
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from method_results import MethodResults
 from confidence_interval_maker import ConfidenceIntervalMaker
+from model_truncation import ModelTruncation
 from common import *
 
 class ContextModelAlgo:
@@ -125,16 +126,13 @@ class ContextModelAlgo:
 
         if log_lik_ratio_lower_bound is None or log_lik_ratio_lower_bound >= 0:
             # STAGE 2: REFIT THE MODEL WITH NO PENALTY
-            zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask = make_zero_theta_refit_mask(
-                penalized_theta,
-                self.feat_generator,
-            )
-            log.info("Refit theta size: %d" % zero_theta_mask_refit.size)
-            if zero_theta_mask_refit.size > 0:
+            model_masks = ModelTruncation(penalized_theta, feat_generator)
+            log.info("Refit theta size: %d" % model_masks.zero_theta_mask_refit.size)
+            if model_masks.zero_theta_mask_refit.size > 0:
                 # Create a feature generator for this shrunken model
                 feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
                     motif_lens=self.motif_lens,
-                    motifs_to_remove=motifs_to_remove,
+                    feats_to_remove=model_masks.feats_to_remove,
                     left_motif_flank_len_list=self.positions_mutating,
                 )
                 # Get the data ready - using ALL data
@@ -143,7 +141,7 @@ class ContextModelAlgo:
                 # Create the theta mask for the shrunken theta
                 possible_theta_mask_refit = get_possible_motifs_to_targets(
                     feat_generator_stage2.motif_list,
-                    zero_theta_mask_refit.shape,
+                    model_masks.zero_theta_mask_refit.shape,
                     feat_generator_stage2.mutating_pos_list,
                 )
                 # Refit over the support from the penalized problem
@@ -152,7 +150,7 @@ class ContextModelAlgo:
                     feat_generator_stage2,
                     theta=penalized_theta[~motifs_to_remove_mask,:], # initialize from the lasso version
                     possible_theta_mask=possible_theta_mask_refit,
-                    zero_theta_mask=zero_theta_mask_refit,
+                    zero_theta_mask=model_masks.zero_theta_mask_refit,
                     burn_in=self.burn_in,
                     penalty_params=(0,), # now fit with no penalty
                     max_em_iters=self.em_max_iters,
@@ -178,10 +176,10 @@ class ContextModelAlgo:
                 curr_model_results.set_refit_theta(
                     refit_theta,
                     variance_est,
-                    motifs_to_remove,
-                    motifs_to_remove_mask,
+                    model_masks.feats_to_remove,
+                    model_masks.feats_to_remove_mask,
                     possible_theta_mask_refit,
-                    zero_theta_mask_refit,
+                    model_masks.zero_theta_mask_refit,
                     num_not_crossing_zero,
                 )
                 log.info("Pen_param %f, Number nonzero %d, Perc nonzero %f" % (penalty_param, curr_model_results.num_not_crossing_zero, curr_model_results.percent_not_crossing_zero))

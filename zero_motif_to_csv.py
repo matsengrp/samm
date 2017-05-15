@@ -27,6 +27,10 @@ def parse_args():
         type=str,
         help='comma-separated lengths of motifs (must all be odd)',
         default='3,5,7')
+    parser.add_argument('--positions-mutating',
+        type=str,
+        help='comma-separated mut pos',
+        default=None)
 
     args = parser.parse_args()
     args.output_path = os.path.dirname(os.path.realpath(args.input_pkl))
@@ -41,9 +45,17 @@ def main(args=sys.argv[1:]):
     for m in args.motif_len_vals:
         assert(m % 2 == 1)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_len_vals)
+    if args.positions_mutating is not None:
+        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
+        for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+
+    feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=args.motif_len_vals,
+            left_motif_flank_len_list=args.positions_mutating,
+        )
     args.max_motif_len = max(args.motif_len_vals)
-    full_motif_dict = feat_generator.feat_gens[-1].motif_dict
 
     # Load fitted theta file
     with open(args.input_pkl, "r") as f:
@@ -53,7 +65,7 @@ def main(args=sys.argv[1:]):
     csv_lines = []
     for i in range(theta.shape[0]):
         motif = feat_generator.motif_list[i]
-        csv_line = [motif]
+        csv_line = [motif, feat_generator.left_motif_flank_len]
         for j in range(theta.shape[1]):
             theta_val = theta[i,j]
             if theta_val == -np.inf:
