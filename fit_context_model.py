@@ -289,10 +289,10 @@ def main(args=sys.argv[1:]):
                     break
             else:
                 # We are going to tune using confidence intervals
-                if curr_model_results.num_not_crossing_zero <= num_nonzero_confint:
+                if curr_model_results.num_not_crossing_zero < num_nonzero_confint:
                     log.info("Number of nonzero confidence intervals decreasing. Stop trying penalty parameters")
                     break
-
+        num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
 
     if all_runs_pool is not None:
