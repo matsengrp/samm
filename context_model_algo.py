@@ -126,7 +126,7 @@ class ContextModelAlgo:
 
         if log_lik_ratio_lower_bound is None or log_lik_ratio_lower_bound >= 0:
             # STAGE 2: REFIT THE MODEL WITH NO PENALTY
-            model_masks = ModelTruncation(penalized_theta, feat_generator)
+            model_masks = ModelTruncation(penalized_theta, self.feat_generator)
             log.info("Refit theta size: %d" % model_masks.zero_theta_mask_refit.size)
             if model_masks.zero_theta_mask_refit.size > 0:
                 # Create a feature generator for this shrunken model
@@ -148,7 +148,7 @@ class ContextModelAlgo:
                 refit_theta, variance_est, _ = self.em_algo.run(
                     obs_data_stage2,
                     feat_generator_stage2,
-                    theta=penalized_theta[~motifs_to_remove_mask,:], # initialize from the lasso version
+                    theta=penalized_theta[~model_masks.feats_to_remove_mask,:], # initialize from the lasso version
                     possible_theta_mask=possible_theta_mask_refit,
                     zero_theta_mask=model_masks.zero_theta_mask_refit,
                     burn_in=self.burn_in,
@@ -167,7 +167,7 @@ class ContextModelAlgo:
                         refit_theta,
                         np.sqrt(np.diag(variance_est)),
                         possible_theta_mask_refit,
-                        zero_theta_mask_refit,
+                        model_masks.zero_theta_mask_refit,
                         z=self.z_stat,
                     )
                     num_cross_zero = np.sum((conf_int[:,0] <= 0) & (0 <= conf_int[:,2]))
