@@ -112,7 +112,7 @@ class MCMC_EM:
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < 0)
-                log.info("lower_bound_is_negative %d, lower_bound %f" % (lower_bound_is_negative, lower_bound))
+                log.info("em lower bound %f" % (lower_bound))
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break

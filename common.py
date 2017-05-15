@@ -429,3 +429,68 @@ def get_target_col(sample, mutation_pos):
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
     return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
+
+def make_zero_theta_refit_mask(theta, feat_generator):
+    """
+    @param theta: a fitted theta from which we determine the theta support
+    @param feat_generator: the feature generator
+
+    Figure out what the theta support is from the fitted theta
+    """
+    zeroed_thetas = np.array(np.abs(theta) < ZERO_THRES, dtype=bool)
+    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
+    motifs_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
+    motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
+
+    zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
+    return zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask
+
+def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
+    """
+    Initialize theta
+    @param possible_theta_mask: set the negative of this mask to negative infinity theta values
+    @param zero_theta_mask: set the negative of this mask to negative infinity theta values
+    """
+    theta = np.random.randn(theta_shape[0], theta_shape[1]) * 1e-3
+    # Set the impossible thetas to -inf
+    theta[~possible_theta_mask] = -np.inf
+    # Set particular thetas to zero upon request
+    theta[zero_theta_mask] = 0
+    return theta
+
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
+    """
+    @param num_obs: number of observations
+    @param feat_generator: submotif feature generator
+    @param metadata: metadata to include variables to perform validation on
+    @param tuning_sample_ratio: ratio of data to place in validation set
+    @param validation_column: variable to perform validation on (if None then sample randomly)
+
+    @return training and validation indices
+    """
+    if validation_column is None:
+        # For no validation column just sample data randomly
+        val_size = int(tuning_sample_ratio * num_obs)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+        permuted_idx = np.random.permutation(num_obs)
+        train_idx = permuted_idx[:num_obs - val_size]
+        val_idx = permuted_idx[num_obs - val_size:]
+    else:
+        # For a validation column, sample the categories randomly based on
+        # tuning_sample_ratio
+        categories = set([elt[validation_column] for elt in metadata])
+        num_categories = len(categories)
+        val_size = int(tuning_sample_ratio * num_categories)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+
+        # sample random categories from our validation variable
+        val_categories = set(random.sample(categories, val_size))
+        train_categories = categories - val_categories
+        log.info("train_categories %s" % train_categories)
+        log.info("val_categories %s" % val_categories)
+        train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
+        val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
+
+    return train_idx, val_idx

@@ -475,3 +475,10 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
                 # '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
             ]
         )
+
+def load_true_model(file_name):
+    with open(file_name, "rb") as f:
+        real_params = pickle.load(f)
+        true_theta = real_params[2] if len(real_params) > 2 else real_params[0]
+        probability_matrix = real_params[1]
+    return true_theta, probability_matrix

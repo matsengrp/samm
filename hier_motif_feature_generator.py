@@ -82,23 +82,24 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
                     feat_vec_dict[pos].append(feat + offset)
         return feat_vec_dict
 
-    def create_base_features_for_list(self, obs_data):
+    def add_base_features_for_list(self, obs_data):
         """
         Calls create_base_features over a list of obs_seq_mutation
+        Mutates the obs_data object -- adds starting features as an attribute
         """
-        obs_data_aug = []
         for obs in obs_data:
-            obs_data_aug.append(self.create_base_features(obs))
-        return obs_data_aug
+            self.add_base_features(obs)
 
-    def create_base_features(self, obs_seq_mutation):
+    def add_base_features(self, obs_seq_mutation):
+        """
+        Mutates the `obs_seq_mutation` object -- adds starting features as an attribute
+        """
         feat_mats = []
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
             feat_mat = feat_gen._get_base_features(obs_seq_mutation)
             feat_mats.append(feat_mat)
         full_feat_mat = hstack(feat_mats, format="csr")
         obs_seq_mutation.set_start_feats(full_feat_mat)
-        return obs_seq_mutation
 
     def count_mutated_motifs(self, seq_mut_order):
         mutated_motifs = []

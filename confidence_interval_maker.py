@@ -41,7 +41,13 @@ class ConfidenceIntervalMaker:
             # Make sure that the variance estimate makes sense -- should be positive values only
             if np.all(np.diag(variance_est) > 0):
                 standard_errors = np.sqrt(np.diag(variance_est))
-                conf_ints = self._create_confidence_intervals(standard_errors, theta, z)
+                conf_ints = self.create_confidence_intervals(
+                    theta,
+                    standard_errors,
+                    self.possible_theta_mask,
+                    self.zero_theta_mask,
+                    z,
+                )
                 log.info("===== Confidence Intervals ======")
                 log.info(self._get_confidence_interval_print_lines(conf_ints))
                 return variance_est
@@ -50,21 +56,6 @@ class ConfidenceIntervalMaker:
         else:
             log.info("Confidence interval: observation matrix is singular")
         return None
-
-    def _create_confidence_intervals(self, standard_errors, theta, z=1.96):
-        """
-        Creates the confidence intervals using the normal approximation
-        """
-        theta_flat = theta.reshape((theta.size,), order="F")
-        theta_flat = theta_flat[self.theta_mask_flat]
-        conf_int_low = theta_flat - z * standard_errors
-        conf_int_upper = theta_flat + z * standard_errors
-        conf_ints = np.hstack((
-            conf_int_low.reshape((conf_int_low.size, 1)),
-            theta_flat.reshape((theta_flat.size, 1)),
-            conf_int_upper.reshape((conf_int_upper.size, 1)),
-        ))
-        return conf_ints
 
     def _get_confidence_interval_print_lines(self, conf_ints):
         """
@@ -84,3 +75,22 @@ class ConfidenceIntervalMaker:
                 idx += 1
         sorted_lines = sorted(print_line_list, key=lambda s: s[0])
         return "\n".join([l[1] for l in sorted_lines])
+
+    @staticmethod
+    def create_confidence_intervals(theta, standard_errors, possible_theta_mask, zero_theta_mask, z=1.96):
+        """
+        Creates the confidence intervals using the normal approximation
+        """
+        theta_mask = possible_theta_mask & ~zero_theta_mask
+        theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
+        theta_flat = theta.reshape((theta.size,), order="F")
+        theta_flat = theta_flat[theta_mask_flat]
+
+        conf_int_low = theta_flat - z * standard_errors
+        conf_int_upper = theta_flat + z * standard_errors
+        conf_ints = np.hstack((
+            conf_int_low.reshape((conf_int_low.size, 1)),
+            theta_flat.reshape((theta_flat.size, 1)),
+            conf_int_upper.reshape((conf_int_upper.size, 1)),
+        ))
+        return conf_ints
