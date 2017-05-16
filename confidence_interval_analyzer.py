@@ -32,6 +32,7 @@ def main(args=sys.argv[1:]):
     if args.true_model:
         with open(args.true_model, "r") as f:
             true_model = pickle.load(f)
+        true_theta = true_model[0]
 
     with open(args.fitted_model, "r") as f:
         fitted_models = pickle.load(f)
@@ -40,35 +41,54 @@ def main(args=sys.argv[1:]):
         motif_lens=fitted_models[0].motif_lens,
         left_motif_flank_len_list=fitted_models[0].positions_mutating,
     )
-    for f_model in fitted_models:
-        if f_model.has_refit_data and f_model.variance_est is not None:
-            feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
-                motif_lens=f_model.motif_lens,
-                feats_to_remove=f_model.model_masks.feats_to_remove,
-                left_motif_flank_len_list=f_model.positions_mutating,
-            )
-            refit_model = f_model.refit_theta
-            motif_mask = ~f_model.model_masks.feats_to_remove_mask
 
-            small_true_model = true_model[0][motif_mask,:]
-            small_penalized_model = f_model.penalized_theta[motif_mask,:]
+    good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
+    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
 
-            refit_model_flat = refit_model[f_model.refit_possible_theta_mask]
-            small_true_model_flat = small_true_model[f_model.refit_possible_theta_mask]
-            small_penalized_model_flat = small_penalized_model[f_model.refit_possible_theta_mask]
+    best_model = good_models[max_idx]
+    refit_model = best_model.refit_theta
+    motif_mask = ~best_model.model_masks.feats_to_remove_mask
 
-            se = np.sqrt(np.diag(f_model.variance_est))
-            lower = refit_model_flat - args.z * se
-            upper = refit_model_flat + args.z * se
+    small_true_model = true_theta[motif_mask,:]
+    small_penalized_model = best_model.penalized_theta[motif_mask,:]
 
-            print("num nonzero theta %d" % f_model.num_p)
-            print("  num dont cross zero %d" % f_model.num_not_crossing_zero)
-            print("  coverage %f" % np.mean((lower < small_true_model_flat) & (upper > small_true_model_flat)))
-            print("  support TP %f" % (np.sum(motif_mask & (true_model[0].ravel() != 0))/float(np.sum(motif_mask))))
-            print("  refit: pearson %f, %f" % scipy.stats.pearsonr(refit_model_flat, small_true_model_flat))
-            print("  refit: spearman %f, %f" % scipy.stats.spearmanr(refit_model_flat, small_true_model_flat))
-            print("  penal: pearson %f, %f" % scipy.stats.pearsonr(small_penalized_model_flat, small_true_model_flat))
-            print("  penal: spearman %f, %f" % scipy.stats.spearmanr(small_penalized_model_flat, small_true_model_flat))
+    refit_model_flat = refit_model[best_model.refit_possible_theta_mask]
+    small_true_model_flat = small_true_model[best_model.refit_possible_theta_mask]
+    small_penalized_model_flat = small_penalized_model[best_model.refit_possible_theta_mask]
+
+    se = np.sqrt(np.diag(best_model.variance_est))
+    lower = refit_model_flat - args.z * se
+    upper = refit_model_flat + args.z * se
+
+    # calculate coverage of groups of theta values
+    thres_coverages = []
+    thresholds = np.percentile(true_theta, [25, 50, 75, 100])
+    prev_thres = -np.inf
+    for i, thres in enumerate(thresholds):
+        thres_mask = (true_theta > prev_thres) & (true_theta <= thres)
+        true_theta_thres = np.copy(true_theta)
+        true_theta_thres[~thres_mask] = np.nan
+        small_true_theta_thres = true_theta_thres[motif_mask, :]
+        small_true_theta_thres_flat = small_true_theta_thres[best_model.refit_possible_theta_mask]
+        small_thres_mask = ~np.isnan(small_true_theta_thres_flat)
+        if np.sum(small_thres_mask) > 0:
+            small_true_theta_thres_final = small_true_theta_thres_flat[small_thres_mask]
+            thres_coverage = np.mean((lower[small_thres_mask] < small_true_theta_thres_final) & (small_true_theta_thres_final < upper[small_thres_mask]))
+            thres_coverages.append(thres_coverage)
+        else:
+            thres_coverages.append(np.nan)
+        prev_thres = thres
+
+
+    print("num nonzero theta %d" % best_model.num_p)
+    print("  num dont cross zero %d" % best_model.num_not_crossing_zero)
+    print("  coverage %f" % np.mean((lower < small_true_model_flat) & (upper > small_true_model_flat)))
+    print("  thres coverage %s" % thres_coverages)
+    print("  support TP %f" % (np.sum(motif_mask & (true_model[0].ravel() != 0))/float(np.sum(motif_mask))))
+    print("  refit: pearson %f, %f" % scipy.stats.pearsonr(refit_model_flat, small_true_model_flat))
+    print("  refit: spearman %f, %f" % scipy.stats.spearmanr(refit_model_flat, small_true_model_flat))
+    print("  penal: pearson %f, %f" % scipy.stats.pearsonr(small_penalized_model_flat, small_true_model_flat))
+    print("  penal: spearman %f, %f" % scipy.stats.spearmanr(small_penalized_model_flat, small_true_model_flat))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
