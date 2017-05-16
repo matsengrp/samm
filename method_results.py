@@ -51,9 +51,6 @@ class MethodResults:
         self.num_p = np.sum(self.refit_possible_theta_mask & ~self.model_masks.zero_theta_mask_refit)
         self.num_not_crossing_zero = num_not_crossing_zero
         self.percent_not_crossing_zero = num_not_crossing_zero/float(self.num_p)
-        self.motifs_to_remove = motifs_to_remove
-        self.motifs_to_remove_mask = motifs_to_remove_mask
-        self.zero_theta_mask = zero_theta_mask
 
     def __str__(self):
         pen_param_str = ",".join(map(str, self.penalty_params))
