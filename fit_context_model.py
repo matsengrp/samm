@@ -295,10 +295,6 @@ def main(args=sys.argv[1:]):
         num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
 
-        if variance_est is None and args.conf_int_stop and curr_model_results.penalized_num_nonzero > 0:
-            log.info("Stopping since no confidence intervals could be made")
-            break
-
     if all_runs_pool is not None:
         all_runs_pool.close()
         # helpful comment copied over: make sure we don't keep these processes open!
