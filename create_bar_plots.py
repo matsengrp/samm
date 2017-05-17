@@ -83,58 +83,6 @@ def convert_to_csv(output_csv, theta_vals, theta_lower, theta_upper, full_feat_g
         writer.writerow(header)
         writer.writerows(data)
 
-def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, covariance_est, col_idx):
-    """
-    Combine hierarchical and offset theta values
-    """
-    full_theta_size = full_feat_generator.feature_vec_len
-    full_theta = np.zeros(full_theta_size)
-    theta_lower = np.zeros(full_theta_size)
-    theta_upper = np.zeros(full_theta_size)
-
-    theta_index_matches = {i:[] for i in range(full_theta_size)}
-
-    for i, feat_gen in enumerate(feat_generator.feat_gens):
-        for m_idx, m in enumerate(feat_gen.motif_list):
-            raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
-            m_theta = theta[raw_theta_idx, 0]
-
-            if col_idx != 0:
-                m_theta += theta[raw_theta_idx, col_idx]
-
-            if feat_gen.motif_len == full_feat_generator.motif_len:
-                # Already at maximum motif length, so nothing to combine
-                full_m_idx = full_feat_generator.motif_dict[m][feat_gen.left_motif_flank_len]
-                full_theta[full_m_idx] += m_theta
-
-                theta_index_matches[full_m_idx].append(raw_theta_idx)
-                if col_idx != 0:
-                    theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
-            else:
-                # Combine hierarchical feat_gens for given left_motif_len
-                for full_feat_gen in full_feat_generator.feat_gens:
-                    flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
-                    for f in flanks:
-                        full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
-                        full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
-                        full_theta[full_m_idx] += m_theta
-
-                        theta_index_matches[full_m_idx].append(raw_theta_idx)
-                        if col_idx != 0:
-                            theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
-
-    for full_theta_idx, matches in theta_index_matches.iteritems():
-        var_est = 0
-        for i in matches:
-            for j in matches:
-                var_est += covariance_est[i,j]
-
-        standard_err_est = np.sqrt(var_est)
-        theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
-        theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
-
-    return full_theta, theta_lower, theta_upper
-
 def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, targets, full_feat_generator, max_motif_len):
     convert_to_csv(
         output_csv,
@@ -159,7 +107,7 @@ def main(args=sys.argv[1:]):
     args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
     for m in args.motif_len_vals:
         assert(m % 2 == 1)
-        
+
     args.max_motif_len = max(args.motif_len_vals)
 
     if args.positions_mutating is None:

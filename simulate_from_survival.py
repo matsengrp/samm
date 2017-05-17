@@ -28,10 +28,10 @@ def parse_args():
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=24)
-    parser.add_argument('--motif-len',
-        type=int,
-        help='length of motif (must be odd)',
-        default=5)
+    parser.add_argument('--motif-lens',
+        type=str,
+        help='length of motifs (must be odd)',
+        default="5")
     parser.add_argument('--input-model',
         type=str,
         default='_output/true_model.pkl',
@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument('--n-taxa',
         type=int,
         help='number of taxa to simulate',
-        default=2)
+        default=1)
     parser.add_argument('--n-germlines',
         type=int,
         help='number of germline genes to sample from (max 350)',
@@ -73,15 +73,16 @@ def parse_args():
 
     parser.set_defaults(guarantee_motifs_showup=False, with_replacement=False)
     args = parser.parse_args()
-    # Only even random gene lengths allowed
-    assert(args.random_gene_len % 2 == 0)
 
+    args.motif_lens = [int(m) for m in args.motif_lens.split(",")]
+    for m in args.motif_lens:
+        assert(m % 2 == 1)
     return args
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.random_gene_len > 0:
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
-        germline_nucleotides = [get_random_dna_seq(args.random_gene_len + args.motif_len) for i in range(args.n_germlines)]
+        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
     else:
         # Read parameters from file
         params = read_germline_file(args.germline_path)
@@ -111,7 +112,7 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_lens])
     with open(args.input_model, 'r') as f:
         true_thetas, probability_matrix, raw_theta = pickle.load(f)
 
