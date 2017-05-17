@@ -51,6 +51,9 @@ Export('env')
 
 env.SConsignFile()
 
+flag = 'coverage_simulations'
+SConscript(flag + '/sconscript', exports=['flag'])
+
 flag = 'params_for_shmulate'
 SConscript(flag + '/sconscript', exports=['flag'])
 
@@ -71,4 +74,3 @@ SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'imputed_ancestors_comparison'
 SConscript(flag + '/sconscript', exports=['flag'])
-

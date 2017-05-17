@@ -176,10 +176,8 @@ class ContextModelAlgo:
                 curr_model_results.set_refit_theta(
                     refit_theta,
                     variance_est,
-                    model_masks.feats_to_remove,
-                    model_masks.feats_to_remove_mask,
+                    model_masks,
                     possible_theta_mask_refit,
-                    model_masks.zero_theta_mask_refit,
                     num_not_crossing_zero,
                 )
                 log.info("Pen_param %f, Number nonzero %d, Perc nonzero %f" % (penalty_param, curr_model_results.num_not_crossing_zero, curr_model_results.percent_not_crossing_zero))

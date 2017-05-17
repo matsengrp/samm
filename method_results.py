@@ -33,14 +33,12 @@ class MethodResults:
         self.reference_penalty_param = reference_penalty_param
         self.penalized_num_nonzero = get_num_nonzero(self.penalized_theta)
 
-    def set_refit_theta(self, refit_theta, variance_est, motifs_to_remove, motifs_to_remove_mask, possible_theta_mask, zero_theta_mask, num_not_crossing_zero):
+    def set_refit_theta(self, refit_theta, variance_est, model_masks, possible_theta_mask, num_not_crossing_zero):
         """
         @param refit_theta: the theta value after the second refitting stage
         @param variance_est: a variance estimate if we were able to obtain one
-        @param motifs_to_remove: the motifs we removed when we fit this model (list of strings)
-        @param motifs_to_remove_mask: the motifs we removed, but a numpy boolean mask of the full theta
+        @param model_masks: ModelTruncation object
         @param possible_theta_mask: the theta values allowed to be a finite value for this shrunken refit theta (np bool array)
-        @param zero_theta_mask: the theta values we force to be zero in this shrinken refit theta (np bool array)
         @param num_not_crossing_zero: number of confidence intervals that didnt include zero, using z_stat for the width
 
         Store the model from the refit stage
@@ -48,12 +46,9 @@ class MethodResults:
         self.has_refit_data = True
         self.refit_theta = refit_theta
         self.variance_est = variance_est
-        self.motifs_to_remove = motifs_to_remove
-        self.motifs_to_remove_mask = motifs_to_remove_mask
-        self.refit_zero_theta_mask = zero_theta_mask
+        self.model_masks = model_masks
         self.refit_possible_theta_mask = possible_theta_mask
-        self.num_p = np.sum(self.refit_possible_theta_mask & ~self.refit_zero_theta_mask)
-        self.zero_theta_mask = zero_theta_mask
+        self.num_p = np.sum(self.refit_possible_theta_mask & ~self.model_masks.zero_theta_mask_refit)
         self.num_not_crossing_zero = num_not_crossing_zero
         self.percent_not_crossing_zero = num_not_crossing_zero/float(self.num_p)
 

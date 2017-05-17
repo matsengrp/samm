@@ -22,6 +22,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
 from likelihood_evaluator import LikelihoodComparer
+from method_results import MethodResults
 from common import *
 from read_data import *
 from matsen_grp_data import *
@@ -141,7 +142,7 @@ def parse_args():
         help="confidence interval z statistic",
         default=1.96)
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -183,14 +184,13 @@ def parse_args():
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
-    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
     if not os.path.exists(args.scratch_dir):
         os.makedirs(args.scratch_dir)
 
     # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
-
     return args
 
 def main(args=sys.argv[1:]):
