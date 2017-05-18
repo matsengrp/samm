@@ -107,7 +107,7 @@ def simulate(env, outdir, c):
            '--random-gene-len',
            250,
            '--min-censor-time',
-           0.1,
+           1.0,
            '--output-file ${TARGETS[0]}',
            '--output-genes ${TARGETS[1]}']
     return env.Command(
@@ -171,5 +171,5 @@ def fit_context_model(env, outdir, c):
                '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
-        c['generate'],
+        c['simulate'],
         ' '.join(map(str, cmd)))

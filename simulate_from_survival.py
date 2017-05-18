@@ -115,6 +115,7 @@ def main(args=sys.argv[1:]):
     if agg_theta.shape[1] == NUM_NUCLEOTIDES + 1:
         simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
     else:
+        probability_matrix = np.ones((agg_theta.size, NUM_NUCLEOTIDES)) * 1.0/3
         simulator = SurvivalModelSimulatorSingleColumn(agg_theta, probability_matrix, feat_generator, lambda0=args.lambda0)
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
@@ -131,7 +132,7 @@ def main(args=sys.argv[1:]):
             full_data_samples = [
                 simulator.simulate(
                     start_seq=sequence.lower(),
-                    censoring_time=args.min_censor_time + np.random.rand(), # allow some variation in censor time
+                    censoring_time=args.min_censor_time + np.random.rand() * 0.25, # allow some variation in censor time
                     with_replacement=args.with_replacement,
                 ) for i in range(args.n_taxa)
             ]

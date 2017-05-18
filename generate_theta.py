@@ -170,7 +170,7 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_distribu
     )
     for i in indices_to_zero:
         theta_param[i] = 0
-
+    theta_param -= np.median(theta_param)
     return theta_param
 
 def dump_parameters(agg_theta, theta, args, feat_generator):
