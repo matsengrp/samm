@@ -246,14 +246,18 @@ def main(args=sys.argv[1:]):
     # Run EM on the lasso parameters from largest to smallest
     val_set_evaluator = None
     penalty_param_prev = None
+    prev_pen_theta = None
     num_val_samples = args.num_val_samples
     results_list = []
     num_nonzero_confint = 0
-    for penalty_param in args.penalty_params:
+    for param_i, penalty_param in enumerate(args.penalty_params):
         log.info("==== Penalty parameter %f ====" % penalty_param)
         curr_model_results = cmodel_algo.fit(
             penalty_param,
+            stage1_em_iters=args.max_em_iters/2 if param_i > 0 else args.max_em_iters,
+            stage2_em_iters=args.max_em_iters,
             val_set_evaluator,
+            init_theta=prev_pen_theta,
             reference_pen_param=penalty_param_prev
         )
 
@@ -294,6 +298,7 @@ def main(args=sys.argv[1:]):
                     break
         num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
+        prev_pen_theta = curr_model_results.penalized_theta
 
     if all_runs_pool is not None:
         all_runs_pool.close()

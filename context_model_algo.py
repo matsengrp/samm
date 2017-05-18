@@ -83,7 +83,7 @@ class ContextModelAlgo:
 
         return ll_ratio_lower_bound, log_lik_ratio
 
-    def fit(self, penalty_param, val_set_evaluator=None, reference_pen_param=None):
+    def fit(self, penalty_param, stage1_em_iters, stage2_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
         """
         @param penalty_param: penalty parameter for fitting the first stage
         @param val_set_evaluator: LikelihoodComparer with a given reference model
@@ -92,7 +92,8 @@ class ContextModelAlgo:
         @return the fitted model after the 2-step procedure
         """
         penalty_params = (penalty_param, )
-        init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
+        if init_theta is None:
+            init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
 
         #### STAGE 1: FIT A PENALIZED MODEL
         penalized_theta, _, _ = self.em_algo.run(
@@ -103,7 +104,7 @@ class ContextModelAlgo:
             zero_theta_mask=self.zero_theta_mask,
             burn_in=self.burn_in,
             penalty_params=penalty_params,
-            max_em_iters=self.em_max_iters,
+            max_em_iters=stage1_em_iters,
             intermed_file_prefix="%s/e_samples_%f_" % (self.intermediate_out_dir, penalty_param),
         )
         curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating, self.z_stat)
@@ -153,7 +154,7 @@ class ContextModelAlgo:
                     zero_theta_mask=model_masks.zero_theta_mask_refit,
                     burn_in=self.burn_in,
                     penalty_params=(0,), # now fit with no penalty
-                    max_em_iters=self.em_max_iters,
+                    max_em_iters=stage2_em_iters,
                     intermed_file_prefix="%s/e_samples_%f_full_" % (self.intermediate_out_dir, penalty_param),
                     get_hessian=True,
                 )

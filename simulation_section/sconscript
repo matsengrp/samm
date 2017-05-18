@@ -149,7 +149,7 @@ def fit_context_model(env, outdir, c):
                '--num-cpu-threads',
                6,
                '--num-jobs',
-               20,
+               10,
                '--burn-in',
                2,
                '--num-e-samples',
