@@ -235,6 +235,7 @@ def main(args=sys.argv[1:]):
     feat_generator.add_base_features_for_list(train_set)
     feat_generator.add_base_features_for_list(val_set)
 
+    st_time = time.time()
     log.info("Data statistics:")
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_idx), len(val_idx)))
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
@@ -304,7 +305,7 @@ def main(args=sys.argv[1:]):
         all_runs_pool.close()
         # helpful comment copied over: make sure we don't keep these processes open!
         all_runs_pool.join()
-    log.info("Completed!")
+    log.info("Completed! Time: %s" % str(time.time() - st_time))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

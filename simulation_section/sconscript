@@ -132,7 +132,7 @@ def fit_context_model(env, outdir, c):
         return
     cmd = []
     if c["method"] == "samm":
-        penalty_params = np.power(10, np.arange(-1.0, -7, step=-0.2)).tolist()
+        penalty_params = np.power(10, np.arange(-1.5, -7, step=-0.5)).tolist()
         per_target_model_str = ""
         if c["model"]["per_target"]:
             per_target_model_str = "--per-target-model"
