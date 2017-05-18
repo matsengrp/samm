@@ -111,8 +111,6 @@ def fit_context_model(env, outdir, c):
            10,
            '--scratch-directory',
            SCRATCH_DIR,
-           '--num-val-burnin',
-           10,
            '--tuning-sample-ratio',
            0,
            '--input-genes ${SOURCES[0]}',

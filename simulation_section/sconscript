@@ -13,6 +13,10 @@ from matsen_grp_data import SCRATCH_DIR
 Import('env')
 localenv = env.Clone()
 
+SPARSITIES = [0.25, 0.5, 1.0]
+EFFECT_SIZES = [0.5, 1.0, 2.0]
+SIMULATION_SIZES = [500, 1500, 4500]
+
 # Set up state
 base = {'nreps': localenv['NREPS'],
         'output_name': localenv['OUTPUT_NAME']}
@@ -21,40 +25,39 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 models = [
-    {'model': 'shazam'}
-    {'model': 'samm', 'motif_lens': '5', 'per_target': False},
-    {'model': 'samm', 'motif_lens': '3,5', 'per_target': False},
-    {'model': 'samm', 'motif_lens': '3,5', 'per_target': True},
+    {'motif_lens': [5], 'per_target': False},
+    #{'motif_lens': [3,5], 'per_target': False},
+    #{'motif_lens': [3,5], 'per_target': True},
 ]
 
 nest.add(
     'model',
     models,
-    lambda c: [
-        "%s_target%s" % (c["motif_lens"].replace(",", "_"), c["per_target"])
-    ],
+    label_func=lambda c: "%s_target%s" % ("_".join([str(m) for m in c["motif_lens"]]), c["per_target"]),
 )
 
 nest.add(
     'sparsity_ratio',
-    [0.25, 0.5, 1.0],
+    SPARSITIES,
     label_func=lambda c: "sparsity%d" % int(c * 100),
 )
 
 nest.add(
     'effect_size',
-    [0.5, 1.0, 2.0],
+    EFFECT_SIZES,
     label_func=lambda c: "effect_size_%d" % int(c * 100),
 )
 
 # Nest for replicates
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
+    if c['effect_size'] != EFFECT_SIZES[1] and c['sparsity_ratio'] != SPARSITIES[1]:
+        return
     cmd = ['python generate_theta.py',
            '--seed',
            0,
-           '--motif-len',
-           c['model']['motif_lens'],
+           '--motif-lens',
+           ",".join([str(m) for m in c['model']['motif_lens']]),
            '--effect-size',
            c['effect_size'],
            '--sparsity-ratio',
@@ -67,14 +70,14 @@ def generate(env, outdir, c):
 
 nest.add(
     'simulation_size',
-    [500, 1500, 4500],
-    label_func=lambda c: "samples%d" % c['size'],
+    SIMULATION_SIZES,
+    label_func=lambda c: "samples%d" % c,
 )
 
 # Nest for replicates
 nest.add(
     'replicate',
-    range(10),
+    range(1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -86,11 +89,16 @@ nest.add(
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
+    c1 = c['simulation_size'] == SIMULATION_SIZES[1]
+    c2 = c['sparsity_ratio'] == SPARSITIES[1]
+    c3 = c['effect_size'] == EFFECT_SIZES[1]
+    if np.sum([c1, c2, c3]) < 2:
+        return
     cmd = ['python simulate_from_survival.py',
            '--seed',
            c['seed'],
-           '--motif-lens',
-           c['motif_params']['motif_lens'],
+           '--agg-motif-len',
+           max(c['model']['motif_lens']),
            '--input-model ${SOURCES[0]}',
            '--n-taxa',
            1,
@@ -107,38 +115,33 @@ def simulate(env, outdir, c):
         c['generate'],
         ' '.join(map(str, cmd)))
 
+nest.add(
+    'method',
+    [
+        "samm",
+        "shazam",
+    ])
+
 # Nest for model fitting
-# TODO: put this all in one driver function so sources/targets jibe with one another
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
-    fit_per_target_model = c['model_options'] in model_per_target_options
-
-    # True model should match the estimated model
-    if c['per_target_model'] == "is_per_target":
-        if c['model_options'] not in model_per_target_options:
-            return
-    else:
-        if c['model_options'] not in model_single_options:
-            return
-
-    per_target_model_str = ""
-    if fit_per_target_model:
-        per_target_model_str = "--per-target-model"
-
+    c1 = c['simulation_size'] == SIMULATION_SIZES[1]
+    c2 = c['sparsity_ratio'] == SPARSITIES[1]
+    c3 = c['effect_size'] == EFFECT_SIZES[1]
+    if np.sum([c1, c2, c3]) < 2:
+        return
     cmd = []
-    if c["model_options"].startswith("survival_"):
-        if c["model_options"] == "survival_L5":
-            penalty_params = np.power(10, np.arange(-2.0, -7.0, step=-0.25)).tolist()
-        elif c["model_options"] == "survival_none5":
-            penalty_params = [0]
+    if c["method"] == "samm":
+        penalty_params = np.power(10, np.arange(-1.0, -7, step=-0.2)).tolist()
+        per_target_model_str = ""
+        if c["model"]["per_target"]:
+            per_target_model_str = "--per-target-model"
 
         cmd = ['python fit_context_model.py',
                '--seed',
                c['seed'],
                '--motif-lens',
-               5,
-               '--positions-mutating',
-               2,
+               ",".join([str(m) for m in c['model']['motif_lens']]),
                '--em-max-iters',
                10,
                '--penalty-params',
@@ -154,16 +157,16 @@ def fit_context_model(env, outdir, c):
                per_target_model_str,
                '--scratch-directory',
                SCRATCH_DIR,
-               '--theta-file ${SOURCES[0]}',
-               '--input-seqs ${SOURCES[1]}',
-               '--input-genes ${SOURCES[2]}',
+               '--tuning-sample-ratio',
+               0,
+               '--input-seqs ${SOURCES[0]}',
+               '--input-genes ${SOURCES[1]}',
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
-    elif c["model_options"] == "shazam":
+    elif c["method"] == "shazam":
         cmd = ['python fit_shmulate_model.py',
-               '--theta-file ${SOURCES[0]}',
-               '--input-file ${SOURCES[1]}',
-               '--input-genes ${SOURCES[2]}',
+               '--input-file ${SOURCES[0]}',
+               '--input-genes ${SOURCES[1]}',
                '--model-pkl ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     return env.Command(

@@ -28,10 +28,10 @@ def parse_args():
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=24)
-    parser.add_argument('--motif-lens',
-        type=str,
-        help='length of motifs (must be odd)',
-        default="5")
+    parser.add_argument('--agg-motif-len',
+        type=int,
+        help='length of motif',
+        default=5)
     parser.add_argument('--input-model',
         type=str,
         default='_output/true_model.pkl',
@@ -64,19 +64,13 @@ def parse_args():
         type=float,
         help='Minimum censoring time',
         default=1)
-    parser.add_argument('--guarantee-motifs-showup',
-        action="store_true",
-        help='Make sure the nonzero motifs show up in the germline')
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')
 
-    parser.set_defaults(guarantee_motifs_showup=False, with_replacement=False)
+    parser.set_defaults(with_replacement=False)
     args = parser.parse_args()
 
-    args.motif_lens = [int(m) for m in args.motif_lens.split(",")]
-    for m in args.motif_lens:
-        assert(m % 2 == 1)
     return args
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
@@ -112,16 +106,16 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_lens])
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.agg_motif_len])
     with open(args.input_model, 'r') as f:
-        true_thetas, probability_matrix, raw_theta = pickle.load(f)
+        agg_theta, raw_theta = pickle.load(f)
 
     germline_nucleotides, germline_genes = _get_germline_nucleotides(args)
 
-    if true_thetas.shape[1] == NUM_NUCLEOTIDES + 1:
-        simulator = SurvivalModelSimulatorMultiColumn(true_thetas, feat_generator, lambda0=args.lambda0)
+    if agg_theta.shape[1] == NUM_NUCLEOTIDES + 1:
+        simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
     else:
-        simulator = SurvivalModelSimulatorSingleColumn(true_thetas, probability_matrix, feat_generator, lambda0=args.lambda0)
+        simulator = SurvivalModelSimulatorSingleColumn(agg_theta, probability_matrix, feat_generator, lambda0=args.lambda0)
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
 
