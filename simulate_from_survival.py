@@ -30,7 +30,7 @@ def parse_args():
         default=24)
     parser.add_argument('--agg-motif-len',
         type=int,
-        help='length of motif',
+        help='length of motif -- assume center mutates',
         default=5)
     parser.add_argument('--input-model',
         type=str,
@@ -106,7 +106,10 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.agg_motif_len])
+    feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[args.agg_motif_len],
+        left_motif_flank_len_list=[[args.agg_motif_len/2]],
+    )
     with open(args.input_model, 'r') as f:
         agg_theta, raw_theta = pickle.load(f)
 

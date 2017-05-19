@@ -108,7 +108,7 @@ def parse_args():
             proportion of data to use for tuning the penalty parameter.
             if zero, tunes by number of confidence intervals for theta that do not contain zero
             """,
-        default=0.2)
+        default=0)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
@@ -157,8 +157,6 @@ def parse_args():
         args.theta_num_col = 1
 
     args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
-    for m in args.motif_lens:
-        assert(m % 2 == 1)
 
     args.max_motif_len = max(args.motif_lens)
 

@@ -1,3 +1,7 @@
+"""
+This can do offset motifs, but you need to have the center position of the longest motif mutate.
+And we will suppose that all the other shorter motifs are contained in the longest motif.
+"""
 import pickle
 import sys
 import argparse
@@ -42,8 +46,16 @@ def parse_args():
         default='_output/true_model.pkl')
     parser.add_argument('--motif-lens',
         type=str,
-        help='length of motifs (must be odd), comma separated',
+        help='length of motifs, comma separated',
         default="5")
+    parser.add_argument('--positions-mutating',
+        type=str,
+        help="""
+        length of left motif flank determining which position is mutating; comma-separated within
+        a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
+        be a 3mer with first and second mutating position and 5mer with first, second and third
+        """,
+        default=None)
     parser.add_argument('--effect-size',
         type=float,
         help='how much to scale sampling distribution for theta',
@@ -63,9 +75,7 @@ def parse_args():
     args = parser.parse_args()
 
     args.motif_lens = [int(m) for m in args.motif_lens.split(",")]
-    for m in args.motif_lens:
-        assert(m % 2 == 1)
-
+    args.positions_mutating, args.max_mut_pos = process_mutating_positions(args.motif_lens, args.positions_mutating)
     args.num_cols = NUM_NUCLEOTIDES + 1 if args.per_target_model else 1
 
     return args
@@ -103,43 +113,6 @@ def _read_mutability_probability_params(args):
         full_exp_theta = np.hstack([exp_theta, probability_matrix])
         assert(full_exp_theta.shape[1] == 5)
         return full_exp_theta
-
-def random_generate_thetas(motif_list, motif_lens, per_target_model):
-    """
-    DEPRECATED
-    Returns back an aggregated theta vector corresponding to the motif_list as well as the raw theta vector
-    """
-    max_motif_len = max(motif_lens)
-    num_theta_cols = NUM_NUCLEOTIDES + 1 if per_target_model else 1
-
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=motif_lens)
-    true_theta = np.zeros((len(motif_list), num_theta_cols))
-    full_raw_theta = np.zeros((feat_generator.feature_vec_len, num_theta_cols))
-
-    theta_scaling = 1.0
-    start_idx = 0
-    for f in feat_generator.feat_gens:
-        motif_list = f.motif_list
-        sub_theta = theta_scaling * (2 * np.random.rand(len(motif_list)) - 1)
-        full_raw_theta[start_idx : start_idx + f.feature_vec_len, 0] = sub_theta
-        if per_target_model:
-            sub_target_theta = theta_scaling * 0.1 * np.random.randn(f.feature_vec_len, NUM_NUCLEOTIDES)
-            sub_target_theta_mask = get_possible_motifs_to_targets(motif_list, sub_target_theta.shape)
-            sub_target_theta[~sub_target_theta_mask] = -np.inf
-            full_raw_theta[start_idx : start_idx + f.feature_vec_len, 1:] = sub_target_theta
-        start_idx += f.feature_vec_len
-        for i, motif in enumerate(motif_list):
-            flank_len = max_motif_len - f.motif_len
-            motif_flanks = itertools.product(*([NUCLEOTIDES] * flank_len))
-            for flank in motif_flanks:
-                full_motif = "".join(flank[:flank_len/2]) + motif + "".join(flank[-flank_len/2:])
-                full_motif_idx = feat_generator.feat_gens[-1].motif_dict[full_motif]
-                true_theta[full_motif_idx, 0] += sub_theta[i]
-                if per_target_model:
-                    true_theta[full_motif_idx, 1:] += sub_target_theta[i,:]
-        theta_scaling *= 0.5
-
-    return true_theta, full_raw_theta
 
 def _make_theta_sampling_distribution(args):
     shmulate_theta = _read_mutability_probability_params(args)
@@ -190,8 +163,14 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    hier_feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
-    agg_feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[hier_feat_generator.max_motif_len])
+    hier_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=args.motif_lens,
+        left_motif_flank_len_list=args.positions_mutating,
+    )
+    agg_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[hier_feat_generator.max_motif_len],
+        left_motif_flank_len_list=args.max_mut_pos,
+    )
 
     theta_sampling_distribution = _make_theta_sampling_distribution(args)
 

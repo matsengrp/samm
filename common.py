@@ -69,6 +69,20 @@ INT8_MAX = 127
 
 FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
 
+def process_mutating_positions(motif_len_vals, positions_mutating):
+    max_motif_len = max(motif_len_vals)
+    if positions_mutating is None:
+        # default to central base mutating
+        positions_mutating = [[m/2] for m in motif_len_vals]
+        max_mut_pos = [[max_motif_len/2]]
+    else:
+        positions_mutating = [[int(m) for m in positions.split(',')] for positions in positions_mutating.split(':')]
+        for motif_len, positions in zip(motif_len_vals, positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+        max_mut_pos = [mut_pos for mut_pos, motif_len in zip(positions_mutating, motif_len_vals) if motif_len == max_motif_len]
+    return positions_mutating, max_mut_pos
+
 def get_batched_list(my_list, num_batches):
     batch_size = max(len(my_list)/num_batches, 1)
     batched_list = []

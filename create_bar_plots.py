@@ -110,16 +110,7 @@ def main(args=sys.argv[1:]):
 
     args.max_motif_len = max(args.motif_len_vals)
 
-    if args.positions_mutating is None:
-        # default to central base mutating
-        args.positions_mutating = [[m/2] for m in args.motif_len_vals]
-        args.max_mut_pos = [[args.max_motif_len/2]]
-    else:
-        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
-        for motif_len, positions in zip(args.motif_len_vals, args.positions_mutating):
-            for m in positions:
-                assert(m in range(motif_len))
-        args.max_mut_pos = [mut_pos for mut_pos, motif_len in zip(args.positions_mutating, args.motif_len_vals) if motif_len == args.max_motif_len]
+    args.positions_mutating, args.max_mut_pos = process_mutating_positions(args.motif_len_vals, args.positions_mutating)
 
     motifs_to_remove, pos_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
     feat_generator = HierarchicalMotifFeatureGenerator(
