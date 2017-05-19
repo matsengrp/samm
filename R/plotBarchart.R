@@ -2,7 +2,7 @@ plotBarchart <- function (model,
                           model_lower=NULL, model_upper=NULL,
                           nucleotides = c("A", "C", "G", "T"),
                           target = c("N"),
-                          style = c("hedgehog", "bar"), size = 1,
+                          style = c("hedgehog", "bar"), size = 2,
                           bar.size = 0, y_lim = c(-5, 5), rect_height=0.5)
 {
     # Plots bar chart of mutabilities
@@ -291,9 +291,7 @@ plotBarchart <- function (model,
                     scale_x_continuous(expand = c(0, 1)) +
                     scale_y_continuous(limits = y_limits,
                                        breaks = y_breaks,
-                                       expand = c(0, 0.5),
-                                       labels = function(x)
-                                           scales::scientific(x)) +
+                                       expand = c(0, 0.5)) +
                     geom_bar(data = sub_df,
                              mapping = aes_string(x = "x",
                                                   y = "score",
