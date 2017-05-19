@@ -142,32 +142,24 @@ def tune_parameters(env, outdir, c):
                motif_len,
                '--positions-mutating',
                left_flanks,
-               '--solver',
-               solver,
                '--penalty-params',
                penalty_params,
                '--num-cpu-threads',
                10,
                '--num-jobs',
-               40,
+               20,
                '--burn-in',
                2,
                '--num-e-samples',
                4,
                '--em-max-iters',
                10,
-               '--num-val-burnin',
-               10,
                '--scratch-directory',
                SCRATCH_DIR,
                '--tuning-sample-ratio',
-               0.1,
+               0,
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
-        if c['validation_methods'] is not 'none':
-            cmd += [
-               '--validation-column',
-               c['validation_methods']]
         if c['sample_or_impute'] == 'sample':
             cmd += ['--sample-regime', 2]
         if c["per_target"]:

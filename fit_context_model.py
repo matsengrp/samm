@@ -255,9 +255,9 @@ def main(args=sys.argv[1:]):
         log.info("==== Penalty parameter %f ====" % penalty_param)
         curr_model_results = cmodel_algo.fit(
             penalty_param,
-            stage1_em_iters=args.max_em_iters/2 if param_i > 0 else args.max_em_iters,
-            stage2_em_iters=args.max_em_iters,
-            val_set_evaluator,
+            stage1_em_iters=args.em_max_iters/2 if param_i > 0 else args.em_max_iters,
+            stage2_em_iters=args.em_max_iters,
+            val_set_evaluator=val_set_evaluator,
             init_theta=prev_pen_theta,
             reference_pen_param=penalty_param_prev
         )
