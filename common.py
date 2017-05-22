@@ -230,6 +230,12 @@ def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
             mutating_nucleotide = motif_list[i][center_motif_idx]
             center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide] + 1
             theta_mask[i, center_nucleotide_idx] = False
+    elif mask_shape[1] == NUM_NUCLEOTIDES:
+        for i in range(len(motif_list)):
+            center_motif_idx = mutating_pos_list[i]
+            mutating_nucleotide = motif_list[i][center_motif_idx]
+            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
+            theta_mask[i, center_nucleotide_idx] = False
 
     return theta_mask
 
@@ -571,6 +577,5 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta):
         return theta_col.reshape((theta_col.size, 1))
 
     theta_cols = [_combine_thetas(col_idx) for col_idx in range(theta.shape[1])]
-    print "theta_cols", theta_cols
     agg_theta = np.hstack(theta_cols)
     return agg_theta
