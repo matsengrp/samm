@@ -111,7 +111,7 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
     """
     def __init__(self, thetas, feature_generator, lambda0):
         """
-        @param thetas: Numpy array(p,4) where p is number of motifs. In each row, theta_row[i] represents the rate
+        @param thetas: Numpy array(p,5) where p is number of motifs. In each row, theta_row[i] represents the rate
                         to mutate to the i-th nucleotide in the string NUCLEOTIDES. Note that the theta values
                         for target nucleotides that have the SAME center nucleotide as the motif should be
                         completey ignored. (They should technically be negative infinity).
