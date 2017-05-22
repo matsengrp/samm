@@ -32,7 +32,7 @@ def main(args=sys.argv[1:]):
     if args.true_model:
         with open(args.true_model, "r") as f:
             true_model = pickle.load(f)
-        true_theta = true_model[0]
+        true_theta = true_model[1]
 
     with open(args.fitted_model, "r") as f:
         fitted_models = pickle.load(f)

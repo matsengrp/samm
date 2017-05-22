@@ -84,13 +84,11 @@ def main(args=sys.argv[1:]):
     agg_true_theta = create_aggregate_theta(dense_hier_feat_gen, dense_agg_feat_gen, true_theta)
     if per_target:
         agg_true_theta = agg_true_theta[:,0:1] + agg_true_theta[:,1:]
-
     possible_agg_mask = get_possible_motifs_to_targets(
         dense_agg_feat_gen.motif_list,
         mask_shape=agg_true_theta.shape,
         mutating_pos_list=[args.agg_pos_mutating] * dense_agg_feat_gen.feature_vec_len,
     )
-    tot_elems = np.sum(possible_agg_mask)
 
     norm_diffs = [get_norm_diff(fmodel, agg_true_theta, possible_agg_mask) for fmodel in fitted_models]
     print "norm_diffs", norm_diffs
