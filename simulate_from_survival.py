@@ -64,6 +64,10 @@ def parse_args():
         type=float,
         help='Minimum censoring time',
         default=1)
+    parser.add_argument('--min-percent-mutated',
+        type=float,
+        help='Minimum percent of sequence to mutate',
+        default=0.05)
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')

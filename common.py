@@ -512,7 +512,7 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
 
     return train_idx, val_idx
 
-def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, covariance_est=None, col_idx=0):
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, covariance_est=None, col_idx=0, zstat=ZSCORE_95):
     """
     Combine hierarchical and offset theta values
     """
@@ -560,8 +560,8 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                     var_est += covariance_est[i,j]
 
             standard_err_est = np.sqrt(var_est)
-            theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
-            theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
+            theta_lower[full_theta_idx] = full_theta[full_theta_idx] - zstat * standard_err_est
+            theta_upper[full_theta_idx] = full_theta[full_theta_idx] + zstat * standard_err_est
 
     return full_theta, theta_lower, theta_upper
 

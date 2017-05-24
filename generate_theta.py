@@ -145,32 +145,41 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, th
         size=(hier_feat_generator.feature_vec_len, 1),
         replace=True,
     )
+    # Zero parts of the first theta column
+    indices_to_zero = np.random.choice(
+        np.arange(theta_param.size),
+        size=int((1 - args.sparsity_ratio) * theta_param.size),
+        replace=False,
+    )
+    theta_param[indices_to_zero] = 0
+    theta_param -= np.median(theta_param)
+
     if args.per_target_model:
         theta_col_prob_idx = np.random.choice(
             np.arange(theta_sampling_col_prob.shape[0]),
             size=hier_feat_generator.feature_vec_len,
             replace=True,
         )
+
+        # zero out certain rows -- set to equal prob 1/3
+        col_probs_to_third = np.random.choice(
+            np.arange(hier_feat_generator.feature_vec_len),
+            size=int((1 - args.sparsity_ratio) * hier_feat_generator.feature_vec_len),
+            replace=False,
+        )
+
         theta_col_probs = []
         for row_idx, sampled_row_idx in enumerate(theta_col_prob_idx):
             theta_row_mask = np.where(theta_mask[row_idx, 1:])[0]
             theta_col_prob_row = np.ones(NUM_NUCLEOTIDES) * -np.inf
-            theta_col_prob_row[theta_row_mask] = theta_sampling_col_prob[sampled_row_idx]
+            if row_idx in col_probs_to_third:
+                theta_col_prob_row[theta_row_mask] = np.log(1.0/3)
+            else:
+                theta_col_prob_row[theta_row_mask] = theta_sampling_col_prob[sampled_row_idx]
             theta_col_probs.append(theta_col_prob_row)
         theta_col_probs = np.array(theta_col_probs)
-        theta_col_prob = theta_sampling_col_prob[theta_col_prob_idx, :]
-        theta_param = np.hstack((theta_param, theta_col_prob))
+        theta_param = np.hstack((theta_param, theta_col_probs))
 
-    # Zero out a portion
-    possible_indices = np.where(theta_mask)[0]
-    indices_to_zero = np.random.choice(
-        possible_indices,
-        size=int((1 - args.sparsity_ratio) * possible_indices.size),
-        replace=False,
-    )
-    for i in indices_to_zero:
-        theta_param[i] = 0
-    theta_param -= np.median(theta_param)
     return theta_param
 
 def dump_parameters(agg_theta, theta, args, feat_generator):

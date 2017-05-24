@@ -9,7 +9,7 @@ class SurvivalModelSimulator:
     A simple model that will mutate sequences based on the survival model we've assumed.
     We will suppose that the hazard is constant over time.
     """
-    def simulate(self, start_seq, censoring_time, with_replacement=False):
+    def simulate(self, start_seq, censoring_time=None, percent_mutated=None, with_replacement=False):
         """
         @param start_seq: string for the original sequence (includes flanks!)
         @param censoring_time: how long to mutate the sequence for
@@ -35,10 +35,13 @@ class SurvivalModelSimulator:
             mutate_time_delta, mutate_pos, nucleotide_target = self._sample_mutation(feature_vec_dict, intermediate_seq, pos_to_mutate)
             mutate_time = last_mutate_time + mutate_time_delta
 
-            if censoring_time > mutate_time:
-                last_mutate_time = mutate_time
-            else:
+            if censoring_time is not None and censoring_time < mutate_time:
                 break
+            elif percent_mutated is not None and len(mutations) > percent_mutated * len(start_seq):
+                break
+
+            last_mutate_time = mutate_time
+
 
             if not with_replacement:
                 pos_to_mutate.remove(mutate_pos)
