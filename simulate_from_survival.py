@@ -28,9 +28,9 @@ def parse_args():
         type=int,
         help='Create random germline genes of this length. If zero, load true germline genes',
         default=24)
-    parser.add_argument('--motif-len',
+    parser.add_argument('--agg-motif-len',
         type=int,
-        help='length of motif (must be odd)',
+        help='length of motif -- assume center mutates',
         default=5)
     parser.add_argument('--input-model',
         type=str,
@@ -55,7 +55,7 @@ def parse_args():
     parser.add_argument('--n-taxa',
         type=int,
         help='number of taxa to simulate',
-        default=2)
+        default=1)
     parser.add_argument('--n-germlines',
         type=int,
         help='number of germline genes to sample from (max 350)',
@@ -64,24 +64,19 @@ def parse_args():
         type=float,
         help='Minimum censoring time',
         default=1)
-    parser.add_argument('--guarantee-motifs-showup',
-        action="store_true",
-        help='Make sure the nonzero motifs show up in the germline')
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')
 
-    parser.set_defaults(guarantee_motifs_showup=False, with_replacement=False)
+    parser.set_defaults(with_replacement=False)
     args = parser.parse_args()
-    # Only even random gene lengths allowed
-    assert(args.random_gene_len % 2 == 0)
 
     return args
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.random_gene_len > 0:
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
-        germline_nucleotides = [get_random_dna_seq(args.random_gene_len + args.motif_len) for i in range(args.n_germlines)]
+        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
     else:
         # Read parameters from file
         params = read_germline_file(args.germline_path)
@@ -111,16 +106,20 @@ def main(args=sys.argv[1:]):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
+    feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[args.agg_motif_len],
+        left_motif_flank_len_list=[[args.agg_motif_len/2]],
+    )
     with open(args.input_model, 'r') as f:
-        true_thetas, probability_matrix, raw_theta = pickle.load(f)
+        agg_theta, raw_theta = pickle.load(f)
 
     germline_nucleotides, germline_genes = _get_germline_nucleotides(args)
 
-    if true_thetas.shape[1] == NUM_NUCLEOTIDES + 1:
-        simulator = SurvivalModelSimulatorMultiColumn(true_thetas, feat_generator, lambda0=args.lambda0)
+    if agg_theta.shape[1] == NUM_NUCLEOTIDES + 1:
+        simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
     else:
-        simulator = SurvivalModelSimulatorSingleColumn(true_thetas, probability_matrix, feat_generator, lambda0=args.lambda0)
+        probability_matrix = np.ones((agg_theta.size, NUM_NUCLEOTIDES)) * 1.0/3
+        simulator = SurvivalModelSimulatorSingleColumn(agg_theta, probability_matrix, feat_generator, lambda0=args.lambda0)
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
 
@@ -136,7 +135,7 @@ def main(args=sys.argv[1:]):
             full_data_samples = [
                 simulator.simulate(
                     start_seq=sequence.lower(),
-                    censoring_time=args.min_censor_time + np.random.rand(), # allow some variation in censor time
+                    censoring_time=args.min_censor_time + np.random.rand() * 0.25, # allow some variation in censor time
                     with_replacement=args.with_replacement,
                 ) for i in range(args.n_taxa)
             ]

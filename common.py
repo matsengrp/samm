@@ -3,6 +3,7 @@ import pandas as pd
 import re
 import random
 import warnings
+import itertools
 
 from Bio import SeqIO
 
@@ -67,6 +68,20 @@ HOT_COLD_SPOT_REGS = [
 INT8_MAX = 127
 
 FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
+
+def process_mutating_positions(motif_len_vals, positions_mutating):
+    max_motif_len = max(motif_len_vals)
+    if positions_mutating is None:
+        # default to central base mutating
+        positions_mutating = [[m/2] for m in motif_len_vals]
+        max_mut_pos = [[max_motif_len/2]]
+    else:
+        positions_mutating = [[int(m) for m in positions.split(',')] for positions in positions_mutating.split(':')]
+        for motif_len, positions in zip(motif_len_vals, positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+        max_mut_pos = [mut_pos for mut_pos, motif_len in zip(positions_mutating, motif_len_vals) if motif_len == max_motif_len]
+    return positions_mutating, max_mut_pos
 
 def get_batched_list(my_list, num_batches):
     batch_size = max(len(my_list)/num_batches, 1)
@@ -207,19 +222,21 @@ def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
     @return a boolean matrix with possible mutations as True, impossible mutations as False
     """
     theta_mask = np.ones(mask_shape, dtype=bool)
-    if mask_shape[1] == 1:
-        # Estimating a single theta vector - then we should estimate all theta values
-        return theta_mask
+    if mask_shape[1] == NUM_NUCLEOTIDES + 1:
+        # Estimating a different theta vector for different target nucleotides
+        # We cannot have a motif mutate to the same center nucleotide
+        for i in range(len(motif_list)):
+            center_motif_idx = mutating_pos_list[i]
+            mutating_nucleotide = motif_list[i][center_motif_idx]
+            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide] + 1
+            theta_mask[i, center_nucleotide_idx] = False
+    elif mask_shape[1] == NUM_NUCLEOTIDES:
+        for i in range(len(motif_list)):
+            center_motif_idx = mutating_pos_list[i]
+            mutating_nucleotide = motif_list[i][center_motif_idx]
+            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
+            theta_mask[i, center_nucleotide_idx] = False
 
-    # Estimating a different theta vector for different target nucleotides
-    # We cannot have a motif mutate to the same center nucleotide
-    for i in range(len(motif_list)):
-        center_motif_idx = mutating_pos_list[i]
-        if mask_shape[1] == NUM_NUCLEOTIDES:
-            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
-        else:
-            center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]] + 1
-        theta_mask[i, center_nucleotide_idx] = False
     return theta_mask
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
@@ -494,3 +511,71 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
     return train_idx, val_idx
+
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, covariance_est=None, col_idx=0):
+    """
+    Combine hierarchical and offset theta values
+    """
+    full_theta_size = full_feat_generator.feature_vec_len
+    full_theta = np.zeros(full_theta_size)
+    theta_lower = np.zeros(full_theta_size)
+    theta_upper = np.zeros(full_theta_size)
+
+    theta_index_matches = {i:[] for i in range(full_theta_size)}
+
+    for i, feat_gen in enumerate(feat_generator.feat_gens):
+        for m_idx, m in enumerate(feat_gen.motif_list):
+            raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
+            m_theta = theta[raw_theta_idx, 0]
+
+            if col_idx != 0:
+                m_theta += theta[raw_theta_idx, col_idx]
+
+            if feat_gen.motif_len == full_feat_generator.motif_len:
+                # Already at maximum motif length, so nothing to combine
+                full_m_idx = full_feat_generator.motif_dict[m][feat_gen.left_motif_flank_len]
+                full_theta[full_m_idx] += m_theta
+
+                theta_index_matches[full_m_idx].append(raw_theta_idx)
+                if col_idx != 0:
+                    theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
+            else:
+                # Combine hierarchical feat_gens for given left_motif_len
+                for full_feat_gen in full_feat_generator.feat_gens:
+                    flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
+                    for f in flanks:
+                        full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
+                        full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
+                        full_theta[full_m_idx] += m_theta
+
+                        theta_index_matches[full_m_idx].append(raw_theta_idx)
+                        if col_idx != 0:
+                            theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
+
+    if covariance_est is not None:
+        for full_theta_idx, matches in theta_index_matches.iteritems():
+            var_est = 0
+            for i in matches:
+                for j in matches:
+                    var_est += covariance_est[i,j]
+
+            standard_err_est = np.sqrt(var_est)
+            theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
+            theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
+
+    return full_theta, theta_lower, theta_upper
+
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta):
+    def _combine_thetas(col_idx):
+        theta_col, _, _ =  combine_thetas_and_get_conf_int(
+            hier_feat_generator,
+            agg_feat_generator,
+            theta,
+            None,
+            col_idx,
+        )
+        return theta_col.reshape((theta_col.size, 1))
+
+    theta_cols = [_combine_thetas(col_idx) for col_idx in range(theta.shape[1])]
+    agg_theta = np.hstack(theta_cols)
+    return agg_theta

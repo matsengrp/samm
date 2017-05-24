@@ -54,6 +54,9 @@ env.SConsignFile()
 flag = 'coverage_simulations'
 SConscript(flag + '/sconscript', exports=['flag'])
 
+flag = 'simulation_section'
+SConscript(flag + '/sconscript', exports=['flag'])
+
 flag = 'params_for_shmulate'
 SConscript(flag + '/sconscript', exports=['flag'])
 

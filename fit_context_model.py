@@ -108,7 +108,7 @@ def parse_args():
             proportion of data to use for tuning the penalty parameter.
             if zero, tunes by number of confidence intervals for theta that do not contain zero
             """,
-        default=0.2)
+        default=0)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
@@ -157,8 +157,6 @@ def parse_args():
         args.theta_num_col = 1
 
     args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
-    for m in args.motif_lens:
-        assert(m % 2 == 1)
 
     args.max_motif_len = max(args.motif_lens)
 
@@ -235,6 +233,7 @@ def main(args=sys.argv[1:]):
     feat_generator.add_base_features_for_list(train_set)
     feat_generator.add_base_features_for_list(val_set)
 
+    st_time = time.time()
     log.info("Data statistics:")
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_idx), len(val_idx)))
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
@@ -246,14 +245,18 @@ def main(args=sys.argv[1:]):
     # Run EM on the lasso parameters from largest to smallest
     val_set_evaluator = None
     penalty_param_prev = None
+    prev_pen_theta = None
     num_val_samples = args.num_val_samples
     results_list = []
     num_nonzero_confint = 0
-    for penalty_param in args.penalty_params:
+    for param_i, penalty_param in enumerate(args.penalty_params):
         log.info("==== Penalty parameter %f ====" % penalty_param)
         curr_model_results = cmodel_algo.fit(
             penalty_param,
-            val_set_evaluator,
+            stage1_em_iters=args.em_max_iters/2 if param_i > 0 else args.em_max_iters,
+            stage2_em_iters=args.em_max_iters,
+            val_set_evaluator=val_set_evaluator,
+            init_theta=prev_pen_theta,
             reference_pen_param=penalty_param_prev
         )
 
@@ -289,17 +292,18 @@ def main(args=sys.argv[1:]):
                     break
             else:
                 # We are going to tune using confidence intervals
-                if curr_model_results.num_not_crossing_zero < num_nonzero_confint:
+                if curr_model_results.num_not_crossing_zero < num_nonzero_confint or curr_model_results.num_not_crossing_zero == 0:
                     log.info("Number of nonzero confidence intervals decreasing. Stop trying penalty parameters")
                     break
         num_nonzero_confint = curr_model_results.num_not_crossing_zero
         penalty_param_prev = penalty_param
+        prev_pen_theta = curr_model_results.penalized_theta
 
     if all_runs_pool is not None:
         all_runs_pool.close()
         # helpful comment copied over: make sure we don't keep these processes open!
         all_runs_pool.join()
-    log.info("Completed!")
+    log.info("Completed! Time: %s" % str(time.time() - st_time))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

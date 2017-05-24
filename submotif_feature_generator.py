@@ -32,7 +32,6 @@ class SubmotifFeatureGenerator(FeatureGenerator):
         @param right_update_region: number of positions to consider right of mutating position to update
             features correctly
         """
-        assert(motif_len % 2 == 1)
         assert(left_motif_flank_len in range(motif_len))
         assert(hier_offset >= 0)
 
