@@ -116,25 +116,52 @@ def _read_mutability_probability_params(args):
 
 def _make_theta_sampling_distribution(args):
     shmulate_theta = _read_mutability_probability_params(args)
-    nonzero_theta_vals = shmulate_theta[shmulate_theta != 0]
-    shmulate_theta_vals = np.log(nonzero_theta_vals)
-    shmulate_theta_vals -= np.median(shmulate_theta_vals) # center shmulate parameters
-    return args.effect_size * shmulate_theta_vals
+    nonzero_theta_col0 = shmulate_theta[shmulate_theta[:,0] != 0, 0]
+    shmulate_theta_col0 = np.log(nonzero_theta_col0)
+    shmulate_theta_col0 -= np.median(shmulate_theta_col0) # center shmulate parameters
 
-def _generate_true_parameters(hier_feat_generator, args, theta_sampling_distribution):
+    prob_theta = []
+    for row_idx in range(shmulate_theta.shape[0]):
+        prob_row = shmulate_theta[row_idx, 1:]
+        prob_theta.append(prob_row[prob_row != 0])
+    prob_theta = np.log(np.array(prob_theta))
+    return args.effect_size * shmulate_theta_col0, prob_theta
+
+def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, theta_sampling_col_prob):
     """
     Make a sparse version if sparsity_ratio > 0
     """
     num_cols = NUM_NUCLEOTIDES + 1 if args.per_target_model else 1
     theta_shape = (hier_feat_generator.feature_vec_len, num_cols)
 
-    theta_param = np.random.choice(theta_sampling_distribution, size=theta_shape, replace=True)
     theta_mask = get_possible_motifs_to_targets(
         hier_feat_generator.motif_list,
         theta_shape,
         hier_feat_generator.mutating_pos_list,
     )
-    theta_param[~theta_mask] = -np.inf
+
+    theta_param = np.random.choice(
+        theta_sampling_col0,
+        size=(hier_feat_generator.feature_vec_len, 1),
+        replace=True,
+    )
+    if args.per_target_model:
+        theta_col_prob_idx = np.random.choice(
+            np.arange(theta_sampling_col_prob.shape[0]),
+            size=hier_feat_generator.feature_vec_len,
+            replace=True,
+        )
+        theta_col_probs = []
+        for row_idx, sampled_row_idx in enumerate(theta_col_prob_idx):
+            theta_row_mask = np.where(theta_mask[row_idx, 1:])[0]
+            theta_col_prob_row = np.ones(NUM_NUCLEOTIDES) * -np.inf
+            theta_col_prob_row[theta_row_mask] = theta_sampling_col_prob[sampled_row_idx]
+            theta_col_probs.append(theta_col_prob_row)
+        theta_col_probs = np.array(theta_col_probs)
+        theta_col_prob = theta_sampling_col_prob[theta_col_prob_idx, :]
+        theta_param = np.hstack((theta_param, theta_col_prob))
+
+    # Zero out a portion
     possible_indices = np.where(theta_mask)[0]
     indices_to_zero = np.random.choice(
         possible_indices,
@@ -172,12 +199,13 @@ def main(args=sys.argv[1:]):
         left_motif_flank_len_list=args.max_mut_pos,
     )
 
-    theta_sampling_distribution = _make_theta_sampling_distribution(args)
+    theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
 
     theta = _generate_true_parameters(
         hier_feat_generator,
         args,
-        theta_sampling_distribution,
+        theta_sampling_col0,
+        theta_sampling_col_prob,
     )
 
     agg_theta = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta)
