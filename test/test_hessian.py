@@ -14,9 +14,9 @@ class Hessian_TestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(1)
-        cls.motif_len = 5
-        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[5])
-        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
+        cls.motif_len = 3
+        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[3])
+        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[2,3], left_motif_flank_len_list=[[0,1], [1]])
 
         cls.obs_seq_mut = ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "aggctcgtattcgctaaaataagcaccag", cls.motif_len)
         cls.mutation_order = [12, 18, 3, 5, 19, 16, 8, 17, 21, 0, 22, 10, 24, 11, 9, 23]

@@ -16,12 +16,13 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         np.random.seed(10)
         cls.motif_len = 5
 
-        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
+        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[3,5], left_motif_flank_len_list=[[0,1], [2]])
 
         obs_seq_mut = ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "aggctcgtattcgctaaaataagcaccag", cls.motif_len)
         cls.mutation_order = [12, 18, 3, 5, 19, 16, 8, 17, 21, 0, 22, 10, 24, 11, 9, 23]
 
-        cls.sample_hier = ImputedSequenceMutations(cls.feat_gen_hier.create_base_features(obs_seq_mut), cls.mutation_order)
+        cls.feat_gen_hier.add_base_features(obs_seq_mut)
+        cls.sample_hier = ImputedSequenceMutations(obs_seq_mut, cls.mutation_order)
 
     def _compare_grad_calculation(self, feat_gen, sample, per_target):
         """
@@ -33,10 +34,9 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
             theta_num_col = 1
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
+        theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape, feat_gen.mutating_pos_list)
         theta[~theta_mask] = -np.inf
-
-        prob_solver = SurvivalProblemCustom(feat_gen, [sample], [1], per_target, theta_mask)
+        prob_solver = SurvivalProblemCustom(feat_gen, [sample], sample_labels = None, penalty_params=[1], per_target_model=per_target, possible_theta_mask=theta_mask)
         sample_data = prob_solver.precalc_data[0]
 
         # Basic gradient calculation
@@ -64,10 +64,11 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
             theta_num_col = 1
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
+        theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape, feat_gen.mutating_pos_list)
+        # theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape)
         theta[~theta_mask] = -np.inf
 
-        prob_solver = SurvivalProblemCustom(feat_gen, [sample], [1], per_target, theta_mask)
+        prob_solver = SurvivalProblemCustom(feat_gen, [sample], sample_labels = None, penalty_params=[1], per_target_model=per_target, possible_theta_mask=theta_mask)
         sample_data = prob_solver.precalc_data[0]
 
         feat_mut_steps = feat_gen.create_for_mutation_steps(sample)

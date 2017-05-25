@@ -541,16 +541,16 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                     theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
             else:
                 # Combine hierarchical feat_gens for given left_motif_len
-                for full_feat_gen in full_feat_generator.feat_gens:
-                    flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
-                    for f in flanks:
-                        full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
-                        full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
-                        full_theta[full_m_idx] += m_theta
+                full_feat_gen = full_feat_generator.feat_gens[0]
+                flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
+                for f in flanks:
+                    full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
+                    full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
+                    full_theta[full_m_idx] += m_theta
 
-                        theta_index_matches[full_m_idx].append(raw_theta_idx)
-                        if col_idx != 0:
-                            theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
+                    theta_index_matches[full_m_idx].append(raw_theta_idx)
+                    if col_idx != 0:
+                        theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
 
     if covariance_est is not None:
         for full_theta_idx, matches in theta_index_matches.iteritems():
