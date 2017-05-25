@@ -139,7 +139,8 @@ def main(args=sys.argv[1:]):
             full_data_samples = [
                 simulator.simulate(
                     start_seq=sequence.lower(),
-                    censoring_time=args.min_censor_time + np.random.rand() * 0.25, # allow some variation in censor time
+                    # censoring_time=args.min_censor_time + np.random.rand() * 0.25, # allow some variation in censor time
+                    percent_mutated=args.min_percent_mutated + np.random.rand() * 0.1, # allow some variation in censor time
                     with_replacement=args.with_replacement,
                 ) for i in range(args.n_taxa)
             ]

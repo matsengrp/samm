@@ -44,9 +44,9 @@ def parse_args():
     if args.stat == "norm":
         args.stat_func = _get_agg_norm_diff
     elif args.stat == "coverage":
-        args.stat_func = _get_raw_coverage #_get_agg_coverage
+        args.stat_func = _get_agg_coverage #_get_raw_coverage #_get_agg_coverage
     elif args.stat == "pearson":
-        args.stat_func = _get_pearson
+        args.stat_func = _get_raw_pearson# _get_pearson
 
     return args
 
@@ -87,7 +87,16 @@ def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, sta
     return statistics
 
 def _get_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    return scipy.stats.pearsonr(agg_true_theta[possible_agg_mask], fmodel.agg_refit_theta[possible_agg_mask])[0]
+    return scipy.stats.pearsonr(
+        agg_true_theta[possible_agg_mask],
+        fmodel.agg_refit_theta[possible_agg_mask],
+    )[0]
+
+def _get_raw_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+    return scipy.stats.pearsonr(
+        raw_true_theta[~fmodel.model_masks.feats_to_remove_mask],
+        fmodel.refit_theta,
+    )[0]
 
 def _get_agg_norm_diff(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
     tot_elems = np.sum(possible_agg_mask)
@@ -114,7 +123,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         # fmodel.refit_theta[:,col_idx:col_idx + 1] - np.median(fmodel.refit_theta[:,col_idx:col_idx + 1]),
         covariance_est=fmodel.variance_est,
         col_idx=col_idx,
-        zstat=2.576,
+        zstat=1.96,
     )
     med_theta = np.median(agg_fitted_theta)
     agg_fitted_lower -= med_theta
@@ -126,7 +135,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
 
     agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[:,col_idx])
     agg_true_theta_small = agg_true_theta_col[comparison_mask]
-    print np.vstack([agg_fitted_lower_small, agg_true_theta_small, agg_fitted_upper_small])
+    # print np.vstack([agg_fitted_lower_small, agg_true_theta_small, agg_fitted_upper_small])
     return np.mean((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
 
 def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
