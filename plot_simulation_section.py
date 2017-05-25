@@ -44,9 +44,9 @@ def parse_args():
     if args.stat == "norm":
         args.stat_func = _get_agg_norm_diff
     elif args.stat == "coverage":
-        args.stat_func = _get_agg_coverage #_get_raw_coverage #_get_agg_coverage
+        args.stat_func = _get_agg_coverage
     elif args.stat == "pearson":
-        args.stat_func = _get_raw_pearson# _get_pearson
+        args.stat_func = _get_pearson
 
     return args
 
@@ -55,7 +55,9 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
         fitted_models = pickle.load(f)
 
     good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
-    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
+    if len(good_models) == 0:
+        return None
+    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models])# Take the one with the most nonzero and the largest penalty parameter
     best_model = good_models[max_idx]
 
     hier_feat_gen = HierarchicalMotifFeatureGenerator(
@@ -83,7 +85,7 @@ def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, sta
         mask_shape=agg_true_theta.shape,
         mutating_pos_list=[args.agg_pos_mutating] * dense_agg_feat_gen.feature_vec_len,
     )
-    statistics = [stat_func(fmodel, dense_agg_feat_gen, raw_true_theta, agg_true_theta, possible_agg_mask) for fmodel in fitted_models]
+    statistics = [stat_func(fmodel, dense_agg_feat_gen, raw_true_theta, agg_true_theta, possible_agg_mask) for fmodel in fitted_models if fmodel is not None]
     return statistics
 
 def _get_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
@@ -115,28 +117,33 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
     )
 
     # calculate coverage of groups of theta values
-    col_idx = 0
-    agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = combine_thetas_and_get_conf_int(
-        hier_feat_gen,
-        full_feat_generator,
-        fmodel.refit_theta,
-        # fmodel.refit_theta[:,col_idx:col_idx + 1] - np.median(fmodel.refit_theta[:,col_idx:col_idx + 1]),
-        covariance_est=fmodel.variance_est,
-        col_idx=col_idx,
-        zstat=1.96,
-    )
-    med_theta = np.median(agg_fitted_theta)
-    agg_fitted_lower -= med_theta
-    agg_fitted_upper -= med_theta
-    comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
-    # comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
-    agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
-    agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
+    agg_coverage = []
+    for col_idx in range(agg_true_theta.shape[1]):
+        print "col_idx", col_idx
+        agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = combine_thetas_and_get_conf_int(
+            hier_feat_gen,
+            full_feat_generator,
+            fmodel.refit_theta,
+            # fmodel.refit_theta[:,col_idx:col_idx + 1] - np.median(fmodel.refit_theta[:,col_idx:col_idx + 1]),
+            covariance_est=fmodel.variance_est,
+            col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
+            zstat=1.96,
+        )
+        #agg_fitted_lower -= med_theta
+        #agg_fitted_upper -= med_theta
+        comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
+        print np.sum(comparison_mask)
+        # comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
+        agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
+        agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
 
-    agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[:,col_idx])
-    agg_true_theta_small = agg_true_theta_col[comparison_mask]
+        agg_true_theta_col = agg_true_theta[:,col_idx] #- np.median(agg_true_theta[:,col_idx])
+        agg_true_theta_small = agg_true_theta_col[comparison_mask]
     # print np.vstack([agg_fitted_lower_small, agg_true_theta_small, agg_fitted_upper_small])
-    return np.mean((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
+        coverage = np.mean((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
+        agg_coverage.append(coverage)
+    print "agg_cover", agg_coverage
+    return np.mean(agg_coverage)
 
 def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
     conf_int = ConfidenceIntervalMaker.create_confidence_intervals(
