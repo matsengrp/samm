@@ -526,20 +526,20 @@ def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
                 idx += 1
     return theta_idx_counter
 
-def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, method_res, col_idx=0, zstat=ZSCORE_95):
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0, zstat=ZSCORE_95):
     """
     Combine hierarchical and offset theta values
     """
     full_theta_size = full_feat_generator.feature_vec_len
+    theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
+    # stores which hierarchical theta values were used to construct the full theta
+    # important for calculating covariance
+    theta_index_matches = {i:[] for i in range(full_theta_size)}
+
     full_theta = np.zeros(full_theta_size)
     theta_lower = np.zeros(full_theta_size)
     theta_upper = np.zeros(full_theta_size)
 
-    theta = method_res.refit_theta
-    theta_idx_counter = create_theta_idx_mask(method_res.model_masks.zero_theta_mask_refit, method_res.refit_possible_theta_mask)
-    # stores which hierarchical theta values were used to construct the full theta
-    # important for calculating covariance
-    theta_index_matches = {i:[] for i in range(full_theta_size)}
     for i, feat_gen in enumerate(feat_generator.feat_gens):
         for m_idx, m in enumerate(feat_gen.motif_list):
             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
@@ -571,12 +571,12 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, method_
                     if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
                         theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
 
-    if method_res.has_refit_data:
+    if covariance_est is not None:
         for full_theta_idx, matches in theta_index_matches.iteritems():
             var_est = 0
             for i in matches:
                 for j in matches:
-                    var_est += method_res.variance_est[i,j]
+                    var_est += covariance_est[i,j]
 
             standard_err_est = np.sqrt(var_est)
             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - zstat * standard_err_est
@@ -584,17 +584,20 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, method_
 
     return full_theta, theta_lower, theta_upper
 
-def create_aggregate_theta(hier_feat_generator, agg_feat_generator, fmodel):
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask):
     def _combine_thetas(col_idx):
         theta_col, _, _ =  combine_thetas_and_get_conf_int(
             hier_feat_generator,
             agg_feat_generator,
-            fmodel,
+            theta,
+            zero_theta_mask,
+            possible_theta_mask,
+            None,
             col_idx,
         )
         return theta_col.reshape((theta_col.size, 1))
 
-    theta_cols = [_combine_thetas(col_idx) for col_idx in range(fmodel.refit_theta.shape[1])]
+    theta_cols = [_combine_thetas(col_idx) for col_idx in range(theta.shape[1])]
     agg_theta = np.hstack(theta_cols)
     return agg_theta
 
