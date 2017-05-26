@@ -216,12 +216,12 @@ class Gibbs_TestCase(unittest.TestCase):
             multi_theta[~theta_mask] = -np.inf
             return multi_theta
 
-        multi_theta = _make_multi_theta(self.feat_gen)
+        multi_theta = _make_multi_theta(self.feat_gen)/2
         rho, pval = self._test_joint_distribution(self.feat_gen, multi_theta)
-        self.assertTrue(rho > 0.89)
+        self.assertTrue(rho > 0.90)
         self.assertTrue(pval < 1e-25)
 
         multi_theta = _make_multi_theta(self.feat_gen_hier)/2
         rho, pval = self._test_joint_distribution(self.feat_gen_hier, multi_theta)
-        self.assertTrue(rho > 0.92)
-        self.assertTrue(pval < 1e-26)
+        self.assertTrue(rho > 0.97)
+        self.assertTrue(pval < 1e-40)
