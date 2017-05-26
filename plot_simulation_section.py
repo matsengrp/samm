@@ -37,10 +37,7 @@ def parse_args():
 def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
-
-    good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
-    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
-    best_model = good_models[max_idx]
+        best_model = pick_best_model(fitted_models)
 
     hier_feat_gen = HierarchicalMotifFeatureGenerator(
         motif_lens=best_model.motif_lens,

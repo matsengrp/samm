@@ -105,21 +105,10 @@ def main(args=sys.argv[1:]):
     args = parse_args()
 
     args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
-    for m in args.motif_len_vals:
-        assert(m % 2 == 1)
 
     args.max_motif_len = max(args.motif_len_vals)
 
     args.positions_mutating, args.max_mut_pos = process_mutating_positions(args.motif_len_vals, args.positions_mutating)
-
-    motifs_to_remove, pos_to_remove, target_pairs_to_remove = read_zero_motif_csv(args.zero_motifs, args.per_target_model)
-    feat_generator = HierarchicalMotifFeatureGenerator(
-        motif_lens=args.motif_len_vals,
-        motifs_to_remove=motifs_to_remove,
-        pos_to_remove=pos_to_remove,
-        left_motif_flank_len_list=args.positions_mutating,
-    )
-    mutating_pos_list = feat_generator.mutating_pos_list
 
     full_feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=[args.max_motif_len],
@@ -128,35 +117,40 @@ def main(args=sys.argv[1:]):
 
     # Load fitted theta file
     with open(args.input_pkl, "r") as f:
-        pickled_tup = pickle.load(f)
-        theta = pickled_tup[0]
-        if args.center_median:
-            theta -= np.median(theta)
+        method_results = pickle.load(f)
+        method_res = pick_best_model(method_results)
 
-        if args.no_conf_int or pickled_tup[2] is None:
-            covariance_est = np.zeros((theta.size, theta.size))
-        else:
-            covariance_est = pickled_tup[2]
-        assert(theta.shape[0] == feat_generator.feature_vec_len)
+    theta = method_res.refit_theta
+    if args.center_median:
+        theta -= np.median(theta)
 
-    # with open("_output/fisher_info_obs.pkl", "r") as f:
-    #     fisher_info1 = pickle.load(f)
-    #
-    #     possible_theta_mask = get_possible_motifs_to_targets(feat_generator.motif_list, theta.shape, feat_generator.mutating_pos_list)
-    #     zero_theta_mask = get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta.shape)
-    #     theta_mask = possible_theta_mask & ~zero_theta_mask
-    #     theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
-    #
-    #     sample_obs_information = (fisher_info1[theta_mask_flat,:])[:,theta_mask_flat]
-    #     covariance_est = np.linalg.inv(sample_obs_information)
+    covariance_est = method_res.variance_est
+
+    feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=args.motif_len_vals,
+        feats_to_remove=method_res.model_masks.feats_to_remove,
+        left_motif_flank_len_list=args.positions_mutating,
+    )
+    mutating_pos_list = feat_generator.mutating_pos_list
 
     full_theta = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
     theta_lower = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
     theta_upper = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
-
     for col_idx in range(theta.shape[1]):
-        full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = \
-                combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, covariance_est, col_idx)
+        full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = combine_thetas_and_get_conf_int(
+            feat_generator,
+            full_feat_generator,
+            method_res.refit_theta,
+            method_res.model_masks.zero_theta_mask_refit,
+            method_res.refit_possible_theta_mask,
+            method_res.variance_est,
+            col_idx,
+        )
+
+    agg_possible_motif_mask = get_possible_motifs_to_targets(full_feat_generator.motif_list, full_theta.shape, full_feat_generator.mutating_pos_list)
+    full_theta[~agg_possible_motif_mask] = -np.inf
+    theta_lower[~agg_possible_motif_mask] = -np.inf
+    theta_upper[~agg_possible_motif_mask] = -np.inf
 
     if args.per_target_model:
         if args.plot_separate:

@@ -512,16 +512,33 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
 
     return train_idx, val_idx
 
-def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, covariance_est=None, col_idx=0):
+def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
+    """
+    From an aggregate theta, creates a matrix with the index of the hierarchical theta
+    """
+    theta_idx_counter = np.ones(possible_theta_mask.shape, dtype=int) * -1
+    theta_mask = ~zero_theta_mask_refit & possible_theta_mask
+    idx = 0
+    for col in range(theta_mask.shape[1]):
+        for row in range(theta_mask.shape[0]):
+            if theta_mask[row, col]:
+                theta_idx_counter[row, col] = idx
+                idx += 1
+    return theta_idx_counter
+
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0):
     """
     Combine hierarchical and offset theta values
     """
     full_theta_size = full_feat_generator.feature_vec_len
+    theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
+    # stores which hierarchical theta values were used to construct the full theta
+    # important for calculating covariance
+    theta_index_matches = {i:[] for i in range(full_theta_size)}
+
     full_theta = np.zeros(full_theta_size)
     theta_lower = np.zeros(full_theta_size)
     theta_upper = np.zeros(full_theta_size)
-
-    theta_index_matches = {i:[] for i in range(full_theta_size)}
 
     for i, feat_gen in enumerate(feat_generator.feat_gens):
         for m_idx, m in enumerate(feat_gen.motif_list):
@@ -536,9 +553,10 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                 full_m_idx = full_feat_generator.motif_dict[m][feat_gen.left_motif_flank_len]
                 full_theta[full_m_idx] += m_theta
 
-                theta_index_matches[full_m_idx].append(raw_theta_idx)
-                if col_idx != 0:
-                    theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
+                if theta_idx_counter[raw_theta_idx, 0] != -1:
+                    theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+                if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+                    theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
             else:
                 # Combine hierarchical feat_gens for given left_motif_len
                 for full_feat_gen in full_feat_generator.feat_gens:
@@ -548,9 +566,10 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                         full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
                         full_theta[full_m_idx] += m_theta
 
-                        theta_index_matches[full_m_idx].append(raw_theta_idx)
-                        if col_idx != 0:
-                            theta_index_matches[full_m_idx].append(raw_theta_idx + col_idx * theta.shape[0])
+                        if theta_idx_counter[raw_theta_idx, 0] != -1:
+                            theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+                        if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+                            theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
 
     if covariance_est is not None:
         for full_theta_idx, matches in theta_index_matches.iteritems():
@@ -562,20 +581,34 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
             standard_err_est = np.sqrt(var_est)
             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
             theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
-
     return full_theta, theta_lower, theta_upper
 
-def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta):
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True):
     def _combine_thetas(col_idx):
-        theta_col, _, _ =  combine_thetas_and_get_conf_int(
+        theta_col, _, _ = combine_thetas_and_get_conf_int(
             hier_feat_generator,
             agg_feat_generator,
             theta,
+            zero_theta_mask,
+            possible_theta_mask,
             None,
             col_idx,
         )
         return theta_col.reshape((theta_col.size, 1))
 
-    theta_cols = [_combine_thetas(col_idx) for col_idx in range(theta.shape[1])]
+    if theta.shape[1] == 1:
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(num_cols)]
+    else:
+        start_idx = 0 if keep_col0 else 1
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(start_idx, theta.shape[1])]
     agg_theta = np.hstack(theta_cols)
     return agg_theta
+
+def pick_best_model(fitted_models):
+    """
+    Select the one with the most CI that do not cross zero
+    """
+    good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
+    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
+    best_model = good_models[max_idx]
+    return best_model

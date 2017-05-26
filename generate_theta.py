@@ -144,7 +144,7 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_distribu
     for i in indices_to_zero:
         theta_param[i] = 0
     theta_param -= np.median(theta_param)
-    return theta_param
+    return theta_param, theta_mask
 
 def dump_parameters(agg_theta, theta, args, feat_generator):
     # Dump a pickle file of simulation parameters
@@ -174,13 +174,13 @@ def main(args=sys.argv[1:]):
 
     theta_sampling_distribution = _make_theta_sampling_distribution(args)
 
-    theta = _generate_true_parameters(
+    theta, theta_mask = _generate_true_parameters(
         hier_feat_generator,
         args,
         theta_sampling_distribution,
     )
 
-    agg_theta = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta)
+    agg_theta = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, np.zeros(theta.shape, dtype=bool), theta_mask, keep_col0=False)
     dump_parameters(agg_theta, theta, args, hier_feat_generator)
 
 if __name__ == "__main__":
