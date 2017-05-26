@@ -119,7 +119,7 @@ def main(args=sys.argv[1:]):
 
     germline_nucleotides, germline_genes = _get_germline_nucleotides(args)
 
-    if agg_theta.shape[1] == NUM_NUCLEOTIDES + 1:
+    if agg_theta.shape[1] == NUM_NUCLEOTIDES:
         simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
     else:
         agg_theta_shape = (agg_theta.size, NUM_NUCLEOTIDES)

@@ -598,7 +598,7 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_
         return theta_col.reshape((theta_col.size, 1))
 
     if theta.shape[1] == 1:
-        theta_cols = [_combine_thetas(col_idx) for col_idx in range(num_cols)]
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(1)]
     else:
         start_idx = 0 if keep_col0 else 1
         theta_cols = [_combine_thetas(col_idx) for col_idx in range(start_idx, theta.shape[1])]
