@@ -43,7 +43,6 @@ def main(args=sys.argv[1:]):
     )
 
     good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
-    print [f_model.num_not_crossing_zero for f_model in good_models]
     max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
     for max_idx in range(len(good_models)):
         best_model = good_models[max_idx]
@@ -51,23 +50,18 @@ def main(args=sys.argv[1:]):
         motif_mask = ~best_model.model_masks.feats_to_remove_mask
 
         small_true_model = true_theta[motif_mask,:]
-        #print "median", np.median(small_true_model)
-        #small_true_model -= np.median(small_true_model)
         small_penalized_model = best_model.penalized_theta[motif_mask,:]
 
         refit_model_flat = refit_model[best_model.refit_possible_theta_mask]
         small_true_model_flat = small_true_model[best_model.refit_possible_theta_mask]
         small_penalized_model_flat = small_penalized_model[best_model.refit_possible_theta_mask]
-        print small_true_model_flat
         se = np.sqrt(np.diag(best_model.variance_est))
         lower = refit_model_flat - args.z * se
         upper = refit_model_flat + args.z * se
-        print np.vstack([lower, upper])
 
         # calculate coverage of groups of theta values
         thres_coverages = []
         thresholds = np.percentile(true_theta, [25, 50, 75, 100])
-        print thresholds
         prev_thres = -np.inf
         for i, thres in enumerate(thresholds):
             thres_mask = (true_theta > prev_thres) & (true_theta <= thres)
@@ -78,10 +72,6 @@ def main(args=sys.argv[1:]):
             small_thres_mask = ~np.isnan(small_true_theta_thres_flat)
             if np.sum(small_thres_mask) > 0:
                 small_true_theta_thres_final = small_true_theta_thres_flat[small_thres_mask]
-                print "thres lower", lower[small_thres_mask]
-                print "thres true", small_true_theta_thres_final
-                print "lower", np.mean(lower[small_thres_mask] < small_true_theta_thres_final)
-                print "upper", np.mean(small_true_theta_thres_final < upper[small_thres_mask])
                 thres_coverage = np.mean((lower[small_thres_mask] < small_true_theta_thres_final) & (small_true_theta_thres_final < upper[small_thres_mask]))
                 thres_coverages.append(thres_coverage)
             else:

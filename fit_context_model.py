@@ -292,10 +292,11 @@ def main(args=sys.argv[1:]):
                     break
             else:
                 # We are going to tune using confidence intervals
+                # explore a couple more penalty parameters
                 if curr_model_results.num_not_crossing_zero < num_nonzero_confint - 5 or curr_model_results.num_not_crossing_zero == 0:
                     log.info("Number of nonzero confidence intervals decreasing. Stop trying penalty parameters")
                     break
-        num_nonzero_confint = curr_model_results.num_not_crossing_zero
+        num_nonzero_confint = max(num_nonzero_confint, curr_model_results.num_not_crossing_zero)
         penalty_param_prev = penalty_param
         prev_pen_theta = curr_model_results.penalized_theta
 

@@ -64,9 +64,10 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
         motif_lens=[agg_motif_len],
         left_motif_flank_len_list=[[agg_pos_mutating]],
     )
-    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model)
+    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model.refit_theta, best_model.model_masks.zero_theta_mask_refit, best_model.refit_possible_theta_mask)
     if best_model.agg_refit_theta.shape[1] == NUM_NUCLEOTIDES + 1:
-        best_model.agg_refit_theta = best_model.agg_refit_theta[:, 0:1] + best_model.agg_refit_theta[:, 1:]
+        best_model.agg_refit_theta = best_model.agg_refit_theta[:, 1:]
+
     return best_model
 
 def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, stat_func):
@@ -91,8 +92,8 @@ def _get_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, po
 
 def _get_raw_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
     return scipy.stats.pearsonr(
-        raw_true_theta[~fmodel.model_masks.feats_to_remove_mask],
-        fmodel.refit_theta,
+        raw_true_theta[~fmodel.model_masks.feats_to_remove_mask][fmodel.refit_theta != -np.inf],
+        fmodel.refit_theta[fmodel.refit_theta != -np.inf],
     )[0]
 
 def _get_agg_norm_diff(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
@@ -110,33 +111,33 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         feats_to_remove=fmodel.model_masks.feats_to_remove,
         left_motif_flank_len_list=fmodel.positions_mutating,
     )
-
     # calculate coverage of groups of theta values
     agg_coverage = []
+    tot_covered = 0
+    tot_considered = 0
     for col_idx in range(agg_true_theta.shape[1]):
-        print "col_idx", col_idx
         agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = combine_thetas_and_get_conf_int(
             hier_feat_gen,
             full_feat_generator,
-            fmodel,
+            fmodel.refit_theta,
+            fmodel.model_masks.zero_theta_mask_refit,
+            fmodel.refit_possible_theta_mask,
+            fmodel.variance_est,
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=1.96,
         )
-        #agg_fitted_lower -= med_theta
-        #agg_fitted_upper -= med_theta
         comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
-        print np.sum(comparison_mask)
+        num_considered = np.sum(comparison_mask)
+        tot_considered += num_considered
         # comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
 
-        agg_true_theta_col = agg_true_theta[:,col_idx] #- np.median(agg_true_theta[:,col_idx])
+        agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[agg_true_theta != -np.inf])
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
-    # print np.vstack([agg_fitted_lower_small, agg_true_theta_small, agg_fitted_upper_small])
-        coverage = np.mean((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
-        agg_coverage.append(coverage)
-    print "agg_cover", agg_coverage
-    return np.mean(agg_coverage)
+        num_covered = np.sum((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
+        tot_covered += num_covered
+    return tot_covered/float(tot_considered)
 
 def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
     conf_int = ConfidenceIntervalMaker.create_confidence_intervals(
@@ -178,7 +179,6 @@ def main(args=sys.argv[1:]):
 
     for i in range(len(fitted_models)):
         statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], args.stat_func)
-        # print "statistics", statistics
         print "MEAN", np.mean(statistics), "(%f)" % np.sqrt(np.var(statistics))
 
 if __name__ == "__main__":
