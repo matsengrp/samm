@@ -53,12 +53,7 @@ def parse_args():
 def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
-
-    good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
-    if len(good_models) == 0:
-        return None
-    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models])# Take the one with the most nonzero and the largest penalty parameter
-    best_model = good_models[max_idx]
+        best_model = pick_best_model(fitted_models)
 
     hier_feat_gen = HierarchicalMotifFeatureGenerator(
         motif_lens=best_model.motif_lens,
@@ -69,7 +64,7 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
         motif_lens=[agg_motif_len],
         left_motif_flank_len_list=[[agg_pos_mutating]],
     )
-    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model.refit_theta)
+    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model)
     if best_model.agg_refit_theta.shape[1] == NUM_NUCLEOTIDES + 1:
         best_model.agg_refit_theta = best_model.agg_refit_theta[:, 0:1] + best_model.agg_refit_theta[:, 1:]
     return best_model
@@ -123,9 +118,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = combine_thetas_and_get_conf_int(
             hier_feat_gen,
             full_feat_generator,
-            fmodel.refit_theta,
-            # fmodel.refit_theta[:,col_idx:col_idx + 1] - np.median(fmodel.refit_theta[:,col_idx:col_idx + 1]),
-            covariance_est=fmodel.variance_est,
+            fmodel,
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=1.96,
         )
