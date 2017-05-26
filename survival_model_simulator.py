@@ -1,6 +1,6 @@
 import numpy as np
 from common import mutate_string
-from common import NUCLEOTIDES
+from common import NUCLEOTIDES, NUM_NUCLEOTIDES
 from common import sample_multinomial
 from models import *
 
@@ -119,7 +119,7 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         @param lambda0: a constant hazard rate
         """
         self.thetas = thetas
-        assert(theta.shape[1] == NUM_NUCLEOTIDES)
+        assert(thetas.shape[1] == NUM_NUCLEOTIDES)
         self.feature_generator = feature_generator
         self.motif_list = self.feature_generator.motif_list
         self.lambda0 = lambda0
