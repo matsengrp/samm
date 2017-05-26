@@ -137,8 +137,20 @@ def main(args=sys.argv[1:]):
     theta_lower = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
     theta_upper = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
     for col_idx in range(theta.shape[1]):
-        full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = \
-                combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, method_res, col_idx)
+        full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = combine_thetas_and_get_conf_int(
+            feat_generator,
+            full_feat_generator,
+            method_res.refit_theta,
+            method_res.model_masks.zero_theta_mask_refit,
+            method_res.refit_possible_theta_mask,
+            method_res.variance_est,
+            col_idx,
+        )
+
+    agg_possible_motif_mask = get_possible_motifs_to_targets(full_feat_generator.motif_list, full_theta.shape, full_feat_generator.mutating_pos_list)
+    full_theta[~agg_possible_motif_mask] = -np.inf
+    theta_lower[~agg_possible_motif_mask] = -np.inf
+    theta_upper[~agg_possible_motif_mask] = -np.inf
 
     if args.per_target_model:
         if args.plot_separate:
