@@ -64,9 +64,7 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
         motif_lens=[agg_motif_len],
         left_motif_flank_len_list=[[agg_pos_mutating]],
     )
-    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model.refit_theta, best_model.model_masks.zero_theta_mask_refit, best_model.refit_possible_theta_mask)
-    if best_model.agg_refit_theta.shape[1] == NUM_NUCLEOTIDES + 1:
-        best_model.agg_refit_theta = best_model.agg_refit_theta[:, 1:]
+    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model.refit_theta, best_model.model_masks.zero_theta_mask_refit, best_model.refit_possible_theta_mask, keep_col0=False)
 
     return best_model
 
