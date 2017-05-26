@@ -26,7 +26,7 @@ class Gibbs_TestCase(unittest.TestCase):
         cls.feat_gen_off = HierarchicalMotifFeatureGenerator(motif_lens=[3], left_motif_flank_len_list=[[0,1,2]])
         cls.obs_off = ObservedSequenceMutations("attcaaatgatatac", "ataaatagggtttac", cls.motif_len, left_flank_len=2, right_flank_len=2)
 
-    def _test_compute_log_probs(self, feat_gen, per_target_model, obs):
+    def _test_compute_log_probs(self, feat_gen, per_target_model, obs_seq_m):
         if per_target_model:
             theta = np.random.rand(feat_gen.feature_vec_len, NUM_NUCLEOTIDES + 1)
             possible_motif_mask = get_possible_motifs_to_targets(feat_gen.motif_list,
@@ -35,7 +35,7 @@ class Gibbs_TestCase(unittest.TestCase):
             theta[~possible_motif_mask] = -np.inf
         else:
             theta = np.random.rand(feat_gen.feature_vec_len, 1) * 2
-        obs_seq_m = feat_gen.create_base_features(obs)
+        feat_gen.add_base_features(obs_seq_m)
         sampler = MutationOrderGibbsSampler(theta, feat_gen, obs_seq_m)
 
         order = obs_seq_m.mutation_pos_dict.keys()
@@ -83,8 +83,8 @@ class Gibbs_TestCase(unittest.TestCase):
             self._test_compute_log_probs(self.feat_gen_hier, per_target_model, self.obs)
             self._test_compute_log_probs(self.feat_gen_off, per_target_model, self.obs_off)
 
-    def _test_compute_log_probs_with_reference(self, feat_gen, per_target_model, obs):
-        obs_seq_m = feat_gen.create_base_features(obs)
+    def _test_compute_log_probs_with_reference(self, feat_gen, per_target_model, obs_seq_m):
+        feat_gen.add_base_features(obs_seq_m)
         if per_target_model:
             num_cols = NUM_NUCLEOTIDES + 1
         else:
@@ -144,24 +144,24 @@ class Gibbs_TestCase(unittest.TestCase):
             probability_matrix[~possible_motif_mask] = 0
             surv_simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, feat_gen, lambda0=LAMBDA0)
         else:
-            surv_simulator = SurvivalModelSimulatorMultiColumn(theta, feat_gen, lambda0=LAMBDA0)
+            surv_simulator = SurvivalModelSimulatorMultiColumn(theta[:,0:1] + theta[:, 1:], feat_gen, lambda0=LAMBDA0)
 
         # Simulate some data from the same starting sequence
         # Get the distribution of mutation orders from our survival model
         full_seq_muts = [surv_simulator.simulate(START_SEQ, censoring_time=CENSORING_TIME) for i in range(NUM_OBS_SAMPLES)]
         # We make the mutation orders strings so easy to process
         true_order_distr = ["".join(map(str,m.get_mutation_order())) for m in full_seq_muts]
-        obs_seq_mutations = [
-            feat_gen.create_base_features(
-                ObservedSequenceMutations(
-                    m.left_flank + m.start_seq + m.right_flank,
-                    m.left_flank + m.end_seq + m.right_flank,
-                    motif_len=self.motif_len,
-                    left_flank_len=feat_gen.max_left_motif_flank_len,
-                    right_flank_len=feat_gen.max_right_motif_flank_len,
-                )
-            ) for m in full_seq_muts
-        ]
+        obs_seq_mutations = []
+        for m in full_seq_muts:
+            obs = ObservedSequenceMutations(
+                m.left_flank + m.start_seq + m.right_flank,
+                m.left_flank + m.end_seq + m.right_flank,
+                motif_len=self.motif_len,
+                left_flank_len=feat_gen.max_left_motif_flank_len,
+                right_flank_len=feat_gen.max_right_motif_flank_len,
+            )
+            feat_gen.add_base_features(obs)
+            obs_seq_mutations.append(obs)
 
         # Now get the distribution of orders from our gibbs sampler (so sample mutation order
         # given known mutation positions)
@@ -216,12 +216,12 @@ class Gibbs_TestCase(unittest.TestCase):
             multi_theta[~theta_mask] = -np.inf
             return multi_theta
 
-        multi_theta = _make_multi_theta(self.feat_gen)
+        multi_theta = _make_multi_theta(self.feat_gen)/2
         rho, pval = self._test_joint_distribution(self.feat_gen, multi_theta)
-        self.assertTrue(rho > 0.89)
+        self.assertTrue(rho > 0.90)
         self.assertTrue(pval < 1e-25)
 
         multi_theta = _make_multi_theta(self.feat_gen_hier)/2
         rho, pval = self._test_joint_distribution(self.feat_gen_hier, multi_theta)
-        self.assertTrue(rho > 0.92)
-        self.assertTrue(pval < 1e-26)
+        self.assertTrue(rho > 0.97)
+        self.assertTrue(pval < 1e-40)

@@ -1,6 +1,6 @@
 import numpy as np
 from common import mutate_string
-from common import NUCLEOTIDES
+from common import NUCLEOTIDES, NUM_NUCLEOTIDES
 from common import sample_multinomial
 from models import *
 
@@ -114,7 +114,7 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
     """
     def __init__(self, thetas, feature_generator, lambda0):
         """
-        @param thetas: Numpy array(p,5) where p is number of motifs. In each row, theta_row[i] represents the rate
+        @param thetas: Numpy array(p,4) where p is number of motifs. In each row, theta_row[i] represents the rate
                         to mutate to the i-th nucleotide in the string NUCLEOTIDES. Note that the theta values
                         for target nucleotides that have the SAME center nucleotide as the motif should be
                         completey ignored. (They should technically be negative infinity).
@@ -122,6 +122,7 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         @param lambda0: a constant hazard rate
         """
         self.thetas = thetas
+        assert(thetas.shape[1] == NUM_NUCLEOTIDES)
         self.feature_generator = feature_generator
         self.motif_list = self.feature_generator.motif_list
         self.lambda0 = lambda0
@@ -137,7 +138,7 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
             nucleotide_to_mutate = intermediate_seq[p]
             for theta_idx, target_nucleotide in enumerate(NUCLEOTIDES):
                 if target_nucleotide != nucleotide_to_mutate:
-                    exp_theta = np.exp(self.thetas[motif_idxs, 0].sum() + self.thetas[motif_idxs, theta_idx + 1].sum())
+                    exp_theta = np.exp(self.thetas[motif_idxs, theta_idx].sum())
                     hazard_weights.append(exp_theta)
                     target_nucleotides.append(target_nucleotide)
                     mutate_positions.append(p)

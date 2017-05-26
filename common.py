@@ -584,9 +584,9 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 
     return full_theta, theta_lower, theta_upper
 
-def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask):
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True):
     def _combine_thetas(col_idx):
-        theta_col, _, _ =  combine_thetas_and_get_conf_int(
+        theta_col, _, _ = combine_thetas_and_get_conf_int(
             hier_feat_generator,
             agg_feat_generator,
             theta,
@@ -597,7 +597,11 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_
         )
         return theta_col.reshape((theta_col.size, 1))
 
-    theta_cols = [_combine_thetas(col_idx) for col_idx in range(theta.shape[1])]
+    if theta.shape[1] == 1:
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(num_cols)]
+    else:
+        start_idx = 0 if keep_col0 else 1
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(start_idx, theta.shape[1])]
     agg_theta = np.hstack(theta_cols)
     return agg_theta
 

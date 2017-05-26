@@ -217,7 +217,7 @@ def main(args=sys.argv[1:]):
         theta_sampling_col_prob,
     )
 
-    agg_theta = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, np.zeros(theta.shape, dtype=bool), theta_mask)
+    agg_theta = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, np.zeros(theta.shape, dtype=bool), theta_mask, keep_col0=False)
     dump_parameters(agg_theta, theta, args, hier_feat_generator)
 
 if __name__ == "__main__":
