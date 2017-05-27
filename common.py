@@ -540,6 +540,7 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
     theta_lower = np.zeros(full_theta_size)
     theta_upper = np.zeros(full_theta_size)
 
+    full_feat_gen = full_feat_generator.feat_gens[0]
     for i, feat_gen in enumerate(feat_generator.feat_gens):
         for m_idx, m in enumerate(feat_gen.motif_list):
             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
@@ -549,8 +550,9 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                 m_theta += theta[raw_theta_idx, col_idx]
 
             if feat_gen.motif_len == full_feat_generator.motif_len:
+                assert(full_feat_gen.left_motif_flank_len == feat_gen.left_motif_flank_len)
                 # Already at maximum motif length, so nothing to combine
-                full_m_idx = full_feat_generator.motif_dict[m][feat_gen.left_motif_flank_len]
+                full_m_idx = full_feat_generator.motif_dict[m][full_feat_gen.left_motif_flank_len]
                 full_theta[full_m_idx] += m_theta
 
                 if theta_idx_counter[raw_theta_idx, 0] != -1:
@@ -559,7 +561,6 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                     theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
             else:
                 # Combine hierarchical feat_gens for given left_motif_len
-                full_feat_gen = full_feat_generator.feat_gens[0]
                 flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
                 for f in flanks:
                     full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
@@ -592,8 +593,8 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_
             theta,
             zero_theta_mask,
             possible_theta_mask,
-            None,
-            col_idx,
+            covariance_est=None,
+            col_idx=col_idx,
         )
         return theta_col.reshape((theta_col.size, 1))
 

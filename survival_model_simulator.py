@@ -102,8 +102,7 @@ class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
         mutate_pos = mutate_positions[sampled_idx]
         mutate_feat_idx = feature_vec_dict[mutate_pos]
         nucleotide_target_idx = sample_multinomial(
-            # Silly hack: generate probabilities for the target nucleotide by averaging across the different features.
-            self.probability_matrix[mutate_feat_idx,:].sum(axis=0)/len(mutate_feat_idx)
+            self.probability_matrix[mutate_feat_idx,:].sum(axis=0)
         )
         return mutate_time_delta, mutate_pos, NUCLEOTIDES[nucleotide_target_idx]
 
@@ -153,6 +152,5 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         # this is a multinomial
         sampled_idx = sample_multinomial(hazard_weights)
         mutate_pos = mutate_positions[sampled_idx]
-        mutate_feat_idx = feature_vec_dict[mutate_pos]
         nucleotide_target = target_nucleotides[sampled_idx]
         return mutate_time_delta, mutate_pos, nucleotide_target

@@ -115,18 +115,20 @@ def main(args=sys.argv[1:]):
         left_motif_flank_len_list=[[args.agg_motif_len/2]],
     )
     with open(args.input_model, 'r') as f:
-        agg_theta, raw_theta = pickle.load(f)
+        agg_theta, _ = pickle.load(f)
 
     germline_nucleotides, germline_genes = _get_germline_nucleotides(args)
 
     if agg_theta.shape[1] == NUM_NUCLEOTIDES:
         simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
-    else:
+    elif agg_theta.shape[1] == 1:
         agg_theta_shape = (agg_theta.size, NUM_NUCLEOTIDES)
         probability_matrix = np.ones(agg_theta_shape) * 1.0/3
         possible_motifs_mask = get_possible_motifs_to_targets(feat_generator.motif_list, agg_theta_shape, feat_generator.mutating_pos_list)
         probability_matrix[~possible_motifs_mask] = 0
         simulator = SurvivalModelSimulatorSingleColumn(agg_theta, probability_matrix, feat_generator, lambda0=args.lambda0)
+    else:
+        raise ValueError("Aggregate theta shape is wrong")
 
     dump_germline_data(germline_nucleotides, germline_genes, args)
 

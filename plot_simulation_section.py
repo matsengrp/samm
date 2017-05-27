@@ -64,7 +64,14 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
         motif_lens=[agg_motif_len],
         left_motif_flank_len_list=[[agg_pos_mutating]],
     )
-    best_model.agg_refit_theta = create_aggregate_theta(hier_feat_gen, agg_feat_gen, best_model.refit_theta, best_model.model_masks.zero_theta_mask_refit, best_model.refit_possible_theta_mask, keep_col0=False)
+    best_model.agg_refit_theta = create_aggregate_theta(
+        hier_feat_gen,
+        agg_feat_gen,
+        best_model.refit_theta,
+        best_model.model_masks.zero_theta_mask_refit,
+        best_model.refit_possible_theta_mask,
+        keep_col0=False,
+    )
 
     return best_model
 
@@ -113,6 +120,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
     agg_coverage = []
     tot_covered = 0
     tot_considered = 0
+    agg_fitted_thetas = []
     for col_idx in range(agg_true_theta.shape[1]):
         agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = combine_thetas_and_get_conf_int(
             hier_feat_gen,
@@ -124,17 +132,36 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=1.96,
         )
+        agg_fitted_thetas.append((agg_fitted_theta, agg_fitted_lower, agg_fitted_upper))
+
+    all_theta = np.vstack([t[0] for t in agg_fitted_thetas])
+    print "all_theta", all_theta
+    print "all_theta[all_theta != -np.inf]", np.sort(all_theta[all_theta != -np.inf])
+    med_theta = np.median(all_theta[all_theta != -np.inf])
+    print "med_theta", med_theta
+
+    for col_idx, (agg_fitted_theta, agg_fitted_lower, agg_fitted_upper) in enumerate(agg_fitted_thetas):
+        #print "HACK AHCK - only one col"
+        # med_theta = np.median(agg_fitted_theta[agg_fitted_theta != -np.inf])
+        # print "med theta", med_theta
+        agg_fitted_lower -= med_theta
+        agg_fitted_upper -= med_theta
         comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
+        print np.hstack((
+            agg_fitted_lower.reshape((agg_fitted_lower.size,1)),
+            agg_true_theta[:, col_idx:col_idx + 1] - np.median(agg_true_theta[agg_true_theta != -np.inf]),
+            agg_fitted_upper.reshape((agg_fitted_upper.size,1))
+        ))
         num_considered = np.sum(comparison_mask)
         tot_considered += num_considered
         # comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
-
         agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[agg_true_theta != -np.inf])
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
         num_covered = np.sum((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
         tot_covered += num_covered
+        print "num_covered", np.where(((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small)))[0], "num_considered", num_considered
     return tot_covered/float(tot_considered)
 
 def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
@@ -155,12 +182,7 @@ def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, p
 def _load_true_model(file_name):
     with open(file_name, "r") as f:
         true_model_agg, true_model = pickle.load(f)
-
-    # Find the most parsimonious version of this theta
-    true_theta_lasso = true_model
-    if true_model_agg.shape[1] == NUM_NUCLEOTIDES + 1:
-        true_model_agg = true_model_agg[:,0:1] + true_model_agg[:,1:]
-    return true_model_agg, true_theta_lasso
+    return true_model_agg, true_model
 
 def main(args=sys.argv[1:]):
     args = parse_args()

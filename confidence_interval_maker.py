@@ -64,13 +64,12 @@ class ConfidenceIntervalMaker:
         """
         print_line_list = []
         idx = 0
-        for i in range(self.zero_theta_mask.shape[0]):
-            motif = self.motif_list[i]
-            for j in range(self.zero_theta_mask.shape[1]):
-                target_nucleotide = "n" if j == 0 else NUCLEOTIDES[j - 1]
+        for j in range(self.zero_theta_mask.shape[1]):
+            target_nucleotide = "n" if j == 0 else NUCLEOTIDES[j - 1]
+            for i in range(self.zero_theta_mask.shape[0]):
                 if not self.theta_mask[i, j]:
                     continue
-                print_str = "%s (%s->%s)" % (conf_ints[idx,:], motif, target_nucleotide)
+                print_str = "%s (%s->%s)" % (conf_ints[idx,:], self.motif_list[i], target_nucleotide)
                 print_line_list.append((conf_ints[idx,1], print_str))
                 idx += 1
         sorted_lines = sorted(print_line_list, key=lambda s: s[0])

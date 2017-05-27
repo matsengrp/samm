@@ -13,9 +13,9 @@ from matsen_grp_data import SCRATCH_DIR
 Import('env')
 localenv = env.Clone()
 
-SPARSITIES = [0.25, 0.5, 1.0]
-EFFECT_SIZES = [1.0]# [0.5, 1.0, 2.0]
-SIMULATION_SIZES = [40, 120, 360]
+SPARSITIES = [0.5] #[0.25, 0.5, 1.0]
+EFFECT_SIZES = [1.0] # [0.5, 1.0, 2.0]
+SIMULATION_SIZES = [900] #[40, 120, 360]
 
 # Set up state
 base = {'nreps': localenv['NREPS'],
@@ -51,7 +51,7 @@ nest.add(
 
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    if c['effect_size'] != EFFECT_SIZES[int(len(EFFECT_SIZES)/2)] and c['sparsity_ratio'] != SPARSITIES[1]:
+    if c['effect_size'] != EFFECT_SIZES[int(len(EFFECT_SIZES)/2)] and c['sparsity_ratio'] != SPARSITIES[int(len(SPARSITIES)/2)]:
         return
 
     per_target_model_str = ""
@@ -97,8 +97,8 @@ nest.add(
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
-    c1 = c['simulation_size'] == SIMULATION_SIZES[1]
-    c2 = c['sparsity_ratio'] == SPARSITIES[1]
+    c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
+    c2 = c['sparsity_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
     c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
     if np.sum([c1, c2, c3]) < 2:
         return
@@ -133,8 +133,8 @@ nest.add(
 # Nest for model fitting
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
-    c1 = c['simulation_size'] == SIMULATION_SIZES[1]
-    c2 = c['sparsity_ratio'] == SPARSITIES[1]
+    c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
+    c2 = c['sparsity_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
     c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
     if np.sum([c1, c2, c3]) < 2:
         return
@@ -157,9 +157,9 @@ def fit_context_model(env, outdir, c):
                '--penalty-params',
                ",".join(map(str, penalty_params)),
                '--num-cpu-threads',
-               4, #min(int(c['simulation_size']/20), 6),
+               min(int(c['simulation_size']/20), 10),
                '--num-jobs',
-               min(int(c['simulation_size']/40), 6),
+               min(int(c['simulation_size']/40), 10),
                '--burn-in',
                2,
                '--num-e-samples',
