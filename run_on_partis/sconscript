@@ -40,51 +40,77 @@ nest.add(
 # Targets
 nest.add(
     'model_options',
-    ['basic'])
+    [
+        'survival',
+        #'shazam'
+    ])
+
+motif_params_dict = [
+    {'motif_length': '5', 'left_motif_flanks': '2'},
+    {'motif_length': '3', 'left_motif_flanks': '0,1,2'},
+    #{'motif_length': '3,5,7', 'left_motif_flanks': '1:2:3'},
+]
 
 # Nest for model fitting
 @nest.add_target_with_env(localenv)
 def fit_models(env, outdir, c):
     cmd = []
-    if c["model_options"] == "survival":
+    motif_len = c['motif_params']['motif_length']
+    left_flanks = c['motif_params']['left_motif_flanks']
+    if c["model_options"].startswith("survival"):
+        if motif_len == '5':
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.5, -2.0, step=-0.1)).tolist()))
+        elif motif_len == '3,5,7':
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -2.5, step=-0.25)).tolist()))
+        elif motif_len == '3' and c['per_target']:
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.25, -1.35, step=-0.025)).tolist()))
+        elif motif_len == '3' and not c['per_target']:
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.25, -2.5, step=-0.25)).tolist()))
+
         cmd = ['python fit_context_model.py',
                '--seed',
-               randint(1000, 9999),
-               '--motif-len',
-               5,
+               c['seed'],
+               '--motif-lens',
+               motif_len,
+               '--positions-mutating',
+               left_flanks,
                '--penalty-params',
-               "0.01,0.001,0.0001",
+               penalty_params,
                '--num-cpu-threads',
-               10,
+               4,
                '--num-jobs',
                20,
                '--burn-in',
                2,
                '--num-e-samples',
                4,
-               '--use-partis',
-               '--input-partis',
-               c['data_path'],
-               '--chain',
-               c['chain'],
-               '--igclass',
-               c['igclass'],
+               '--em-max-iters',
+               10,
+               '--num-val-burnin',
+               2,
+               '--num-val-samples',
+               4,
+               '--num-val-threads',
+               4,
+               '--scratch-directory',
+               SCRATCH_DIR,
+               '--tuning-sample-ratio',
+               0.1,
                '--out-file ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
-    elif c["model_options"] == "basic":
-        cmd = ['python fit_basic_model.py',
-               '--seed',
-               randint(1000, 9999),
-               '--motif-len',
-               5,
-               '--use-partis',
-               '--input-partis',
-               c['data_path'],
-               '--chain',
-               c['chain'],
-               '--igclass',
-               c['igclass'],
-               '--prop-file ${TARGETS[0]}',
+        if c['validation_methods'] is not 'none':
+            cmd += [
+               '--validation-column',
+               c['validation_methods']]
+        if c['sample_or_impute'] == 'sample':
+            cmd += ['--sample-regime', 2]
+        if c["per_target"]:
+            cmd += ['--per-target-model']
+    elif c["model_options"] == "shazam" and motif_len == '5' and left_flanks == '2':
+        cmd = ['python fit_shmulate_model.py',
+               '--input-file ${SOURCES[0]}',
+               '--input-genes ${SOURCES[1]}',
+               '--model-pkl ${TARGETS[0]}',
                '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],

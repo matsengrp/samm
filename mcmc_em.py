@@ -95,6 +95,11 @@ class MCMC_EM:
                     get_nonzero_theta_print_lines(theta, self.motif_list)
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
+                lower_bound_is_negative = (lower_bound < -ZERO_THRES)
+                log.info("em lower bound %f" % (lower_bound))
+                if num_nonzero == 0:
+                    # The whole theta is zero - just stop and consider a different penalty parameter
+                    break
 
                 if prev_pen_exp_log_lik is not None:
                     # Get statistics
@@ -116,7 +121,9 @@ class MCMC_EM:
                 # if penalized log likelihood is increasing but not by very much
                 break
 
-            prev_pen_exp_log_lik = pen_exp_log_lik
-            log.info("official pen_exp_log_lik %f" % pen_exp_log_lik)
-
-        return theta, all_traces
+        if get_hessian:
+            ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, possible_theta_mask, zero_theta_mask, feat_generator.mutating_pos_list)
+            variance_est = ci_maker.run(theta, e_step_samples, problem)
+        else:
+            variance_est = None
+        return theta, variance_est, all_traces
