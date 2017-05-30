@@ -1,13 +1,17 @@
 ## Test model fits against one another
 
 import os
+import pickle
+import csv
+import numpy as np
 
 from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
 from random import randint
-from matsen_grp_data import *
+from matsen_grp_data import CUI_DATA_PATH
+from matsen_grp_data import SCRATCH_DIR
 
 Import('env')
 localenv = env.Clone()
@@ -17,24 +21,65 @@ base = {'output_name': localenv['OUTPUT_NAME']}
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
+SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
+
 # Nest for datasets
 nest.add(
     'datasets',
-    ['laura', 'kate'])
+    ['cui'])
 
+# TODO: eventually add jason-mg data, once processed
 nest.add(
     'data_path',
-    lambda c: [LAURA_DATA_PATH if c['datasets'] == 'laura' else KATE_DATA_PATH],
+    [CUI_DATA_PATH],
     create_dir=False)
 
-# Chains and classes
 nest.add(
-    'chain',
-    ['h', 'k', 'l'])
+    'sample_or_impute',
+    [
+        'sample',
+        #'impute'
+    ])
+
+# Nest for processing data
+# Not imputing so we don't need to pass motif length---this way data will only
+# be processed once
+@nest.add_target_with_env(localenv)
+def process_data(env, outdir, c):
+    cmd = ['python preprocess_data.py',
+               '--data-path',
+               c['data_path'],
+               '--read-from-partis',
+               '--metadata-path',
+               c['data_path'] + '/meta.csv',
+               '--output-genes ${TARGETS[0]}',
+               '--output-seqs ${TARGETS[1]}']
+    if c['sample_or_impute'] == 'impute':
+        cmd += ['--impute-ancestors']
+
+    return env.Command(
+        [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# Loci
+# ! no heavy chain in cui data
+nest.add(
+    'locus',
+    [
+        'igk',
+        #'igl'
+    ])
 
 nest.add(
-    'igclass',
-    lambda c: 'G' if c['chain'] == 'h' else c['chain'].upper(),
+    'replicate',
+    range(localenv['NREPS']),
+    label_func='{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
     create_dir=False)
 
 # Targets
@@ -42,18 +87,41 @@ nest.add(
     'model_options',
     [
         'survival',
-        #'shazam'
+        #'shmulate'
     ])
 
 motif_params_dict = [
     {'motif_length': '5', 'left_motif_flanks': '2'},
-    {'motif_length': '3', 'left_motif_flanks': '0,1,2'},
     #{'motif_length': '3,5,7', 'left_motif_flanks': '1:2:3'},
+    #{'motif_length': '5', 'left_motif_flanks': '0,2,4'},
+    #{'motif_length': '3,5,7', 'left_motif_flanks': '0,1,2:0,2,4:0,3,6'},
 ]
 
-# Nest for model fitting
+nest.add(
+    'motif_params',
+    motif_params_dict,
+    label_func=lambda c: 'motif-' + c['motif_length'].replace(',','-') +
+        '-flank-' + c['left_motif_flanks'].replace(',', '-').replace(':', '--'))
+
+nest.add(
+    'per_target',
+    [
+         False,
+         True
+    ]
+)
+
+nest.add(
+    'validation_methods',
+    [
+        #'none',
+        'subject',
+        #'clonal_family'
+    ])
+
+# Nest for deciding parameter ranges
 @nest.add_target_with_env(localenv)
-def fit_models(env, outdir, c):
+def tune_parameters(env, outdir, c):
     cmd = []
     motif_len = c['motif_params']['motif_length']
     left_flanks = c['motif_params']['left_motif_flanks']
@@ -68,6 +136,12 @@ def fit_models(env, outdir, c):
             penalty_params = ",".join(map(str, np.power(10, np.arange(-1.25, -2.5, step=-0.25)).tolist()))
 
         cmd = ['python fit_context_model.py',
+               '--input-genes ${SOURCES[0]}',
+               '--input-seqs ${SOURCES[1]}',
+               '--locus',
+               c['locus'],
+               '--species',
+               'mouse',
                '--seed',
                c['seed'],
                '--motif-lens',
