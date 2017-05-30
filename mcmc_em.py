@@ -1,77 +1,79 @@
 import time
 import numpy as np
 import logging as log
+import pickle
 
 from models import *
 from common import *
 from sampler_collection import SamplerCollection
 from profile_support import profile
+from confidence_interval_maker import ConfidenceIntervalMaker
 
 class MCMC_EM:
-    def __init__(self, observed_data, feat_generator, sampler_cls, problem_solver_cls, theta_mask, base_num_e_samples=10, burn_in=10, max_m_iters=500, num_jobs=1, num_threads=1, approx='none'):
+    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=500, num_jobs=1, scratch_dir='_output', pool=None, per_target_model=False):
         """
-        @param observed_data: list of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
-        @param feat_generator: an instance of a FeatureGenerator
+        @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param sampler_cls: a Sampler class
         @param problem_solver_cls: SurvivalProblem class
         @param base_num_e_samples: number of E-step samples to draw initially
-        @param burn_in: number of gibbs sweeps to do for burn in
         @param max_m_iters: maximum number of iterations for the M-step
         @param num_jobs: number of jobs to submit for E-step
-        @param num_threads: number of threads to use for M-step
         """
-        self.observed_data = observed_data
-        self.feat_generator = feat_generator
-        self.motif_list = self.feat_generator.get_motif_list()
         self.base_num_e_samples = base_num_e_samples
         self.max_m_iters = max_m_iters
-        self.burn_in = burn_in
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
         self.num_jobs = num_jobs
-        self.num_threads = num_threads
-        self.theta_mask = theta_mask
-        self.approx = approx
+        self.pool = pool
+        self.scratch_dir = scratch_dir
+        self.per_target_model = per_target_model
 
-    def run(self, theta, penalty_param=1, max_em_iters=10, diff_thres=1e-6, max_e_samples=1000):
+    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=20, intermed_file_prefix="", get_hessian=False):
         """
         @param theta: initial value for theta in MCMC-EM
-        @param penalty_param: the coefficient for the penalty function
+        @param feat_generator: an instance of a FeatureGenerator
+        @param penalty_params: the coefficient(s) for the penalty function
         @param max_em_iters: the maximum number of iterations of MCMC-EM
+        @param burn_in: number of burn in iterations
         @param diff_thres: if the change in the objective function changes no more than `diff_thres`, stop MCMC-EM
+        @param max_e_samples: maximum number of e-samples to grab per observed sequence
+        @param train_and_val: whether to train on both train and validation data
         """
+        motif_list = feat_generator.motif_list
+
         st = time.time()
+        num_data = len(observed_data)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
-        init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in self.observed_data]
-        prev_pen_exp_log_lik = None
+        init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in observed_data]
         all_traces = []
+        # burn in only at the very beginning
         for run in range(max_em_iters):
-            lower_bound_is_negative = True
             prev_theta = theta
             num_e_samples = self.base_num_e_samples
-            burn_in = self.burn_in
 
             sampler_collection = SamplerCollection(
-                self.observed_data,
+                observed_data,
                 prev_theta,
                 self.sampler_cls,
-                self.feat_generator,
+                feat_generator,
                 self.num_jobs,
-                self.approx,
+                self.scratch_dir,
             )
 
             e_step_samples = []
-            while lower_bound_is_negative and len(e_step_samples) < max_e_samples:
+            e_step_labels = []
+            lower_bound_is_negative = True
+            while len(e_step_samples)/num_data < max_e_samples and lower_bound_is_negative:
                 ## Keep grabbing samples until it is highly likely we have increased the penalized log likelihood
 
                 # do E-step
-                log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples) + num_e_samples, time.time() - st))
+                log.info("E STEP, iter %d, num samples %d, time %f" % (run, len(e_step_samples)/num_data + num_e_samples, time.time() - st))
                 sampler_results = sampler_collection.get_samples(
                     init_orders,
                     num_e_samples,
                     burn_in,
                 )
-                # Don't use burn-in if we are repeating the sampling due to a negative lower bound
+                # Don't use burn-in from now on
                 burn_in = 0
                 all_traces.append([res.trace for res in sampler_results])
                 sampled_orders_list = [res.samples for res in sampler_results]
@@ -81,18 +83,32 @@ class MCMC_EM:
                 init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
                 # flatten the list of samples to get all the samples
                 e_step_samples += [o for orders in sampled_orders_list for o in orders]
+                e_step_labels += [i for i, orders in enumerate(sampled_orders_list) for o in orders]
 
                 # Do M-step
                 log.info("M STEP, iter %d, time %f" % (run, time.time() - st))
 
-                problem = self.problem_solver_cls(self.feat_generator, e_step_samples, penalty_param, self.theta_mask, self.num_threads)
-                theta, pen_exp_log_lik = problem.solve(
+                problem = self.problem_solver_cls(
+                    feat_generator,
+                    e_step_samples,
+                    e_step_labels,
+                    penalty_params,
+                    self.per_target_model,
+                    possible_theta_mask=possible_theta_mask,
+                    zero_theta_mask=zero_theta_mask,
+                    pool=self.pool,
+                )
+
+                theta, pen_exp_log_lik, lower_bound = problem.solve(
                     init_theta=prev_theta,
                     max_iters=self.max_m_iters,
                 )
-                log.info("Current Theta")
+
+                num_nonzero = get_num_nonzero(theta)
+                num_unique = get_num_unique_theta(theta)
+                log.info("Current Theta, num_nonzero %d, unique %d" % (num_nonzero, num_unique))
                 log.info(
-                    get_nonzero_theta_print_lines(theta, self.motif_list)
+                    get_nonzero_theta_print_lines(theta, feat_generator)
                 )
                 log.info("penalized log likelihood %f" % pen_exp_log_lik)
                 lower_bound_is_negative = (lower_bound < -ZERO_THRES)
@@ -101,25 +117,16 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-                if prev_pen_exp_log_lik is not None:
-                    # Get statistics
-                    log_lik_vec = problem.calculate_log_lik_ratio_vec(theta, prev_theta)
+            # Save the e-step samples if we want to analyze later on
+            # e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
+            # log.info("Pickling E-step samples %s" % e_sample_file_name)
+            # with open(e_sample_file_name, "w") as f:
+            #     pickle.dump(e_step_samples, f)
 
-                    # Calculate lower bound to determine if we need to rerun
-                    # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
-                    ase, lower_bound, _ = get_standard_error_ci_corrected(log_lik_vec, ZSCORE, pen_exp_log_lik - prev_pen_exp_log_lik)
-
-                    lower_bound_is_negative = (lower_bound < 0)
-                    log.info("lower_bound_is_negative %d" % lower_bound_is_negative)
-                else:
-                    lower_bound_is_negative = False
-
-            if lower_bound_is_negative:
-                # if penalized log likelihood is decreasing
+            if lower_bound_is_negative or lower_bound < diff_thres or num_nonzero == 0:
+                # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
-            elif prev_pen_exp_log_lik is not None and pen_exp_log_lik - prev_pen_exp_log_lik < diff_thres:
-                # if penalized log likelihood is increasing but not by very much
-                break
+            log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
         if get_hessian:
             ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, possible_theta_mask, zero_theta_mask, feat_generator.mutating_pos_list)

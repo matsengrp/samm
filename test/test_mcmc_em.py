@@ -8,7 +8,7 @@ from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
-from common import read_gene_seq_csv_data
+from read_data import read_gene_seq_csv_data
 from constants import *
 
 class MCMC_EM_TestCase(unittest.TestCase):
@@ -16,8 +16,10 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         Check if MCMC EM will run to completion
         """
-        feat_generator = SubmotifFeatureGenerator(motif_len=3)
-        gene_dict, obs_data_raw = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS)
+        MOTIF_LEN = 3
+
+        feat_generator = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
+        obs_data_raw = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len=MOTIF_LEN)
         obs_data = []
         for obs_seq_mutation in obs_data_raw:
             obs_data.append(feat_generator.create_base_features(obs_seq_mutation))
@@ -33,7 +35,6 @@ class MCMC_EM_TestCase(unittest.TestCase):
             SurvivalProblemLasso,
             theta_mask,
             num_jobs=1,
-            num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
 
@@ -45,7 +46,6 @@ class MCMC_EM_TestCase(unittest.TestCase):
             SurvivalProblemFusedLassoProximal,
             theta_mask,
             num_jobs=1,
-            num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
 
@@ -57,7 +57,6 @@ class MCMC_EM_TestCase(unittest.TestCase):
             SurvivalProblemLassoCVXPY,
             theta_mask,
             num_jobs=1,
-            num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)
 
@@ -69,6 +68,5 @@ class MCMC_EM_TestCase(unittest.TestCase):
             SurvivalProblemFusedLassoCVXPY,
             theta_mask,
             num_jobs=1,
-            num_threads=1,
         )
         em_algo.run(init_theta, max_em_iters=1)

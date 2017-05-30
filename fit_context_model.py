@@ -11,21 +11,22 @@ import os.path
 import csv
 import pickle
 import logging as log
+import time
+import random
+from multiprocessing import Pool
 
 import numpy as np
 import scipy.stats
 
-from models import ObservedSequenceMutations
-from mcmc_em import MCMC_EM
-from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
-from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
-from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
-from survival_problem_fused_lasso_prox import SurvivalProblemFusedLassoProximal
-from multinomial_solver import MultinomialSolver
+from likelihood_evaluator import LikelihoodComparer
+from method_results import MethodResults
 from common import *
+from read_data import *
 from matsen_grp_data import *
+from context_model_algo import ContextModelAlgo
 
 def parse_args():
     ''' parse command line arguments '''
@@ -36,14 +37,23 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--input-file',
-        type=str,
-        help='sequence data in csv',
-        default='_output/seqs.csv')
     parser.add_argument('--input-genes',
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
+    parser.add_argument('--input-seqs',
+        type=str,
+        help='sequence data in csv',
+        default='_output/seqs.csv')
+    parser.add_argument('--sample-regime',
+        type=int,
+        default=1,
+        choices=(1, 2, 3),
+        help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
+    parser.add_argument('--scratch-directory',
+        type=str,
+        help='where to write gibbs workers and dnapars files, if necessary',
+        default='_output')
     parser.add_argument('--num-cpu-threads',
         type=int,
         help='number of threads to use during M-step',
@@ -52,15 +62,18 @@ def parse_args():
         type=int,
         help='number of jobs to submit during E-step',
         default=1)
-    parser.add_argument('--solver',
+    parser.add_argument('--motif-lens',
         type=str,
-        help='CL = cvxpy lasso, CFL = cvxpy fused lasso, L = gradient descent lasso, FL = fused lasso, PFL = fused lasso with prox solver',
-        choices=["CL", "CFL", "L", "FL"],
-        default="L")
-    parser.add_argument('--motif-len',
-        type=int,
         help='length of motif (must be odd)',
-        default=5)
+        default='5')
+    parser.add_argument('--positions-mutating',
+        type=str,
+        help="""
+        length of left motif flank determining which position is mutating; comma-separated within
+        a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
+        be a 3mer with first and second mutating position and 5mer with first, second and third
+        """,
+        default=None)
     parser.add_argument('--em-max-iters',
         type=int,
         help='number of EM iterations',
@@ -81,161 +94,216 @@ def parse_args():
         type=str,
         help='file with pickled context model',
         default='_output/context_model.pkl')
+    parser.add_argument('--theta-file',
+        type=str,
+        help='true theta file',
+        default='')
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.01")
-    parser.add_argument('--theta-file',
+        default="0.5, 0.25")
+    parser.add_argument('--tuning-sample-ratio',
+        type=float,
+        help="""
+            proportion of data to use for tuning the penalty parameter.
+            if zero, tunes by number of confidence intervals for theta that do not contain zero
+            """,
+        default=0)
+    parser.add_argument('--num-val-burnin',
+        type=int,
+        help='Number of burn in iterations when estimating likelihood of validation data',
+        default=10)
+    parser.add_argument('--num-val-samples',
+        type=int,
+        help='Number of burn in iterations when estimating likelihood of validation data',
+        default=10)
+    parser.add_argument('--num-val-threads',
+        type=int,
+        help='number of threads to use for validation calculations',
+        default=12)
+    parser.add_argument('--validation-column',
         type=str,
-        help='file with pickled true context model (default: None, for no truth)',
+        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
         default=None)
-    parser.add_argument('--input-partis',
-        type=str,
-        help='partis annotations file',
-        default=SAMPLE_PARTIS_ANNOTATIONS)
-    parser.add_argument('--use-partis',
-        action='store_true',
-        help='use partis annotations file')
     parser.add_argument('--per-target-model',
         action='store_true')
-    parser.add_argument('--chain',
-        default='h',
-        choices=('h', 'k', 'l'),
-        help='heavy chain or kappa/lambda light chain')
-    parser.add_argument('--igclass',
-        default='G',
-        choices=('G', 'M', 'K', 'L'),
-        help='immunoglobulin class')
+    parser.add_argument("--locus",
+        type=str,
+        choices=('','igh','igk','igl'),
+        help="locus (igh, igk or igl; default empty)",
+        default='')
+    parser.add_argument("--species",
+        type=str,
+        choices=('','mouse','human'),
+        help="species (mouse or human; default empty)",
+        default='')
+    parser.add_argument("--z-stat",
+        type=float,
+        help="confidence interval z statistic",
+        default=1.96)
 
-    parser.set_defaults(per_target_model=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
 
     # Determine problem solver
     args.problem_solver_cls = SurvivalProblemLasso
-    if args.solver == "CL":
-        args.problem_solver_cls = SurvivalProblemLassoCVXPY
-    elif args.solver == "CFL":
-        if args.per_target_model:
-            raise NotImplementedError()
-        else:
-            args.problem_solver_cls = SurvivalProblemFusedLassoCVXPY
-    elif args.solver == "L":
-        args.problem_solver_cls = SurvivalProblemLasso
-    elif args.solver == "FL":
-        if args.per_target_model:
-            raise NotImplementedError()
-        else:
-            args.problem_solver_cls = SurvivalProblemFusedLassoProximal
 
     # Determine sampler
     args.sampler_cls = MutationOrderGibbsSampler
     if args.per_target_model:
-        args.theta_num_col = NUM_NUCLEOTIDES
+        # First column is the median theta value and the remaining columns are the offset for that target nucleotide
+        args.theta_num_col = NUM_NUCLEOTIDES + 1
     else:
         args.theta_num_col = 1
 
-    assert(args.motif_len % 2 == 1 and args.motif_len > 1)
+    args.motif_lens = [int(m) for m in args.motif_lens.split(',')]
 
-    return args
+    args.max_motif_len = max(args.motif_lens)
 
-def load_true_theta(theta_file, per_target_model):
-    """
-    @param theta_file: file name
-    @param per_target_model: if True, we return the entire theta. If False, we return a collapsed theta vector
-
-    @return the true theta vector/matrix
-    """
-    true_theta = pickle.load(open(theta_file, 'rb'))
-    if per_target_model:
-        return true_theta
+    if args.positions_mutating is None:
+        # default to central base mutating
+        args.max_left_flank = None
+        args.max_right_flank = None
     else:
-        return np.matrix(np.max(true_theta, axis=1)).T
+        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
+        for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+
+        # Find the maximum left and right flanks of the motif with the largest length in the
+        # hierarchy in order to process the data correctly
+        args.max_left_flank = max(sum(args.positions_mutating, []))
+        args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
+
+        # Check if our full feature generator will conform to input
+        max_left_flanks = args.positions_mutating[args.motif_lens.index(args.max_motif_len)]
+        if args.max_left_flank > max(max_left_flanks) or args.max_right_flank > args.max_motif_len - min(max_left_flanks) - 1:
+            raise AssertionError('The maximum length motif does not contain all smaller length motifs.')
+
+    args.intermediate_out_dir = os.path.dirname(args.out_file)
+
+    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
+    if not os.path.exists(args.scratch_dir):
+        os.makedirs(args.scratch_dir)
+
+    # sort penalty params from largest to smallest
+    args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
+    args.penalty_params = sorted(args.penalty_params, reverse=True)
+    return args
 
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
 
-    # Load true theta for comparison
-    if args.theta_file is not None:
-        # no true theta if we run on real data
-        true_theta = load_true_theta(args.theta_file, args.per_target_model)
-        assert(true_theta.shape[0] == feat_generator.feature_vec_len)
+    true_theta = None
+    if args.theta_file != "":
+        true_theta, _ = load_true_model(args.theta_file)
+
+    if args.num_cpu_threads > 1:
+        all_runs_pool = Pool(args.num_cpu_threads)
+    else:
+        all_runs_pool = None
+
+    feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=args.motif_lens,
+        left_motif_flank_len_list=args.positions_mutating,
+    )
 
     log.info("Reading data")
-    if args.use_partis:
-        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
-    else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+    obs_data, metadata = read_gene_seq_csv_data(
+        args.input_genes,
+        args.input_seqs,
+        motif_len=args.max_motif_len,
+        left_flank_len=args.max_left_flank,
+        right_flank_len=args.max_right_flank,
+        sample=args.sample_regime,
+        locus=args.locus,
+        species=args.species,
+    )
 
-    obs_seq_feat_base = []
-    total_mutations = 0
-    for obs_seq_mutation in obs_data:
-        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-        total_mutations += obs_seq_feat_base[-1].num_mutations
+    train_idx, val_idx = split_train_val(
+        len(obs_data),
+        metadata,
+        args.tuning_sample_ratio,
+        args.validation_column,
+    )
+    train_set = [obs_data[i] for i in train_idx]
+    val_set = [obs_data[i] for i in val_idx]
+    feat_generator.add_base_features_for_list(train_set)
+    feat_generator.add_base_features_for_list(val_set)
 
-    log.info("Number of germlines %d" % len(gene_dict))
-    log.info("Number of sequences %d" % len(obs_seq_feat_base))
-    log.info("Number of mutations %d" % total_mutations)
+    st_time = time.time()
+    log.info("Data statistics:")
+    log.info("  Number of sequences: Train %d, Val %d" % (len(train_idx), len(val_idx)))
+    log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
     log.info("Running EM")
-
-    motif_list = feat_generator.get_motif_list()
+    cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
-    penalty_params = [float(l) for l in args.penalty_params.split(",")]
+    val_set_evaluator = None
+    penalty_param_prev = None
+    prev_pen_theta = None
+    num_val_samples = args.num_val_samples
     results_list = []
-
-    theta = np.random.randn(feat_generator.feature_vec_len, args.theta_num_col)
-    # Set the impossible thetas to -inf
-    theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape)
-    theta[~theta_mask] = -np.inf
-
-    fitted_prob_vector = None
-    if not args.per_target_model:
-        fitted_prob_vector = MultinomialSolver.solve(obs_data, feat_generator)
-        log.info("=== Fitted Probability Vector ===")
-        log.info(get_nonzero_theta_print_lines(fitted_prob_vector, motif_list))
-
-    em_algo = MCMC_EM(
-        obs_seq_feat_base,
-        feat_generator,
-        args.sampler_cls,
-        args.problem_solver_cls,
-        theta_mask = theta_mask,
-        base_num_e_samples=args.num_e_samples,
-        burn_in=args.burn_in,
-        num_jobs=args.num_jobs,
-        num_threads=args.num_cpu_threads,
-        approx='none',
-    )
-
-    for penalty_param in sorted(penalty_params, reverse=True):
-        log.info("Penalty parameter %f" % penalty_param)
-        theta, _ = em_algo.run(
-            theta=theta,
-            penalty_param=penalty_param,
-            max_em_iters=args.em_max_iters,
+    num_nonzero_confint = 0
+    for param_i, penalty_param in enumerate(args.penalty_params):
+        log.info("==== Penalty parameter %f ====" % penalty_param)
+        curr_model_results = cmodel_algo.fit(
+            penalty_param,
+            stage1_em_iters=args.em_max_iters/2 if param_i > 0 else args.em_max_iters,
+            stage2_em_iters=args.em_max_iters,
+            val_set_evaluator=val_set_evaluator,
+            init_theta=prev_pen_theta,
+            reference_pen_param=penalty_param_prev
         )
-        results_list.append((penalty_param, theta, fitted_prob_vector))
 
+        if args.tuning_sample_ratio > 0:
+            # Create this val set evaluator for next time
+            val_set_evaluator = LikelihoodComparer(
+                val_set,
+                feat_generator,
+                theta_ref=curr_model_results.penalized_theta,
+                num_samples=num_val_samples,
+                burn_in=args.num_val_burnin,
+                num_jobs=args.num_jobs,
+                scratch_dir=args.scratch_dir,
+                pool=all_runs_pool,
+            )
+            # grab this many validation samples from now on
+            num_val_samples = val_set_evaluator.num_samples
+
+        # Save model results
+        results_list.append(curr_model_results)
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        log.info("==== FINAL theta, penalty param %f ====" % penalty_param)
-        log.info(get_nonzero_theta_print_lines(theta, motif_list))
+        if curr_model_results.penalized_num_nonzero > 0:
+            # first make sure that the penalty isnt so big that theta is empty
+            if args.tuning_sample_ratio > 0:
+                # We are going to tune using EM surrogate function on the validation set
+                ll_lower_bound = curr_model_results.log_lik_ratio_lower_bound
+                if ll_lower_bound is not None and ll_lower_bound < 0:
+                    # This model is not better than the previous model.
+                    # Use a greedy approach and stop trying penalty parameters
+                    log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
+                    break
+            else:
+                # We are going to tune using confidence intervals
+                if curr_model_results.num_not_crossing_zero < num_nonzero_confint or curr_model_results.num_not_crossing_zero == 0:
+                    log.info("Number of nonzero confidence intervals decreasing. Stop trying penalty parameters")
+                    break
+        num_nonzero_confint = curr_model_results.num_not_crossing_zero
+        penalty_param_prev = penalty_param
+        prev_pen_theta = curr_model_results.penalized_theta
 
-        if args.theta_file is not None:
-            theta_shape = (theta_mask.sum(), 1)
-            flat_theta = theta[theta_mask].reshape(theta_shape)
-            flat_true_theta = true_theta[theta_mask].reshape(theta_shape)
-            log.info("Spearman cor=%f, p=%f" % scipy.stats.spearmanr(flat_theta, flat_true_theta))
-            log.info("Kendall Tau cor=%f, p=%f" % scipy.stats.kendalltau(flat_theta, flat_true_theta))
-            log.info("Pearson cor=%f, p=%f" % scipy.stats.pearsonr(flat_theta, flat_true_theta))
-            log.info("L2 error %f" % np.linalg.norm(flat_theta - flat_true_theta))
+    if all_runs_pool is not None:
+        all_runs_pool.close()
+        # helpful comment copied over: make sure we don't keep these processes open!
+        all_runs_pool.join()
+    log.info("Completed! Time: %s" % str(time.time() - st_time))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

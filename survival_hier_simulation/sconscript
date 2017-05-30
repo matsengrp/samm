@@ -1,0 +1,140 @@
+## Test model fits against one another - data generated from a survival model
+
+import os
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+import numpy as np
+
+from matsen_grp_data import SCRATCH_DIR
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {'nreps': localenv['NREPS'],
+        'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+# Nest for simulation methods
+sim_models = [
+    #'is_single', # used theta_ratio0.5
+    'more_variance_theta', # theta ratio 0.8
+]
+
+nest.add(
+    'per_target_model',
+    sim_models)
+
+sim_size_dict = [
+    {'size': 'size1', 'n_germlines': 250, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    {'size': 'size2', 'n_germlines': 500, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    {'size': 'size3', 'n_germlines': 1000, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    {'size': 'size4', 'n_germlines': 2000, 'n_taxa': 1, 'random_gene_len': 300, 'min_censor_time': 0.5},
+    #{'size': 'mini', 'n_taxa': 1, 'n_germlines': 10, 'random_gene_len': 300, 'min_censor_time': 1},
+]
+
+nest.add(
+    'simulation_size',
+    sim_size_dict,
+    label_func=lambda c: c['size'])
+
+# Nest for replicates
+nest.add(
+    'replicate',
+    range(localenv['NREPS']),
+    label_func='{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
+    create_dir=False)
+
+# Targets for simulating fake data
+# TODO: put this all in one driver function so sources/targets jibe with one another
+@nest.add_target_with_env(localenv)
+def generate(env, outdir, c):
+    cmd = [
+        'python simulate_from_survival.py',
+        '--motif-len 7',
+        '--seed',
+        c['seed'],
+        '--n-taxa',
+        c['simulation_size']['n_taxa'],
+        '--n-germlines',
+        c['simulation_size']['n_germlines'],
+        '--output-true-theta ${TARGETS[0]}',
+        '--output-file ${TARGETS[1]}',
+        '--output-genes ${TARGETS[2]}',
+        '--random-gene-len',
+       c['simulation_size']['random_gene_len'],
+       '--min-censor-time',
+       c['simulation_size']['min_censor_time'],
+       '--sparsity-ratio',
+       0,
+       '--hierarchical'
+    ]
+
+    return env.Command(
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# Nest for fitting models
+model_single_options = [
+    #'survival',
+    'fine_pen_param'
+]
+model_per_target_options = []
+
+nest.add(
+    'model_options',
+    list(set(model_single_options + model_per_target_options)))
+
+# Nest for model fitting
+# TODO: put this all in one driver function so sources/targets jibe with one another
+@nest.add_target_with_env(localenv)
+def fit_context_model(env, outdir, c):
+    # True model should match the estimated model
+    per_target_model_str = ""
+    cmd = []
+    motif_lens = [3,5,7]
+    penalty_params = np.power(10, np.arange(-2.0, -6.0, step=-0.25)).tolist()
+    cmd = ['python fit_context_model.py',
+           '--seed',
+           c['seed'],
+           '--motif-lens',
+           ",".join(map(str, motif_lens)),
+           '--em-max-iters',
+           8,
+           '--penalty-params',
+           ",".join(map(str, penalty_params)),
+           '--num-cpu-threads',
+           6,
+           '--num-jobs',
+           20,
+           '--burn-in',
+           1,
+           '--num-e-samples',
+           2,
+           '--solver',
+           "L",
+           '--tuning-sample-ratio',
+           0.1,
+           per_target_model_str,
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--theta-file ${SOURCES[0]}',
+           '--input-seqs ${SOURCES[1]}',
+           '--input-genes ${SOURCES[2]}',
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+

@@ -17,7 +17,7 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
 
     def post_init(self):
         # Calculate the fused lasso indices
-        motif_list = self.feature_generator.get_motif_list()
+        motif_list = self.feature_generator.motif_list
         fused_lasso_pen = 0
         # We implement the fused penalty in terms of differences of pairs that are stored in these
         # index lists: the first entry of the first list minus the first entry in the second list, etc.
@@ -52,7 +52,7 @@ class SurvivalProblemFusedLasso(SurvivalProblemCustom):
         """
         fused_lasso_pen = np.linalg.norm(self.get_fused_lasso_theta(theta), ord=1)
         lasso_pen = np.linalg.norm(theta, ord=1)
-        return -(self.get_log_lik(theta) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
+        return -(1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
 
     def get_fused_lasso_theta(self, theta):
         """
@@ -151,7 +151,7 @@ class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
         """
         @return negative penalized log likelihood
         """
-        return -1 * self.get_log_lik(theta) + self.get_value_addon(theta)
+        return -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) + self.get_value_addon(theta)
 
     def get_value_addon(self, theta):
         """
@@ -178,11 +178,11 @@ class SurvivalProblemLassoInnerADMM(SurvivalProblemLasso):
         @return final fitted value of theta and penalized log likelihood
         """
 
-        theta, current_value, step_size = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
-        return theta, -current_value, step_size
+        theta, current_value, diff, lower_bound = self._solve(init_theta, max_iters, num_threads, init_step_size, step_size_shrink, backtrack_alpha, diff_thres, verbose)
+        return theta, -current_value, diff, lower_bound
 
     def _get_value_parallel(self, theta):
         """
         @return negative penalized log likelihood
         """
-        return -1 * self._get_log_lik_parallel(theta) + self.get_value_addon(theta)
+        return -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) + self.get_value_addon(theta)

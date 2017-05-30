@@ -19,7 +19,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
 
         cls.theta_g = np.random.rand(cls.feature_vec_len)
 
-        motif_list = feat_gen.get_motif_list()
+        motif_list = feat_gen.motif_list
         cls.fuse_idx1, cls.fuse_idx2 = cls._get_fuse_indices(motif_list)
 
     @classmethod
@@ -71,8 +71,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
             np.array(self.fuse_idx2, dtype=np.intc),
             penalty_param,
         )
-        print "c time", time.time() - st
-        self.assertTrue(np.allclose(c_soln, cvx_soln, rtol=1e-10, atol=1e-14))
+        self.assertTrue(np.allclose(c_soln, cvx_soln))
 
     def test_sparse_fused_lasso(self):
         """

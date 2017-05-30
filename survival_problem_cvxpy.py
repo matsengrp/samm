@@ -18,21 +18,36 @@ class SurvivalProblemCVXPY(SurvivalProblem):
         return log_lik_vec
 
     def calculate_per_sample_log_lik(self, theta, sample):
-        all_feature_vecs, _ = self.feature_generator.create_for_mutation_steps(sample)
         obj = Parameter(1, value=0)
-        for mutating_pos, vecs_at_mutation_step in zip(sample.mutation_order, all_feature_vecs.feature_vec_dicts):
-            # vec_mutation_step are the feature vectors of the at-risk group after mutation i
-            feature_vec_mutated = vecs_at_mutation_step[mutating_pos]
+
+        seq_str = sample.obs_seq_mutation.start_seq
+        for i in range(len(sample.mutation_order)):
+            mutating_pos = sample.mutation_order[i]
+
+            feature_dict = self.feature_generator.create_for_sequence(
+                seq_str,
+                sample.obs_seq_mutation.left_flank,
+                sample.obs_seq_mutation.right_flank,
+                set(range(sample.obs_seq_mutation.seq_len)) - set(sample.mutation_order[:i])
+            )
+            # vecs_at_mutation_step[i] are the feature vectors of the at-risk group after mutation i
+            feature_idx_mutated = feature_dict[mutating_pos]
             col_idx = 0
             if self.per_target_model:
                 col_idx = NUCLEOTIDE_DICT[sample.obs_seq_mutation.end_seq[mutating_pos]]
 
-            obj += sum_entries(theta[feature_vec_mutated, col_idx]) - log_sum_exp(vstack(*[
-                sum_entries(theta[f, i])
-                for f in vecs_at_mutation_step.values()
+            obj += sum_entries(theta[feature_idx_mutated, col_idx]) - log_sum_exp(vstack(*[
+                sum_entries(theta[feat_idx, i])
+                for feat_idx in feature_dict.values()
                 for i in range(self.theta_num_col)
-                if self.theta_mask[f,i]
+                if self.theta_mask[feat_idx,i]
             ]))
+
+            seq_str = mutate_string(
+                seq_str,
+                mutating_pos,
+                sample.obs_seq_mutation.end_seq[mutating_pos]
+            )
         return obj
 
     def get_log_likelihood(self, theta):
@@ -114,7 +129,7 @@ class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
         @param max_iters: ignored
         @param num_threads: ignored
         """
-        motif_list = self.feature_generator.get_motif_list()
+        motif_list = self.feature_generator.motif_list
 
         theta = Variable(self.feature_generator.feature_vec_len)
         obj = 0

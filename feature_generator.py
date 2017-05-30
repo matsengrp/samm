@@ -21,7 +21,7 @@ class FeatureGenerator:
     def create_for_mutation_steps(self, seq_mut_order):
         """
         @param seq_mut_order: a ImputedSequenceMutations
-        @return: tuple of (FeatureMutationSteps, list of theta_sums)
+        @return: list of FeatureMutationStep
         """
         raise NotImplementedError()
 
@@ -49,94 +49,80 @@ class FeatureGenerator:
         """
         raise NotImplementedError()
 
-class ObservedSequenceMutationsFeatures:
+class MultiFeatureMutationStep:
     """
-    An augmented ObservedSequenceMutations with features from before mutations have occured
+    Stores the deltas between each mutation step
+
+    This allows fast calculation of the likelihood of the mutation order.
+    Recall that the denominator = sum(exp(psi * theta)).
+    At the next mutation step, we know that
+    1. One of the terms must disappear because the risk group is smaller. One of the positions has mutated.
+    2. The nucleotides next to the position that mutated have new motifs; so we need to update the motif
+        indices for these positions. If we use the denominator from the previous step, we need to subtract
+        out the old exp(psi * theta)) and add in new exp(psi * theta)
     """
-    def __init__(self, obs_seq_mutation, feat_matrix, feat_dict):
+    def __init__(self, mutating_pos_feat=None, neighbors_feat_old=None, neighbors_feat_new=None):
         """
-        @param feat_matrix: a scipy sparse csr_matrix, the features before any mutations have occurred
-        @param feat_dict: a dictionary of our own implementation of feature vectors, the features before any mutations have occurred
+        @param mutating_pos_feats: the feature index of the position that mutated
+        @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
+        @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
+        @param feat_mut_step: FeatureMutationStep
         """
-        self.feat_matrix = feat_matrix
-        self.feat_dict = feat_dict
-
-        # (shallow) copy over the rest of the data
-        self.start_seq = obs_seq_mutation.start_seq
-        self.end_seq = obs_seq_mutation.end_seq
-        self.mutation_pos_dict = obs_seq_mutation.mutation_pos_dict
-        self.num_mutations = obs_seq_mutation.num_mutations
-        self.seq_len = obs_seq_mutation.seq_len
-
-class FeatureMutationSteps:
-    """
-    Store all the features and other intermediate info at each mutation step
-    """
-    def __init__(self, seq_mut_order=None, intermediate_seqs=None, feature_vec_dicts=None, feat_matrix0=None, feat_matrix0T=None):
-        """
-        Two options for instantiating this object:
-        Option 1:
-        @param seq_mut_order: ImputedSequenceMutations[ObservedSequenceMutationsFeatures]
-
-        Option 2:
-        @param intermediate_seqs: list of strings at each mutation step
-        @param feature_vec_dicts: list of dictionaries with our own sparse feature vector representation
-        @param feat_matrix0: scipy sparse csr_matrix representation of the features at each position before any mutations have occurred
-        @param feat_matrix0T: the transpose of feat_matrix0
-        """
-        if seq_mut_order is not None:
-            num_steps = seq_mut_order.obs_seq_mutation.num_mutations - 1
-            self.intermediate_seqs = [seq_mut_order.obs_seq_mutation.start_seq] + [None] * num_steps
-            self.feature_vec_dicts = [seq_mut_order.obs_seq_mutation.feat_dict] + [None] * num_steps
-            self.feat_matrix0 = seq_mut_order.obs_seq_mutation.feat_matrix
-            self.feat_matrix0T = self.feat_matrix0.transpose()
-        elif intermediate_seqs is not None:
-            self.intermediate_seqs = intermediate_seqs
-            self.feature_vec_dicts = feature_vec_dicts
-            self.feat_matrix0 = feat_matrix0
-            self.feat_matrix0T = feat_matrix0T
-
-
-    def copy(self):
-        """
-        Creates a semi-shallow copy of this object
-        """
-        return FeatureMutationSteps(
-            intermediate_seqs=list(self.intermediate_seqs),
-            feature_vec_dicts=list(self.feature_vec_dicts),
-            feat_matrix0=self.feat_matrix0,
-            feat_matrix0T=self.feat_matrix0T,
-        )
-
-    def get_theta_sum(self, mutation_step, position, theta, col_idx=None):
-        """
-        Calculate feature vector * theta for a given mutation step
-        @param mutation_step: index of the mutation step
-        @param position: the position to calculate the theta sum for
-        @param theta: numpy vector
-        @param col_idx: if provided, only calculates the theta sum for that column
-        """
-        if col_idx is not None:
-            return theta[self.feature_vec_dicts[mutation_step][position], col_idx].sum()
+        if mutating_pos_feat is not None:
+            self.mutating_pos_feats = np.array([mutating_pos_feat], dtype=int)
         else:
-            mini_theta = theta[self.feature_vec_dicts[mutation_step][position], :]
-            return mini_theta.sum(axis=0)
+            self.mutating_pos_feats = np.array([], dtype=int)
+        self.neighbors_feat_old = dict()
+        self.neighbors_feat_new = dict()
+        if neighbors_feat_old is not None:
+            self._merge_dicts(self.neighbors_feat_old, neighbors_feat_old, feature_offset=0)
+        if neighbors_feat_new is not None:
+            self._merge_dicts(self.neighbors_feat_new, neighbors_feat_new, feature_offset=0)
 
-    def get_init_theta_sum(self, theta):
+    def update(self, feat_mut_step, feature_offset):
         """
-        Multiply theta with our initial matrix
+        @param feat_mut_step: MultiFeatureMutationStep
         """
-        return self.feat_matrix0.dot(theta)
+        if feat_mut_step.mutating_pos_feats is not None:
+            self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feats + feature_offset)
+        self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
+        self._merge_dicts(self.neighbors_feat_new, feat_mut_step.neighbors_feat_new, feature_offset)
 
-    def update(self, mutation_step, seq_str, feat_dict):
-        """
-        Update the state of a mutation step
-        @param mutation_step: the index of the mutation step to be updated
-        @param seq_str: string
-        @param feat_dict: a dictionary with our own sparse feature implementation
-        """
-        self.intermediate_seqs[mutation_step] = seq_str
-        self.feature_vec_dicts[mutation_step] = feat_dict
+    def _merge_dicts(self, my_dict, new_dict, feature_offset):
+        for k in new_dict.keys():
+            if new_dict[k] is not None:
+                new_feature = new_dict[k] + feature_offset
+                if k not in my_dict:
+                    my_dict[k] = np.array([new_feature], dtype=int)
+                else:
+                    my_dict[k] = np.append(my_dict[k], new_feature)
+            else:
+                my_dict[k] = np.array([], dtype=int)
 
     def __str__(self):
-        return ",".join(self.intermediate_seqs)
+        return "(%s, old: %s, new: %s)" % (self.mutating_pos_feats, self.neighbors_feat_old, self.neighbors_feat_new)
+
+class FeatureMutationStep:
+    """
+    Stores the deltas between each mutation step
+
+    This allows fast calculation of the likelihood of the mutation order.
+    Recall that the denominator = sum(exp(psi * theta)).
+    At the next mutation step, we know that
+    1. One of the terms must disappear because the risk group is smaller. One of the positions has mutated.
+    2. The nucleotides next to the position that mutated have new motifs; so we need to update the motif
+        indices for these positions. If we use the denominator from the previous step, we need to subtract
+        out the old exp(psi * theta)) and add in new exp(psi * theta)
+    """
+    def __init__(self, mutating_pos_feat, neighbors_feat_old=dict(), neighbors_feat_new=dict()):
+        """
+        @param mutating_pos_feat: the feature index of the position that mutated
+        @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
+        @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
+        """
+        self.mutating_pos_feat = mutating_pos_feat
+        self.neighbors_feat_old = neighbors_feat_old
+        self.neighbors_feat_new = neighbors_feat_new
+
+    def __str__(self):
+        return "(%d, old: %s, new: %s)" % (self.mutating_pos_feat, self.neighbors_feat_old, self.neighbors_feat_new)

@@ -11,15 +11,18 @@ import os.path
 import csv
 import pickle
 import logging as log
+import time
 
 import numpy as np
 import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from common import *
+from read_data import read_gene_seq_csv_data
+from read_data import SAMPLE_PARTIS_ANNOTATIONS
 from matsen_grp_data import *
 
 def parse_args():
@@ -31,21 +34,23 @@ def parse_args():
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser.add_argument('--input-file',
-        type=str,
-        help='sequence data in csv',
-        default='_output/seqs.csv')
     parser.add_argument('--input-genes',
         type=str,
         help='genes data in csv',
         default='_output/genes.csv')
-    parser.add_argument('--input-partis',
+    parser.add_argument('--input-seqs',
         type=str,
-        help='partis annotations file',
-        default=SAMPLE_PARTIS_ANNOTATIONS)
-    parser.add_argument('--use-partis',
-        action='store_true',
-        help='use partis annotations file')
+        help='sequence data in csv',
+        default='_output/seqs.csv')
+    parser.add_argument('--sample-regime',
+        type=int,
+        default=1,
+        choices=(1, 2, 3),
+        help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
+    parser.add_argument('--scratch-directory',
+        type=str,
+        help='where to write dnapars files, if necessary',
+        default='_output')
     parser.add_argument('--num-threads',
         type=str,
         help='number of threads to use during E-step',
@@ -58,22 +63,17 @@ def parse_args():
         type=str,
         help='file with pickled true context model (default: None, for no truth)',
         default=None)
-    parser.add_argument('--prop-file',
+    parser.add_argument('--out-file',
         type=str,
         help='file to output fitted proportions',
-        default='_output/prop_file.pkl')
+        default='_output/basic_file.pkl')
     parser.add_argument('--log-file',
         type=str,
         help='file to output logs',
         default='_output/basic_log.txt')
-    parser.add_argument('--chain',
-        default='h',
-        choices=('h', 'k', 'l'),
-        help='heavy chain or kappa/lambda light chain')
-    parser.add_argument('--igclass',
-        default='G',
-        choices=('G', 'M', 'K', 'L'),
-        help='immunoglobulin class')
+    parser.add_argument('--per-target-model',
+        action='store_true',
+        help='Fit per target model')
 
     args = parser.parse_args()
 
@@ -87,71 +87,67 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
     np.random.seed(args.seed)
-    feat_generator = SubmotifFeatureGenerator(motif_len=args.motif_len)
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[args.motif_len])
 
-    if args.use_partis:
-        annotations, germlines = get_paths_to_partis_annotations(args.input_partis, chain=args.chain, ig_class=args.igclass)
-        gene_dict, obs_data = read_partis_annotations(annotations, inferred_gls=germlines, chain=args.chain)
-    else:
-        gene_dict, obs_data = read_gene_seq_csv_data(args.input_genes, args.input_file)
+    obs_data, metadata = read_gene_seq_csv_data(
+            args.input_genes,
+            args.input_seqs,
+            motif_len=args.motif_len,
+            mutating_positions=['center'],
+            sample=args.sample_regime
+        )
 
-    obs_seq_feat_base = []
-    total_mutations = 0
-    for obs_seq_mutation in obs_data:
-        obs_seq_feat_base.append(feat_generator.create_base_features(obs_seq_mutation))
-        total_mutations += obs_seq_feat_base[-1].num_mutations
+    motif_list = feat_generator.motif_list
 
-    log.info("Number of germlines %d" % len(gene_dict))
-    log.info("Number of sequences %d" % len(obs_data))
-    log.info("Number of mutations %d" % total_mutations)
-
-    motif_list = feat_generator.get_motif_list()
-    motif_list.append('EDGES')
-    # remove^
-
-    mutations = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
-    proportions = {motif: {nucleotide: 0. for nucleotide in 'acgt'} for motif in motif_list}
+    mutations = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
     appearances = {motif: 0. for motif in motif_list}
 
     for obs_seq in obs_data:
-        germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq)
+        germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
 
         for key, value in germline_motifs.iteritems():
             appearances[motif_list[value]] += 1
 
         for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
-            mutations[motif_list[germline_motifs[mut_pos]]][mut_nuc] += 1
+            feat_idx = (germline_motifs[mut_pos])[0]
+            mutations[motif_list[feat_idx]][mut_nuc] += 1
 
-    for key in motif_list:
-        for nucleotide in 'acgt':
-            if appearances[key] > 0:
-                proportions[key][nucleotide] = 1. * mutations[key][nucleotide] / appearances[key]
+    # Print number of times the motifs appear in the starting sequence
+    motif_appear_counts = [(m, k) for m, k in appearances.iteritems()]
+    motif_appear_counts_sorted = sorted(motif_appear_counts, key=lambda x: x[1], reverse=True)
+    log.info("Appearances in the starting sequence")
+    for m,k in motif_appear_counts_sorted:
+        log.info("%s: %d" % (m, k))
 
-    prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in 'acgt'] for i in range(len(motif_list))])
-    pickle.dump(prop_list, open(args.prop_file, 'w'))
+    if args.per_target_model:
+        proportions = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
+        probability_matrix = None
+        for key in motif_list:
+            for nucleotide in NUCLEOTIDES:
+                if appearances[key] > 0:
+                    proportions[key][nucleotide] = 1. * mutations[key][nucleotide] / appearances[key]
+        prop_list = np.array([[proportions[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
+    else:
+        proportions = {motif: 0 for motif in motif_list}
+        probability_dict = {motif: {nucleotide: 0. for nucleotide in NUCLEOTIDES} for motif in motif_list}
+        for key in motif_list:
+            num_mutations = sum(mutations[key].values())
+            # if num_mutations > 0:
+            if num_mutations > 0 and appearances[key] > 150:
+                proportions[key] = 1. * num_mutations / appearances[key]
+                for nucleotide in NUCLEOTIDES:
+                    probability_dict[key][nucleotide] = 1. * mutations[key][nucleotide] / num_mutations
+        prop_list = np.array([proportions[motif_list[i]] for i in range(len(motif_list))])
+        probability_matrix = np.array([[probability_dict[motif_list[i]][nucleotide] for nucleotide in NUCLEOTIDES] for i in range(len(motif_list))])
 
-    # Print the motifs with the highest and lowest proportions
-    if args.theta_file is not None:
-        theta = pickle.load(open(args.theta_file, 'rb'))
-        threshold_prop_list = np.zeros(prop_list.shape)
-        mean_prop = np.mean(prop_list, axis=0)
-        sd_prop = np.sqrt(np.var(prop_list, axis=0))
-        for i in range(theta.shape[0]):
-            for idx, nucleotide in enumerate('acgt'):
-                if np.abs(proportions[motif_list[i]][nucleotide] - mean_prop[idx]) > 0.5 * sd_prop[idx]:
-                    log.info("%d: %f, %s, %f" % (i, np.max(theta[i,idx]), motif_list[i], proportions[motif_list[i]][nucleotide]))
-                    threshold_prop_list[i][idx] = proportions[motif_list[i]][nucleotide]
-    
-        theta_flat = np.ravel(theta)
-        prop_flat = np.ravel(prop_list)
-        thresh_flat = np.ravel(threshold_prop_list)
-        log.info("THETA")
-        log.info(scipy.stats.spearmanr(theta_flat, prop_flat))
-        log.info(scipy.stats.kendalltau(theta_flat, prop_flat))
-    
-        log.info("THRESHOLDED THETA")
-        log.info(scipy.stats.spearmanr(theta_flat, thresh_flat))
-        log.info(scipy.stats.kendalltau(theta_flat, thresh_flat))
+        # Print theta values
+        log.info("Fitted theta values")
+        motif_theta_vals = [(motif_list[i], proportions[motif_list[i]]) for i in range(len(motif_list))]
+        for m, t in sorted(motif_theta_vals, key=lambda x: x[1]):
+            log.info("%s: %f" % (m, t))
+
+    with open(args.out_file, 'w') as pickle_file:
+        pickle.dump((prop_list, probability_matrix), pickle_file)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

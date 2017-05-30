@@ -2,3 +2,15 @@
 _output/
 .sconsign.dblite
 .fus*
+*.o
+*.gch
+*.lprof
+*.so
+results/
+params_for_shmulate/_output/
+survival_ctmc/_output/
+compare_models/_output/
+survival_compare_models/_output/
+_build/
+partis/
+gctree/

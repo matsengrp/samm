@@ -1,34 +1,130 @@
-import csv
 import numpy as np
 import pandas as pd
-import sys
+import re
+import random
+import warnings
+import itertools
 
-PARTIS_PATH = './partis'
-sys.path.insert(1, PARTIS_PATH + '/python')
-import utils
-import glutils
-
-# needed to read partis files
-csv.field_size_limit(sys.maxsize)
-
-from models import ObservedSequenceMutations
+from Bio import SeqIO
 
 DEBUG = False
 
 NUM_NUCLEOTIDES = 4
-NUCLEOTIDES = "atcg"
-NUCLEOTIDE_SET = set(["a", "t", "c", "g"])
+NUCLEOTIDES = "acgt"
+NUCLEOTIDE_SET = set(["a", "c", "g", "t"])
 NUCLEOTIDE_DICT = {
     "a": 0,
-    "t": 1,
-    "c": 2,
-    "g": 3,
+    "c": 1,
+    "g": 2,
+    "t": 3,
 }
-GERMLINE_PARAM_FILE = '/home/matsengrp/working/matsen/SRR1383326-annotations-imgt-v01.h5'
-SAMPLE_PARTIS_ANNOTATIONS = PARTIS_PATH + '/test/reference-results/partition-new-simu-cluster-annotations.csv'
 ZSCORE = 1.65
+ZSCORE_95 = 1.96
 ZERO_THRES = 1e-6
 MAX_TRIALS = 10
+
+COMPLEMENT_DICT = {
+    'A': 'T',
+    'G': 'C',
+    'C': 'G',
+    'T': 'A',
+    'Y': 'R',
+    'R': 'Y',
+    'S': 'S',
+    'W': 'W',
+    'M': 'K',
+    'K': 'M',
+    'B': 'V',
+    'D': 'H',
+    'H': 'D',
+    'V': 'B',
+    'N': 'N',
+}
+
+DEGENERATE_BASE_DICT = {
+    'A': 'a',
+    'G': 'g',
+    'C': 'c',
+    'T': 't',
+    'Y': '[ct]',
+    'R': '[ag]',
+    'S': '[gc]',
+    'W': '[at]',
+    'M': '[ac]',
+    'K': '[gt]',
+    'B': '[cgt]',
+    'D': '[agt]',
+    'H': '[act]',
+    'V': '[acg]',
+    'N': '[agct]',
+}
+
+HOT_COLD_SPOT_REGS = [
+        {'central': 'G', 'left_flank': 'R', 'right_flank': 'YW', 'hot_or_cold': 'hot'},
+        {'central': 'A', 'left_flank': 'W', 'right_flank': '', 'hot_or_cold': 'hot'},
+        {'central': 'C', 'left_flank': 'SY', 'right_flank': '', 'hot_or_cold': 'cold'},
+        {'central': 'G', 'left_flank': '', 'right_flank': 'YW', 'hot_or_cold': 'hot'},
+]
+INT8_MAX = 127
+
+FUSED_LASSO_PENALTY_RATIO = [1./4, 1./2, 1., 2., 4.]
+
+def process_mutating_positions(motif_len_vals, positions_mutating):
+    max_motif_len = max(motif_len_vals)
+    if positions_mutating is None:
+        # default to central base mutating
+        positions_mutating = [[m/2] for m in motif_len_vals]
+        max_mut_pos = [[max_motif_len/2]]
+    else:
+        positions_mutating = [[int(m) for m in positions.split(',')] for positions in positions_mutating.split(':')]
+        for motif_len, positions in zip(motif_len_vals, positions_mutating):
+            for m in positions:
+                assert(m in range(motif_len))
+        max_mut_pos = [mut_pos for mut_pos, motif_len in zip(positions_mutating, motif_len_vals) if motif_len == max_motif_len]
+    return positions_mutating, max_mut_pos
+
+def get_batched_list(my_list, num_batches):
+    batch_size = max(len(my_list)/num_batches, 1)
+    batched_list = []
+    for i in range(num_batches + 1):
+        additional_batch = my_list[i * batch_size: (i+1) * batch_size]
+        if len(additional_batch):
+            batched_list.append(additional_batch)
+    return batched_list
+
+def return_complement(kmer):
+    return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
+
+def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2):
+    """
+    Known hot and cold spots were constructed on a 5mer model, so "N" pad
+    longer motifs and subset shorter ones
+    """
+    kmer_list = []
+    hot_or_cold_list = []
+    hot_or_cold_complements = []
+    for spot in hot_or_cold_dicts:
+        hot_or_cold_complements.append({'central': return_complement(spot['central']),
+                'left_flank': return_complement(spot['right_flank']),
+                'right_flank': return_complement(spot['left_flank']),
+                'hot_or_cold': spot['hot_or_cold']})
+
+    for spot in hot_or_cold_dicts + hot_or_cold_complements:
+        if len(spot['left_flank']) > half_motif_len or \
+            len(spot['right_flank']) > motif_len - half_motif_len - 1:
+                # this hot/cold spot is not a part of our motif size
+                continue
+
+        left_pad = spot['left_flank'].rjust(half_motif_len, 'N')
+        right_pad = spot['right_flank'].ljust(motif_len - half_motif_len - 1, 'N')
+        kmer_list.append(left_pad + spot['central'] + right_pad)
+        hot_or_cold_list.append(spot['hot_or_cold'])
+
+    hot_cold_regs = []
+    for kmer, hot_or_cold in zip(kmer_list, hot_or_cold_list):
+        hot_cold_regs.append([' - '.join([kmer.replace('N', ''), hot_or_cold]),
+            ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in kmer])])
+    return hot_cold_regs
 
 def contains_degenerate_base(seq_str):
     for nucleotide in seq_str:
@@ -42,39 +138,105 @@ def get_randint():
     """
     return np.random.randint(low=0, high=2**32 - 1)
 
-def get_nonzero_theta_print_lines(theta, motif_list):
+def get_num_nonzero(theta):
+    nonzero_idx = np.logical_and(np.isfinite(theta), np.abs(theta) > ZERO_THRES)
+    return np.sum(nonzero_idx)
+
+def get_num_unique_theta(theta):
+    zero_theta_mask = np.abs(theta) < ZERO_THRES
+    nonzero_idx = np.logical_and(np.isfinite(theta), ~zero_theta_mask)
+    unique_theta = set(theta[nonzero_idx].flatten().tolist())
+    num_unique = len(unique_theta)
+    if np.any(zero_theta_mask):
+        num_unique += 1
+    return num_unique
+
+def is_re_match(regex, submotif):
+    match_res = re.match(regex, submotif)
+    return match_res is not None
+
+def get_nonzero_theta_print_lines(theta, feat_gen):
     """
     @return a string that summarizes the theta vector/matrix
     """
+    motif_list = feat_gen.motif_list
+    motif_len = feat_gen.motif_len
+    mutating_pos_list = feat_gen.mutating_pos_list
+
     lines = []
+    mutating_pos_set = list(set(mutating_pos_list))
+    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
-                if i == theta.shape[0] - 1:
-                    lines.append("%d: %s (EDGES)" % (i, theta[i,]))
-                else:
-                    lines.append("%d: %s (%s)" % (i, theta[i,], motif_list[i]))
+                # print the whole line if any element in the theta is nonzero
+                motif = motif_list[i]
+                pos_idx = mutating_pos_set.index(mutating_pos_list[i])
+                hot_cold_matches = ""
+                for spot_name, spot_regex in known_hot_cold[pos_idx]:
+                    if is_re_match(spot_regex, motif):
+                        hot_cold_matches = " -- " + spot_name
+                        break
+                thetas = theta[i,]
+                lines.append((
+                    thetas[np.isfinite(thetas)].sum(),
+                    "%s (%s%s) pos %s" % (thetas, motif_list[i], hot_cold_matches, mutating_pos_list[i]),
+                ))
                 break
-    return "\n".join(lines)
+    sorted_lines = sorted(lines, key=lambda s: s[0])
+    return "\n".join([l[1] for l in sorted_lines])
 
-def get_possible_motifs_to_targets(motif_list, mask_shape):
+def print_known_cold_hot_spot(motif, known_hot_cold_regexs):
+    for spot_name, spot_regex in known_hot_cold_regexs:
+        if is_re_match(spot_regex, motif):
+            return spot_name
+    return None
+
+def get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape):
+    """
+    Combines `target_pairs_to_remove` from `read_zero_motif_csv` and with the feature generator
+
+    @return a boolean matrix with fixed zero theta values True, others as False
+    """
+    zero_theta_mask = np.zeros(theta_shape, dtype=bool)
+    if theta_shape[1] == 1:
+        return zero_theta_mask
+
+    for motif, target_dict in target_pairs_to_remove.iteritems():
+        for mut_pos, targets in target_dict:
+            if motif in feat_generator.motif_dict:
+                for nuc in targets:
+                    motif_idx = feat_generator.motif_dict[motif][mut_pos]
+                    if nuc == "n":
+                        zero_theta_mask[motif_idx, 0] = 1
+                    else:
+                        zero_theta_mask[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = 1
+    return zero_theta_mask
+
+def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
     """
     @param motif_list: list of motifs - assumes that the first few theta rows correspond to these motifs
     @param mask_shape: shape of the theta matrix
+    @param mutating_pos_list: list of mutating positions
 
     @return a boolean matrix with possible mutations as True, impossible mutations as False
     """
     theta_mask = np.ones(mask_shape, dtype=bool)
-    if mask_shape[1] == 1:
-        # Estimating a single theta vector - then we should estimate all theta values
-        return theta_mask
+    if mask_shape[1] == NUM_NUCLEOTIDES + 1:
+        # Estimating a different theta vector for different target nucleotides
+        # We cannot have a motif mutate to the same center nucleotide
+        for i in range(len(motif_list)):
+            center_motif_idx = mutating_pos_list[i]
+            mutating_nucleotide = motif_list[i][center_motif_idx]
+            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide] + 1
+            theta_mask[i, center_nucleotide_idx] = False
+    elif mask_shape[1] == NUM_NUCLEOTIDES:
+        for i in range(len(motif_list)):
+            center_motif_idx = mutating_pos_list[i]
+            mutating_nucleotide = motif_list[i][center_motif_idx]
+            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
+            theta_mask[i, center_nucleotide_idx] = False
 
-    # Estimating a different theta vector for different target nucleotides
-    # We cannot have a motif mutate to the same center nucleotide
-    center_motif_idx = len(motif_list[0])/2
-    for i in range(len(motif_list)):
-        center_nucleotide_idx = NUCLEOTIDE_DICT[motif_list[i][center_motif_idx]]
-        theta_mask[i, center_nucleotide_idx] = False
     return theta_mask
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
@@ -82,6 +244,13 @@ def mutate_string(begin_str, mutate_pos, mutate_value):
     Mutate a string
     """
     return "%s%s%s" % (begin_str[:mutate_pos], mutate_value, begin_str[mutate_pos + 1:])
+
+def unmutate_string(mutated_str, unmutate_pos, orig_nuc):
+    return (
+        mutated_str[:unmutate_pos]
+        + orig_nuc
+        + mutated_str[unmutate_pos + 1:]
+    )
 
 def sample_multinomial(pvals):
     """
@@ -109,7 +278,7 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     """
     @param values: the values that are correlated
     @param zscore: the zscore to form the confidence interval
-    @param pen_val_diff: the total penalized value (so it should be the average of the values plus some penalty)
+    @param pen_val_diff: difference of the total penalized values (the negative log likelihood plus some penalty)
 
     @returns
         the standard error of the values correcting for auto-correlation between the values
@@ -147,10 +316,12 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     # Effective sample size calculation
     ess = values.size/autocorr
 
-    # Corrected standard error
-    ase = np.sqrt(var/ess)
-
-    return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
+    if var/ess < 0:
+        return None, -np.inf, np.inf
+    else:
+        # Corrected standard error
+        ase = np.sqrt(var/ess)
+        return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
 
 def soft_threshold(theta, thres):
     """
@@ -163,111 +334,79 @@ def soft_threshold(theta, thres):
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
 
-def read_bcr_hd5(path, remove_gap=True):
+def read_germline_file(fasta):
     """
-    read hdf5 parameter file and process
-    """
+    Read fasta file containing germlines
 
-    sites = pd.read_hdf(path, 'sites')
-
-    if remove_gap:
-        return sites.query('base != "-"')
-    else:
-        return sites
-
-def read_partis_annotations(annotations_file_names, chain='h', use_v=True, species='human', use_np=True, inferred_gls=None):
-    """
-    Function to read partis annotations csv
-
-    @param annotations_file_names: list of paths to annotations files
-    @param chain: h for heavy, k or l for kappa or lambda light chain
-    @param use_v: use just the V gene or use the whole sequence?
-    @param species: 'human' or 'mouse'
-    @param use_np: use nonproductive sequences only
-    @param inferred_gls: list of paths to partis-inferred germlines
-
-    TODO: do we want to output intermediate genes.csv/seqs.csv files?
-
-    TODO: do we want support for including multiple annotations files?
-    is this something people do, or is this done at the partis level?
-
-    @return gene_dict, obs_data
+    @return dataframe with column "gene" for the name of the germline gene and
+    "base" for the nucleotide content
     """
 
-    if not isinstance(annotations_file_names, list):
-        annotations_file_names = [annotations_file_names]
+    with open(fasta) as fasta_file:
+        genes = []
+        bases = []
+        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
+            genes.append(seq_record.id)
+            bases.append(str(seq_record.seq))
 
-    # read default germline info
-    if inferred_gls is not None:
-        if not isinstance(inferred_gls, list):
-            inferred_gls = [inferred_gls]
-        germlines = {}
-        for germline_file in set(inferred_gls):
-            germlines[germline_file] = glutils.read_glfo(germline_file, chain=chain)
-    else:
-        glfo = glutils.read_glfo(PARTIS_PATH + '/data/germlines/' + species, chain=chain)
-        inferred_gls = [None] * len(annotations_file_names)
+    return pd.DataFrame({'base': bases}, index=genes)
 
-    gene_dict = {}
-    obs_data = []
+def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
+    """
+    Process the degenerate characters in sequences:
+    1. Replace unknown characters with "n"
+    2. Remove padding "n"s at beginning and end of sequence
+    3. Collapse runs of "n"s into one of motif_len/2
+    4. Replace all interior "n"s with nonmutating random nucleotide
 
-    seqs_col = 'v_qr_seqs' if use_v else 'seqs'
-    gene_col = 'v_gl_seq' if use_v else 'naive_seq'
+    @param start_seq: starting sequence
+    @param end_seq: ending sequence
+    @param motif_len: motif length; needed to determine length of collapsed "n" run
+    @param threshold: if proportion of "n"s in a sequence is larger than this then
+        throw a warning
+    """
 
-    if use_np:
-        # return only nonproductive sequences
-        # here "nonproductive" is defined as having a stop codon or being
-        # out of frame or having a mutated conserved cysteine
-        good_seq = lambda seqs: seqs['stops'] or not seqs['in_frames'] or seqs['mutated_invariants']
-    else:
-        # return all sequences
-        good_seq = lambda seqs: [True for seq in seqs[seqs_col]]
+    assert(len(start_seq) == len(end_seq))
 
-    for annotations_file, germline_file in zip(annotations_file_names, inferred_gls):
-        if germline_file is not None:
-            glfo = germlines[germline_file]
-        with open(annotations_file, "r") as csvfile:
-            reader = csv.DictReader(csvfile)
-            for idx, line in enumerate(reader):
-                # add goodies from partis
-                utils.process_input_line(line)
-                utils.add_implicit_info(glfo, line)
-                # for now just use V gene for ID
-                key = 'clone{}-{}'.format(*[idx, line['v_gene']])
-                gene_dict[key] = line[gene_col]
-                start_seq = line[gene_col].lower()
-                good_seqs = [seq for seq, cond in zip(line[seqs_col], good_seq(line)) if cond]
-                for end_seq in good_seqs:
-                    obs_data.append(
-                        ObservedSequenceMutations(
-                            start_seq=start_seq[:len(end_seq)],
-                            end_seq=end_seq.lower(),
-                        )
-                    )
-    return gene_dict, obs_data
+    # replace all unknowns with an "n"
+    processed_start_seq = re.sub('[^agctn]', 'n', start_seq)
+    processed_end_seq = re.sub('[^agctn]', 'n', end_seq)
 
-def read_gene_seq_csv_data(gene_file_name, seq_file_name):
-    gene_dict = {}
-    with open(gene_file_name, "r") as gene_csv:
-        gene_reader = csv.reader(gene_csv, delimiter=',')
-        gene_reader.next()
-        for row in gene_reader:
-            gene_dict[row[0]] = row[1]
+    # conform unknowns and collapse "n"s
+    repl = 'n' * (motif_len/2)
+    pattern = repl + '+' if motif_len > 1 else 'n'
+    if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
+        # turn known bases in start_seq to "n"s and collapse degenerates
+        start_list = list(processed_start_seq)
+        end_list = list(processed_end_seq)
+        for idx in re.finditer('n', processed_end_seq):
+            start_list[idx.start()] = 'n'
+        processed_start_seq = ''.join(start_list)
+        for idx in re.finditer('n', processed_start_seq):
+            end_list[idx.start()] = 'n'
+        processed_end_seq = ''.join(end_list)
 
-    obs_data = []
-    with open(seq_file_name, "r") as seq_csv:
-        seq_reader = csv.reader(seq_csv, delimiter=",")
-        seq_reader.next()
-        for row in seq_reader:
-            start_seq = gene_dict[row[0]].lower()
-            end_seq = row[2]
-            obs_data.append(
-                ObservedSequenceMutations(
-                    start_seq=start_seq[:len(end_seq)],
-                    end_seq=end_seq,
-                )
-            )
-    return gene_dict, obs_data
+        # first remove beginning and trailing "n"s
+        processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
+        processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
+
+        # ensure there are not too many internal "n"s
+        num_ns = processed_end_seq.count('n')
+        seq_len = len(processed_end_seq)
+        if num_ns > threshold * seq_len:
+            warnings.warn("Sequence of length {0} had {1} unknown bases".format(seq_len, num_ns))
+
+        # now collapse interior "n"s
+        processed_start_seq = re.sub(pattern, repl, processed_start_seq)
+        processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+
+        # generate random nucleotide if an "n" occurs in the middle of a sequence
+        for match in re.compile('n').finditer(processed_start_seq):
+            random_nuc = random.choice(NUCLEOTIDES)
+            processed_start_seq = mutate_string(processed_start_seq, match.start(), random_nuc)
+            processed_end_seq = mutate_string(processed_end_seq, match.start(), random_nuc)
+
+    return processed_start_seq, processed_end_seq
 
 def get_idx_differ_by_one_character(s1, s2):
     """
@@ -283,3 +422,193 @@ def get_idx_differ_by_one_character(s1, s2):
             count_diffs += 1
             idx_differ = i
     return idx_differ
+
+def is_central_kmer_shared(s1, s2, k=5):
+    """
+    Return if central k-mer matches
+    @param k: must be odd
+    """
+    if k % 2 == 0:
+        return False
+
+    str_len = len(s1)
+    if str_len - k <= 0:
+        return False
+    else:
+        offset = (str_len - k)/2
+        central1 = s1[offset:-offset]
+        central2 = s2[offset:-offset]
+        return central1 == central2
+
+def get_target_col(sample, mutation_pos):
+    """
+    @param sample: ObservedSequenceMutations
+    @returns the index of the column in the hazard rate matrix for the target nucleotide
+    """
+    return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
+
+def make_zero_theta_refit_mask(theta, feat_generator):
+    """
+    @param theta: a fitted theta from which we determine the theta support
+    @param feat_generator: the feature generator
+
+    Figure out what the theta support is from the fitted theta
+    """
+    zeroed_thetas = np.array(np.abs(theta) < ZERO_THRES, dtype=bool)
+    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
+    motifs_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
+    motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
+
+    zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
+    return zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask
+
+def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
+    """
+    Initialize theta
+    @param possible_theta_mask: set the negative of this mask to negative infinity theta values
+    @param zero_theta_mask: set the negative of this mask to negative infinity theta values
+    """
+    theta = np.random.randn(theta_shape[0], theta_shape[1]) * 1e-3
+    # Set the impossible thetas to -inf
+    theta[~possible_theta_mask] = -np.inf
+    # Set particular thetas to zero upon request
+    theta[zero_theta_mask] = 0
+    return theta
+
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
+    """
+    @param num_obs: number of observations
+    @param feat_generator: submotif feature generator
+    @param metadata: metadata to include variables to perform validation on
+    @param tuning_sample_ratio: ratio of data to place in validation set
+    @param validation_column: variable to perform validation on (if None then sample randomly)
+
+    @return training and validation indices
+    """
+    if validation_column is None:
+        # For no validation column just sample data randomly
+        val_size = int(tuning_sample_ratio * num_obs)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+        permuted_idx = np.random.permutation(num_obs)
+        train_idx = permuted_idx[:num_obs - val_size]
+        val_idx = permuted_idx[num_obs - val_size:]
+    else:
+        # For a validation column, sample the categories randomly based on
+        # tuning_sample_ratio
+        categories = set([elt[validation_column] for elt in metadata])
+        num_categories = len(categories)
+        val_size = int(tuning_sample_ratio * num_categories)
+        if tuning_sample_ratio > 0:
+            val_size = max(val_size, 1)
+
+        # sample random categories from our validation variable
+        val_categories = set(random.sample(categories, val_size))
+        train_categories = categories - val_categories
+        log.info("train_categories %s" % train_categories)
+        log.info("val_categories %s" % val_categories)
+        train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
+        val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
+
+    return train_idx, val_idx
+
+def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
+    """
+    From an aggregate theta, creates a matrix with the index of the hierarchical theta
+    """
+    theta_idx_counter = np.ones(possible_theta_mask.shape, dtype=int) * -1
+    theta_mask = ~zero_theta_mask_refit & possible_theta_mask
+    idx = 0
+    for col in range(theta_mask.shape[1]):
+        for row in range(theta_mask.shape[0]):
+            if theta_mask[row, col]:
+                theta_idx_counter[row, col] = idx
+                idx += 1
+    return theta_idx_counter
+
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0):
+    """
+    Combine hierarchical and offset theta values
+    """
+    full_theta_size = full_feat_generator.feature_vec_len
+    theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
+    # stores which hierarchical theta values were used to construct the full theta
+    # important for calculating covariance
+    theta_index_matches = {i:[] for i in range(full_theta_size)}
+
+    full_theta = np.zeros(full_theta_size)
+    theta_lower = np.zeros(full_theta_size)
+    theta_upper = np.zeros(full_theta_size)
+
+    for i, feat_gen in enumerate(feat_generator.feat_gens):
+        for m_idx, m in enumerate(feat_gen.motif_list):
+            raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
+            m_theta = theta[raw_theta_idx, 0]
+
+            if col_idx != 0:
+                m_theta += theta[raw_theta_idx, col_idx]
+
+            if feat_gen.motif_len == full_feat_generator.motif_len:
+                # Already at maximum motif length, so nothing to combine
+                full_m_idx = full_feat_generator.motif_dict[m][feat_gen.left_motif_flank_len]
+                full_theta[full_m_idx] += m_theta
+
+                if theta_idx_counter[raw_theta_idx, 0] != -1:
+                    theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+                if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+                    theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
+            else:
+                # Combine hierarchical feat_gens for given left_motif_len
+                for full_feat_gen in full_feat_generator.feat_gens:
+                    flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
+                    for f in flanks:
+                        full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
+                        full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
+                        full_theta[full_m_idx] += m_theta
+
+                        if theta_idx_counter[raw_theta_idx, 0] != -1:
+                            theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+                        if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+                            theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
+
+    if covariance_est is not None:
+        for full_theta_idx, matches in theta_index_matches.iteritems():
+            var_est = 0
+            for i in matches:
+                for j in matches:
+                    var_est += covariance_est[i,j]
+
+            standard_err_est = np.sqrt(var_est)
+            theta_lower[full_theta_idx] = full_theta[full_theta_idx] - ZSCORE_95 * standard_err_est
+            theta_upper[full_theta_idx] = full_theta[full_theta_idx] + ZSCORE_95 * standard_err_est
+    return full_theta, theta_lower, theta_upper
+
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True):
+    def _combine_thetas(col_idx):
+        theta_col, _, _ = combine_thetas_and_get_conf_int(
+            hier_feat_generator,
+            agg_feat_generator,
+            theta,
+            zero_theta_mask,
+            possible_theta_mask,
+            None,
+            col_idx,
+        )
+        return theta_col.reshape((theta_col.size, 1))
+
+    if theta.shape[1] == 1:
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(num_cols)]
+    else:
+        start_idx = 0 if keep_col0 else 1
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(start_idx, theta.shape[1])]
+    agg_theta = np.hstack(theta_cols)
+    return agg_theta
+
+def pick_best_model(fitted_models):
+    """
+    Select the one with the most CI that do not cross zero
+    """
+    good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
+    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
+    best_model = good_models[max_idx]
+    return best_model

@@ -61,10 +61,10 @@ def process_data(env, outdir, c):
         [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
         [],
         ' '.join(map(str, cmd)))
-
 # Loci
 # ! no heavy chain in cui data
 nest.add(
+<<<<<<< HEAD
     'locus',
     [
         'igk',
@@ -188,6 +188,6 @@ def tune_parameters(env, outdir, c):
                '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
-        [],
+        c['process_data'],
         ' '.join(map(str, cmd)))
 

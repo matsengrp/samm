@@ -2,7 +2,6 @@ from cvxpy import *
 import time
 import numpy as np
 import logging as log
-from multiprocessing import Pool
 
 from survival_problem_prox import SurvivalProblemProximal
 from common import *
@@ -18,26 +17,13 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
 
     def post_init(self):
         # Calculate the fused lasso indices
-        self.motif_list = self.feature_generator.get_motif_list()
-
-        # We implement the fused penalty in terms of differences of pairs that are stored in these
-        # index lists: the first entry of the first list minus the first entry in the second list, etc.
-        motifs_fused_lasso1 = []
-        motifs_fused_lasso2 = []
-        for i1, m1 in enumerate(self.motif_list):
-            for i2, m2 in enumerate(self.motif_list):
-                if i1 == i2:
-                    continue
-                if get_idx_differ_by_one_character(m1, m2) is not None:
-                    motifs_fused_lasso1.append(i1)
-                    motifs_fused_lasso2.append(i2)
+        self.motif_list = self.feature_generator.motif_list
+        motifs_fused_lasso1, motifs_fused_lasso2 = self.feature_generator.get_similar_motifs(fuse_windows=self.fuse_windows, fuse_center_only=self.fuse_center_only)
         self.fused_lasso_idx1 = np.array(motifs_fused_lasso1, dtype=np.intc)
         self.fused_lasso_idx2 = np.array(motifs_fused_lasso2, dtype=np.intc)
 
-        self.penalty_param_fused = self.penalty_param
-        # TODO: This is a hack for now since we assume only one penalty param
-        # We upweight lasso since we don't want to over-penalize.
-        self.penalty_param_lasso = 2 * self.penalty_param
+        self.penalty_param_lasso = self.penalty_params[0]
+        self.penalty_param_fused = self.penalty_params[1]
 
     def get_value(self, theta):
         """
@@ -45,7 +31,7 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
         """
         fused_lasso_pen = np.linalg.norm(self.get_fused_lasso_theta(theta), ord=1)
         lasso_pen = np.linalg.norm(theta, ord=1)
-        return -(self.get_log_lik(theta) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
+        return -(1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta)) - self.penalty_param_fused * fused_lasso_pen - self.penalty_param_lasso * lasso_pen)
 
     def get_fused_lasso_theta(self, theta):
         """
@@ -99,8 +85,9 @@ class SurvivalProblemFusedLassoProximal(SurvivalProblemProximal):
 
     def _get_value_parallel(self, theta):
         """
-        @return negative penalized log likelihood
+        @return tuple: negative penalized log likelihood and array of log likelihoods
         """
         fused_lasso_pen = self.penalty_param_fused * np.linalg.norm(self.get_fused_lasso_theta(theta), ord=1)
         lasso_pen = self.penalty_param_lasso * np.linalg.norm(theta, ord=1)
-        return -self._get_log_lik_parallel(theta) + fused_lasso_pen + lasso_pen
+        log_likelihoods = self._get_log_lik_parallel(theta)
+        return -1.0/self.num_samples * log_likelihoods.sum() + fused_lasso_pen + lasso_pen, log_likelihoods
