@@ -138,6 +138,9 @@ def get_randint():
     """
     return np.random.randint(low=0, high=2**32 - 1)
 
+def is_zero(num):
+    return np.abs(num) < ZERO_THRES
+
 def get_num_nonzero(theta):
     nonzero_idx = np.logical_and(np.isfinite(theta), np.abs(theta) > ZERO_THRES)
     return np.sum(nonzero_idx)

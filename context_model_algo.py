@@ -147,10 +147,12 @@ class ContextModelAlgo:
                     feat_generator_stage2.mutating_pos_list,
                 )
                 # Refit over the support from the penalized problem
+                init_theta = penalized_theta[~model_masks.feats_to_remove_mask,:]
+                init_theta[model_masks.zero_theta_mask_refit] = 0
                 refit_theta, variance_est, _ = self.em_algo.run(
                     obs_data_stage2,
                     feat_generator_stage2,
-                    theta=penalized_theta[~model_masks.feats_to_remove_mask,:], # initialize from the lasso version
+                    theta=init_theta, # initialize from the lasso version
                     possible_theta_mask=possible_theta_mask_refit,
                     zero_theta_mask=model_masks.zero_theta_mask_refit,
                     burn_in=self.burn_in,
