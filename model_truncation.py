@@ -14,8 +14,8 @@ class ModelTruncation:
             motif_lens=[max(feat_generator.motif_lens)],
             # HACK: THIS SHOULD TAKE IN THE REAL POSITION MUTATING
         )
-        pruner = ModelPruner(feat_generator, full_feat_gen, theta)
-        self.removal_mask = pruner.prune()
+        pruner = ModelPruner(feat_generator, full_feat_gen)
+        self.removal_mask = pruner.prune(theta)
 
         zeroed_thetas = (np.abs(theta) < ZERO_THRES)  | self.removal_mask
         zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
