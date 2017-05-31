@@ -84,7 +84,7 @@ class ModelPruner:
                 else:
                     bad_cols.append(idx)
 
-        prune_mask = np.ones(theta.size, dtype=bool)
-        prune_mask[bad_cols] = False
+        prune_mask = np.zeros(theta.size, dtype=bool)
+        prune_mask[bad_cols] = True
         prune_mask = prune_mask.reshape(theta.shape, order="F")
         return prune_mask
