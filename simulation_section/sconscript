@@ -15,7 +15,7 @@ localenv = env.Clone()
 
 SPARSITIES = [0.5] #[0.25, 0.5, 1.0]
 EFFECT_SIZES = [1.0] # [0.5, 1.0, 2.0]
-SIMULATION_SIZES = [900] #[40, 120, 360]
+SIMULATION_SIZES = [360] #[40, 120, 360]
 
 # Set up state
 base = {'nreps': localenv['NREPS'],
@@ -168,7 +168,7 @@ def fit_context_model(env, outdir, c):
                '--scratch-directory',
                SCRATCH_DIR,
                '--tuning-sample-ratio',
-               0,
+               0.1,
                '--input-seqs ${SOURCES[0]}',
                '--input-genes ${SOURCES[1]}',
                '--out-file ${TARGETS[0]}',
