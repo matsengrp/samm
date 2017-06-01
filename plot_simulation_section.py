@@ -158,33 +158,23 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         agg_fitted_thetas.append((agg_fitted_theta, agg_fitted_lower, agg_fitted_upper))
 
     all_theta = np.vstack([t[0] for t in agg_fitted_thetas])
-    print "all_theta", all_theta
-    print "all_theta[all_theta != -np.inf]", np.sort(all_theta[all_theta != -np.inf])
     med_theta = np.median(all_theta[all_theta != -np.inf])
-    print "med_theta", med_theta
 
     for col_idx, (agg_fitted_theta, agg_fitted_lower, agg_fitted_upper) in enumerate(agg_fitted_thetas):
-        #print "HACK AHCK - only one col"
-        # med_theta = np.median(agg_fitted_theta[agg_fitted_theta != -np.inf])
-        # print "med theta", med_theta
         agg_fitted_lower -= med_theta
         agg_fitted_upper -= med_theta
         comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
-        # print np.hstack((
-        #     agg_fitted_lower.reshape((agg_fitted_lower.size,1)),
-        #     agg_true_theta[:, col_idx:col_idx + 1] - np.median(agg_true_theta[agg_true_theta != -np.inf]),
-        #     agg_fitted_upper.reshape((agg_fitted_upper.size,1))
-        # ))
-        num_considered = np.sum(comparison_mask)
-        tot_considered += num_considered
-        # comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
+
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
         agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[agg_true_theta != -np.inf])
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
+
         num_covered = np.sum((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
         tot_covered += num_covered
-        print "num_covered", np.where(((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small)))[0], "num_considered", num_considered
+        num_considered = np.sum(comparison_mask)
+        tot_considered += num_considered
+
     return tot_covered/float(tot_considered)
 
 def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
@@ -202,11 +192,6 @@ def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, p
     true_theta_trunc = np.array(raw_true_theta[~fmodel.model_masks.feats_to_remove_mask, :])
     true_theta_trunc = true_theta_trunc.reshape((true_theta_trunc.size,), order="F")
     true_theta_trunc = true_theta_trunc[theta_mask_flat]
-    print np.hstack((
-        conf_int[:,0:1],
-        true_theta_trunc.reshape((true_theta_trunc.size, 1)),
-        conf_int[:,2:3]
-    ))
     return np.mean((conf_int[:,0] <= true_theta_trunc) & (true_theta_trunc <= conf_int[:,2]))
 
 def _load_true_model(file_name, agg_motif_len, agg_pos_mutating, hier_motif_lens, hier_positions_mutating):
@@ -224,11 +209,6 @@ def _load_true_model(file_name, agg_motif_len, agg_pos_mutating, hier_motif_lens
     )
 
     sparse_raw_theta = SparseModelMaker.solve(true_model_agg, dense_hier_feat_gen, dense_agg_feat_gen, raw_theta=true_model)
-    print "sparse_raw_theta v true", np.hstack((sparse_raw_theta, true_model))
-    print "l1 min soln", np.sum(sparse_raw_theta == 0)
-    print "l1 l1", np.linalg.norm(sparse_raw_theta, 1)
-    print "true model", np.sum(true_model == 0)
-    print "l1 true_model", np.linalg.norm(true_model[true_model != -np.inf], 1)
     possible_raw_theta_mask = get_possible_motifs_to_targets(dense_hier_feat_gen.motif_list, sparse_raw_theta.shape, dense_hier_feat_gen.mutating_pos_list)
     sparse_raw_theta[~possible_raw_theta_mask] = -np.inf
     return np.array(true_model_agg), np.array(sparse_raw_theta)
@@ -257,7 +237,7 @@ def main(args=sys.argv[1:]):
 
     for i in range(len(fitted_models)):
         statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], args.stat_func)
-        print "MEAN", np.mean(statistics), "(%f)" % np.sqrt(np.var(statistics))
+        print "MEAN", args.stat, np.mean(statistics), "(%f)" % np.sqrt(np.var(statistics))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
