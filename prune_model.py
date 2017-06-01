@@ -75,7 +75,7 @@ class ModelPruner:
         last_rank = 0
         good_cols = []
         bad_cols= []
-        for idx in range(M.shape[1]):
+        for idx in reversed(range(M.shape[1])):
             if np.sum(M[:,idx]) > 0:
                 new_rank = np.linalg.matrix_rank(M[:,good_cols + [idx]])
                 if last_rank != new_rank:

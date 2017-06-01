@@ -33,7 +33,7 @@ class MethodResults:
         self.reference_penalty_param = reference_penalty_param
         self.penalized_num_nonzero = get_num_nonzero(self.penalized_theta)
 
-    def set_refit_theta(self, refit_theta, variance_est, model_masks, possible_theta_mask, num_not_crossing_zero):
+    def set_refit_theta(self, refit_theta, variance_est, model_masks, possible_theta_mask, num_not_crossing_zero=0):
         """
         @param refit_theta: the theta value after the second refitting stage
         @param variance_est: a variance estimate if we were able to obtain one

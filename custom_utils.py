@@ -87,7 +87,7 @@ def run_cmd(cmdfo, batch_system=None, batch_options=None):
                      stderr=None,
                      env=cmdfo.env)
 
-    print "Running process:", cmd_str
+    #print "Running process:", cmd_str
     return proc
 
 def run_cmds(cmdfos, sleep=True, batch_system="slurm", batch_options=None, debug=None):
