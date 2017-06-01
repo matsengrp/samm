@@ -14,9 +14,9 @@ class Hessian_TestCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         np.random.seed(1)
-        cls.motif_len = 5
-        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[5])
-        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[3,5])
+        cls.motif_len = 3
+        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[3])
+        cls.feat_gen_hier = HierarchicalMotifFeatureGenerator(motif_lens=[2,3], left_motif_flank_len_list=[[0,1], [1]])
 
         cls.obs_seq_mut = ObservedSequenceMutations("agtctggcatcaaagaaagagcgatttag", "aggctcgtattcgctaaaataagcaccag", cls.motif_len)
         cls.mutation_order = [12, 18, 3, 5, 19, 16, 8, 17, 21, 0, 22, 10, 24, 11, 9, 23]
@@ -32,12 +32,12 @@ class Hessian_TestCase(unittest.TestCase):
         theta[~possible_theta_mask] = -np.inf
         zero_theta_mask = np.zeros((feat_gen.feature_vec_len, theta_num_col), dtype=bool)
 
-        featured_obs_seq_mut = feat_gen.create_base_features(self.obs_seq_mut)
-        sample = ImputedSequenceMutations(featured_obs_seq_mut, self.mutation_order)
+        feat_gen.add_base_features(self.obs_seq_mut)
+        sample = ImputedSequenceMutations(self.obs_seq_mut, self.mutation_order)
         problem = SurvivalProblemCustom(feat_gen, [sample], [1], [0], per_target, possible_theta_mask, zero_theta_mask)
 
         sample_obs_information, sample_hessian = problem.get_hessian(theta)
-        for i in featured_obs_seq_mut.feat_matrix_start.nonzero()[1][:5]:
+        for i in self.obs_seq_mut.feat_matrix_start.nonzero()[1][:5]:
             for j in range(theta.shape[1]):
                 perturb_vector = np.zeros(theta.shape)
                 perturb_vector[i, j] += perturbation
