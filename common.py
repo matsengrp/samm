@@ -581,7 +581,8 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
             for i in matches:
                 for j in matches:
                     var_est += covariance_est[i,j]
-
+            if var_est < 0:
+                raise ValueError("Unable to come up with valid variance estimate: %f" % var_est)
             standard_err_est = np.sqrt(var_est)
             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - zstat * standard_err_est
             theta_upper[full_theta_idx] = full_theta[full_theta_idx] + zstat * standard_err_est
@@ -614,6 +615,8 @@ def pick_best_model(fitted_models):
     Select the one with the most CI that do not cross zero
     """
     good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
-    max_idx = np.argmax([f_model.num_not_crossing_zero for f_model in good_models]) # Take the one with the most nonzero and the largest penalty parameter
+    for max_idx in reversed(range(len(good_models))):
+        if good_models[max_idx].log_lik_ratio_lower_bound > 0:
+            break
     best_model = good_models[max_idx]
     return best_model

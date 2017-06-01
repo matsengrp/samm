@@ -166,24 +166,11 @@ class ContextModelAlgo:
                 log.info("==== Refit theta, %s====" % curr_model_results)
                 log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))
 
-                num_not_crossing_zero = 0
-                if variance_est is not None:
-                    conf_int = ConfidenceIntervalMaker.create_confidence_intervals(
-                        refit_theta,
-                        np.sqrt(np.diag(variance_est)),
-                        possible_theta_mask_refit,
-                        model_masks.zero_theta_mask_refit,
-                        z=self.z_stat,
-                    )
-                    num_cross_zero = np.sum((conf_int[:,0] <= 0) & (0 <= conf_int[:,2]))
-                    num_not_crossing_zero = conf_int.shape[0] - num_cross_zero
-
                 curr_model_results.set_refit_theta(
                     refit_theta,
                     variance_est,
                     model_masks,
                     possible_theta_mask_refit,
-                    num_not_crossing_zero,
                 )
                 log.info("Pen_param %f, Number nonzero %d, Perc nonzero %f" % (penalty_param, curr_model_results.num_not_crossing_zero, curr_model_results.percent_not_crossing_zero))
 
