@@ -284,8 +284,8 @@ def main(args=sys.argv[1:]):
             # first make sure that the penalty isnt so big that theta is empty
             if args.tuning_sample_ratio > 0:
                 # We are going to tune using EM surrogate function on the validation set
-                ll_lower_bound = curr_model_results.log_lik_ratio_lower_bound
-                if ll_lower_bound is not None and ll_lower_bound < 0:
+                ll_ratio = curr_model_results.log_lik_ratio
+                if ll_ratio is not None and ll_ratio < 0:
                     # This model is not better than the previous model.
                     # Use a greedy approach and stop trying penalty parameters
                     log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
