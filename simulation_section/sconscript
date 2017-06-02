@@ -13,9 +13,9 @@ from matsen_grp_data import SCRATCH_DIR
 Import('env')
 localenv = env.Clone()
 
-SPARSITIES = [0.5] #[0.25, 0.5, 1.0]
+SPARSITIES = [0.25, 0.5, 1.0]
 EFFECT_SIZES = [1.0] # [0.5, 1.0, 2.0]
-SIMULATION_SIZES = [360] #[40, 120, 360]
+SIMULATION_SIZES = [40, 120, 360]
 
 # Set up state
 base = {'nreps': localenv['NREPS'],
@@ -25,9 +25,9 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 models = [
-    #{'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
+    {'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
     {'motif_lens': [3], 'positions_mutating': "1", 'per_target': True},
-    # {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': False},
+    {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': False},
     # {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': True},
 ]
 
@@ -85,7 +85,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(2),
+    range(0,4),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -155,7 +155,7 @@ def fit_context_model(env, outdir, c):
            '--penalty-params',
            ",".join(map(str, penalty_params)),
            '--num-cpu-threads',
-           min(int(c['simulation_size']/20), 10),
+           min(int(c['simulation_size']/40), 10),
            '--num-jobs',
            min(int(c['simulation_size']/40), 10),
            '--burn-in',

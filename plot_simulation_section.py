@@ -170,7 +170,8 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
         agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[agg_true_theta != -np.inf])
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
-
+        #print np.hstack([agg_fitted_lower_small.reshape((agg_fitted_lower_small.size, 1)),
+        #    agg_fitted_upper_small.reshape((agg_fitted_upper_small.size, 1))])
         num_covered = np.sum((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
         tot_covered += num_covered
         num_considered = np.sum(comparison_mask)
