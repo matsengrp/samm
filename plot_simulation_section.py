@@ -8,6 +8,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from confidence_interval_maker import ConfidenceIntervalMaker
 from make_model_sparse import SparseModelMaker
 from common import *
+import matplotlib as plt
 
 def parse_args():
     ''' parse command line arguments '''
@@ -17,6 +18,13 @@ def parse_args():
     parser.add_argument('--fitted-models',
         type=str,
         help='fitted model pickle, comma separated, colon separated')
+    parser.add_argument('--model-labels',
+        type=str,
+        help='model labels, colon separated',
+        default="40,120,360")
+    parser.add_argument('--shmulate-models',
+        type=str,
+        help='fitted model shmulate pickle, comma separated, colon separated')
     parser.add_argument('--true-models',
         type=str,
         help='true model pickle file, colon separated')
@@ -40,6 +48,7 @@ def parse_args():
     args.fitted_models = args.fitted_models.split(":")
     for i, fmodels in enumerate(args.fitted_models):
         args.fitted_models[i] = fmodels.split(",")
+    args.model_labels = args.model_labels.split(":")
     args.true_models = args.true_models.split(":")
 
     if args.stat == "norm":
@@ -235,9 +244,17 @@ def main(args=sys.argv[1:]):
     num_cols = fitted_models[0][0].refit_theta.shape[1]
     per_target = num_cols == NUM_NUCLEOTIDES + 1
 
+    samm_means = []
     for i in range(len(fitted_models)):
         statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], args.stat_func)
-        print "MEAN", args.stat, np.mean(statistics), "(%f)" % np.sqrt(np.var(statistics))
+        mean = np.mean(statistics)
+        se = np.sqrt(np.var(statistics)
+        samm_means.append(mean)
+        samm_se.append(se)
+        print "MEAN", args.stat, result[0], "(%f)" % result[1]
+
+    plt.errorbar(args.model_labels, samm_means, samm_se, linestyle='None')
+    plt.show()
 
 if __name__ == "__main__":
     main(sys.argv[1:])
