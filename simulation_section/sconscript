@@ -127,7 +127,6 @@ nest.add(
     'method',
     [
         "samm",
-        # "shazam",
     ])
 
 # Nest for model fitting
@@ -139,46 +138,39 @@ def fit_context_model(env, outdir, c):
     if np.sum([c1, c2, c3]) < 2:
         return
     cmd = []
-    if c["method"] == "samm":
-        penalty_params = np.power(10, np.arange(-0.5, -6, step=-0.5)).tolist()
-        per_target_model_str = ""
-        if c["model"]["per_target"]:
-            per_target_model_str = "--per-target-model"
+    penalty_params = np.power(10, np.arange(-0.5, -6, step=-0.25)).tolist()
+    per_target_model_str = ""
+    if c["model"]["per_target"]:
+        per_target_model_str = "--per-target-model"
 
-        cmd = ['python fit_context_model.py',
-               '--seed',
-               c['seed'],
-               '--motif-lens',
-               ",".join([str(m) for m in c['model']['motif_lens']]),
-               '--positions-mutating',
-               c["model"]["positions_mutating"],
-               '--em-max-iters',
-               10,
-               '--penalty-params',
-               ",".join(map(str, penalty_params)),
-               '--num-cpu-threads',
-               min(int(c['simulation_size']/40), 10),
-               '--num-jobs',
-               min(int(c['simulation_size']/40), 10),
-               '--burn-in',
-               2,
-               '--num-e-samples',
-               4,
-               per_target_model_str,
-               '--scratch-directory',
-               SCRATCH_DIR,
-               '--tuning-sample-ratio',
-               0.1,
-               '--input-seqs ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
-    elif c["method"] == "shazam":
-        cmd = ['python fit_shmulate_model.py',
-               '--input-file ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--model-pkl ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+    cmd = ['python fit_context_model.py',
+           '--seed',
+           c['seed'],
+           '--motif-lens',
+           ",".join([str(m) for m in c['model']['motif_lens']]),
+           '--positions-mutating',
+           c["model"]["positions_mutating"],
+           '--em-max-iters',
+           10,
+           '--penalty-params',
+           ",".join(map(str, penalty_params)),
+           '--num-cpu-threads',
+           min(int(c['simulation_size']/40), 10),
+           '--num-jobs',
+           min(int(c['simulation_size']/40), 10),
+           '--burn-in',
+           2,
+           '--num-e-samples',
+           4,
+           per_target_model_str,
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--tuning-sample-ratio',
+           0.1,
+           '--input-seqs ${SOURCES[0]}',
+           '--input-genes ${SOURCES[1]}',
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['simulate'],
