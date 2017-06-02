@@ -8,7 +8,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from confidence_interval_maker import ConfidenceIntervalMaker
 from make_model_sparse import SparseModelMaker
 from common import *
-import matplotlib as plt
+import matplotlib.pyplot as plt
 
 def parse_args():
     ''' parse command line arguments '''
@@ -18,13 +18,16 @@ def parse_args():
     parser.add_argument('--fitted-models',
         type=str,
         help='fitted model pickle, comma separated, colon separated')
-    parser.add_argument('--model-labels',
+    parser.add_argument('--title',
         type=str,
-        help='model labels, colon separated',
-        default="40,120,360")
-    parser.add_argument('--shmulate-models',
+        default="")
+    parser.add_argument('--x-labels',
         type=str,
-        help='fitted model shmulate pickle, comma separated, colon separated')
+        help='x labels, colon separated',
+        default="40:120:360")
+    parser.add_argument('--x-lab',
+        type=str,
+        default="Samples")
     parser.add_argument('--true-models',
         type=str,
         help='true model pickle file, colon separated')
@@ -34,11 +37,14 @@ def parse_args():
     parser.add_argument('--agg-pos-mutating',
         type=int,
         default=1)
-    parser.add_argument('--stat',
+    parser.add_argument('--stats',
         type=str,
-        default="norm",
-        choices=("norm", "raw_norm", "coverage", "raw_coverage", "raw_pearson", "pearson", "support"),
+        default="norm,coverage,pearson",
+        # choices=("norm", "raw_norm", "coverage", "raw_coverage", "raw_pearson", "pearson", "support"),
     )
+    parser.add_argument('--outdir',
+        type=str,
+        default="/Users/jeanfeng/Desktop")
     parser.add_argument('--z',
         type=float,
         help="z statistic",
@@ -48,24 +54,10 @@ def parse_args():
     args.fitted_models = args.fitted_models.split(":")
     for i, fmodels in enumerate(args.fitted_models):
         args.fitted_models[i] = fmodels.split(",")
-    args.model_labels = args.model_labels.split(":")
+    args.x_labels = args.x_labels.split(":")
+    args.x_labels = [int(l) for l in args.x_labels]
     args.true_models = args.true_models.split(":")
-
-    if args.stat == "norm":
-        args.stat_func = _get_agg_norm_diff
-    elif args.stat == "raw_norm":
-        args.stat_func = _get_raw_norm_diff
-    elif args.stat == "raw_coverage":
-        args.stat_func = _get_raw_coverage
-    elif args.stat == "coverage":
-        args.stat_func = _get_agg_coverage
-    elif args.stat == "raw_pearson":
-        args.stat_func = _get_raw_pearson
-    elif args.stat == "pearson":
-        args.stat_func = _get_agg_pearson
-    elif args.stat == "support":
-        args.stat_func = _get_support
-
+    args.stats = args.stats.split(",")
     return args
 
 def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
@@ -222,6 +214,17 @@ def _load_true_model(file_name, agg_motif_len, agg_pos_mutating, hier_motif_lens
     sparse_raw_theta[~possible_raw_theta_mask] = -np.inf
     return np.array(true_model_agg), np.array(sparse_raw_theta)
 
+def _get_stat_func(stat):
+    STAT_FUNC_DICT = {
+        "norm": _get_agg_norm_diff,
+        "raw_norm": _get_raw_norm_diff,
+        "raw_coverage": _get_raw_coverage,
+        "coverage": _get_agg_coverage,
+        "raw_pearson": _get_raw_pearson,
+        "pearson": _get_agg_pearson,
+    }
+    return STAT_FUNC_DICT[stat]
+
 def main(args=sys.argv[1:]):
     args = parse_args()
 
@@ -244,17 +247,27 @@ def main(args=sys.argv[1:]):
     num_cols = fitted_models[0][0].refit_theta.shape[1]
     per_target = num_cols == NUM_NUCLEOTIDES + 1
 
-    samm_means = []
-    for i in range(len(fitted_models)):
-        statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], args.stat_func)
-        mean = np.mean(statistics)
-        se = np.sqrt(np.var(statistics)
-        samm_means.append(mean)
-        samm_se.append(se)
-        print "MEAN", args.stat, result[0], "(%f)" % result[1]
+    for stat in args.stats:
+        stat_func = _get_stat_func(stat)
 
-    plt.errorbar(args.model_labels, samm_means, samm_se, linestyle='None')
-    plt.show()
+        samm_means = []
+        samm_se = []
+        for i in range(len(fitted_models)):
+            samm_statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], stat_func)
+            mean = np.mean(samm_statistics)
+            se = np.sqrt(np.var(samm_statistics))
+            samm_means.append(mean)
+            samm_se.append(se)
+            print "MEAN", stat, samm_means[-1], "(%f)" % samm_se[-1]
+
+        plt.clf()
+        plt.errorbar(args.x_labels, samm_means, samm_se, linestyle='None', marker=".")
+        plt.ylabel(stat)
+        plt.xlabel(args.x_lab)
+        plt.title(args.title)
+        out_fig_name = "%s/%s_%s_%s.pdf" % (args.outdir, args.title.replace(" " , "_"), stat, args.x_lab)
+        print "out_fig_name", out_fig_name
+        plt.savefig(out_fig_name)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
