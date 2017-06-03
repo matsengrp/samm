@@ -4,6 +4,7 @@ import re
 import random
 import warnings
 import itertools
+import logging as log
 
 from Bio import SeqIO
 
@@ -475,13 +476,14 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column, val_column_idx):
     """
     @param num_obs: number of observations
     @param feat_generator: submotif feature generator
     @param metadata: metadata to include variables to perform validation on
     @param tuning_sample_ratio: ratio of data to place in validation set
     @param validation_column: variable to perform validation on (if None then sample randomly)
+    @param val_column_idx: which index to pick for K-fold validation
 
     @return training and validation indices
     """
@@ -503,7 +505,7 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
             val_size = max(val_size, 1)
 
         # sample random categories from our validation variable
-        val_categories = set(random.sample(categories, val_size))
+        val_categories = set([list(categories)[val_column_idx]])
         train_categories = categories - val_categories
         log.info("train_categories %s" % train_categories)
         log.info("val_categories %s" % val_categories)
