@@ -141,6 +141,9 @@ def parse_args():
         type=float,
         help="confidence interval z statistic",
         default=1.96)
+    parser.add_argument("--val-mouse-idx",
+        type=int,
+        help="index of validation mouse")
 
     parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
@@ -191,6 +194,23 @@ def parse_args():
     args.penalty_params = sorted(args.penalty_params, reverse=True)
     return args
 
+def write_sampled_data(input_shazam_seqs, input_shazam_genes, sampled_set):
+    """
+    Write data after sampling so shazam and samm fit to the same data
+    """
+
+    with open(input_shazam_seqs, 'w') as shazam_seq_file, open(input_shazam_genes, 'w') as shazam_gene_file:
+                gene_writer = csv.DictWriter(shazam_gene_file, ['germline_name', 'germline_sequence'])
+                gene_writer.writeheader()
+                seq_writer = csv.DictWriter(shazam_seq_file, ['germline_name', 'sequence'])
+                seq_writer.writeheader()
+                for idx, obs_seq_mutation in enumerate(train_set):
+                    gl_name = 'germline' + str(idx)
+                    gene_writer.writerow({'germline_name': gl_name,
+                        'germline_sequence': obs_seq_mutation.start_seq_with_flanks})
+                    seq_writer.writerow({'germline_name': gl_name,
+                        'sequence': obs_seq_mutation.end_seq_with_flanks})
+
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
@@ -227,11 +247,25 @@ def main(args=sys.argv[1:]):
         metadata,
         args.tuning_sample_ratio,
         args.validation_column,
+        args.val_mouse_idx,
     )
     train_set = [obs_data[i] for i in train_idx]
     val_set = [obs_data[i] for i in val_idx]
     feat_generator.add_base_features_for_list(train_set)
     feat_generator.add_base_features_for_list(val_set)
+
+    # for fitting shazam and later validating
+    write_sampled_data(
+            args.out_file.replace('.pkl', '_train_seqs.csv'),
+            args.out_file.replace('.pkl', '_train_genes.csv'),
+            train_set
+        )
+
+    write_sampled_data(
+            args.out_file.replace('.pkl', '_val_seqs.csv'),
+            args.out_file.replace('.pkl', '_val_genes.csv'),
+            val_set
+        )
 
     st_time = time.time()
     log.info("Data statistics:")
