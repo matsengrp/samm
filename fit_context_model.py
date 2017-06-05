@@ -205,7 +205,7 @@ def write_sampled_data(input_shazam_seqs, input_shazam_genes, sampled_set):
                 gene_writer.writeheader()
                 seq_writer = csv.DictWriter(shazam_seq_file, ['germline_name', 'sequence'])
                 seq_writer.writeheader()
-                for idx, obs_seq_mutation in enumerate(train_set):
+                for idx, obs_seq_mutation in enumerate(sampled_set):
                     gl_name = 'germline' + str(idx)
                     gene_writer.writerow({'germline_name': gl_name,
                         'germline_sequence': obs_seq_mutation.start_seq_with_flanks})
