@@ -143,7 +143,8 @@ def parse_args():
         default=1.96)
     parser.add_argument("--val-mouse-idx",
         type=int,
-        help="index of validation mouse")
+        help="index of validation mouse",
+        default=None)
 
     parser.set_defaults(per_target_model=False, conf_int_stop=False)
     args = parser.parse_args()
