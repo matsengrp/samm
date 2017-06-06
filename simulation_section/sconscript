@@ -14,7 +14,7 @@ Import('env')
 localenv = env.Clone()
 
 SPARSITIES = [0.25, 0.5, 1.0]
-EFFECT_SIZES = [0.5, 1.0, 2.0]
+EFFECT_SIZES = [1.0] # [0.5, 1.0, 2.0]
 SIMULATION_SIZES = [40, 120, 360]
 
 # Set up state
@@ -25,9 +25,10 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 models = [
-    #{'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
+    {'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
+    {'motif_lens': [3], 'positions_mutating': "1", 'per_target': True},
     {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': False},
-    #{'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': True},
+    # {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': True},
 ]
 
 nest.add(
@@ -50,7 +51,7 @@ nest.add(
 
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    if c['effect_size'] != EFFECT_SIZES[1] and c['sparsity_ratio'] != SPARSITIES[1]:
+    if c['effect_size'] != EFFECT_SIZES[int(len(EFFECT_SIZES)/2)] and c['sparsity_ratio'] != SPARSITIES[int(len(SPARSITIES)/2)]:
         return
 
     per_target_model_str = ""
@@ -84,7 +85,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(20),
+    range(0,4),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -96,9 +97,9 @@ nest.add(
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
-    c1 = c['simulation_size'] == SIMULATION_SIZES[1]
-    c2 = c['sparsity_ratio'] == SPARSITIES[1]
-    c3 = c['effect_size'] == EFFECT_SIZES[1]
+    c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
+    c2 = c['sparsity_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
+    c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
     if np.sum([c1, c2, c3]) < 2:
         return
     cmd = ['python simulate_from_survival.py',
@@ -113,8 +114,8 @@ def simulate(env, outdir, c):
            c['simulation_size'],
            '--random-gene-len',
            250,
-           '--min-censor-time',
-           1.0,
+           '--min-percent-mutated',
+           0.05,
            '--output-file ${TARGETS[0]}',
            '--output-genes ${TARGETS[1]}']
     return env.Command(
@@ -126,58 +127,50 @@ nest.add(
     'method',
     [
         "samm",
-        # "shazam",
     ])
 
 # Nest for model fitting
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
-    c1 = c['simulation_size'] == SIMULATION_SIZES[1]
-    c2 = c['sparsity_ratio'] == SPARSITIES[1]
-    c3 = c['effect_size'] == EFFECT_SIZES[1]
+    c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
+    c2 = c['sparsity_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
+    c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
     if np.sum([c1, c2, c3]) < 2:
         return
     cmd = []
-    if c["method"] == "samm":
-        penalty_params = np.power(10, np.arange(-0.5, -6, step=-0.25)).tolist()
-        per_target_model_str = ""
-        if c["model"]["per_target"]:
-            per_target_model_str = "--per-target-model"
+    penalty_params = np.power(10, np.arange(-0.5, -6, step=-0.25)).tolist()
+    per_target_model_str = ""
+    if c["model"]["per_target"]:
+        per_target_model_str = "--per-target-model"
 
-        cmd = ['python fit_context_model.py',
-               '--seed',
-               c['seed'],
-               '--motif-lens',
-               ",".join([str(m) for m in c['model']['motif_lens']]),
-               '--positions-mutating',
-               c["model"]["positions_mutating"],
-               '--em-max-iters',
-               10,
-               '--penalty-params',
-               ",".join(map(str, penalty_params)),
-               '--num-cpu-threads',
-               min(int(c['simulation_size']/20), 6),
-               '--num-jobs',
-               min(int(c['simulation_size']/20), 6),
-               '--burn-in',
-               2,
-               '--num-e-samples',
-               4,
-               per_target_model_str,
-               '--scratch-directory',
-               SCRATCH_DIR,
-               '--tuning-sample-ratio',
-               0,
-               '--input-seqs ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
-    elif c["method"] == "shazam":
-        cmd = ['python fit_shmulate_model.py',
-               '--input-file ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--model-pkl ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+    cmd = ['python fit_context_model.py',
+           '--seed',
+           c['seed'],
+           '--motif-lens',
+           ",".join([str(m) for m in c['model']['motif_lens']]),
+           '--positions-mutating',
+           c["model"]["positions_mutating"],
+           '--em-max-iters',
+           10,
+           '--penalty-params',
+           ",".join(map(str, penalty_params)),
+           '--num-cpu-threads',
+           min(int(c['simulation_size']/40), 10),
+           '--num-jobs',
+           min(int(c['simulation_size']/40), 10),
+           '--burn-in',
+           2,
+           '--num-e-samples',
+           4,
+           per_target_model_str,
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--tuning-sample-ratio',
+           0.1,
+           '--input-seqs ${SOURCES[0]}',
+           '--input-genes ${SOURCES[1]}',
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['simulate'],

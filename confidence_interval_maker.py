@@ -30,33 +30,7 @@ class ConfidenceIntervalMaker:
 
         if sample_obs_information.size == 0:
             return None
-
-        # Make sure that we can take an inverse -- need eigenvalues to be nonzero
-        eigenvals = np.linalg.eigvals(sample_obs_information)
-        if np.all(np.abs(np.linalg.eigvals(sample_obs_information)) > 0):
-            variance_est = np.linalg.inv(sample_obs_information)
-            singular_vals = np.linalg.svd(variance_est, compute_uv=False)
-            condition_num = np.max(singular_vals)/np.min(singular_vals)
-            log.info("Condition number %f" % condition_num)
-
-            # Make sure that the variance estimate makes sense -- should be positive values only
-            if np.all(np.diag(variance_est) > 0):
-                standard_errors = np.sqrt(np.diag(variance_est))
-                conf_ints = self.create_confidence_intervals(
-                    theta,
-                    standard_errors,
-                    self.possible_theta_mask,
-                    self.zero_theta_mask,
-                    z,
-                )
-                log.info("===== Confidence Intervals ======")
-                log.info(self._get_confidence_interval_print_lines(conf_ints))
-                return variance_est
-            else:
-                log.info("Variance estimates are negative %s" % np.diag(variance_est))
-        else:
-            log.info("Confidence interval: observation matrix is singular")
-        return None
+        return np.linalg.pinv(sample_obs_information)
 
     def _get_confidence_interval_print_lines(self, conf_ints):
         """
@@ -65,14 +39,12 @@ class ConfidenceIntervalMaker:
         """
         print_line_list = []
         idx = 0
-        for i in range(self.zero_theta_mask.shape[0]):
-            motif = self.motif_list[i]
-            mut_pos = self.mutating_pos_list[i]
-            for j in range(self.zero_theta_mask.shape[1]):
-                target_nucleotide = "n" if j == 0 else NUCLEOTIDES[j - 1]
+        for j in range(self.zero_theta_mask.shape[1]):
+            target_nucleotide = "n" if j == 0 else NUCLEOTIDES[j - 1]
+            for i in range(self.zero_theta_mask.shape[0]):
                 if not self.theta_mask[i, j]:
                     continue
-                print_str = "%s (%s->%s, pos %s)" % (conf_ints[idx,:], motif, target_nucleotide, mut_pos)
+                print_str = "%s (%s->%s, pos %s)" % (conf_ints[idx,:], self.motif_list[i], target_nucleotide, self.mutating_pos_list[i])
                 print_line_list.append((conf_ints[idx,1], print_str))
                 idx += 1
         sorted_lines = sorted(print_line_list, key=lambda s: s[0])

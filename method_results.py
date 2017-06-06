@@ -18,7 +18,7 @@ class MethodResults:
         self.percent_not_crossing_zero = 1
         self.num_p = 0
 
-    def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, reference_penalty_param=None):
+    def set_penalized_theta(self, penalized_theta, log_lik_ratio_lower_bound, log_lik_ratio, model_masks, reference_penalty_param=None):
         """
         @param penalized_theta: the theta value after the first penalized stage
         @param log_lik_ratio_lower_bound: the lower bound of the confidence interval for the log lik ratio
@@ -32,25 +32,22 @@ class MethodResults:
         self.log_lik_ratio_lower_bound = log_lik_ratio_lower_bound
         self.reference_penalty_param = reference_penalty_param
         self.penalized_num_nonzero = get_num_nonzero(self.penalized_theta)
+        self.model_masks = model_masks
 
-    def set_refit_theta(self, refit_theta, variance_est, model_masks, possible_theta_mask, num_not_crossing_zero):
+    def set_refit_theta(self, refit_theta, variance_est, possible_theta_mask):
         """
         @param refit_theta: the theta value after the second refitting stage
         @param variance_est: a variance estimate if we were able to obtain one
         @param model_masks: ModelTruncation object
         @param possible_theta_mask: the theta values allowed to be a finite value for this shrunken refit theta (np bool array)
-        @param num_not_crossing_zero: number of confidence intervals that didnt include zero, using z_stat for the width
 
         Store the model from the refit stage
         """
         self.has_refit_data = True
         self.refit_theta = refit_theta
         self.variance_est = variance_est
-        self.model_masks = model_masks
         self.refit_possible_theta_mask = possible_theta_mask
         self.num_p = np.sum(self.refit_possible_theta_mask & ~self.model_masks.zero_theta_mask_refit)
-        self.num_not_crossing_zero = num_not_crossing_zero
-        self.percent_not_crossing_zero = num_not_crossing_zero/float(self.num_p)
 
     def __str__(self):
         pen_param_str = ",".join(map(str, self.penalty_params))

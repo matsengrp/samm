@@ -108,7 +108,7 @@ def parse_args():
             proportion of data to use for tuning the penalty parameter.
             if zero, tunes by number of confidence intervals for theta that do not contain zero
             """,
-        default=0)
+        default=0.1)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn in iterations when estimating likelihood of validation data',
@@ -193,6 +193,9 @@ def parse_args():
     # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
+
+    assert(args.tuning_sample_ratio > 0)
+
     return args
 
 def write_sampled_data(input_shazam_seqs, input_shazam_genes, sampled_set):
@@ -284,55 +287,56 @@ def main(args=sys.argv[1:]):
     num_val_samples = args.num_val_samples
     results_list = []
     num_nonzero_confint = 0
+    best_pen_idx = 0
     for param_i, penalty_param in enumerate(args.penalty_params):
         log.info("==== Penalty parameter %f ====" % penalty_param)
-        curr_model_results = cmodel_algo.fit(
+        curr_model_results = cmodel_algo.fit_penalized(
             penalty_param,
-            stage1_em_iters=args.em_max_iters/2 if param_i > 0 else args.em_max_iters,
-            stage2_em_iters=args.em_max_iters,
+            max_em_iters=args.em_max_iters,
             val_set_evaluator=val_set_evaluator,
             init_theta=prev_pen_theta,
             reference_pen_param=penalty_param_prev
         )
 
-        if args.tuning_sample_ratio > 0:
-            # Create this val set evaluator for next time
-            val_set_evaluator = LikelihoodComparer(
-                val_set,
-                feat_generator,
-                theta_ref=curr_model_results.penalized_theta,
-                num_samples=num_val_samples,
-                burn_in=args.num_val_burnin,
-                num_jobs=args.num_jobs,
-                scratch_dir=args.scratch_dir,
-                pool=all_runs_pool,
-            )
-            # grab this many validation samples from now on
-            num_val_samples = val_set_evaluator.num_samples
+        # Create this val set evaluator for next time
+        val_set_evaluator = LikelihoodComparer(
+            val_set,
+            feat_generator,
+            theta_ref=curr_model_results.penalized_theta,
+            num_samples=num_val_samples,
+            burn_in=args.num_val_burnin,
+            num_jobs=args.num_jobs,
+            scratch_dir=args.scratch_dir,
+            pool=all_runs_pool,
+        )
+        # grab this many validation samples from now on
+        num_val_samples = val_set_evaluator.num_samples
 
         # Save model results
         results_list.append(curr_model_results)
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        if curr_model_results.penalized_num_nonzero > 0:
-            # first make sure that the penalty isnt so big that theta is empty
-            if args.tuning_sample_ratio > 0:
-                # We are going to tune using EM surrogate function on the validation set
-                ll_lower_bound = curr_model_results.log_lik_ratio_lower_bound
-                if ll_lower_bound is not None and ll_lower_bound < 0:
-                    # This model is not better than the previous model.
-                    # Use a greedy approach and stop trying penalty parameters
-                    log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
-                    break
-            else:
-                # We are going to tune using confidence intervals
-                if curr_model_results.num_not_crossing_zero < num_nonzero_confint or curr_model_results.num_not_crossing_zero == 0:
-                    log.info("Number of nonzero confidence intervals decreasing. Stop trying penalty parameters")
-                    break
-        num_nonzero_confint = curr_model_results.num_not_crossing_zero
+        ll_ratio = curr_model_results.log_lik_ratio
+        if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < 0:
+            # Make sure that the penalty isnt so big that theta is empty
+            # This model is not better than the previous model. Stop trying penalty parameters.
+            # Time to refit the model
+            log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
+            break
+        else:
+            best_pen_idx = param_i
+
         penalty_param_prev = penalty_param
         prev_pen_theta = curr_model_results.penalized_theta
+
+    cmodel_algo.refit_unpenalized(
+        model_result=results_list[best_pen_idx],
+        max_em_iters=args.em_max_iters,
+    )
+    # Pickle the refitted theta
+    with open(args.out_file, "w") as f:
+        pickle.dump(results_list, f)
 
     if all_runs_pool is not None:
         all_runs_pool.close()
