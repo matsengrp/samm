@@ -104,7 +104,7 @@ class ContextModelAlgo:
             burn_in=self.burn_in,
             penalty_params=penalty_params,
             max_em_iters=max_em_iters,
-            max_e_samples=self.num_e_samples * 2,
+            max_e_samples=self.num_e_samples * 4,
             intermed_file_prefix="%s/e_samples_%f_" % (self.intermediate_out_dir, penalty_param),
         )
         curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating, self.z_stat)
