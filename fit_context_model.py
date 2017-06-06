@@ -283,7 +283,6 @@ def main(args=sys.argv[1:]):
             pickle.dump(results_list, f)
 
         ll_ratio = curr_model_results.log_lik_ratio
-        print "ll_ratio", ll_ratio
         if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < 0:
             # Make sure that the penalty isnt so big that theta is empty
             # This model is not better than the previous model. Stop trying penalty parameters.
