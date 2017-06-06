@@ -12,12 +12,12 @@ from common import *
 
 class ContextModelAlgo:
     """
-    Performs the 2-stage fitting procedure
+    Performs fitting procedures
     """
     def __init__(self, feat_generator, obs_data, train_set, args, all_runs_pool, true_theta=None):
         """
         @param feat_generator: feature generator
-        @param obs_data: full data set - used in training for the second stage
+        @param obs_data: full data set - used in training for the refitting stage
         @param train_set: data just used for training the penalized model
         @param args: object with other useful settings (TODO: clean this up one day)
         @param all_runs_pool: multiprocessing pool
@@ -83,9 +83,9 @@ class ContextModelAlgo:
 
         return ll_ratio_lower_bound, log_lik_ratio
 
-    def fit(self, penalty_param, stage1_em_iters, stage2_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
+    def fit_penalized(self, penalty_param, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
         """
-        @param penalty_param: penalty parameter for fitting the first stage
+        @param penalty_param: penalty parameter for fitting penalized model
         @param val_set_evaluator: LikelihoodComparer with a given reference model
         @param reference_pen_param: the penalty parameters for the reference model
 
@@ -95,7 +95,6 @@ class ContextModelAlgo:
         if init_theta is None:
             init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
 
-        #### STAGE 1: FIT A PENALIZED MODEL
         penalized_theta, _, _ = self.em_algo.run(
             self.train_set,
             self.feat_generator,
@@ -104,14 +103,13 @@ class ContextModelAlgo:
             zero_theta_mask=self.zero_theta_mask,
             burn_in=self.burn_in,
             penalty_params=penalty_params,
-            max_em_iters=stage1_em_iters,
-            max_e_samples=self.num_e_samples * 2,
+            max_em_iters=max_em_iters,
+            max_e_samples=self.num_e_samples * 4,
             intermed_file_prefix="%s/e_samples_%f_" % (self.intermediate_out_dir, penalty_param),
         )
         curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating, self.z_stat)
 
-        #### STAGE 1.5: DECIDE IF THIS MODEL IS WORTH REFITTING
-        #### Right now, we check if the validation log likelihood (EM surrogate) is better
+        #### Calculate validation log likelihood (EM surrogate), use to determine if model is any good.
         log_lik_ratio_lower_bound, log_lik_ratio = self._do_validation_set_checks(
             penalized_theta,
             val_set_evaluator,
@@ -120,58 +118,62 @@ class ContextModelAlgo:
             penalized_theta,
             log_lik_ratio_lower_bound,
             log_lik_ratio,
+            model_masks=ModelTruncation(penalized_theta, self.feat_generator),
             reference_penalty_param=reference_pen_param,
         )
 
         log.info("==== Penalized theta, %f, nonzero %d ====" % (penalty_param, curr_model_results.penalized_num_nonzero))
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
-
-        if log_lik_ratio_lower_bound is None or log_lik_ratio_lower_bound >= 0:
-            # STAGE 2: REFIT THE MODEL WITH NO PENALTY
-            model_masks = ModelTruncation(penalized_theta, self.feat_generator)
-            log.info("Refit theta size: %d" % model_masks.zero_theta_mask_refit.size)
-            if model_masks.zero_theta_mask_refit.size > 0:
-                # Create a feature generator for this shrunken model
-                feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
-                    motif_lens=self.motif_lens,
-                    feats_to_remove=model_masks.feats_to_remove,
-                    left_motif_flank_len_list=self.positions_mutating,
-                )
-                # Get the data ready - using ALL data
-                obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
-                feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
-                # Create the theta mask for the shrunken theta
-                possible_theta_mask_refit = get_possible_motifs_to_targets(
-                    feat_generator_stage2.motif_list,
-                    model_masks.zero_theta_mask_refit.shape,
-                    feat_generator_stage2.mutating_pos_list,
-                )
-                # Refit over the support from the penalized problem
-                init_theta = penalized_theta[~model_masks.feats_to_remove_mask,:]
-                init_theta[model_masks.zero_theta_mask_refit] = 0
-                refit_theta, variance_est, _ = self.em_algo.run(
-                    obs_data_stage2,
-                    feat_generator_stage2,
-                    theta=init_theta, # initialize from the lasso version
-                    possible_theta_mask=possible_theta_mask_refit,
-                    zero_theta_mask=model_masks.zero_theta_mask_refit,
-                    burn_in=self.burn_in,
-                    penalty_params=(0,), # now fit with no penalty
-                    max_em_iters=stage2_em_iters,
-                    max_e_samples=self.num_e_samples * 4,
-                    intermed_file_prefix="%s/e_samples_%f_full_" % (self.intermediate_out_dir, penalty_param),
-                    get_hessian=True,
-                )
-
-                log.info("==== Refit theta, %s====" % curr_model_results)
-                log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))
-
-                curr_model_results.set_refit_theta(
-                    refit_theta,
-                    variance_est,
-                    model_masks,
-                    possible_theta_mask_refit,
-                )
-                log.info("Pen_param %f, Number nonzero %d, Perc nonzero %f" % (penalty_param, curr_model_results.num_not_crossing_zero, curr_model_results.percent_not_crossing_zero))
-
         return curr_model_results
+
+    def refit_unpenalized(self, model_result, max_em_iters):
+        """
+        Refit the model
+        Modifies model_result
+        """
+        model_masks = model_result.model_masks
+
+        log.info("Refit theta size: %d" % model_masks.zero_theta_mask_refit.size)
+        if model_masks.zero_theta_mask_refit.size == 0:
+            return
+
+        # Create a feature generator for this shrunken model
+        feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
+            motif_lens=self.motif_lens,
+            feats_to_remove=model_masks.feats_to_remove,
+            left_motif_flank_len_list=self.positions_mutating,
+        )
+        # Get the data ready - using ALL data
+        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
+        feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
+        # Create the theta mask for the shrunken theta
+        possible_theta_mask_refit = get_possible_motifs_to_targets(
+            feat_generator_stage2.motif_list,
+            model_masks.zero_theta_mask_refit.shape,
+            feat_generator_stage2.mutating_pos_list,
+        )
+        # Refit over the support from the penalized problem
+        init_theta = model_result.penalized_theta[~model_masks.feats_to_remove_mask,:]
+        init_theta[model_masks.zero_theta_mask_refit] = 0
+        refit_theta, variance_est, _ = self.em_algo.run(
+            obs_data_stage2,
+            feat_generator_stage2,
+            theta=init_theta, # initialize from the lasso version
+            possible_theta_mask=possible_theta_mask_refit,
+            zero_theta_mask=model_masks.zero_theta_mask_refit,
+            burn_in=self.burn_in,
+            penalty_params=(0,), # now fit with no penalty
+            max_em_iters=max_em_iters,
+            max_e_samples=self.num_e_samples * 4,
+            intermed_file_prefix="%s/e_samples_%f_full_" % (self.intermediate_out_dir, 0),
+            get_hessian=True,
+        )
+
+        log.info("==== Refit theta, %s====" % model_result)
+        log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))
+
+        model_result.set_refit_theta(
+            refit_theta,
+            variance_est,
+            possible_theta_mask_refit,
+        )
