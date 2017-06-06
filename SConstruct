@@ -81,5 +81,5 @@ SConscript(flag + '/sconscript', exports=['flag'])
 flag = 'shazam_vs_samm'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'quick_35'
+flag = 'run_samm'
 SConscript(flag + '/sconscript', exports=['flag'])

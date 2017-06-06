@@ -64,7 +64,6 @@ def process_data(env, outdir, c):
 # Loci
 # ! no heavy chain in cui data
 nest.add(
-<<<<<<< HEAD
     'locus',
     [
         'igk',

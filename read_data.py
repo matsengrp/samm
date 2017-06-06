@@ -82,7 +82,7 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
     return motifs_to_remove, pos_to_remove, target_pairs_to_remove
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=True, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=False, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -109,7 +109,10 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
             current_info['annotations_file'] = annotations
             current_info['locus'] = line['locus']
             current_info['species'] = line['species']
-            current_info['group'] = line['group']
+            if 'group' not in line.keys():
+                current_info['group'] = None
+            else:
+                current_info['group'] = line['group']
             if use_immunized and current_info['group'] != 'immunized':
                 continue
             current_info['subject'] = line['subject']

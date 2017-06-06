@@ -66,7 +66,6 @@ nest.add(
     'locus',
     [
         'igk',
-        #'igl'
     ])
 
 nest.add('validation_mouse_idx', range(4))
@@ -81,14 +80,6 @@ nest.add(
     'seed',
     lambda c: [c['replicate']],
     create_dir=False)
-
-# Targets
-nest.add(
-    'model_options',
-    [
-        'survival',
-        'shazam'
-    ])
 
 motif_params_dict = [
     {'motif_length': '5', 'left_motif_flanks': '2'},
@@ -113,68 +104,78 @@ nest.add(
         'subject',
     ])
 
-# Nest for deciding parameter ranges
+# fit survival
 @nest.add_target_with_env(localenv)
-def tune_parameters(env, outdir, c):
+def fit_survival(env, outdir, c):
     cmd = []
     motif_len = c['motif_params']['motif_length']
     left_flanks = c['motif_params']['left_motif_flanks']
-    if c["model_options"].startswith("survival"):
-        penalty_params = ",".join(map(str, np.power(10, np.arange(-2.5, -5.0, step=-0.5)).tolist()))
+    #penalty_params = ",".join(map(str, np.power(10, np.arange(-3.0, -5.0, step=-0.5)).tolist()))
+    penalty_params = .0001
 
-        cmd = ['python fit_context_model.py',
-               '--input-genes ${SOURCES[0]}',
-               '--input-seqs ${SOURCES[1]}',
-               '--locus',
-               c['locus'],
-               '--species',
-               'mouse',
-               '--seed',
-               c['seed'],
-               '--motif-lens',
-               motif_len,
-               '--positions-mutating',
-               left_flanks,
-               '--penalty-params',
-               penalty_params,
-               '--num-cpu-threads',
-               4,
-               '--num-jobs',
-               20,
-               '--burn-in',
-               2,
-               '--num-e-samples',
-               4,
-               '--em-max-iters',
-               10,
-               '--num-val-burnin',
-               2,
-               '--num-val-samples',
-               4,
-               '--val-mouse-idx',
-               c['validation_mouse_idx'],
-               '--scratch-directory',
-               SCRATCH_DIR,
-               '--tuning-sample-ratio',
-               0.1,
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
-        if c['validation_methods'] is not 'none':
-            cmd += [
-               '--validation-column',
-               c['validation_methods']]
-        if c['sample_or_impute'] == 'sample':
-            cmd += ['--sample-regime', 2]
-        if c["per_target"]:
-            cmd += ['--per-target-model']
-    elif c["model_options"] == "shazam" and motif_len == '5' and left_flanks == '2' and not c['per_target']:
-        cmd = ['python fit_shmulate_model.py',
-               '--input-file ${SOURCES[0]}',
-               '--input-genes ${SOURCES[1]}',
-               '--model-pkl ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
+    cmd = ['python fit_context_model.py',
+           '--input-genes ${SOURCES[0]}',
+           '--input-seqs ${SOURCES[1]}',
+           '--locus',
+           c['locus'],
+           '--species',
+           'mouse',
+           '--seed',
+           c['seed'],
+           '--motif-lens',
+           motif_len,
+           '--positions-mutating',
+           left_flanks,
+           '--penalty-params',
+           penalty_params,
+           '--num-cpu-threads',
+           4,
+           '--num-jobs',
+           20,
+           '--burn-in',
+           2,
+           '--num-e-samples',
+           4,
+           '--em-max-iters',
+           10,
+           '--num-val-burnin',
+           2,
+           '--num-val-samples',
+           4,
+           '--val-mouse-idx',
+           c['validation_mouse_idx'],
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--tuning-sample-ratio',
+           0.1,
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    if c['validation_methods'] is not 'none':
+        cmd += [
+           '--validation-column',
+           c['validation_methods']]
+    if c['sample_or_impute'] == 'sample':
+        cmd += ['--sample-regime', 2]
+    if c["per_target"]:
+        cmd += ['--per-target-model']
     return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt'), join(outdir, 'fitted_train_seqs.csv'), join(outdir, 'fitted_train_genes.csv')],
         c['process_data'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def fit_shazam(env, outdir, c):
+
+    cmd = ['python fit_shmulate_model.py',
+           '--input-file',
+           '${SOURCES[2]}',
+           '--input-genes',
+           '${SOURCES[3]}',
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+
+    return env.Command(
+        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
+        c['fit_survival'],
         ' '.join(map(str, cmd)))
 
