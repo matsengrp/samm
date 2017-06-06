@@ -47,6 +47,12 @@ def parse_args():
     parser.add_argument('--output-seqs',
         type=str,
         help='output sequence info')
+    parser.add_argument('--use-np',
+        action='store_true')
+    parser.add_argument('--use-v',
+        action='store_true')
+    parser.add_argument('--use-immunized',
+        action='store_true')
 
     args = parser.parse_args()
 
@@ -62,7 +68,7 @@ def main(args=sys.argv[1:]):
         os.makedirs(scratch_dir)
 
     if args.read_from_partis:
-        write_partis_data_from_annotations(args.output_genes, args.output_seqs, args.data_path, args.metadata_path)
+        write_partis_data_from_annotations(args.output_genes, args.output_seqs, args.data_path, args.metadata_path, use_np=args.use_np, use_v=args.use_v, use_immunized=args.use_immunized)
         if args.impute_ancestors:
             write_data_after_imputing(args.output_genes, args.output_seqs, args.output_genes, args.output_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
     elif args.impute_ancestors:
