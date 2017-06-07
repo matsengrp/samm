@@ -166,7 +166,7 @@ def fit_context_model(env, outdir, c):
            '--scratch-directory',
            SCRATCH_DIR,
            '--tuning-sample-ratio',
-           0.1,
+           0.2,
            '--input-seqs ${SOURCES[0]}',
            '--input-genes ${SOURCES[1]}',
            '--out-file ${TARGETS[0]}',

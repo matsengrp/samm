@@ -249,26 +249,29 @@ def main(args=sys.argv[1:]):
     per_target = num_cols == NUM_NUCLEOTIDES + 1
 
     for stat in args.stats:
-        stat_func = _get_stat_func(stat)
+        try:
+            stat_func = _get_stat_func(stat)
 
-        samm_means = []
-        samm_se = []
-        for i in range(len(fitted_models)):
-            samm_statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], stat_func)
-            mean = np.mean(samm_statistics)
-            se = np.sqrt(np.var(samm_statistics))
-            samm_means.append(mean)
-            samm_se.append(se)
-            print "MEAN", stat, samm_means[-1], "(%f)" % samm_se[-1]
+            samm_means = []
+            samm_se = []
+            for i in range(len(fitted_models)):
+                samm_statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], stat_func)
+                mean = np.mean(samm_statistics)
+                se = np.sqrt(np.var(samm_statistics))
+                samm_means.append(mean)
+                samm_se.append(se)
+                print "MEAN", stat, samm_means[-1], "(%f)" % samm_se[-1]
 
-        plt.clf()
-        plt.errorbar(args.x_labels, samm_means, samm_se, linestyle='None', marker=".")
-        plt.ylabel(stat)
-        plt.xlabel(args.x_lab)
-        plt.title(args.title)
-        out_fig_name = "%s/%s_%s_%s.pdf" % (args.outdir, args.title.replace(" " , "_"), stat, args.x_lab)
-        print "out_fig_name", out_fig_name
-        plt.savefig(out_fig_name)
+            plt.clf()
+            plt.errorbar(args.x_labels, samm_means, samm_se, linestyle='None', marker=".")
+            plt.ylabel(stat)
+            plt.xlabel(args.x_lab)
+            plt.title(args.title)
+            out_fig_name = "%s/%s_%s_%s.pdf" % (args.outdir, args.title.replace(" " , "_"), stat, args.x_lab)
+            print "out_fig_name", out_fig_name
+            plt.savefig(out_fig_name)
+        except ValueError as v_err:
+            print("ERROR in Stat %s: %s" % (stat, v_err))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
