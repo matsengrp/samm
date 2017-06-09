@@ -136,7 +136,7 @@ def get_randint():
     """
     @return a random integer from a large range
     """
-    return np.random.randint(low=0, high=2**32 - 1)
+    return np.random.randint(low=0, high=2**31)
 
 def is_zero(num):
     return np.abs(num) < ZERO_THRES
