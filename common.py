@@ -615,6 +615,9 @@ def pick_best_model(fitted_models):
     Select the one with largest (pseudo) log lik ratio
     """
     good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
+    if len(good_models) == 0:
+        return None
+
     for max_idx in reversed(range(len(good_models))):
         if good_models[max_idx].log_lik_ratio_lower_bound > 0:
             break
