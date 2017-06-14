@@ -211,7 +211,6 @@ def main(args=sys.argv[1:]):
 
     theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
     avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
-    print "avg_sampled_magnitude", avg_sampled_magnitude
     theta_raw, theta_mask = _generate_true_parameters(
         hier_feat_generator,
         args,
@@ -220,12 +219,10 @@ def main(args=sys.argv[1:]):
     )
 
     agg_theta_raw = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta_raw, np.zeros(theta_raw.shape, dtype=bool), theta_mask, keep_col0=False)
-    print "agg_theta_raw", np.linalg.norm(agg_theta_raw[agg_theta_raw != -np.inf])
 
     # Now rescale theta according to effect size
     mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude
     agg_theta = agg_theta_raw * mult_factor
-    print "agg theta", np.linalg.norm(agg_theta[agg_theta != -np.inf])
     sparse_hier_theta = SparseModelMaker.solve(agg_theta, hier_feat_generator, agg_feat_generator, raw_theta=theta_raw * mult_factor)
 
     dump_parameters(agg_theta, sparse_hier_theta, args, hier_feat_generator)
