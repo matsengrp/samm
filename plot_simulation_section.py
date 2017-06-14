@@ -31,6 +31,9 @@ def parse_args():
     parser.add_argument('--true-models',
         type=str,
         help='true model pickle file, colon separated')
+    parser.add_argument('--model-types',
+        type=str,
+        help='model name, colon separated')
     parser.add_argument('--agg-motif-len',
         type=int,
         default=3)
@@ -39,7 +42,7 @@ def parse_args():
         default=1)
     parser.add_argument('--stats',
         type=str,
-        default="norm,coverage,pearson",
+        default="norm,coverage,coverage_pos,coverage_neg,coverage_zero",
         # choices=("norm", "raw_norm", "coverage", "raw_coverage", "raw_pearson", "pearson", "support"),
     )
     parser.add_argument('--outdir',
@@ -57,6 +60,7 @@ def parse_args():
     args.x_labels = args.x_labels.split(":")
     args.x_labels = [int(l) for l in args.x_labels]
     args.true_models = args.true_models.split(":")
+    args.model_types = args.model_types.split(":")
     args.stats = args.stats.split(",")
     return args
 
@@ -64,6 +68,10 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
         best_model = pick_best_model(fitted_models)
+
+    if best_model is None:
+        print "FAIL", file_name
+        return None
 
     hier_feat_gen = HierarchicalMotifFeatureGenerator(
         motif_lens=best_model.motif_lens,
@@ -82,7 +90,6 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         best_model.refit_possible_theta_mask,
         keep_col0=keep_col0,
     )
-
     return best_model
 
 def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, stat_func):
@@ -96,7 +103,15 @@ def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, sta
         mask_shape=agg_true_theta.shape,
         mutating_pos_list=[args.agg_pos_mutating] * dense_agg_feat_gen.feature_vec_len,
     )
-    statistics = [stat_func(fmodel, dense_agg_feat_gen, raw_true_theta, agg_true_theta, possible_agg_mask) for fmodel in fitted_models if fmodel is not None]
+    statistics = []
+    for fmodel in fitted_models:
+        if fmodel is not None:
+            try:
+                s = stat_func(fmodel, dense_agg_feat_gen, raw_true_theta, agg_true_theta, possible_agg_mask)
+                if s is not None:
+                    statistics.append(s)
+            except ValueError as e:
+                print(e)
     return statistics
 
 def _get_support(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
@@ -132,9 +147,21 @@ def _get_agg_norm_diff(fmodel, full_feat_generator, raw_true_theta, agg_true_the
     possible_agg_true_theta = agg_true_theta[possible_agg_mask] - np.median(agg_true_theta[possible_agg_mask])
     possible_agg_refit_theta = fmodel.agg_refit_theta[possible_agg_mask] - np.median(fmodel.agg_refit_theta[possible_agg_mask])
 
-    return np.linalg.norm(possible_agg_refit_theta - possible_agg_true_theta)/np.sqrt(tot_elems)
+    return np.linalg.norm(possible_agg_refit_theta - possible_agg_true_theta)/np.linalg.norm(possible_agg_true_theta)
 
-def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+def _get_agg_coverage_all(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask)
+def _get_agg_coverage_negative(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+    compare_func = lambda x: x < 0
+    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func)
+def _get_agg_coverage_positive(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+    compare_func = lambda x: x > 0 #np.percentile(x, 75)
+    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func)
+
+def _get_agg_coverage_zero(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+    compare_func = lambda x: x == 0
+    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func)
+def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func=None):
     hier_feat_gen = HierarchicalMotifFeatureGenerator(
         motif_lens=fmodel.motif_lens,
         feats_to_remove=fmodel.model_masks.feats_to_remove,
@@ -161,23 +188,29 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
     all_theta = np.vstack([t[0] for t in agg_fitted_thetas])
     med_theta = np.median(all_theta[all_theta != -np.inf])
 
+    agg_true_theta -= np.median(agg_true_theta[agg_true_theta != -np.inf])
     for col_idx, (agg_fitted_theta, agg_fitted_lower, agg_fitted_upper) in enumerate(agg_fitted_thetas):
         agg_fitted_lower -= med_theta
         agg_fitted_upper -= med_theta
+        agg_true_theta_col = agg_true_theta[:,col_idx]
         comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
+        if compare_func is not None:
+            comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
+            comparison_mask &= compare_func(agg_true_theta_col)
 
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
-        agg_true_theta_col = agg_true_theta[:,col_idx] - np.median(agg_true_theta[agg_true_theta != -np.inf])
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
-        #print np.hstack([agg_fitted_lower_small.reshape((agg_fitted_lower_small.size, 1)),
+        #print np.hstack([
+        #    agg_fitted_lower_small.reshape((agg_fitted_lower_small.size, 1)),
+        #    agg_true_theta_small.reshape((agg_true_theta_small.size, 1)),
         #    agg_fitted_upper_small.reshape((agg_fitted_upper_small.size, 1))])
         num_covered = np.sum((agg_fitted_lower_small - 1e-5 <= agg_true_theta_small) & (agg_fitted_upper_small + 1e-5 >= agg_true_theta_small))
         tot_covered += num_covered
         num_considered = np.sum(comparison_mask)
         tot_considered += num_considered
 
-    return tot_covered/float(tot_considered)
+    return tot_covered/float(tot_considered) if tot_considered > 0 else None
 
 def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
     conf_int = ConfidenceIntervalMaker.create_confidence_intervals(
@@ -220,7 +253,10 @@ def _get_stat_func(stat):
         "norm": _get_agg_norm_diff,
         "raw_norm": _get_raw_norm_diff,
         "raw_coverage": _get_raw_coverage,
-        "coverage": _get_agg_coverage,
+        "coverage": _get_agg_coverage_all,
+        "coverage_pos": _get_agg_coverage_positive,
+        "coverage_neg": _get_agg_coverage_negative,
+        "coverage_zero": _get_agg_coverage_zero,
         "raw_pearson": _get_raw_pearson,
         "pearson": _get_agg_pearson,
     }
@@ -229,46 +265,69 @@ def _get_stat_func(stat):
 def main(args=sys.argv[1:]):
     args = parse_args()
 
-    fitted_models = [
-        [load_fitted_model(file_name, args.agg_motif_len, args.agg_pos_mutating) for file_name in fnames]
-        for fnames in args.fitted_models
-    ]
-    example_model = fitted_models[0][0]
+    fitted_models = {mtype : [] for mtype in set(args.model_types)}
+    for fnames, model_type in zip(args.fitted_models, args.model_types):
+        fitted_models[model_type].append(
+            [load_fitted_model(file_name, args.agg_motif_len, args.agg_pos_mutating) for file_name in fnames]
+        )
+    example_model = fitted_models[args.model_types[0]][0]
 
-    true_thetas = [
-        _load_true_model(
-            tmodel,
+    model_dict = {mtype : [] for mtype in set(args.model_types)}
+    for model_type, tmodel_file in zip(args.model_types, args.true_models):
+        example_model = fitted_models[model_type][0][0]
+        true_model = _load_true_model(
+            tmodel_file,
             args.agg_motif_len,
             args.agg_pos_mutating,
             example_model.motif_lens,
             example_model.positions_mutating,
-        ) for tmodel in args.true_models
-    ]
+        )
+        model_dict[model_type].append(true_model)
 
-    num_cols = fitted_models[0][0].refit_theta.shape[1]
-    per_target = num_cols == NUM_NUCLEOTIDES + 1
-
+    STAT_LABEL = {
+        "coverage": "Coverage",
+        "coverage_pos": "Coverage of Positive Theta",
+        "coverage_neg": "Coverage of Negative Theta",
+        "coverage_zero": "Coverage of Zero Theta",
+        "pearson": "Pearson",
+        "norm": "Norm Diff/Norm Truth",
+    }
+    MODEL_LABEL = {
+        "3_targetTrue": "3-mer Per-target",
+        "3_targetFalse": "3-mer",
+        "2_3_targetFalse": "2,3-mer",
+    }
+    LINE_STYLES = ["solid", "dashed", "dotted"]
+    samm_means = {stat: {mtype : [] for mtype in set(args.model_types)} for stat in args.stats}
+    samm_se = {stat: {mtype : [] for mtype in set(args.model_types)} for stat in args.stats}
     for stat in args.stats:
         stat_func = _get_stat_func(stat)
 
-        samm_means = []
-        samm_se = []
-        for i in range(len(fitted_models)):
-            samm_statistics = _collect_statistics(fitted_models[i], args, true_thetas[i][1], true_thetas[i][0], stat_func)
-            mean = np.mean(samm_statistics)
-            se = np.sqrt(np.var(samm_statistics))
-            samm_means.append(mean)
-            samm_se.append(se)
-            print "MEAN", stat, samm_means[-1], "(%f)" % samm_se[-1]
+        for i, mtype in enumerate(set(args.model_types)):
+            for fmodels, true_model in zip(fitted_models[mtype], model_dict[mtype]):
+                samm_statistics = _collect_statistics(fmodels, args, true_model[1], true_model[0], stat_func)
+                mean = np.mean(samm_statistics)
+                se = 1.96 * np.sqrt(np.var(samm_statistics)/len(samm_statistics))
+                samm_means[stat][mtype].append(mean)
+                samm_se[stat][mtype].append(se)
+                print "MEAN", stat, mtype, mean, "(%f)" % se
+                if se > 0.1:
+                    print samm_statistics
 
-        plt.clf()
-        plt.errorbar(args.x_labels, samm_means, samm_se, linestyle='None', marker=".")
-        plt.ylabel(stat)
-        plt.xlabel(args.x_lab)
+    plt.clf()
+    f, axes = plt.subplots(len(args.stats), sharex=True, figsize=(5, 4 * len(args.stats)))
+    for i, (stat, ax) in enumerate(zip(args.stats, axes)):
+        for idx, mtype in enumerate(set(args.model_types)):
+            ax.errorbar(args.x_labels, samm_means[stat][mtype], samm_se[stat][mtype], linestyle=LINE_STYLES[idx], marker=".", label=MODEL_LABEL[mtype])
+        ax.set_ylabel(STAT_LABEL[stat])
+        if i == len(args.stats) - 1:
+            ax.set_xlabel(args.x_lab)
+            lgd = ax.legend(frameon=False, loc='center left', bbox_to_anchor=(1, 0.5))
+    if args.title:
         plt.title(args.title)
-        out_fig_name = "%s/%s_%s_%s.pdf" % (args.outdir, args.title.replace(" " , "_"), stat, args.x_lab)
-        print "out_fig_name", out_fig_name
-        plt.savefig(out_fig_name)
+    out_fig_name = "%s/%s_%s.pdf" % (args.outdir, "-".join(args.stats), args.x_lab.replace(" ", "_"))
+    print "out_fig_name", out_fig_name
+    plt.savefig(out_fig_name, bbox_extra_artists=(lgd,), bbox_inches='tight')
 
 if __name__ == "__main__":
     main(sys.argv[1:])
