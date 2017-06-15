@@ -83,15 +83,14 @@ class ContextModelAlgo:
 
         return ll_ratio_lower_bound, log_lik_ratio
 
-    def fit_penalized(self, penalty_param, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
+    def fit_penalized(self, penalty_params, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
         """
-        @param penalty_param: penalty parameter for fitting penalized model
+        @param penalty_params: penalty parameter for fitting penalized model
         @param val_set_evaluator: LikelihoodComparer with a given reference model
         @param reference_pen_param: the penalty parameters for the reference model
 
         @return the fitted model after the 2-step procedure
         """
-        penalty_params = (penalty_param, )
         if init_theta is None:
             init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
 
@@ -105,7 +104,7 @@ class ContextModelAlgo:
             penalty_params=penalty_params,
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
-            intermed_file_prefix="%s/e_samples_%f_" % (self.intermediate_out_dir, penalty_param),
+            intermed_file_prefix="%s/e_samples_%s_" % (self.intermediate_out_dir, "-".join([str(p) for p in penalty_params])),
         )
         curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating, self.z_stat)
 
@@ -122,7 +121,7 @@ class ContextModelAlgo:
             reference_penalty_param=reference_pen_param,
         )
 
-        log.info("==== Penalized theta, %f, nonzero %d ====" % (penalty_param, curr_model_results.penalized_num_nonzero))
+        log.info("==== Penalized theta, %s, nonzero %d ====" % (penalty_params, curr_model_results.penalized_num_nonzero))
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
@@ -162,7 +161,7 @@ class ContextModelAlgo:
             possible_theta_mask=possible_theta_mask_refit,
             zero_theta_mask=model_masks.zero_theta_mask_refit,
             burn_in=self.burn_in,
-            penalty_params=(0,), # now fit with no penalty
+            penalty_params=(0,0), # now fit with no penalty
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
             intermed_file_prefix="%s/e_samples_%f_full_" % (self.intermediate_out_dir, 0),
