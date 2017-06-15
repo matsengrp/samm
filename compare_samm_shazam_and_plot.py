@@ -46,6 +46,14 @@ def parse_args():
     parser.add_argument('--in-samm',
         type=str,
         help='comma separated samm csv files')
+    parser.add_argument('--in-samm-same-target',
+        type=str,
+        help='comma separated samm csv files',
+        default=None)
+    parser.add_argument('--log-file',
+        type=str,
+        help='log file',
+        default=None)
     parser.add_argument('--out-shazam',
         type=str,
         help='output csv for shazam theta',
@@ -194,7 +202,7 @@ def get_shazam_theta(motif_len, mutability_file, target_file=None):
                 theta[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = _read_shmulate_val(sub_motif_dict[motif][nuc])
 
     # median-center
-    theta[:, 0] -= np.median(theta[:, 0])
+    #theta[:, 0] -= np.median(theta[:, 0])
 
     return theta
 
@@ -212,8 +220,17 @@ def write_data_for_r_plots(motif_len, theta, out_file):
         writer.writerow(header)
         writer.writerows(data)
 
+def load_fitted_model_mod(file_name, agg_motif_len, agg_pos_mutating):
+    with open(file_name, "r") as f:
+        fitted_models = pickle.load(f)
+        best_model = fitted_models[-1]
+
+    return best_model.penalized_theta[64:, :]
+
 def main(args=sys.argv[1:]):
     args = parse_args()
+
+    log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
 
     if args.num_cpu_threads > 1:
         all_runs_pool = Pool(args.num_cpu_threads)
@@ -222,6 +239,9 @@ def main(args=sys.argv[1:]):
 
     shazam_theta_list = [get_shazam_theta(args.max_motif_len, shazam_mut_csv, shazam_sub_csv) for shazam_mut_csv, shazam_sub_csv in zip(args.shazam_mut_files, args.shazam_sub_files)]
     samm_theta_list = [load_fitted_model(samm_pkl, args.max_motif_len, args.max_position_mutating, args.keep_col0).agg_refit_theta for samm_pkl in args.in_samm.split(',')]
+
+    log.info(samm_theta_list)
+
     write_data_for_r_plots(
         args.max_motif_len,
         np.mean(shazam_theta_list, axis=0),
@@ -269,6 +289,25 @@ def main(args=sys.argv[1:]):
         log_lik_ratio_list.append(log_lik_ratio)
         log_lik_ratio_lb_list.append(log_lik_ratio_lower_bound)
         log_lik_ratio_ub_list.append(log_lik_ratio_upper_bound)
+        log.info((log_lik_ratio_list, log_lik_ratio_lb_list, log_lik_ratio_ub_list))
+
+        # Create val set evaluator using shazam as reference
+        val_set_evaluator2 = LikelihoodComparer(
+            val_set,
+            full_feat_generator,
+            theta_ref=samm_theta,
+            num_samples=args.num_val_samples,
+            burn_in=args.num_val_burnin,
+            num_jobs=args.num_jobs,
+            scratch_dir=args.scratch_dir,
+            pool=all_runs_pool,
+        )
+
+        log_lik_ratio, log_lik_ratio_lower_bound, log_lik_ratio_upper_bound = val_set_evaluator2.get_log_likelihood_ratio(shazam_theta)
+        log_lik_ratio_list.append(log_lik_ratio)
+        log_lik_ratio_lb_list.append(log_lik_ratio_lower_bound)
+        log_lik_ratio_ub_list.append(log_lik_ratio_upper_bound)
+        log.info((log_lik_ratio_list, log_lik_ratio_lb_list, log_lik_ratio_ub_list))
         
     with open(args.out_log_lik_file, 'w') as f:
         pickle.dump((log_lik_ratio_list, log_lik_ratio_lb_list, log_lik_ratio_ub_list), f)

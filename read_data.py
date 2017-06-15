@@ -15,7 +15,7 @@ import glutils
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
-from gctree.bin.gctree import phylip_parse
+#from gctree.bin.gctree import phylip_parse
 
 from common import *
 from models import ObservedSequenceMutations

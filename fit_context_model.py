@@ -100,8 +100,8 @@ def parse_args():
         default='')
     parser.add_argument("--penalty-params",
         type=str,
-        help="penalty parameters, comma separated",
-        default="0.5, 0.25")
+        help="penalty parameters, comma separated; if not included then include --best-model to refit parameters",
+        default='.1')
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help="""
@@ -126,6 +126,8 @@ def parse_args():
         help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
         default=None)
     parser.add_argument('--per-target-model',
+        action='store_true')
+    parser.add_argument('--refit-on-training',
         action='store_true')
     parser.add_argument("--locus",
         type=str,
@@ -196,6 +198,7 @@ def parse_args():
 
     assert(args.tuning_sample_ratio > 0)
 
+
     return args
 
 def write_sampled_data(input_shazam_seqs, input_shazam_genes, sampled_set):
@@ -263,13 +266,13 @@ def main(args=sys.argv[1:]):
             args.out_file.replace('.pkl', '_train_seqs.csv'),
             args.out_file.replace('.pkl', '_train_genes.csv'),
             train_set
-        )
+    )
 
     write_sampled_data(
             args.out_file.replace('.pkl', '_val_seqs.csv'),
             args.out_file.replace('.pkl', '_val_genes.csv'),
             val_set
-        )
+    )
 
     st_time = time.time()
     log.info("Data statistics:")
@@ -278,6 +281,10 @@ def main(args=sys.argv[1:]):
     log.info("Settings %s" % args)
 
     log.info("Running EM")
+    if args.refit_on_training:
+        # only use the training set in computing thetas
+        obs_data = train_set
+
     cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
@@ -350,12 +357,13 @@ def main(args=sys.argv[1:]):
         args.num_jobs,
         args.scratch_dir,
         pool=all_runs_pool,
-     )
+    )
 
     cmodel_algo.refit_unpenalized(
         model_result=all_results_list[best_pen0_idx][best_model_idxs[best_pen0_idx]],
         max_em_iters=args.em_max_iters,
     )
+
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
         pickle.dump(all_results_list, f)
