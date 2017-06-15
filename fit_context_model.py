@@ -21,7 +21,7 @@ import scipy.stats
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
-from likelihood_evaluator import LikelihoodComparer
+from likelihood_evaluator import LikelihoodComparer, GreedyLikelihoodComparer
 from method_results import MethodResults
 from common import *
 from read_data import *
@@ -247,61 +247,83 @@ def main(args=sys.argv[1:]):
 
     # Run EM on the lasso parameters from largest to smallest
     val_set_evaluator = None
-    penalty_param_prev = None
+    penalty_params_prev = None
     prev_pen_theta = None
     num_val_samples = args.num_val_samples
-    results_list = []
+    all_results_list = [
+        [] for i in args.penalty_params
+    ]
     num_nonzero_confint = 0
-    best_pen_idx = 0
+    best_model_idxs = [0 for i in args.penalty_params]
     for param_i, penalty_param in enumerate(args.penalty_params):
-        log.info("==== Penalty parameter %f ====" % penalty_param)
-        curr_model_results = cmodel_algo.fit_penalized(
-            penalty_param,
-            max_em_iters=args.em_max_iters,
-            val_set_evaluator=val_set_evaluator,
-            init_theta=prev_pen_theta,
-            reference_pen_param=penalty_param_prev
-        )
+        results_list = all_results_list[param_i]
+        target_penalty_params = penalty_param * np.power(10, np.arange(start=2.0, stop=-0.01, step=-0.25))
+        for target_param_i, target_penalty_param in enumerate(target_penalty_params):
+            log.info("==== Penalty parameters %f, %f ====" % (penalty_param, target_penalty_param))
+            penalty_params = (penalty_param, target_penalty_param)
+            curr_model_results = cmodel_algo.fit_penalized(
+                penalty_params,
+                max_em_iters=args.em_max_iters,
+                val_set_evaluator=val_set_evaluator,
+                init_theta=prev_pen_theta,
+                reference_pen_param=penalty_params_prev
+            )
+            print penalty_params
+            print "    ", np.sum(curr_model_results.penalized_theta == 0)
 
-        # Create this val set evaluator for next time
-        val_set_evaluator = LikelihoodComparer(
-            val_set,
-            feat_generator,
-            theta_ref=curr_model_results.penalized_theta,
-            num_samples=num_val_samples,
-            burn_in=args.num_val_burnin,
-            num_jobs=args.num_jobs,
-            scratch_dir=args.scratch_dir,
-            pool=all_runs_pool,
-        )
-        # grab this many validation samples from now on
-        num_val_samples = val_set_evaluator.num_samples
+            # Create this val set evaluator for next time
+            val_set_evaluator = LikelihoodComparer(
+                val_set,
+                feat_generator,
+                theta_ref=curr_model_results.penalized_theta,
+                num_samples=num_val_samples,
+                burn_in=args.num_val_burnin,
+                num_jobs=args.num_jobs,
+                scratch_dir=args.scratch_dir,
+                pool=all_runs_pool,
+            )
+            # grab this many validation samples from now on
+            num_val_samples = val_set_evaluator.num_samples
 
-        # Save model results
-        results_list.append(curr_model_results)
-        with open(args.out_file, "w") as f:
-            pickle.dump(results_list, f)
+            # Save model results
+            results_list.append(curr_model_results)
+            with open(args.out_file, "w") as f:
+                pickle.dump(all_results_list, f)
 
-        ll_ratio = curr_model_results.log_lik_ratio
-        if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < 0:
-            # Make sure that the penalty isnt so big that theta is empty
-            # This model is not better than the previous model. Stop trying penalty parameters.
-            # Time to refit the model
-            log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
-            break
-        else:
-            best_pen_idx = param_i
+            ll_ratio = curr_model_results.log_lik_ratio
+            if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < 0:
+                # Make sure that the penalty isnt so big that theta is empty
+                # This model is not better than the previous model. Stop trying penalty parameters.
+                # Time to refit the model
+                log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
+                # break
+            else:
+                best_model_idxs[param_i] = target_param_i
 
-        penalty_param_prev = penalty_param
-        prev_pen_theta = curr_model_results.penalized_theta
+            penalty_params_prev = penalty_params
+            prev_pen_theta = curr_model_results.penalized_theta
+
+    best_model, best_pen0_idx = GreedyLikelihoodComparer.do_greedy_search(
+        val_set,
+        feat_generator,
+        [
+            all_results_list[i][best_model_idxs[i]] for i in range(len(args.penalty_params))
+        ],
+        lambda m:get_num_unique_theta(m.penalized_theta),
+        args.num_val_burnin,
+        args.num_val_samples,
+        args.num_jobs,
+        args.scratch_dir,
+        pool=all_runs_pool,
+     )
 
     cmodel_algo.refit_unpenalized(
-        model_result=results_list[best_pen_idx],
+        model_result=all_results_list[best_pen0_idx][best_model_idxs[best_pen0_idx]],
         max_em_iters=args.em_max_iters,
     )
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
-        pickle.dump(results_list, f)
+        pickle.dump(all_results_list, f)
 
     if all_runs_pool is not None:
         all_runs_pool.close()
