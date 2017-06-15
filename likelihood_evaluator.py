@@ -25,7 +25,7 @@ class GreedyLikelihoodComparer:
         """
         sorted_models = sorted(models, key=sort_func)
         best_model = sorted_models[0]
-
+        best_model_idx = 0
         val_set_evaluator = LikelihoodComparer(
             val_set,
             feat_generator,
@@ -36,11 +36,12 @@ class GreedyLikelihoodComparer:
             scratch_dir=scratch_dir,
             pool=pool,
         )
-        for model in sorted_models[1:]:
-            log_lik_ratio = val_set_evaluator.get_log_likelihood_ratio(model.penalized_theta)
-            log.info("  Greedy search: ratio %f, model %s" % (log_lik_ratio, model))
-            if log_lik_ratio > 0:
+        for model_idx, model in enumerate(sorted_models[1:]):
+            log_lik_ratio, lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(model.penalized_theta)
+            log.info("  Greedy search: ratio %f (%f, %f), model %s" % (log_lik_ratio, lower_bound, upper_bound, model))
+            if log_lik_ratio >= 0:
                 best_model = model
+                best_model_idx = model_idx + 1
                 val_set_evaluator = LikelihoodComparer(
                     val_set,
                     feat_generator,
@@ -51,7 +52,9 @@ class GreedyLikelihoodComparer:
                     scratch_dir=scratch_dir,
                     pool=pool,
                 )
-        return best_model
+            else:
+                break
+        return best_model, best_model_idx
 
 class LikelihoodComparer:
     """
