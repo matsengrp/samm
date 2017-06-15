@@ -5,6 +5,7 @@ from common import NUCLEOTIDES, NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from read_data import get_sequence_mutations_from_tree
 from likelihood_evaluator import LogLikelihoodEvaluator
+from fit_shmulate_model import _read_shmulate_val
 
 def likelihood_of_tree(tree, mutability_file, target_file=None, feat_generator=None, num_jobs=1, scratch_dir='_output'):
     """
@@ -73,8 +74,4 @@ def shazam_to_theta(feat_generator, mutability_file, target_file=None):
                 theta[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = _read_shmulate_val(target_motif_dict[motif][nuc])
 
     return theta
-
-def _read_shmulate_val(shmulate_value):
-    """ return the log so we can be sure we're comparing the same things!"""
-    return -np.inf if (shmulate_value == "NA" or shmulate_value == "0") else np.log(float(shmulate_value))
 
