@@ -100,7 +100,7 @@ def parse_args():
         default='')
     parser.add_argument("--penalty-params",
         type=str,
-        help="penalty parameters, comma separated; if not included then include --best-model to refit parameters",
+        help="penalty parameters, comma separated",
         default='.1')
     parser.add_argument('--tuning-sample-ratio',
         type=float,
@@ -192,12 +192,10 @@ def parse_args():
     if not os.path.exists(args.scratch_dir):
         os.makedirs(args.scratch_dir)
 
-    # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
 
     assert(args.tuning_sample_ratio > 0)
-
 
     return args
 
