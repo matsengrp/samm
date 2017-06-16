@@ -118,7 +118,7 @@ def fit_survival(env, outdir, c):
     left_flanks = c['motif_params']['left_motif_flanks']
     if c['per_target']:
         if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -4.0, step=-.5)).tolist()))
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -5.0, step=-.5)).tolist()))
         elif c['motif_params']['motif_length'] == '3':
             penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -4.0, step=-.5)).tolist()))
         elif c['motif_params']['motif_length'] == '3,5':
