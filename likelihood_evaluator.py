@@ -42,7 +42,7 @@ class GreedyLikelihoodComparer:
             if log_lik_ratio >= 0:
                 best_model = model
                 best_model_idx = model_idx + 1
-                if model_idx != len(sorted_models) - 1:
+                if model_idx != len(sorted_models) - 2:
                     val_set_evaluator = LikelihoodComparer(
                         val_set,
                         feat_generator,
