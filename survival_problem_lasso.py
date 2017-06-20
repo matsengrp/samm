@@ -13,9 +13,6 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
     """
     min_diff_thres = 1e-8
 
-    def post_init(self):
-        self.penalty_params = self.penalty_params
-
     def solve_prox(self, theta, step_size):
         """
         Do proximal gradient step
