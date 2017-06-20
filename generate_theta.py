@@ -223,9 +223,9 @@ def main(args=sys.argv[1:]):
     # Now rescale theta according to effect size
     mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude
     agg_theta = agg_theta_raw * mult_factor
-    sparse_hier_theta = SparseModelMaker.solve(agg_theta, hier_feat_generator, agg_feat_generator, raw_theta=theta_raw * mult_factor)
+    theta_raw = theta_raw * mult_factor
 
-    dump_parameters(agg_theta, sparse_hier_theta, args, hier_feat_generator)
+    dump_parameters(agg_theta, theta_raw, args, hier_feat_generator)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

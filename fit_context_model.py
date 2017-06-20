@@ -246,9 +246,6 @@ def main(args=sys.argv[1:]):
     cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
-    val_set_evaluator = None
-    penalty_params_prev = None
-    prev_pen_theta = None
     num_val_samples = args.num_val_samples
     all_results_list = [
         [] for i in args.penalty_params
@@ -257,7 +254,10 @@ def main(args=sys.argv[1:]):
     best_model_idxs = [0 for i in args.penalty_params]
     for param_i, penalty_param in enumerate(args.penalty_params):
         results_list = all_results_list[param_i]
-        target_penalty_params = penalty_param * np.power(10, np.arange(start=2.0, stop=-0.01, step=-0.25))
+        val_set_evaluator = None
+        penalty_params_prev = None
+        prev_pen_theta = None
+        target_penalty_params = penalty_param * np.power(10, np.arange(start=4, stop=-0.1, step=-1))
         for target_param_i, target_penalty_param in enumerate(target_penalty_params):
             log.info("==== Penalty parameters %f, %f ====" % (penalty_param, target_penalty_param))
             penalty_params = (penalty_param, target_penalty_param)
@@ -268,8 +268,6 @@ def main(args=sys.argv[1:]):
                 init_theta=prev_pen_theta,
                 reference_pen_param=penalty_params_prev
             )
-            print penalty_params
-            print "    ", np.sum(curr_model_results.penalized_theta == 0)
 
             # Create this val set evaluator for next time
             val_set_evaluator = LikelihoodComparer(
@@ -291,12 +289,12 @@ def main(args=sys.argv[1:]):
                 pickle.dump(all_results_list, f)
 
             ll_ratio = curr_model_results.log_lik_ratio
-            if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < 0:
+            if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < -ZERO_THRES:
                 # Make sure that the penalty isnt so big that theta is empty
                 # This model is not better than the previous model. Stop trying penalty parameters.
                 # Time to refit the model
                 log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
-                # break
+                break
             else:
                 best_model_idxs[param_i] = target_param_i
 
@@ -315,7 +313,7 @@ def main(args=sys.argv[1:]):
         args.num_jobs,
         args.scratch_dir,
         pool=all_runs_pool,
-     )
+    )
 
     cmodel_algo.refit_unpenalized(
         model_result=all_results_list[best_pen0_idx][best_model_idxs[best_pen0_idx]],
