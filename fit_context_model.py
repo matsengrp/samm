@@ -305,9 +305,9 @@ def main(args=sys.argv[1:]):
         val_set,
         feat_generator,
         [
-            all_results_list[i][best_model_idxs[i]] for i in range(len(args.penalty_params))
+            result_list[best_model_idxs[i]] for i, result_list in enumerate(all_results_list)
         ],
-        lambda m:get_num_unique_theta(m.penalized_theta),
+        lambda m:m.penalized_num_nonzero,
         args.num_val_burnin,
         args.num_val_samples,
         args.num_jobs,
