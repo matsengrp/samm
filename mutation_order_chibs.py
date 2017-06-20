@@ -35,7 +35,7 @@ class MutationOrderChibsSampler(Sampler):
     Each of these log probability terms is estimated using the empirical distribution of a (conditional) gibbs sampler.
     Note that the last term can be calculated analytically.
     """
-    def run(self, init_order, burn_in, num_samples, num_tries=5):
+    def run(self, init_order, burn_in, num_samples, get_full_sweep=False, num_tries=5):
         """
         Perform Chibs method to calculate the marginal likelihood of observing a particular ending sequence
         given the starting sequence
@@ -52,7 +52,7 @@ class MutationOrderChibsSampler(Sampler):
                 init_order,
                 burn_in,
                 num_samples,
-                get_full_sweep=True,
+                get_full_sweep=get_full_sweep,
             )
 
             # Choose reference order to be the most commonly seen mutation order
@@ -67,7 +67,7 @@ class MutationOrderChibsSampler(Sampler):
             if log_prob_order_terms is None:
                 num_samples *= 10
                 log.info("Chibs: not enough samples to estimate validation log likelihood -- trying again with %d samples" % num_samples)
-                break
+                continue
 
             # Get log probability of reference order (not conditional on ending sequence)
             log_prob_ref_order = gibbs_sampler.get_log_probs(reference_order)

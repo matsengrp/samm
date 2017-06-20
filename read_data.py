@@ -82,7 +82,7 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
     return motifs_to_remove, pos_to_remove, target_pairs_to_remove
 
 # TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=True, use_np=True, use_immunized=True, motif_len=1):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False, motif_len=1):
     """
     Function to read partis annotations csv
 
@@ -109,7 +109,10 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
             current_info['annotations_file'] = annotations
             current_info['locus'] = line['locus']
             current_info['species'] = line['species']
-            current_info['group'] = line['group']
+            if 'group' not in line.keys():
+                current_info['group'] = None
+            else:
+                current_info['group'] = line['group']
             if use_immunized and current_info['group'] != 'immunized':
                 continue
             current_info['subject'] = line['subject']
@@ -334,6 +337,37 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer = csv.DictWriter(seqs_file, list(seqs.columns.values))
         seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
+
+def get_sequence_mutations_from_tree(tree, motif_len=5, left_flank_len=None, right_flank_len=None):
+    """
+    Given an ETE tree, return a list of observed sequence mutations
+    """
+    if left_flank_len is None or right_flank_len is None:
+        left_flank_len = motif_len/2
+        right_flank_len = motif_len/2
+
+    obs_data = []
+    for _, descendant in enumerate(tree.traverse('preorder')):
+        if not descendant.is_root():
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(
+                descendant.up.sequence.lower(),
+                descendant.sequence.lower(),
+                motif_len
+            )
+
+            obs_seq_mutation = ObservedSequenceMutations(
+                    start_seq=start_seq,
+                    end_seq=end_seq,
+                    motif_len=motif_len,
+                    left_flank_len=left_flank_len,
+                    right_flank_len=right_flank_len,
+            )
+
+            if obs_seq_mutation.num_mutations > 0:
+                # don't consider pairs where mutations occur in flanking regions
+                obs_data.append(obs_seq_mutation)
+
+    return obs_data
 
 def read_gene_seq_csv_data(
         gene_file_name,
