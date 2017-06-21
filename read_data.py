@@ -338,6 +338,37 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
         seq_writer.writeheader()
         seq_writer.writerows(out_seqs)
 
+def get_sequence_mutations_from_tree(tree, motif_len=5, left_flank_len=None, right_flank_len=None):
+    """
+    Given an ETE tree, return a list of observed sequence mutations
+    """
+    if left_flank_len is None or right_flank_len is None:
+        left_flank_len = motif_len/2
+        right_flank_len = motif_len/2
+
+    obs_data = []
+    for _, descendant in enumerate(tree.traverse('preorder')):
+        if not descendant.is_root():
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(
+                descendant.up.sequence.lower(),
+                descendant.sequence.lower(),
+                motif_len
+            )
+
+            obs_seq_mutation = ObservedSequenceMutations(
+                    start_seq=start_seq,
+                    end_seq=end_seq,
+                    motif_len=motif_len,
+                    left_flank_len=left_flank_len,
+                    right_flank_len=right_flank_len,
+            )
+
+            if obs_seq_mutation.num_mutations > 0:
+                # don't consider pairs where mutations occur in flanking regions
+                obs_data.append(obs_seq_mutation)
+
+    return obs_data
+
 def read_gene_seq_csv_data(
         gene_file_name,
         seq_file_name,

@@ -13,26 +13,6 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
     """
     min_diff_thres = 1e-8
 
-    def post_init(self):
-        self.penalty_params = self.penalty_params
-
-    def get_value(self, theta):
-        """
-        @return negative penalized log likelihood
-        """
-        neg_log_lik = -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta))
-        if self.penalty_params[1] == 0:
-            l1_norm = np.linalg.norm(theta[self.possible_theta_mask,], ord=1) if self.possible_theta_mask is not None else 0
-            return neg_log_lik + self.penalty_params[0] * l1_norm
-        elif self.possible_theta_mask is not None:
-            col0_mask = self.possible_theta_mask[:,1]
-            l1_col0_norm = np.linalg.norm(theta[col0_mask,1], ord=1)
-            l1_norm_target = 0
-            if self.possible_theta_mask.shape[2] > 1:
-                target_mask = self.possible_theta_mask[:,1:]
-                l1_norm_target = np.linalg.norm(theta[col_target_mask,1:], ord=1)
-            return neg_log_lik + self.penalty_params[0] * l1_col0_norm + self.penalty_params[1] * l1_norm_target
-
     def solve_prox(self, theta, step_size):
         """
         Do proximal gradient step
@@ -47,17 +27,20 @@ class SurvivalProblemLasso(SurvivalProblemProximal):
         @return tuple: negative penalized log likelihood and array of log likelihoods
         """
         log_lik_vec = self._get_log_lik_parallel(theta)
-        neg_log_lik = -1.0/self.num_samples * np.sum(self._get_log_lik_parallel(theta))
-        if self.penalty_params[1] == 0:
-            l1_norm = np.linalg.norm(theta[self.possible_theta_mask,], ord=1) if self.possible_theta_mask is not None else 0
-            return neg_log_lik + self.penalty_params[0] * l1_norm, log_lik_vec
-        elif self.possible_theta_mask is not None:
-            col0_mask = self.possible_theta_mask[:,0:1]
-            theta_col0 = theta[:,0:1]
-            l1_col0_norm = np.linalg.norm(theta_col0[col0_mask], ord=1)
-            l1_norm_target = 0
-            if self.possible_theta_mask.shape[1] > 1:
-                target_mask = self.possible_theta_mask[:,1:]
-                theta_target = theta[:,1:]
-                l1_norm_target = np.linalg.norm(theta_target[target_mask], ord=1)
-            return neg_log_lik + self.penalty_params[0] * l1_col0_norm + self.penalty_params[1] * l1_norm_target, log_lik_vec
+        neg_log_lik = -1.0/self.num_samples * log_lik_vec.sum()
+        if self.possible_theta_mask is None:
+            return neg_log_lik, log_lik_vec
+        else:
+            if self.penalty_params[1] == 0:
+                l1_norm = np.linalg.norm(theta[self.possible_theta_mask], ord=1)
+                return neg_log_lik + self.penalty_params[0] * l1_norm, log_lik_vec
+            else:
+                col0_mask = self.possible_theta_mask[:,0:1]
+                theta_col0 = theta[:,0:1]
+                l1_col0_norm = np.linalg.norm(theta_col0[col0_mask], ord=1)
+                l1_norm_target = 0
+                if self.per_target_model:
+                    target_mask = self.possible_theta_mask[:,1:]
+                    theta_target = theta[:,1:]
+                    l1_norm_target = np.linalg.norm(theta_target[target_mask], ord=1)
+                return neg_log_lik + self.penalty_params[0] * l1_col0_norm + self.penalty_params[1] * l1_norm_target, log_lik_vec

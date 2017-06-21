@@ -42,16 +42,17 @@ class GreedyLikelihoodComparer:
             if log_lik_ratio >= 0:
                 best_model = model
                 best_model_idx = model_idx + 1
-                val_set_evaluator = LikelihoodComparer(
-                    val_set,
-                    feat_generator,
-                    theta_ref=best_model.penalized_theta,
-                    num_samples=num_samples,
-                    burn_in=burn_in,
-                    num_jobs=num_jobs,
-                    scratch_dir=scratch_dir,
-                    pool=pool,
-                )
+                if model_idx != len(sorted_models) - 2:
+                    val_set_evaluator = LikelihoodComparer(
+                        val_set,
+                        feat_generator,
+                        theta_ref=best_model.penalized_theta,
+                        num_samples=num_samples,
+                        burn_in=burn_in,
+                        num_jobs=num_jobs,
+                        scratch_dir=scratch_dir,
+                        pool=pool,
+                    )
             else:
                 break
         return best_model, best_model_idx

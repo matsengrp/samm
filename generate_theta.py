@@ -16,6 +16,7 @@ import random
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from make_model_sparse import SparseModelMaker
 from common import *
 from read_data import GERMLINE_PARAM_FILE
 
@@ -125,7 +126,7 @@ def _make_theta_sampling_distribution(args):
         prob_row = shmulate_theta[row_idx, 1:]
         prob_theta.append(prob_row[prob_row != 0])
     prob_theta = np.log(np.array(prob_theta))
-    return args.effect_size * shmulate_theta_col0, prob_theta
+    return shmulate_theta_col0, prob_theta
 
 def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, theta_sampling_col_prob):
     """
@@ -209,16 +210,22 @@ def main(args=sys.argv[1:]):
     )
 
     theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
-
-    theta, theta_mask = _generate_true_parameters(
+    avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
+    theta_raw, theta_mask = _generate_true_parameters(
         hier_feat_generator,
         args,
         theta_sampling_col0,
         theta_sampling_col_prob,
     )
 
-    agg_theta = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, np.zeros(theta.shape, dtype=bool), theta_mask, keep_col0=False)
-    dump_parameters(agg_theta, theta, args, hier_feat_generator)
+    agg_theta_raw = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta_raw, np.zeros(theta_raw.shape, dtype=bool), theta_mask, keep_col0=False)
+
+    # Now rescale theta according to effect size
+    mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude
+    agg_theta = agg_theta_raw * mult_factor
+    theta_raw = theta_raw * mult_factor
+
+    dump_parameters(agg_theta, theta_raw, args, hier_feat_generator)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
