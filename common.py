@@ -536,7 +536,7 @@ def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
                 idx += 1
     return theta_idx_counter
 
-def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0, zstat=ZSCORE_95):
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
     """
     Combine hierarchical and offset theta values
     """
@@ -556,8 +556,10 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
             m_theta = theta[raw_theta_idx, 0]
 
-            if col_idx != 0:
+            if col_idx != 0 and add_targets:
                 m_theta += theta[raw_theta_idx, col_idx]
+            elif col_idx != 0:
+                m_theta = theta[raw_theta_idx, col_idx]
 
             if feat_gen.motif_len == full_feat_generator.motif_len:
                 assert(full_feat_gen.left_motif_flank_len == feat_gen.left_motif_flank_len)
@@ -599,7 +601,7 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 
     return full_theta, theta_lower, theta_upper
 
-def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True):
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True, add_targets=True):
     def _combine_thetas(col_idx):
         theta_col, _, _ = combine_thetas_and_get_conf_int(
             hier_feat_generator,
