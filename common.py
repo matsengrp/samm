@@ -547,11 +547,10 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
     for i, feat_gen in enumerate(feat_generator.feat_gens):
         for m_idx, m in enumerate(feat_gen.motif_list):
             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
-            m_theta = theta[raw_theta_idx, 0]
 
             if col_idx != 0 and add_targets:
-                m_theta += theta[raw_theta_idx, col_idx]
-            elif col_idx != 0:
+                m_theta = theta[raw_theta_idx, 0] + theta[raw_theta_idx, col_idx]
+            else:
                 m_theta = theta[raw_theta_idx, col_idx]
 
             if feat_gen.motif_len == full_feat_generator.motif_len:
@@ -601,6 +600,7 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_
             possible_theta_mask,
             covariance_est=None,
             col_idx=col_idx,
+            add_targets=add_targets,
         )
         return theta_col.reshape((theta_col.size, 1))
 
