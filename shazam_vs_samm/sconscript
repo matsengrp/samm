@@ -71,9 +71,10 @@ nest.add(
     ])
 
 motif_params_dict = [
-    {'motif_length': '5', 'left_motif_flanks': '2'},
+    #{'motif_length': '5', 'left_motif_flanks': '2'},
     #{'motif_length': '3', 'left_motif_flanks': '0,1,2'},
     #{'motif_length': '3,5', 'left_motif_flanks': '1:2'},
+    {'motif_length': '3,5', 'left_motif_flanks': '0,1,2:2'},
 ]
 
 nest.add(
@@ -91,7 +92,7 @@ nest.add(
 )
 
 #nest.add('validation_mouse_idx', [0])
-nest.add('validation_mouse_idx', range(4))
+nest.add('validation_mouse_idx', range(1,4))
 
 nest.add(
     'replicate',
@@ -118,11 +119,11 @@ def fit_survival(env, outdir, c):
     left_flanks = c['motif_params']['left_motif_flanks']
     if c['per_target']:
         if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -5.0, step=-.5)).tolist()))
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.0, step=-.5)).tolist()))
         elif c['motif_params']['motif_length'] == '3':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -4.0, step=-.5)).tolist()))
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.0, step=-.5)).tolist()))
         elif c['motif_params']['motif_length'] == '3,5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -4.0, step=-.5)).tolist()))
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.5, step=-.5)).tolist()))
     else:
         if c['motif_params']['motif_length'] == '5':
             penalty_params = ",".join(map(str, np.power(10, np.arange(-5.0, -8.0, step=-.5)).tolist()))

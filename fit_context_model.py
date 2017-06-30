@@ -297,7 +297,10 @@ def main(args=sys.argv[1:]):
         val_set_evaluator = None
         penalty_params_prev = None
         prev_pen_theta = None
-        target_penalty_params = penalty_param * np.power(10, np.arange(start=4, stop=-0.1, step=-1))
+        if args.per_target_model:
+            target_penalty_params = [penalty_param]
+        else:
+            target_penalty_params = [0.]
         for target_param_i, target_penalty_param in enumerate(target_penalty_params):
             log.info("==== Penalty parameters %f, %f ====" % (penalty_param, target_penalty_param))
             penalty_params = (penalty_param, target_penalty_param)
@@ -337,23 +340,25 @@ def main(args=sys.argv[1:]):
                 break
             else:
                 best_model_idxs[param_i] = target_param_i
+                best_pen0_idx = param_i
 
             penalty_params_prev = penalty_params
             prev_pen_theta = curr_model_results.penalized_theta
 
-    best_model, best_pen0_idx = GreedyLikelihoodComparer.do_greedy_search(
-        val_set,
-        feat_generator,
-        [
-            result_list[best_model_idxs[i]] for i, result_list in enumerate(all_results_list)
-        ],
-        lambda m:m.penalized_num_nonzero,
-        args.num_val_burnin,
-        args.num_val_samples,
-        args.num_jobs,
-        args.scratch_dir,
-        pool=all_runs_pool,
-    )
+    if args.per_target_model:
+        best_model, best_pen0_idx = GreedyLikelihoodComparer.do_greedy_search(
+            val_set,
+            feat_generator,
+            [
+                result_list[best_model_idxs[i]] for i, result_list in enumerate(all_results_list)
+            ],
+            lambda m:m.penalized_num_nonzero,
+            args.num_val_burnin,
+            args.num_val_samples,
+            args.num_jobs,
+            args.scratch_dir,
+            pool=all_runs_pool,
+        )
 
     cmodel_algo.refit_unpenalized(
         model_result=all_results_list[best_pen0_idx][best_model_idxs[best_pen0_idx]],
