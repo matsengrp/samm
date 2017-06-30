@@ -128,9 +128,5 @@ def main(args=sys.argv[1:]):
     # keep mut_model_array in same position as mutabilities from fit_context
     pickle.dump((mut_model_array, (target_model_array, sub_model_array)), open(args.model_pkl, 'w'))
 
-def _read_shmulate_val(shmulate_value):
-    """ return the log so we can be sure we're comparing the same things!"""
-    return -np.inf if shmulate_value == "NA" else np.log(float(shmulate_value))
-
 if __name__ == "__main__":
     main(sys.argv[1:])

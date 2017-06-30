@@ -625,3 +625,55 @@ def pick_best_model(fitted_models):
             break
     best_model = good_models[max_idx]
     return best_model
+
+def get_shazam_theta(motif_len, mutability_file, target_file=None):
+    """
+    Take shazam csv files and turn them into our theta vector
+    """
+
+    # Read in the results from the shmulate model-fitter
+    feat_gen = SubmotifFeatureGenerator(motif_len=motif_len)
+    motif_list = feat_gen.motif_list
+
+    # Read mutability matrix
+    mut_motif_dict = dict()
+    with open(mutability_file, "r") as model_file:
+        csv_reader = csv.reader(model_file)
+        motifs = csv_reader.next()[1:]
+        motif_vals = csv_reader.next()[1:]
+        for motif, motif_val in zip(motifs, motif_vals):
+            mut_motif_dict[motif.lower()] = motif_val
+
+    num_theta_cols = 1
+    if target_file is not None:
+        num_theta_cols = NUM_NUCLEOTIDES + 1
+        # Read substitution matrix
+        sub_motif_dict = dict()
+        with open(target_file, "r") as model_file:
+            csv_reader = csv.reader(model_file)
+            # Assume header is ACGT
+            header = csv_reader.next()
+            for i in range(NUM_NUCLEOTIDES):
+                header[i + 1] = header[i + 1].lower()
+
+            for line in csv_reader:
+                motif = line[0].lower()
+                mutate_to_prop = {}
+                for i in range(NUM_NUCLEOTIDES):
+                    mutate_to_prop[header[i + 1]] = line[i + 1]
+                sub_motif_dict[motif] = mutate_to_prop
+
+    motif_list = feat_gen.motif_list
+    # Reconstruct theta in the right order
+    theta = np.zeros((feat_gen.feature_vec_len, num_theta_cols))
+    for motif_idx, motif in enumerate(motif_list):
+        theta[motif_idx, 0] = _read_shmulate_val(mut_motif_dict[motif])
+        if num_theta_cols > 1:
+            for nuc in NUCLEOTIDES:
+                theta[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = _read_shmulate_val(sub_motif_dict[motif][nuc])
+
+    return theta
+
+def _read_shmulate_val(shmulate_value):
+    """ return the log so we can be sure we're comparing the same things!"""
+    return -np.inf if shmulate_value == "NA" else np.log(float(shmulate_value))
