@@ -7,6 +7,8 @@ import pickle
 import pandas as pd
 import glob
 
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 from utils import add_implicit_info, process_input_line
@@ -516,3 +518,32 @@ def load_true_model(file_name):
         true_theta = real_params[2] if len(real_params) > 2 else real_params[0]
         probability_matrix = real_params[1]
     return true_theta, probability_matrix
+
+def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False, add_targets=True):
+    with open(file_name, "r") as f:
+        fitted_models = pickle.load(f)
+        best_model = pick_best_model(fitted_models)
+
+    if best_model is None:
+        print "FAIL", file_name
+        return None
+
+    hier_feat_gen = HierarchicalMotifFeatureGenerator(
+        motif_lens=best_model.motif_lens,
+        feats_to_remove=best_model.model_masks.feats_to_remove,
+        left_motif_flank_len_list=best_model.positions_mutating,
+    )
+    agg_feat_gen = HierarchicalMotifFeatureGenerator(
+        motif_lens=[agg_motif_len],
+        left_motif_flank_len_list=[[agg_pos_mutating]],
+    )
+    best_model.agg_refit_theta = create_aggregate_theta(
+        hier_feat_gen,
+        agg_feat_gen,
+        best_model.refit_theta,
+        best_model.model_masks.zero_theta_mask_refit,
+        best_model.refit_possible_theta_mask,
+        keep_col0=keep_col0,
+        add_targets=add_targets,
+    )
+    return best_model
