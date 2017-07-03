@@ -611,6 +611,7 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_
             possible_theta_mask,
             covariance_est=None,
             col_idx=col_idx,
+            add_targets=add_targets,
         )
         return theta_col.reshape((theta_col.size, 1))
 
@@ -626,8 +627,10 @@ def pick_best_model(fitted_models):
     """
     Select the one with largest (pseudo) log lik ratio
     """
-
-    good_models = [f_model for f_model_list in fitted_models for f_model in f_model_list if f_model.has_refit_data and f_model.variance_est is not None]
+    if isinstance(fitted_models[0], list):
+        good_models = [f_model for f_model_list in fitted_models for f_model in f_model_list if f_model.has_refit_data]
+    else:
+        good_models = [f_model for f_model in fitted_models if f_model.has_refit_data]
     if len(good_models) == 0:
         return None
 

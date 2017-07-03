@@ -8,6 +8,7 @@ import pandas as pd
 import glob
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
