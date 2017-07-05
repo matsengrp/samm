@@ -8,6 +8,7 @@ import pandas as pd
 import glob
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -547,6 +548,41 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         add_targets=add_targets,
     )
     return best_model
+
+def get_shazam_target(motif_len, target_file):
+    """
+    Take shazam csv files and turn them into our theta vector
+    """
+
+    # Read in the results from the shmulate model-fitter
+    feat_gen = SubmotifFeatureGenerator(motif_len=motif_len)
+    motif_list = feat_gen.motif_list
+
+    num_theta_cols = 4
+    # Read target matrix
+    sub_motif_dict = dict()
+    with open(target_file, "r") as model_file:
+        csv_reader = csv.reader(model_file)
+        # Assume header is ACGT
+        header = csv_reader.next()
+        for i in range(NUM_NUCLEOTIDES):
+            header[i + 1] = header[i + 1].lower()
+
+        for line in csv_reader:
+            motif = line[0].lower()
+            mutate_to_prop = {}
+            for i in range(NUM_NUCLEOTIDES):
+                mutate_to_prop[header[i + 1]] = line[i + 1]
+            sub_motif_dict[motif] = mutate_to_prop
+
+    motif_list = feat_gen.motif_list
+    # Reconstruct theta in the right order
+    theta = np.zeros((feat_gen.feature_vec_len, num_theta_cols))
+    for motif_idx, motif in enumerate(motif_list):
+        for nuc in NUCLEOTIDES:
+            theta[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(sub_motif_dict[motif][nuc])
+
+    return theta
 
 def get_shazam_theta(motif_len, mutability_file, target_file=None):
     """
