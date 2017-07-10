@@ -42,7 +42,7 @@ def parse_args():
         default=1)
     parser.add_argument('--stats',
         type=str,
-        default="norm,coverage,coverage_pos,coverage_neg,coverage_zero",
+        default="norm,kendall,coverage",
         # choices=("norm", "raw_norm", "coverage", "raw_coverage", "raw_pearson", "pearson", "support"),
     )
     parser.add_argument('--outdir',
@@ -129,6 +129,12 @@ def _get_raw_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta
 
 def _get_agg_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
     return scipy.stats.pearsonr(
+        agg_true_theta[possible_agg_mask],
+        fmodel.agg_refit_theta[possible_agg_mask],
+    )[0]
+
+def _get_agg_kendall(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+    return scipy.stats.kendalltau(
         agg_true_theta[possible_agg_mask],
         fmodel.agg_refit_theta[possible_agg_mask],
     )[0]
@@ -259,6 +265,7 @@ def _get_stat_func(stat):
         "coverage_zero": _get_agg_coverage_zero,
         "raw_pearson": _get_raw_pearson,
         "pearson": _get_agg_pearson,
+        "kendall": _get_agg_kendall,
     }
     return STAT_FUNC_DICT[stat]
 
@@ -289,15 +296,26 @@ def main(args=sys.argv[1:]):
         "coverage_pos": "Coverage of Positive Theta",
         "coverage_neg": "Coverage of Negative Theta",
         "coverage_zero": "Coverage of Zero Theta",
-        "pearson": "Pearson",
-        "norm": "Norm Diff/Norm Truth",
+	"pearson": "Pearson",
+        "kendall": "Kendall Tau",
+        "norm": "Theta Error",
     }
     MODEL_LABEL = {
-        "3_targetTrue": "3-mer Per-target",
+        "3_targetTrue": "3-mer per-target",
         "3_targetFalse": "3-mer",
         "2_3_targetFalse": "2,3-mer",
     }
     LINE_STYLES = ["solid", "dashed", "dotted"]
+    JITTER = {
+        "3_targetTrue": -0.02 * max(args.x_labels),
+        "3_targetFalse": 0,
+        "2_3_targetFalse": 0.02 * max(args.x_labels),
+    }
+    YLIMS = {
+        "coverage": [0.65, 1],
+        "kendall": [0.5, 1],
+        "norm": [0.1, 1.1],
+    }
     samm_means = {stat: {mtype : [] for mtype in set(args.model_types)} for stat in args.stats}
     samm_se = {stat: {mtype : [] for mtype in set(args.model_types)} for stat in args.stats}
     for stat in args.stats:
@@ -311,15 +329,17 @@ def main(args=sys.argv[1:]):
                 samm_means[stat][mtype].append(mean)
                 samm_se[stat][mtype].append(se)
                 print "MEAN", stat, mtype, mean, "(%f)" % se
-                if se > 0.1:
+                if stat == "coverage" and mean < 0.8:
                     print samm_statistics
 
     plt.clf()
     f, axes = plt.subplots(len(args.stats), sharex=True, figsize=(5, 4 * len(args.stats)))
     for i, (stat, ax) in enumerate(zip(args.stats, axes)):
         for idx, mtype in enumerate(set(args.model_types)):
-            ax.errorbar(args.x_labels, samm_means[stat][mtype], samm_se[stat][mtype], linestyle=LINE_STYLES[idx], marker=".", label=MODEL_LABEL[mtype])
+            ax.errorbar(np.array(args.x_labels) + JITTER[mtype], samm_means[stat][mtype], samm_se[stat][mtype], linestyle=LINE_STYLES[idx], marker=".", label=MODEL_LABEL[mtype], capsize=3)
         ax.set_ylabel(STAT_LABEL[stat])
+        ax.xaxis.set_ticks(args.x_labels)
+        ax.set_ylim(YLIMS[stat])
         if i == len(args.stats) - 1:
             ax.set_xlabel(args.x_lab)
             lgd = ax.legend(frameon=False, loc='center left', bbox_to_anchor=(1, 0.5))
