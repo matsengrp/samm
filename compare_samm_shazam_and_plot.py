@@ -108,7 +108,7 @@ def parse_args():
         args.keep_col0 = False
 
     args.shazam_mut_files = args.in_shazam_mut.split(',')
-    if args.in_shazam_sub is not None:
+    if args.per_target_model:
         args.shazam_sub_files = args.in_shazam_sub.split(',')
     else:
         args.shazam_sub_files = [None] * len(args.shazam_mut_files)
