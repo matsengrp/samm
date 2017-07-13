@@ -52,6 +52,8 @@ def parse_args():
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.random_gene_len > 0:
+        # shmulateSeq requires codons
+        args.random_gene_len -= (args.random_gene_len % 3)
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
         germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
     else:
