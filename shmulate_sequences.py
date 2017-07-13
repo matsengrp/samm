@@ -1,13 +1,8 @@
-import pickle
 import sys
 import argparse
-import itertools
 import numpy as np
-import os
-import os.path
 import csv
-import re
-import random
+import subprocess
 
 from common import *
 from read_data import GERMLINE_PARAM_FILE
@@ -94,8 +89,8 @@ def main(args=sys.argv[1:]):
     script_file = 'R/shmulate_sequences.R'
 
     cmd = [command, script_file, args.output_genes, args.seed, args.min_percent_mutated, args.max_percent_mutated, args.output_file]
-    print "Calling:", " ".join(cmd)
-    res = subprocess.call(cmd)
+    print "Calling:", " ".join(map(str, cmd))
+    res = subprocess.call(map(str, cmd))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

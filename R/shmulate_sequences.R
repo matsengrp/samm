@@ -5,8 +5,8 @@ source('shmulate/R/SHMulate_Functions.R')
 arg <- commandArgs(TRUE)
 gene_file <- arg[1]
 seed <- arg[2]
-min_pct_mut <- arg[3]
-max_pct_mut <- arg[4]
+min_pct_mut <- as.numeric(arg[3])
+max_pct_mut <- as.numeric(arg[4])
 output_file <- arg[5]
 
 set.seed(seed)
