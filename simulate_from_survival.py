@@ -12,6 +12,7 @@ import random
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from simulate_germline import GermlineSimulator
 from common import *
 from read_data import GERMLINE_PARAM_FILE
 
@@ -77,32 +78,33 @@ def parse_args():
 
     return args
 
-def _get_germline_nucleotides(args, nonzero_motifs=[]):
-    if args.random_gene_len > 0:
+def _get_germline_nucleotides(args, nonzero_motifs=[], use_partis=True):
+    if use_partis:
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        g = GermlineSimulator(output_dir=current_dir + "/_output")
+        germline_seqs, germline_freqs = g.generate_germline_set()
+    else:
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
         germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
-    else:
-        # Read parameters from file
-        params = read_germline_file(args.germline_path)
+        germline_seqs = {g:n for g,n in zip(germline_genes, germline_nucleotides)}
+        germline_freqs = {g:1.0/args.n_germlines for g in germline_genes}
 
-        # Select, with replacement, args.n_germlines germline genes from our
-        # parameter file and place them into a numpy array.
-        germline_genes = np.random.choice(params.index.values, size=args.n_germlines)
+    return germline_seqs, germline_freqs
 
-        # Put the nucleotide content of each selected germline gene into a
-        # corresponding list.
-        germline_nucleotides = [row[gene] for gene in germline_genes]
-
-    return germline_nucleotides, germline_genes
-
-def dump_germline_data(germline_nucleotides, germline_genes, args):
+def dump_germline_data(germline_seqs, germline_freqs, args):
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
     with open(args.output_genes, 'w') as outgermlines:
         germline_file = csv.writer(outgermlines)
         germline_file.writerow(['germline_name','germline_sequence'])
-        for gene, sequence in zip(germline_genes, germline_nucleotides):
+        for gene, sequence in germline_seqs.iteritems():
             germline_file.writerow([gene,sequence])
+
+    with open(args.output_genes.replace(".csv", "_prevalence.csv"), 'w') as outgermlines:
+        germline_freq_file = csv.writer(outgermlines)
+        germline_freq_file.writerow(['germline_name','freq'])
+        for gene, freq in germline_freqs.iteritems():
+            germline_freq_file.writerow([gene,freq])
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -117,7 +119,7 @@ def main(args=sys.argv[1:]):
     with open(args.input_model, 'r') as f:
         agg_theta, _ = pickle.load(f)
 
-    germline_nucleotides, germline_genes = _get_germline_nucleotides(args)
+    germline_seqs, germline_freqs = _get_germline_nucleotides(args)
 
     if agg_theta.shape[1] == NUM_NUCLEOTIDES:
         simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
@@ -130,7 +132,13 @@ def main(args=sys.argv[1:]):
     else:
         raise ValueError("Aggregate theta shape is wrong")
 
-    dump_germline_data(germline_nucleotides, germline_genes, args)
+    dump_germline_data(germline_seqs, germline_freqs, args)
+
+    # If there were an even distribution, we would have this many taxa
+    tot_taxa = args.n_taxa * len(germline_seqs)
+    # But there is an uneven distribution of allele frequencies, so we will make the number of taxa
+    # for different alleles to be different. The number of taxa will just be proportional to the germline
+    # frequency.
 
     # For each germline gene, run survival model to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
@@ -138,16 +146,16 @@ def main(args=sys.argv[1:]):
     with open(args.output_file, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
-        for run, (gene, sequence) in \
-                enumerate(zip(germline_genes, germline_nucleotides)):
-
+        for gene, sequence in germline_seqs.iteritems():
+            # Decide number of taxa. Must be at least one.
+            n_germ_taxa = int(tot_taxa * germline_freqs[gene] + 1)
             full_data_samples = [
                 simulator.simulate(
                     start_seq=sequence.lower(),
                     # censoring_time=args.min_censor_time + np.random.rand() * 0.25, # allow some variation in censor time
                     percent_mutated=args.min_percent_mutated + np.random.rand() * 0.1, # allow some variation in censor time
                     with_replacement=args.with_replacement,
-                ) for i in range(args.n_taxa)
+                ) for i in range(n_germ_taxa)
             ]
 
             # write to file in csv format
