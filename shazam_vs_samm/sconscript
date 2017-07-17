@@ -22,23 +22,9 @@ base = {'output_name': localenv['OUTPUT_NAME']}
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
 SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
-
-# Nest for datasets
-nest.add(
-    'datasets',
-    ['cui'])
-
-nest.add(
-    'data_path',
-    [CUI_DATA_PATH],
-    create_dir=False)
-
-nest.add(
-    'sample_or_impute',
-    [
-        'sample',
-        #'impute'
-    ])
+SAMPLE_OR_IMPUTE = 2 # sample one sequence from each clonal family
+LOCUS = 'igk' # only kappa chain is relevant for Cui data
+VAL_COLUMN = 'subject' # validate on mice, not randomly
 
 # Nest for processing data
 # Not imputing so we don't need to pass motif length---this way data will only
@@ -47,34 +33,36 @@ nest.add(
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--data-path',
-               c['data_path'],
+               CUI_DATA_PATH,
                '--read-from-partis',
                '--metadata-path',
-               c['data_path'] + '/meta.csv',
+               CUI_DATA_PATH + '/meta.csv',
                '--use-v',
                '--use-immunized',
                '--output-genes ${TARGETS[0]}',
                '--output-seqs ${TARGETS[1]}']
-    if c['sample_or_impute'] == 'impute':
-        cmd += ['--impute-ancestors']
 
     return env.Command(
         [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
         [],
         ' '.join(map(str, cmd)))
-# Loci
-# ! no heavy chain in cui data
-nest.add(
-    'locus',
-    [
-        'igk',
-    ])
 
 motif_params_dict = [
-    #{'motif_length': '5', 'left_motif_flanks': '2'},
-    #{'motif_length': '3', 'left_motif_flanks': '0,1,2'},
-    #{'motif_length': '3,5', 'left_motif_flanks': '1:2'},
-    {'motif_length': '3,5', 'left_motif_flanks': '0,1,2:2'},
+    {
+        'motif_length': '5',
+        'left_motif_flanks': '2',
+        'penalty_params': ",".join(map(str, np.power(10, np.arange(-5.0, -8.0, step=-.5)).tolist())),
+    },
+    {
+        'motif_length': '3,5',
+        'left_motif_flanks': '1:2',
+        'penalty_params': ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist())),
+    },
+    {
+        'motif_length': '3,5',
+        'left_motif_flanks': '0,1,2:2',
+        'penalty_params': ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist())),
+    },
 ]
 
 nest.add(
@@ -86,30 +74,15 @@ nest.add(
 nest.add(
     'per_target',
     [
-         #False,
+         False,
          True,
     ]
 )
 
-#nest.add('validation_mouse_idx', [0])
-nest.add('validation_mouse_idx', range(1,4))
-
 nest.add(
-    'replicate',
-    range(localenv['NREPS']),
-    label_func='{:02d}'.format)
-
-# Set the seed to be the replicate number.
-nest.add(
-    'seed',
-    lambda c: [c['replicate']],
-    create_dir=False)
-
-nest.add(
-    'validation_methods',
-    [
-        'subject',
-    ])
+    'validation_mouse_idx',
+    range(4),
+)
 
 # fit survival
 @nest.add_target_with_env(localenv)
@@ -117,30 +90,17 @@ def fit_survival(env, outdir, c):
     cmd = []
     motif_len = c['motif_params']['motif_length']
     left_flanks = c['motif_params']['left_motif_flanks']
-    if c['per_target']:
-        if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.0, step=-.5)).tolist()))
-        elif c['motif_params']['motif_length'] == '3':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.0, step=-.5)).tolist()))
-        elif c['motif_params']['motif_length'] == '3,5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.5, step=-.5)).tolist()))
-    else:
-        if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-5.0, -8.0, step=-.5)).tolist()))
-        elif c['motif_params']['motif_length'] == '3':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -4.0, step=-.5)).tolist()))
-        elif c['motif_params']['motif_length'] == '3,5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist()))
+    penalty_params = c['motif_params']['penalty_params']
 
     cmd = ['python fit_context_model.py',
            '--input-genes ${SOURCES[0]}',
            '--input-seqs ${SOURCES[1]}',
            '--locus',
-           c['locus'],
+           LOCUS,
            '--species',
            'mouse',
            '--seed',
-           c['seed'],
+           c['validation_mouse_idx'],
            '--motif-lens',
            motif_len,
            '--positions-mutating',
@@ -164,18 +124,16 @@ def fit_survival(env, outdir, c):
            '--refit-on-training',
            '--val-mouse-idx',
            c['validation_mouse_idx'],
+           '--validation-column',
+           VAL_COLUMN,
+           '--sample-regime',
+           SAMPLE_OR_IMPUTE, # sample one seq from clonal family
            '--scratch-directory',
            SCRATCH_DIR,
            '--tuning-sample-ratio',
            0.1,
            '--out-file ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}']
-    if c['validation_methods'] is not 'none':
-        cmd += [
-           '--validation-column',
-           c['validation_methods']]
-    if c['sample_or_impute'] == 'sample':
-        cmd += ['--sample-regime', 2]
     if c["per_target"]:
         cmd += ['--per-target-model']
     return env.Command(

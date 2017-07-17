@@ -277,6 +277,7 @@ def main(args=sys.argv[1:]):
             len(obs_data),
             metadata,
             args.tuning_sample_ratio,
+            validation_column=None,
         )
         train_set = [obs_data[i] for i in train_idx]
         val_set = [obs_data[i] for i in val_idx]
