@@ -12,7 +12,7 @@ import random
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
-from simulate_germline import GermlineSimulator
+from simulate_germline import GermlineSimulatorPartis
 from common import *
 from read_data import GERMLINE_PARAM_FILE
 
@@ -55,11 +55,11 @@ def parse_args():
         default=0.1)
     parser.add_argument('--n-taxa',
         type=int,
-        help='number of taxa to simulate',
-        default=1)
+        help='average number of taxa per germline sequence',
+        default=4)
     parser.add_argument('--n-germlines',
         type=int,
-        help='number of germline genes to sample from (max 350)',
+        help='number of germline genes to sample from (max 350). ignored if using partis',
         default=2)
     parser.add_argument('--min-censor-time',
         type=float,
@@ -84,9 +84,11 @@ def parse_args():
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
         current_dir = os.path.dirname(os.path.realpath(__file__))
-        g = GermlineSimulator(output_dir=current_dir + "/_output")
+        g = GermlineSimulatorPartis(output_dir=current_dir + "/_output")
         germline_seqs, germline_freqs = g.generate_germline_set()
     else:
+        # generate germline sequences at random by drawing from ACGT multinomial
+        # suppose all alleles have equal frequencies
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
         germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
         germline_seqs = {g:n for g,n in zip(germline_genes, germline_nucleotides)}

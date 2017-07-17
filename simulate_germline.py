@@ -5,7 +5,7 @@ PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 import glutils
 
-class GermlineSimulator:
+class GermlineSimulatorPartis:
     """
     Generates germline genes using partis
     To use this file, please use dev branch on partis
