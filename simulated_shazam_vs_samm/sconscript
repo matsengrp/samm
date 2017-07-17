@@ -26,9 +26,9 @@ N_GERMLINES = 1500
 SPARSITY_RATIO = 1.0
 
 models = [
-    {'motif_lens': [3,5], 'positions_mutating': "1:2", 'per_target': False},
-    {'motif_lens': [3,5], 'positions_mutating': "1:2", 'per_target': True},
-    {'motif_lens': [5], 'positions_mutating': "2", 'per_target': True},
+    {'motif_lens': [3,5], 'positions_mutating': "1:2", 'per_target': False, 'simulation': 'survival'},
+    {'motif_lens': [3,5], 'positions_mutating': "1:2", 'per_target': True, 'simulation': 'survival'},
+    {'motif_lens': [5], 'positions_mutating': "2", 'per_target': True, 'simulation': 'shmulate'},
 ]
 
 nest.add(
@@ -55,7 +55,7 @@ def generate(env, outdir, c):
     if c["model"]["per_target"]:
         per_target_model_str = "--per-target-model"
 
-    if c["model"]["positions_mutating"] != '2':
+    if c["model"]["simulation"] == 'survival':
         cmd = ['python generate_theta.py',
                '--seed',
                c['seed'],
@@ -72,9 +72,18 @@ def generate(env, outdir, c):
             [],
             ' '.join(map(str, cmd)))
 
+nest.add(
+    'with_replacement',
+    [
+         False,
+         #True,
+    ]
+)
+
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
-    if c["model"]["positions_mutating"] != '2':
+    if c["model"]["simulation"] == 'survival':
+        # !! Change this to duncan's code---or just the germline generation/clonal family size...
         cmd = ['python simulate_from_survival.py',
                '--seed',
                c['seed'],
@@ -91,6 +100,8 @@ def simulate(env, outdir, c):
                0.05,
                '--output-file ${TARGETS[0]}',
                '--output-genes ${TARGETS[1]}']
+        if c['with_replacement']:
+            cmd += ['--with-replacement']
     else:
         cmd = ['python shmulate_sequences.py',
                '--seed',
@@ -136,51 +147,54 @@ def fit_survival(env, outdir, c):
     left_flanks = c['motif_params']['left_motif_flanks']
     if c['per_target']:
         if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.0, step=-.5)).tolist()))
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -8.0, step=-.5)).tolist()))
         elif c['motif_params']['motif_length'] == '3,5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -5.0, step=-.5)).tolist()))
+            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist()))
     else:
         if c['motif_params']['motif_length'] == '5':
             penalty_params = ",".join(map(str, np.power(10, np.arange(-5.0, -8.0, step=-.5)).tolist()))
         elif c['motif_params']['motif_length'] == '3,5':
             penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist()))
 
-    cmd = ['python fit_context_model.py',
-           '--input-genes ${SOURCES[1]}',
-           '--input-seqs ${SOURCES[0]}',
-           '--seed',
-           c['seed'],
-           '--motif-lens',
-           motif_len,
-           '--positions-mutating',
-           left_flanks,
-           '--penalty-params',
-           penalty_params,
-           '--sample-regime',
-           2,
-           '--num-cpu-threads',
-           4,
-           '--num-jobs',
-           20,
-           '--burn-in',
-           2,
-           '--num-e-samples',
-           4,
-           '--em-max-iters',
-           10,
-           '--num-val-burnin',
-           2,
-           '--num-val-samples',
-           4,
-           '--refit-on-training',
-           '--scratch-directory',
-           SCRATCH_DIR,
-           '--tuning-sample-ratio',
-           0.1,
-           '--out-file ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
-    if c["per_target"]:
-        cmd += ['--per-target-model']
+    if (c['model']['per_target'] and c['per_target']) or (not c['model']['per_target'] and not c['per_target']):
+        # Only fit per target model to per target simulation and vice versa
+        cmd = ['python fit_context_model.py',
+               '--input-genes ${SOURCES[1]}',
+               '--input-seqs ${SOURCES[0]}',
+               '--seed',
+               c['seed'],
+               '--motif-lens',
+               motif_len,
+               '--positions-mutating',
+               left_flanks,
+               '--penalty-params',
+               penalty_params,
+               '--sample-regime',
+               2,
+               '--num-cpu-threads',
+               4,
+               '--num-jobs',
+               20,
+               '--burn-in',
+               2,
+               '--num-e-samples',
+               4,
+               '--em-max-iters',
+               10,
+               '--num-val-burnin',
+               2,
+               '--num-val-samples',
+               4,
+               '--refit-on-training',
+               '--scratch-directory',
+               SCRATCH_DIR,
+               '--tuning-sample-ratio',
+               0.1,
+               '--out-file ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}']
+        if c['per_target']:
+            cmd += ['--per-target-model']
+
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt'), join(outdir, 'fitted_train_seqs.csv'), join(outdir, 'fitted_train_genes.csv')],
         c['simulate'],
