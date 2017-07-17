@@ -7,6 +7,7 @@ import glutils
 
 class GermlineSimulator:
     """
+    Generates germline genes using partis
     To use this file, please use dev branch on partis
     """
 

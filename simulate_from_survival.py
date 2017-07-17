@@ -72,14 +72,17 @@ def parse_args():
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')
+    parser.add_argument('--use-partis',
+        action="store_true",
+        help='Use partis to gernerate germline sequences')
 
-    parser.set_defaults(with_replacement=False)
+    parser.set_defaults(with_replacement=False, use_partis=False)
     args = parser.parse_args()
 
     return args
 
-def _get_germline_nucleotides(args, nonzero_motifs=[], use_partis=True):
-    if use_partis:
+def _get_germline_nucleotides(args, nonzero_motifs=[]):
+    if args.use_partis:
         current_dir = os.path.dirname(os.path.realpath(__file__))
         g = GermlineSimulator(output_dir=current_dir + "/_output")
         germline_seqs, germline_freqs = g.generate_germline_set()
