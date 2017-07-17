@@ -256,8 +256,6 @@ def main(args=sys.argv[1:]):
     )
     train_set = [obs_data[i] for i in train_idx]
     val_set = [obs_data[i] for i in val_idx]
-    feat_generator.add_base_features_for_list(train_set)
-    feat_generator.add_base_features_for_list(val_set)
 
     # for fitting shazam and later validating
     write_sampled_data(
@@ -272,20 +270,30 @@ def main(args=sys.argv[1:]):
             val_set
     )
 
+    if args.refit_on_training:
+        # Only use the training set in computing and validating thetas
+        obs_data = train_set
+        train_idx, val_idx = split_train_val(
+            len(obs_data),
+            metadata,
+            args.tuning_sample_ratio,
+        )
+        train_set = [obs_data[i] for i in train_idx]
+        val_set = [obs_data[i] for i in val_idx]
+
+    feat_generator.add_base_features_for_list(train_set)
+    feat_generator.add_base_features_for_list(val_set)
+
     st_time = time.time()
     log.info("Data statistics:")
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_idx), len(val_idx)))
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
-    log.info("Running EM")
-    if args.refit_on_training:
-        # only use the training set in computing thetas
-        obs_data = train_set
-
     cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
+    log.info("Running EM")
     num_val_samples = args.num_val_samples
     all_results_list = [
         [] for i in args.penalty_params
