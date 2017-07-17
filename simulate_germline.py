@@ -13,8 +13,7 @@ class GermlineSimulatorPartis:
 
     GERMLINE_FOLDER = "./partis/data/germlines"
 
-    def __init__(self, organism="human", output_dir="_output", seed=0):
-        np.random.seed(seed)
+    def __init__(self, organism="human", output_dir="_output"):
         assert(organism in ["human", "mouse"])
         self.glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + organism, "igh")
         self.output_dir = output_dir
