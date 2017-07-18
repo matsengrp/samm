@@ -22,6 +22,7 @@ from Bio import SeqIO
 from submotif_feature_generator import SubmotifFeatureGenerator
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_from_survival import random_generate_thetas
+from simulate_germline import GermlineSimulatorPartis
 
 from gctree.bin.gctree import MutationModel, CollapsedTree
 
@@ -40,11 +41,22 @@ def parse_args():
     parser_simulate.add_argument('--n-taxa',
         type=int,
         help='number of taxa to simulate',
-        default=2)
+        default=None)
     parser_simulate.add_argument('--param-path',
         type=str,
         help='parameter file path',
         default=GERMLINE_PARAM_FILE)
+    parser_simulate.add_argument('--path-to-annotations',
+        type=str,
+        help='''
+        data file path, if --n-taxa and --n-germlines unspecified then
+        compute these statistics from supplied dataset
+        ''',
+        default=None)
+    parser_simulate.add_argument('--path-to-metadata',
+        type=str,
+        help='metadata file path, same as for annotations',
+        default=None)
     parser_simulate.add_argument('--seed',
         type=int,
         help='rng seed for replicability',
@@ -68,7 +80,7 @@ def parse_args():
     parser_simulate.add_argument('--n-germlines',
         type=int,
         help='number of germline genes to sample (maximum 350)',
-        default=2)
+        default=None)
     parser_simulate.add_argument('--verbose',
         action='store_true',
         help='output R log')
@@ -123,7 +135,7 @@ def parse_args():
     return args
 
 
-def run_gctree(args, germline_seq, mutation_model):
+def run_gctree(args, germline_seq, mutation_model, n_taxa):
     ''' somewhat cannibalized gctree simulation '''
 
     if args.lambda0 is None:
@@ -135,7 +147,7 @@ def run_gctree(args, germline_seq, mutation_model):
             tree = mutation_model.simulate(germline_seq,
                                            lambda0=args.lambda0,
                                         #    r=args.r,
-                                           N=args.n_taxa,
+                                           N=n_taxa,
                                            T=args.T)
             collapsed_tree = CollapsedTree(tree=tree, frame=args.frame) # <-- this will fail if backmutations
             break
@@ -179,6 +191,41 @@ def generate_theta(motif_list, motif_lens, per_target_model, output_mutability, 
 
     return true_theta, probability_matrix, raw_theta
 
+def _get_germline_info(args):
+    if args.use_partis:
+        current_dir = os.path.dirname(os.path.realpath(__file__))
+        g = GermlineSimulatorPartis(output_dir=current_dir + "/_output")
+        germline_seqs, germline_freqs = g.generate_germline_set()
+        germline_info = []
+        for name in germline_seqs.keys():
+            germline_info.append({
+                'gene_name': name,
+                'germline_sequence': germline_seqs[name],
+                'freq': germline_freqs[name],
+            })
+    else:
+        # Read parameters from file
+        params = read_germline_file(args.param_path)
+
+        # Find genes with "N" and remove them so gctree is happy
+        genes_to_sample = [idx for idx, row in params.iterrows() if set(row['base'].lower()) == NUCLEOTIDE_SET]
+
+        # Select, with replacement, args.n_germlines germline genes from our
+        # parameter file and place them into a numpy array.
+        germline_genes = np.random.choice(genes_to_sample, size=args.n_germlines)
+
+        # Put the nucleotide content of each selected germline gene into a
+        # corresponding list.
+        germline_info = []
+        for name, nucs in zip(germline_genes, [params.loc[gene]['base'] for gene in germline_genes]):
+            germline_info.append({
+                'gene_name': name,
+                'germline_sequence': nucs,
+                'freq': 1.0/args.n_germlines,
+            })
+
+    return germline_info
+
 def simulate(args):
     ''' simulate submodule '''
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
@@ -213,22 +260,16 @@ def simulate(args):
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
-    # Read parameters from file
-    params = read_germline_file(args.param_path)
-
-    # Find genes with "N" and remove them so gctree is happy
-    genes_to_sample = [idx for idx, row in params.iterrows() if set(row['base'].lower()) == NUCLEOTIDE_SET]
-
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    # Select, with replacement, args.n_germlines germline genes from our
-    # parameter file and place them into a numpy array.
-    germline_genes = np.random.choice(genes_to_sample, size=args.n_germlines)
+    if args.n_taxa is None and args.n_germlines is None:
+        clonal_family_sizes = get_data_stats_from_partis(args.path_to_annotations, args.path_to_metadata, use_v=True, use_np=False, use_immunized=True)
+        args.n_germlines = len(clonal_family_sizes)
 
-    # Put the nucleotide content of each selected germline gene into a
-    # corresponding list.
-    germline_nucleotides = [params.loc[gene]['base'] for gene in germline_genes]
+    list_of_gene_dicts = _get_germline_info(args)
+    for idx, gene_dict in enumerate(list_of_gene_dicts):
+        gene_dict['n_taxa'] = clonal_family_sizes[idx]
 
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
@@ -246,15 +287,14 @@ def simulate(args):
         seq_file.writerow(['germline_name','sequence_name','sequence'])
         seq_anc_file = csv.writer(outseqswithanc)
         seq_anc_file.writerow(['germline_name','sequence_name','sequence'])
-        for run, (gene_name, germline_sequence) in \
-                enumerate(zip(germline_genes, germline_nucleotides)):
+        for run, (gene_dict) in enumerate(list_of_gene_dicts):
             prefix = "clone%d-" % run
-            germline_name = "%s%s" % (prefix, gene_name)
+            germline_name = "%s%s" % (prefix, gene_dict['gene_name'])
             # Creates a file with a single run of simulated sequences.
             # The seed is modified so we aren't generating the same
             # mutations on each run
-            gl_file.writerow([germline_name, germline_sequence])
-            tree = run_gctree(args, germline_sequence, mutation_model)
+            gl_file.writerow([germline_name, gene_dict['germline_sequence']])
+            tree = run_gctree(args, gene_dict['germline_sequence'], mutation_model, gene_dict['n_taxa'])
             for idx, descendant in enumerate(tree.traverse('preorder')):
                 # internal nodes will have frequency zero, so for providing output
                 # along a branch we need to consider these cases! otherwise the leaves
@@ -273,7 +313,7 @@ def simulate(args):
                     if cmp(descendant.sequence.lower(), descendant.up.sequence.lower()) != 0:
                         # write into the true tree branches file
                         seq_anc_file.writerow([descendant.up.name, descendant.name, descendant.sequence.lower()])
-                    if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), germline_sequence) != 0:
+                    if descendant.frequency != 0 and descendant.is_leaf() and cmp(descendant.sequence.lower(), gene_dict['germline_sequence']) != 0:
                         # we are at the leaf of the tree and can write into the "observed data" file
                         obs_seq_name = "%s-%s" % (germline_name, seq_name)
                         seq_file.writerow([germline_name, obs_seq_name, descendant.sequence.lower()])

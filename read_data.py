@@ -83,21 +83,7 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
                     target_pairs_to_remove[motif][mut_pos] = zero_thetas
     return motifs_to_remove, pos_to_remove, target_pairs_to_remove
 
-# TODO: file to convert presto dataset to ours? just correspondence between headers should be enough?
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False, motif_len=1):
-    """
-    Function to read partis annotations csv
-
-    @param path_to_annotations: path to annotations files
-    @param metadata: csv file of metadata; if None defaults will be used for chain/species
-    @param use_v: use just the V gene or use the whole sequence?
-    @param use_np: use nonproductive sequences only
-    @param use_immunized: use immunized mice only
-    @param inferred_gls: list of paths to partis-inferred germlines
-
-    @write genes to output_genes and seqs to output_seqs
-    """
-
+def get_partition_info(path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
     partition_info = []
     with open(metadata, 'r') as metafile:
         reader = csv.DictReader(metafile)
@@ -120,8 +106,6 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
             current_info['subject'] = line['subject']
             partition_info.append(current_info)
 
-    seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'sequence_name', 'sequence']
-
     seqs_col = 'v_qr_seqs' if use_v else 'seqs'
     gene_col = 'v_gl_seq' if use_v else 'naive_seq'
 
@@ -134,9 +118,69 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         # return all sequences
         good_seq = lambda seqs: [True for seq in seqs[seqs_col]]
 
+    return partition_info, good_seq
+
+def get_data_stats_from_partis(path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
+    '''
+    get data statistics from partis annotations
+    '''
+
+    partition_info, good_seq = get_partition_info(
+        path_to_annotations,
+        metadata,
+        use_v,
+        use_np,
+        use_immunized
+    )
+
+    clonal_family_sizes = []
+    for data_idx, data_info in enumerate(partition_info):
+        glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
+        with open(data_info['annotations_file'][0], "r") as csvfile:
+            reader = csv.DictReader(csvfile)
+            for idx, line in enumerate(reader):
+                # add goodies from partis
+                if len(line['input_seqs']) == 0:
+                    # sometimes data will have empty clusters
+                    continue
+                process_input_line(line)
+                add_implicit_info(glfo, line)
+                good_seq_idx = [i for i, is_good in enumerate(good_seq(line)) if is_good]
+                if not good_seq_idx:
+                    # no nonproductive sequences... skip
+                    continue
+                else:
+                    clonal_family_sizes.append(len(good_seq_idx))
+
+    return clonal_family_sizes
+
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
+    """
+    Function to read partis annotations csv
+
+    @param path_to_annotations: path to annotations files
+    @param metadata: csv file of metadata; if None defaults will be used for chain/species
+    @param use_v: use just the V gene or use the whole sequence?
+    @param use_np: use nonproductive sequences only
+    @param use_immunized: use immunized mice only
+    @param inferred_gls: list of paths to partis-inferred germlines
+
+    @write genes to output_genes and seqs to output_seqs
+    """
+
+    partition_info, good_seq = get_partition_info(
+        path_to_annotations,
+        metadata,
+        use_v,
+        use_np,
+        use_immunized
+    )
+
     with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
         gene_writer = csv.DictWriter(genes_file, ['germline_name', 'germline_sequence'])
         gene_writer.writeheader()
+
+        seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'sequence_name', 'sequence']
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
