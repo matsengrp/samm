@@ -25,8 +25,8 @@ SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 1.0
 
 models = [
-    #{'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
-    {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    #{'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
 
 nest.add(
@@ -37,7 +37,7 @@ nest.add(
 
 nest.add(
     'replicate',
-    range(1),
+    range(0,2),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -97,7 +97,7 @@ def simulate(env, outdir, c):
 def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -7.0, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
 
     cmd = ['python fit_context_model.py',
         '--input-genes ${SOURCES[1]}',
@@ -111,7 +111,7 @@ def fit_survival(env, outdir, c):
         '--penalty-params',
         penalty_params,
         '--sample-regime',
-        1,
+        1, # use all the sequences since we generate from star tree (and we dont rename germlines)
         '--num-cpu-threads',
         4,
         '--num-jobs',
