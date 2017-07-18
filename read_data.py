@@ -8,6 +8,8 @@ import pandas as pd
 import glob
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from submotif_feature_generator import SubmotifFeatureGenerator
+from fit_shmulate_model import _read_shmulate_val
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -513,11 +515,9 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
         )
 
 def load_true_model(file_name):
-    with open(file_name, "rb") as f:
-        real_params = pickle.load(f)
-        true_theta = real_params[2] if len(real_params) > 2 else real_params[0]
-        probability_matrix = real_params[1]
-    return true_theta, probability_matrix
+    with open(file_name, "r") as f:
+        true_model_agg, true_model = pickle.load(f)
+    return np.array(true_model_agg)
 
 def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False, add_targets=True):
     with open(file_name, "r") as f:
@@ -547,3 +547,53 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         add_targets=add_targets,
     )
     return best_model
+
+def get_shazam_theta(motif_len, mutability_file, target_file=None):
+    """
+    Take shazam csv files and turn them into our theta vector
+    """
+
+    # Read in the results from the shmulate model-fitter
+    feat_gen = SubmotifFeatureGenerator(motif_len=motif_len)
+    motif_list = feat_gen.motif_list
+
+    # Read mutability matrix
+    mut_motif_dict = dict()
+    with open(mutability_file, "r") as model_file:
+        csv_reader = csv.reader(model_file)
+        motifs = csv_reader.next()[1:]
+        motif_vals = csv_reader.next()[1:]
+        for motif, motif_val in zip(motifs, motif_vals):
+            mut_motif_dict[motif.lower()] = motif_val
+
+    num_theta_cols = 1
+    if target_file is not None:
+        num_theta_cols = NUM_NUCLEOTIDES + 1
+        # Read substitution matrix
+        sub_motif_dict = dict()
+        with open(target_file, "r") as model_file:
+            csv_reader = csv.reader(model_file)
+            # Assume header is ACGT
+            header = csv_reader.next()
+            for i in range(NUM_NUCLEOTIDES):
+                header[i + 1] = header[i + 1].lower()
+
+            for line in csv_reader:
+                motif = line[0].lower()
+                mutate_to_prop = {}
+                for i in range(NUM_NUCLEOTIDES):
+                    mutate_to_prop[header[i + 1]] = line[i + 1]
+                sub_motif_dict[motif] = mutate_to_prop
+
+    motif_list = feat_gen.motif_list
+    # Reconstruct theta in the right order
+    theta = np.zeros((feat_gen.feature_vec_len, num_theta_cols))
+    for motif_idx, motif in enumerate(motif_list):
+        theta[motif_idx, 0] = _read_shmulate_val(mut_motif_dict[motif])
+        if num_theta_cols > 1:
+            for nuc in NUCLEOTIDES:
+                theta[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = _read_shmulate_val(sub_motif_dict[motif][nuc])
+
+    return theta
+
+

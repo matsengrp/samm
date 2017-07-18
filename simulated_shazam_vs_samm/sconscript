@@ -25,10 +25,8 @@ SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 1.0
 
 models = [
-    {'simulation': 'survival', 'motif_lens': [1], 'positions_mutating': "0"},
-    {'simulation': 'shmulate', 'motif_lens': [1], 'positions_mutating': "0"},
-    # {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
-    # {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    #{'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
 
 nest.add(
@@ -79,7 +77,7 @@ def simulate(env, outdir, c):
             max(c['model']['motif_lens']),
             '--input-model ${SOURCES[0]}',
             '--n-taxa',
-            1, #30,
+            40,
             '--min-percent-mutated',
             0.05,
             '--max-percent-mutated',
@@ -117,17 +115,17 @@ def fit_survival(env, outdir, c):
         '--num-cpu-threads',
         4,
         '--num-jobs',
-        1, #20,
+        20,
         '--burn-in',
-        1, #2,
+        2,
         '--num-e-samples',
-        1, #4,
+        4,
         '--em-max-iters',
-        1, #10,
+        10,
         '--num-val-burnin',
-        1, #2,
+        2,
         '--num-val-samples',
-        1, #4,
+        4,
         '--scratch-directory',
         SCRATCH_DIR,
         '--tuning-sample-ratio',
