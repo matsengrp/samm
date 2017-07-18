@@ -75,5 +75,5 @@ SConscript(flag + '/sconscript', exports=['flag'])
 flag = 'run_on_partis'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'imputed_ancestors_comparison'
+flag = 'simulated_shazam_vs_samm'
 SConscript(flag + '/sconscript', exports=['flag'])
