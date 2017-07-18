@@ -43,7 +43,7 @@ seqs <- apply(genes, 1, function(gene_data) {
     group='',
     subject='',
     sequence_name=seq_names,
-    mutated_seqs=mutated_seqs
+    sequence=mutated_seqs
   )
 })
 seq_data_frame <- do.call("rbind", seqs)

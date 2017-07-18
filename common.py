@@ -368,7 +368,6 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     @param threshold: if proportion of "n"s in a sequence is larger than this then
         throw a warning
     """
-
     assert(len(start_seq) == len(end_seq))
 
     # replace all unknowns with an "n"
