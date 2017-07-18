@@ -26,20 +26,19 @@ N_GERMLINES = 1500
 SPARSITY_RATIO = 1.0
 
 models = [
-    {'motif_lens': [3,5], 'positions_mutating': "1:2", 'per_target': False, 'simulation': 'survival'},
-    {'motif_lens': [3,5], 'positions_mutating': "1:2", 'per_target': True, 'simulation': 'survival'},
-    {'motif_lens': [5], 'positions_mutating': "2", 'per_target': True, 'simulation': 'shmulate'},
+    {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
 
 nest.add(
     'model',
     models,
-    label_func=lambda c: "%s_target%s" % ("_".join([str(m) for m in c["motif_lens"]]), c["per_target"]),
+    label_func=lambda c: c["simulation"],
 )
 
 nest.add(
     'replicate',
-    range(localenv['NREPS']),
+    range(1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -51,152 +50,96 @@ nest.add(
 # simulate data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    per_target_model_str = ""
-    if c["model"]["per_target"]:
-        per_target_model_str = "--per-target-model"
-
-    if c["model"]["simulation"] == 'survival':
-        cmd = ['python generate_theta.py',
-               '--seed',
-               c['seed'],
-               '--motif-lens',
-               ",".join([str(m) for m in c['model']['motif_lens']]),
-               '--positions-mutating',
-               c["model"]["positions_mutating"],
-               '--sparsity-ratio',
-               SPARSITY_RATIO,
-               per_target_model_str,
-               '--output-model ${TARGETS[0]}']
-        return env.Command(
-            [join(outdir, 'true_model.pkl')],
-            [],
-            ' '.join(map(str, cmd)))
-
-nest.add(
-    'with_replacement',
-    [
-         False,
-         #True,
+    cmd = ['python generate_theta.py',
+            '--seed',
+            c['seed'],
+            '--motif-lens',
+            ",".join([str(m) for m in c['model']['motif_lens']]),
+            '--positions-mutating',
+            c["model"]["positions_mutating"],
+            '--sparsity-ratio',
+            SPARSITY_RATIO,
+            '--per-target-model',
+            '--output-model ${TARGETS[0]}',
     ]
-)
+    return env.Command(
+        [join(outdir, 'true_model.pkl')],
+        [],
+        ' '.join(map(str, cmd)))
 
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
-    if c["model"]["simulation"] == 'survival':
-        # !! Change this to duncan's code---or just the germline generation/clonal family size...
-        cmd = ['python simulate_from_survival.py',
-               '--seed',
-               c['seed'],
-               '--agg-motif-len',
-               max(c['model']['motif_lens']),
-               '--input-model ${SOURCES[0]}',
-               '--n-taxa',
-               1,
-               '--n-germlines',
-               N_GERMLINES,
-               '--random-gene-len',
-               250,
-               '--min-percent-mutated',
-               0.05,
-               '--output-file ${TARGETS[0]}',
-               '--output-genes ${TARGETS[1]}']
-        if c['with_replacement']:
-            cmd += ['--with-replacement']
-    else:
-        cmd = ['python shmulate_sequences.py',
-               '--seed',
-               c['seed'],
-               '--n-germlines',
-               N_GERMLINES,
-               '--random-gene-len',
-               250,
-               '--min-percent-mutated',
-               0.05,
-               '--max-percent-mutated',
-               0.20,
-               '--output-file ${TARGETS[0]}',
-               '--output-genes ${TARGETS[1]}']
+    shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "use-shmulate"
+
+    cmd = ['python simulate_from_survival.py',
+            '--seed',
+            c['seed'],
+            '--agg-motif-len',
+            max(c['model']['motif_lens']),
+            '--input-model ${SOURCES[0]}',
+            '--n-taxa',
+            30,
+            '--n-germlines',
+            N_GERMLINES,
+            '--min-percent-mutated',
+            0.05,
+            '--max-percent-mutated',
+            0.15,
+            '--output-file ${TARGETS[0]}',
+            '--output-genes ${TARGETS[1]}',
+            shmulate_flag,
+            '--use-partis',
+        ]
 
     return env.Command(
         [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
         c['generate'],
         ' '.join(map(str, cmd)))
 
-motif_params_dict = [
-    {'motif_length': '5', 'left_motif_flanks': '2'},
-]
-
-nest.add(
-    'motif_params',
-    motif_params_dict,
-    label_func=lambda c: 'motif-' + c['motif_length'].replace(',','-') +
-        '-flank-' + c['left_motif_flanks'].replace(',', '-').replace(':', '--'))
-
-nest.add(
-    'per_target',
-    [
-         False,
-         True,
-    ]
-)
-
 @nest.add_target_with_env(localenv)
 def fit_survival(env, outdir, c):
-    cmd = []
-    motif_len = c['motif_params']['motif_length']
-    left_flanks = c['motif_params']['left_motif_flanks']
-    if c['per_target']:
-        if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -8.0, step=-.5)).tolist()))
-        elif c['motif_params']['motif_length'] == '3,5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist()))
-    else:
-        if c['motif_params']['motif_length'] == '5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-5.0, -8.0, step=-.5)).tolist()))
-        elif c['motif_params']['motif_length'] == '3,5':
-            penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist()))
+    motif_lens = c['model']['motif_lens']
+    left_flanks = c['model']['left_motif_flanks']
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -7.0, step=-.5)).tolist()))
 
-    if (c['model']['per_target'] and c['per_target']) or (not c['model']['per_target'] and not c['per_target']):
-        # Only fit per target model to per target simulation and vice versa
-        cmd = ['python fit_context_model.py',
-               '--input-genes ${SOURCES[1]}',
-               '--input-seqs ${SOURCES[0]}',
-               '--seed',
-               c['seed'],
-               '--motif-lens',
-               motif_len,
-               '--positions-mutating',
-               left_flanks,
-               '--penalty-params',
-               penalty_params,
-               '--sample-regime',
-               2,
-               '--num-cpu-threads',
-               4,
-               '--num-jobs',
-               20,
-               '--burn-in',
-               2,
-               '--num-e-samples',
-               4,
-               '--em-max-iters',
-               10,
-               '--num-val-burnin',
-               2,
-               '--num-val-samples',
-               4,
-               '--refit-on-training',
-               '--scratch-directory',
-               SCRATCH_DIR,
-               '--tuning-sample-ratio',
-               0.1,
-               '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}']
-        if c['per_target']:
-            cmd += ['--per-target-model']
+    cmd = ['python fit_context_model.py',
+        '--input-genes ${SOURCES[1]}',
+        '--input-seqs ${SOURCES[0]}',
+        '--seed',
+        c['seed'],
+        '--motif-lens',
+        ",".join(motif_lens),
+        '--positions-mutating',
+        left_flanks,
+        '--penalty-params',
+        penalty_params,
+        '--sample-regime',
+        2,
+        '--num-cpu-threads',
+        4,
+        '--num-jobs',
+        20,
+        '--burn-in',
+        2,
+        '--num-e-samples',
+        4,
+        '--em-max-iters',
+        10,
+        '--num-val-burnin',
+        2,
+        '--num-val-samples',
+        4,
+        '--scratch-directory',
+        SCRATCH_DIR,
+        '--tuning-sample-ratio',
+        0.1,
+        '--out-file ${TARGETS[0]}',
+        '--log-file ${TARGETS[1]}',
+        '--per-target-model',
+    ]
 
     return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt'), join(outdir, 'fitted_train_seqs.csv'), join(outdir, 'fitted_train_genes.csv')],
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['simulate'],
         ' '.join(map(str, cmd)))
 
@@ -205,14 +148,13 @@ def fit_shazam(env, outdir, c):
 
     cmd = ['python fit_shmulate_model.py',
            '--input-file',
-           '${SOURCES[2]}',
+           '${SOURCES[0]}',
            '--input-genes',
-           '${SOURCES[3]}',
+           '${SOURCES[1]}',
            '--model-pkl ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}']
 
     return env.Command(
         [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
-        c['fit_survival'],
+        c['simulate'],
         ' '.join(map(str, cmd)))
-

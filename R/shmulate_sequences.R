@@ -1,13 +1,14 @@
 # Take genes.csv file and run shmulateSeq on each sequence
-source('shmulate/R/SHMulate.R')
-source('shmulate/R/SHMulate_Functions.R')
+library(shazam)
 
 arg <- commandArgs(TRUE)
 gene_file <- arg[1]
-seed <- arg[2]
-min_pct_mut <- as.numeric(arg[3])
-max_pct_mut <- as.numeric(arg[4])
-output_file <- arg[5]
+gene_freq_file <- arg[2]
+tot_taxa <- as.numeric(arg[3])
+seed <- as.numeric(arg[4])
+min_pct_mut <- as.numeric(arg[5])
+max_pct_mut <- as.numeric(arg[6])
+output_file <- arg[7]
 
 set.seed(seed)
 
@@ -20,19 +21,32 @@ run_shmulate <- function(germline) {
 }
 
 genes <- read.csv(gene_file, stringsAsFactors=FALSE)
+gene_freqs <- read.csv(gene_freq_file, stringsAsFactors=FALSE)
 
-seqs <- unname(sapply(genes$germline_sequence, function(seq) run_shmulate(seq)))
-seq_names <- unname(sapply(genes$germline_name, function(name) paste0(name, '-', runif(1))))
+genes <- merge(genes, gene_freqs, by="germline_name")
 
-seq_data_frame <- 
-    data.frame(germline_name=genes$germline_name,
-               locus='',
-               species='',
-               clonal_family=genes$germline_name,
-               group='',
-               subject='',
-               sequence_name=seq_names,
-               sequence=seqs)
+seqs <- apply(genes, 1, function(gene_data) {
+  gene_name <- gene_data[1]
+  gene_seq <- gene_data[2]
+  gene_freq <- as.numeric(gene_data[3])
+
+  n_germ_taxa <- floor(tot_taxa * gene_freq + 1)
+  print(paste(gene_name, n_germ_taxa))
+  mutated_seqs <- replicate(n_germ_taxa, run_shmulate(gene_seq))
+  seq_names <- paste0(gene_name, '-', seq(n_germ_taxa))
+  data.frame(
+    germline_name=gene_name,
+    locus='',
+    species='',
+    # each sequence is one clonal family
+    clonal_family=seq_names,
+    group='',
+    subject='',
+    sequence_name=seq_names,
+    mutated_seqs=mutated_seqs
+  )
+})
+seq_data_frame <- do.call("rbind", seqs)
 
 write.csv(
     seq_data_frame,
@@ -40,4 +54,4 @@ write.csv(
     quote=FALSE,
     row.names=FALSE
 )
-
+warnings()
