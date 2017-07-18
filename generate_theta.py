@@ -71,8 +71,11 @@ def parse_args():
     parser.add_argument('--shuffle',
         action="store_true",
         help='Use a shuffled version of the S5F parameters')
+    parser.add_argument('--use-shmulate-as-truth',
+        action="store_true",
+        help='Use shmulate to do SHM')
 
-    parser.set_defaults(per_target_model=False, shuffle=False)
+    parser.set_defaults(per_target_model=False, shuffle=False, use_shmulate_as_truth=False)
     args = parser.parse_args()
 
     args.motif_lens = [int(m) for m in args.motif_lens.split(",")]
@@ -209,23 +212,29 @@ def main(args=sys.argv[1:]):
         left_motif_flank_len_list=args.max_mut_pos,
     )
 
-    theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
-    avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
-    theta_raw, theta_mask = _generate_true_parameters(
-        hier_feat_generator,
-        args,
-        theta_sampling_col0,
-        theta_sampling_col_prob,
-    )
+    if args.use_shmulate_as_truth:
+        h5f_theta = _read_mutability_probability_params(args)
+        h5f_theta[h5f_theta == 0] = -np.inf
+        h5f_theta[h5f_theta != -np.inf] = np.log(h5f_theta[h5f_theta != -np.inf])
+        dump_parameters(h5f_theta, h5f_theta, args, hier_feat_generator)
+    else:
+        theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
+        avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
+        theta_raw, theta_mask = _generate_true_parameters(
+            hier_feat_generator,
+            args,
+            theta_sampling_col0,
+            theta_sampling_col_prob,
+        )
 
-    agg_theta_raw = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta_raw, np.zeros(theta_raw.shape, dtype=bool), theta_mask, keep_col0=False)
+        agg_theta_raw = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta_raw, np.zeros(theta_raw.shape, dtype=bool), theta_mask, keep_col0=False)
 
-    # Now rescale theta according to effect size
-    mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude
-    agg_theta = agg_theta_raw * mult_factor
-    theta_raw = theta_raw * mult_factor
+        # Now rescale theta according to effect size
+        mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude
+        agg_theta = agg_theta_raw * mult_factor
+        theta_raw = theta_raw * mult_factor
 
-    dump_parameters(agg_theta, theta_raw, args, hier_feat_generator)
+        dump_parameters(agg_theta, theta_raw, args, hier_feat_generator)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

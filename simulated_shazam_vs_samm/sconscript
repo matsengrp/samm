@@ -49,6 +49,7 @@ nest.add(
 # simulate data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
+    shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
     cmd = ['python generate_theta.py',
             '--seed',
             c['seed'],
@@ -59,6 +60,7 @@ def generate(env, outdir, c):
             '--sparsity-ratio',
             SPARSITY_RATIO,
             '--per-target-model',
+            shmulate_flag,
             '--output-model ${TARGETS[0]}',
     ]
     return env.Command(
