@@ -141,8 +141,11 @@ def parse_args():
         type=float,
         help="confidence interval z statistic",
         default=1.96)
+    parser.add_argument("--omit-hessian",
+        action="store_true",
+        help="do not calculate the hessian")
 
-    parser.set_defaults(per_target_model=False, conf_int_stop=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False, omit_hessian=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -299,6 +302,7 @@ def main(args=sys.argv[1:]):
     cmodel_algo.refit_unpenalized(
         model_result=results_list[best_model_idx],
         max_em_iters=args.em_max_iters,
+        get_hessian=not args.omit_hessian,
     )
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:

@@ -125,7 +125,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, model_result, max_em_iters):
+    def refit_unpenalized(self, model_result, max_em_iters, get_hessian=True):
         """
         Refit the model
         Modifies model_result
@@ -165,7 +165,7 @@ class ContextModelAlgo:
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
             intermed_file_prefix="%s/e_samples_%f_full_" % (self.intermediate_out_dir, 0),
-            get_hessian=True,
+            get_hessian=get_hessian,
         )
 
         log.info("==== Refit theta, %s====" % model_result)
