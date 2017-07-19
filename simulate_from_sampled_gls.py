@@ -8,20 +8,20 @@
 import subprocess
 import sys
 import argparse
-import pandas as pd
 import numpy as np
 import os
 import os.path
 import csv
 import pickle
+import warnings
 
 from common import *
 from read_data import *
 from Bio import SeqIO
+from scipy.stats import poisson
 
 from submotif_feature_generator import SubmotifFeatureGenerator
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
-from simulate_from_survival import random_generate_thetas
 from simulate_germline import GermlineSimulatorPartis
 
 from gctree.bin.gctree import MutationModel, CollapsedTree
@@ -88,9 +88,6 @@ def parse_args():
         type=str,
         default='3,5',
         help='comma-separated motif lengths (odd only)')
-    parser_simulate.add_argument('--use-s5f',
-        action="store_true",
-        help="use s5f parameters")
     parser_simulate.add_argument('--lambda0',
         type=float,
         default=None,
@@ -111,11 +108,27 @@ def parse_args():
         type=str,
         default='_output/gctree_per_branch_genes.csv',
         help='additionally output genes from single branches with intermediate ancestors instead of leaves from germline')
+    parser_simulate.add_argument('--max-taxa-per-family',
+        type=int,
+        default=1000,
+        help='the maximum taxa per family to simulate when getting clonal family size statistics')
     parser_simulate.add_argument('--output-per-branch-seqs',
         type=str,
         default='_output/gctree_per_branch_seqs.csv',
         help='additionally output genes from single branches with intermediate ancestors instead of leaves from germline')
-    parser_simulate.set_defaults(func=simulate, use_s5f=False, subcommand=simulate)
+    parser_simulate.add_argument('--use-v',
+        action="store_true",
+        help="use V gene only")
+    parser_simulate.add_argument('--use-np',
+        action="store_true",
+        help="use nonproductive sequences")
+    parser_simulate.add_argument('--use-immunized',
+        action="store_true",
+        help="use immunized mice")
+    parser_simulate.add_argument('--use-partis',
+        action="store_true",
+        help="use partis germline generation")
+    parser_simulate.set_defaults(func=simulate, subcommand=simulate)
 
     ###
     # for parsing
@@ -123,80 +136,30 @@ def parse_args():
     args = parser.parse_args()
     args.motif_lens = sorted(map(int, args.motif_lens.split(",")))
 
-    if args.use_s5f:
-        args.mutability = 'gctree/S5F/Mutability.csv'
-        args.substitution = 'gctree/S5F/Substitution.csv'
-    else:
-        args.out_dir = os.path.dirname(args.output_true_theta)
-        args.mutability = "%s/mutability.csv" % args.out_dir
-        args.substitution = "%s/substitution.csv" % args.out_dir
-    print args
+    args.mutability = 'gctree/S5F/Mutability.csv'
+    args.substitution = 'gctree/S5F/Substitution.csv'
 
     return args
-
 
 def run_gctree(args, germline_seq, mutation_model, n_taxa):
     ''' somewhat cannibalized gctree simulation '''
 
     if args.lambda0 is None:
         args.lambda0 = max([1, int(.01*len(germline_seq))])
-    trials = 1000
-    # this loop makes us resimulate if size too small, or backmutation
-    for trial in range(trials):
-        try:
-            tree = mutation_model.simulate(germline_seq,
-                                           lambda0=args.lambda0,
-                                        #    r=args.r,
-                                           N=n_taxa,
-                                           T=args.T)
-            collapsed_tree = CollapsedTree(tree=tree, frame=args.frame) # <-- this will fail if backmutations
-            break
-        except RuntimeError as e:
-            if args.verbose:
-                print('{}, trying again'.format(e))
-        else:
-            raise
+    tree = mutation_model.simulate(germline_seq,
+                                   lambda0=args.lambda0,
+                                   N=n_taxa,
+                                   T=args.T,
+                                   progeny=poisson(.9, loc=1))
 
     return tree
 
-def generate_theta(motif_list, motif_lens, per_target_model, output_mutability, output_substitution, output_model):
-    """
-    Generates random theta vector/matrix and probability matrix.
-    Then writes them all to file
-    """
-    max_motif_len = max(motif_lens)
-    true_theta, raw_theta = random_generate_thetas(motif_list, motif_lens, per_target_model)
-    if per_target_model:
-        raise NotImplementedError()
-    else:
-        probability_matrix = np.ones((len(motif_list), NUM_NUCLEOTIDES)) * 1.0/3
-        for idx, m in enumerate(motif_list):
-            center_nucleotide_idx = NUCLEOTIDE_DICT[m[max_motif_len/2]]
-            probability_matrix[idx, center_nucleotide_idx] = 0
-
-    with open(output_model, "w") as f:
-        pickle.dump((true_theta, probability_matrix, raw_theta), f)
-
-    with open(output_mutability, "w") as f:
-        csv_writer = csv.writer(f, delimiter=' ')
-        csv_writer.writerow(["Motif", "Mutability"])
-        for i, motif in enumerate(motif_list):
-            csv_writer.writerow([motif.upper(), np.asscalar(np.exp(true_theta[i]))])
-
-    with open(output_substitution, "w") as f:
-        csv_writer = csv.writer(f, delimiter=' ')
-        csv_writer.writerow(["Motif", "A", "C", "G", "T"])
-        for i, motif in enumerate(motif_list):
-            csv_writer.writerow([motif.upper()] + probability_matrix[i,:].tolist())
-
-    return true_theta, probability_matrix, raw_theta
-
 def _get_germline_info(args):
+    germline_info = []
     if args.use_partis:
         current_dir = os.path.dirname(os.path.realpath(__file__))
         g = GermlineSimulatorPartis(output_dir=current_dir + "/_output")
         germline_seqs, germline_freqs = g.generate_germline_set()
-        germline_info = []
         for name in germline_seqs.keys():
             germline_info.append({
                 'gene_name': name,
@@ -216,7 +179,6 @@ def _get_germline_info(args):
 
         # Put the nucleotide content of each selected germline gene into a
         # corresponding list.
-        germline_info = []
         for name, nucs in zip(germline_genes, [params.loc[gene]['base'] for gene in germline_genes]):
             germline_info.append({
                 'gene_name': name,
@@ -230,30 +192,21 @@ def simulate(args):
     ''' simulate submodule '''
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=args.motif_lens)
 
-    if not args.use_s5f:
-        generate_theta(
-            feat_generator.feat_gens[-1].motif_list,
-            args.motif_lens,
-            False,
-            args.mutability,
-            args.substitution,
-            args.output_true_theta,
-        )
-        mutation_model = MutationModel(args.mutability, args.substitution)
-    else:
-        # using s5f
-        mutation_model = MutationModel(args.mutability, args.substitution)
-        context_model = mutation_model.context_model
-        true_thetas = np.empty((feat_generator.feature_vec_len, 1))
-        probability_matrix = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
-        for motif_idx, motif in enumerate(feat_generator.motif_list):
-            mutability = context_model[motif.upper()][0]
-            true_thetas[motif_idx] = np.log(mutability)
-            for nuc in NUCLEOTIDES:
-                probability_matrix[motif_idx, NUCLEOTIDE_DICT[nuc]] = context_model[motif.upper()][1][nuc.upper()]
+    mutation_model = MutationModel(args.mutability, args.substitution)
+    context_model = mutation_model.context_model
+    true_thetas = np.empty((feat_generator.feature_vec_len, 1))
+    probability_matrix = np.empty((feat_generator.feature_vec_len, NUM_NUCLEOTIDES))
+    for motif_idx, motif in enumerate(feat_generator.motif_list):
+        mutability = context_model[motif.upper()][0]
+        true_thetas[motif_idx] = np.log(mutability)
+        for nuc in NUCLEOTIDES:
+            probability_matrix[motif_idx, NUCLEOTIDE_DICT[nuc]] = context_model[motif.upper()][1][nuc.upper()]
 
-        with open(args.output_true_theta, 'w') as output_theta:
-            pickle.dump([true_thetas, probability_matrix], output_theta)
+    probability_matrix[probability_matrix == 0] = -np.inf
+    probability_matrix[probability_matrix != -np.inf] = np.log(probability_matrix[probability_matrix != -np.inf])
+
+    with open(args.output_true_theta, 'w') as output_theta:
+        pickle.dump([true_thetas, probability_matrix], output_theta)
 
     # write empty sequence file before appending
     output_dir, _ = os.path.split(args.output_seqs)
@@ -263,9 +216,17 @@ def simulate(args):
     # Randomly generate number of mutations or use default
     np.random.seed(args.seed)
 
-    if args.n_taxa is None and args.n_germlines is None:
-        clonal_family_sizes = get_data_stats_from_partis(args.path_to_annotations, args.path_to_metadata, use_v=True, use_np=False, use_immunized=True)
+    if args.n_taxa is None:
+        clonal_family_sizes = get_data_stats_from_partis(args.path_to_annotations, args.path_to_metadata, use_v=args.use_v, use_np=args.use_np, use_immunized=args.use_immunized)
+        large_list = [n_taxa for n_taxa in clonal_family_sizes if n_taxa > args.max_taxa_per_family]
+        if large_list:
+            warnings.warn("There were {0} clonal families with more than {1} taxa. Ignoring: {2}".format(len(large_list), args.max_taxa_per_family, large_list))
+            clonal_family_sizes = [n_taxa for n_taxa in clonal_family_sizes if n_taxa <= args.max_taxa_per_family]
+
+    if args.n_germlines is None:
         args.n_germlines = len(clonal_family_sizes)
+    else:
+        clonal_family_sizes = np.random.choice(clonal_family_sizes, args.n_germlines)
 
     list_of_gene_dicts = _get_germline_info(args)
     for idx, gene_dict in enumerate(list_of_gene_dicts):
