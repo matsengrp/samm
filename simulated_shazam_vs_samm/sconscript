@@ -25,10 +25,8 @@ SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 1.0
 
 models = [
-    {'simulation': 'survival', 'motif_lens': [1], 'positions_mutating': "0"},
-    {'simulation': 'shmulate', 'motif_lens': [1], 'positions_mutating': "0"},
-    # {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
-    # {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    #{'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
 
 nest.add(
@@ -39,7 +37,7 @@ nest.add(
 
 nest.add(
     'replicate',
-    range(1),
+    range(0,2),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -51,7 +49,10 @@ nest.add(
 # simulate data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
+    shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
     cmd = ['python generate_theta.py',
+            '--mutability R/shmulate_params/mutability.csv',
+            '--substitution R/shmulate_params/substitution.csv',
             '--seed',
             c['seed'],
             '--motif-lens',
@@ -61,6 +62,7 @@ def generate(env, outdir, c):
             '--sparsity-ratio',
             SPARSITY_RATIO,
             '--per-target-model',
+            shmulate_flag,
             '--output-model ${TARGETS[0]}',
     ]
     return env.Command(
@@ -79,7 +81,7 @@ def simulate(env, outdir, c):
             max(c['model']['motif_lens']),
             '--input-model ${SOURCES[0]}',
             '--n-taxa',
-            1, #30,
+            40,
             '--min-percent-mutated',
             0.05,
             '--max-percent-mutated',
@@ -99,7 +101,7 @@ def simulate(env, outdir, c):
 def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -7.0, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
 
     cmd = ['python fit_context_model.py',
         '--input-genes ${SOURCES[1]}',
@@ -113,21 +115,21 @@ def fit_survival(env, outdir, c):
         '--penalty-params',
         penalty_params,
         '--sample-regime',
-        2,
+        1, # use all the sequences since we generate from star tree (and we dont rename germlines)
         '--num-cpu-threads',
         4,
         '--num-jobs',
-        1, #20,
+        20,
         '--burn-in',
-        1, #2,
+        2,
         '--num-e-samples',
-        1, #4,
+        4,
         '--em-max-iters',
-        1, #10,
+        10,
         '--num-val-burnin',
-        1, #2,
+        2,
         '--num-val-samples',
-        1, #4,
+        4,
         '--scratch-directory',
         SCRATCH_DIR,
         '--tuning-sample-ratio',
