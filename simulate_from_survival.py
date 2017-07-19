@@ -84,8 +84,8 @@ def parse_args():
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
-        current_dir = os.path.dirname(os.path.realpath(__file__))
-        g = GermlineSimulatorPartis(output_dir=current_dir + "/_output")
+        out_dir = os.path.dirname(os.path.realpath(args.output_genes))
+        g = GermlineSimulatorPartis(output_dir=out_dir)
         germline_seqs, germline_freqs = g.generate_germline_set()
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
