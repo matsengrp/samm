@@ -290,6 +290,67 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
 
     return genes_line, seq_line
 
+def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_file_name):
+    """
+    @param output_genes: where to write processed germline data, if wanted
+    @param output_genes: where to write processed sequence data, if wanted
+    @param gene_file_name: csv file with germline names and sequences
+    @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
+    """
+
+    genes = pd.read_csv(gene_file_name)
+    seqs = pd.read_csv(seq_file_name)
+
+    full_data = pd.merge(genes, seqs, on='germline_name')
+
+    out_genes = []
+    out_seqs = []
+    for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
+        seqs_line = []
+        genes_line = []
+        gl_seq = cluster['germline_sequence'].values[0].lower()
+        gl_name = cluster['germline_name'].values[0]
+        # Use dnapars to impute nucleotides at intermediate sequences
+
+        # First process sequences to remove unknown nucleotides at the
+        # beginning and end of sequences
+        proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
+        proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
+        sampled_index = random.choice(cluster.index)
+        elt = cluster.loc[sampled_index]
+
+        meta_in_cluster = cluster.iloc[0].to_dict()
+        meta_in_cluster.pop('germline_sequence', None)
+
+        proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'].lower())
+        proc_seq = re.sub('^n+|n+$', '', proc_seq)
+        if len(proc_seq) != len(proc_gl_seq):
+            continue
+
+        current_seq = meta_in_cluster.copy()
+        if cmp(proc_seq, proc_gl_seq):
+            # There are mutations so add to output
+            genes_line.append({'germline_name': gl_name,
+                'germline_sequence': proc_gl_seq})
+            current_seq['germline_name'] = gl_name
+            current_seq['sequence_name'] = elt['sequence_name']
+            current_seq['sequence'] = proc_seq
+            seqs_line.append(meta_in_cluster)
+        else:
+            # No mutations, skip
+            continue
+
+        out_genes += genes_line
+        out_seqs += seqs_line
+
+    with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
+        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values))
+        gene_writer.writeheader()
+        gene_writer.writerows(out_genes)
+        seq_writer = csv.DictWriter(seqs_file, list(seqs.columns.values))
+        seq_writer.writeheader()
+        seq_writer.writerows(out_seqs)
+
 def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_file_name, motif_len=1, scratch_dir='_output', verbose=True):
     """
     @param output_genes: where to write processed germline data, if wanted
@@ -342,6 +403,7 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
             # If there is only one sequence, dnapars still won't do anything,
             # but there might be information if there are mutations
 
+            current_seq = meta_in_cluster.copy()
             if cmp(seqs_in_cluster[0], proc_gl_seq):
                 # There are mutations so add to output
                 genes_line.append({'germline_name': gl_name,
@@ -362,8 +424,8 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
                     gl_name='gene'+str(gl_idx),
                     verbose=verbose
                 )
-            current_seq = meta_in_cluster
             for seq_line in pars_seq:
+                current_seq = meta_in_cluster.copy()
                 current_seq['germline_name'] = seq_line[0]
                 current_seq['sequence_name'] = seq_line[1]
                 current_seq['sequence'] = seq_line[2]
@@ -591,3 +653,20 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         add_targets=add_targets,
     )
     return best_model
+
+def read_germline_file(fasta):
+    """
+    Read fasta file containing germlines
+
+    @return dataframe with column "gene" for the name of the germline gene and
+    "base" for the nucleotide content
+    """
+
+    with open(fasta) as fasta_file:
+        genes = []
+        bases = []
+        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
+            genes.append(seq_record.id)
+            bases.append(str(seq_record.seq))
+
+    return pd.DataFrame({'base': bases}, index=genes)
