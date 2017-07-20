@@ -8,7 +8,7 @@ from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
-from matsen_grp_data import SCRATCH_DIR
+from matsen_grp_data import SCRATCH_DIR, CUI_DATA_PATH
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from itertools import izip
 
@@ -23,8 +23,8 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 MOTIF_LEN = 5
 MUTATING_POSITION = 2
-# !!
-PENALTY_PARAMS = ','.join([.001, .0001])
+N_GERMLINES = 1500
+PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-0.25)).tolist()))
 
 # Nest for replicates
 nest.add(
@@ -41,67 +41,73 @@ nest.add(
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    cmd = ['python simulate_from_sampled_gls.py simulate',
+    generate_cmd = ['python simulate_from_sampled_gls.py simulate',
            '--seed',
            c['seed'],
-           '--use-s5f',
+           '--use-v',
+           '--use-immunized',
+           '--path-to-annotations',
+           CUI_DATA_PATH,
+            '--path-to-metadata',
+           CUI_DATA_PATH + '/meta.csv',
+           '--motif-lens',
+           MOTIF_LEN,
+           '--n-germlines',
+           N_GERMLINES,
            '--output-true-theta ${TARGETS[0]}',
            '--output-genes ${TARGETS[1]}',
            '--output-seqs ${TARGETS[2]}',
            '--output-per-branch-genes ${TARGETS[3]}',
            '--output-per-branch-seqs ${TARGETS[4]}']
 
-    return env.Command(
-        [join(outdir, 'true_theta.pkl'), join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
-         join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv')],
-        [],
-        ' '.join(map(str, cmd)))
-
-nest.add(
-    'motif_length',
-    [
-        5,
-    ],
-    label_func='{:02d}mers'.format)
-
-@nest.add_target_with_env(localenv)
-def process(env, outdir, c):
-    cmd = ['python preprocess_data.py',
-           '--input-genes ${SOURCES[1]}',
-           '--input-seqs ${SOURCES[2]}',
+    process_cmd = ['python preprocess_data.py',
+           '--input-genes ${TARGETS[1]}',
+           '--input-seqs ${TARGETS[2]}',
            '--motif-len',
            MOTIF_LEN,
            '--impute-ancestors',
+           '--sample-from-family',
            '--scratch-directory',
            SCRATCH_DIR,
-           '--output-genes ${TARGETS[0]}',
-           '--output-seqs ${TARGETS[1]}']
+           '--output-genes-imputed ${TARGETS[5]}',
+           '--output-seqs-imputed ${TARGETS[6]}',
+           '--output-genes-sampled ${TARGETS[7]}',
+           '--output-seqs-sampled ${TARGETS[8]}']
+
+    cmd = generate_cmd + ['&&'] + process_cmd
 
     return env.Command(
-        [join(outdir, 'genes_with_imputed_ancestors.csv'), join(outdir, 'seqs_with_imputed_ancestors.csv')],
-        c['generate'],
+        [join(outdir, 'true_theta.pkl'), join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
+         join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv'),
+         join(outdir, 'genes_with_imputed_ancestors.csv'), join(outdir, 'seqs_with_imputed_ancestors.csv'),
+         join(outdir, 'genes_sampled.csv'), join(outdir, 'seqs_sampled.csv')],
+        [],
         ' '.join(map(str, cmd)))
 
 def write_truth(target, source, env):
     c = env['control']
     with open(str(source[0]), 'r') as f:
-        theta, _ = pickle.load(f)
+        theta_mut, theta_sub = pickle.load(f)
 
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
     motif_list = feat_generator.motif_list
-    mutabilities = theta
+
+    columns = 'rep motif col theta model'.split()
+    data = []
+    for col in range(5):
+        for idx, motif in enumerate(motif_list):
+            data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'model': 'truth'}
+            if col == 0:
+                data_dict['theta'] = theta_mut.ravel()[idx]
+            else:
+                data_dict['theta'] = theta_sub[idx, col - 1]
+
+            data.append(data_dict)
 
     with open(str(target[0]), 'wb') as f:
-        writer = csv.writer(f)
-        writer.writerow(
-            'rep sim model'.split() +
-            [motif.upper() for motif in motif_list]
-        )
-        writer.writerow([
-            c['replicate'],
-            'truth'] +
-            mutabilities.ravel().tolist()
-        )
+        writer = csv.DictWriter(f, columns)
+        writer.writeheader()
+        writer.writerows(data)
 
 @nest.add_target_with_env(localenv)
 def convert_truth(env, outdir, c):
@@ -113,21 +119,36 @@ def convert_truth(env, outdir, c):
 
 nest.add_aggregate('compare_models', list)
 
-data_dict = [
-    {'data_type': 'true_ancestors',
-     'sampling_option': 1},
-    {'data_type': 'imputed_ancestors',
-     'sampling_option': 1},
-    {'data_type': 'all_data',
-     'sampling_option': 1},
-    {'data_type': 'sample_random',
-     'sampling_option': 2},
-]
-
 nest.add(
     'data_type',
-    data_dict,
-    label_func=lambda c: c['data_type'])
+    [
+        'true_ancestors',
+        'imputed_ancestors',
+        'all_data',
+        'sample_random',
+    ])
+
+@nest.add_target_with_env(localenv)
+def fit_shazam(env, outdir, c):
+
+    cmd = ['python fit_shmulate_model.py',
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}',
+           '--center-median']
+
+    if c['data_type'] == 'true_ancestors':
+        cmd += ['--input-genes ${SOURCES[3]} --input-file ${SOURCES[4]}']
+    elif c['data_type'] == 'imputed_ancestors':
+        cmd += ['--input-genes ${SOURCES[5]} --input-file ${SOURCES[6]}']
+    elif c['data_type'] == 'sample_random':
+        cmd += ['--input-genes ${SOURCES[7]} --input-file ${SOURCES[8]}']
+    else:
+        cmd += ['--input-genes ${SOURCES[1]} --input-file ${SOURCES[2]}']
+
+    return env.Command(
+        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
 
 # fit survival
 @nest.add_target_with_env(localenv)
@@ -141,11 +162,11 @@ def fit_survival(env, outdir, c):
            '--seed',
            c['seed'],
            '--motif-lens',
-           motif_len,
+           '3,5',
            '--positions-mutating',
-           left_flanks,
+           '1:2',
            '--penalty-params',
-           penalty_params,
+           PENALTY_PARAMS,
            '--num-cpu-threads',
            4,
            '--num-jobs',
@@ -160,8 +181,6 @@ def fit_survival(env, outdir, c):
            2,
            '--num-val-samples',
            4,
-           '--sample-regime',
-           SAMPLE_OR_IMPUTE, # sample one seq from clonal family
            '--scratch-directory',
            SCRATCH_DIR,
            '--tuning-sample-ratio',
@@ -173,7 +192,9 @@ def fit_survival(env, outdir, c):
     if c['data_type'] == 'true_ancestors':
         cmd += ['--input-genes ${SOURCES[0][3]} --input-seqs ${SOURCES[0][4]}']
     elif c['data_type'] == 'imputed_ancestors':
-        cmd += ['--input-genes ${SOURCES[1][0]} --input-seqs ${SOURCES[1][2]}']
+        cmd += ['--input-genes ${SOURCES[1][0]} --input-seqs ${SOURCES[1][1]}']
+    elif c['data_type'] == 'sample_random':
+        cmd += ['--input-genes ${SOURCES[1][2]} --input-seqs ${SOURCES[1][3]}']
     else:
         cmd += ['--input-genes ${SOURCES[0][1]} --input-seqs ${SOURCES[0][2]}']
 
@@ -183,49 +204,36 @@ def fit_survival(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 @nest.add_target_with_env(localenv)
-def fit_shazam(env, outdir, c):
-
-    cmd = ['python fit_shmulate_model.py',
-           '--input-file',
-           '${SOURCES[2]}',
-           '--input-genes',
-           '${SOURCES[3]}',
-           '--model-pkl ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
-
-    return env.Command(
-        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
-        c['fit_survival'],
-        ' '.join(map(str, cmd)))
-
-@nest.add_target_with_env(localenv)
 def convert_fit(env, outdir, c):
 
     def write_files(target, source, env):
         c = env['control']
         with open(str(source[0]), 'r') as f:
-            theta, _ = pickle.load(f)
+            theta_mut, (_, theta_sub) = pickle.load(f)
 
-        feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[c['motif_length']])
+        feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
         motif_list = feat_generator.motif_list
-        mutabilities = theta
+
+        columns = 'rep motif col theta model'.split()
+        data = []
+        for col in range(5):
+            for idx, motif in enumerate(motif_list):
+                data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'model': c['data_type']}
+                if col == 0:
+                    data_dict['theta'] = theta_mut.ravel()[idx]
+                else:
+                    data_dict['theta'] = theta_sub[idx, col - 1]
+
+                data.append(data_dict)
 
         with open(str(target[0]), 'wb') as f:
-            writer = csv.writer(f)
-            writer.writerow(
-                'rep sim data model'.split() +
-                [motif.upper() for motif in motif_list]
-            )
-            writer.writerow([
-                c['replicate'],
-                c['data_type']['data_type'],
-                c['model_options']] +
-                mutabilities.ravel().tolist()
-            )
+            writer = csv.DictWriter(f, columns)
+            writer.writeheader()
+            writer.writerows(data)
 
     c['compare_models'].append(env.Command(
         join(outdir, 'fitted.csv'),
-        c['fit_context_model'],
+        c['fit_shazam'],
         write_files,
         control=c))
 
