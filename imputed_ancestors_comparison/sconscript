@@ -3,6 +3,7 @@
 import os
 import pickle
 import csv
+import numpy as np
 
 from os.path import join
 from nestly.scons import SConsWrap
@@ -11,6 +12,7 @@ from SCons.Script import Environment, Command, AddOption
 from matsen_grp_data import SCRATCH_DIR, CUI_DATA_PATH
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from itertools import izip
+from common import pick_best_model
 
 Import('env')
 localenv = env.Clone()
@@ -23,8 +25,10 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 MOTIF_LEN = 5
 MUTATING_POSITION = 2
-N_GERMLINES = 1500
+N_CLONAL_FAMILIES = 25
 PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-0.25)).tolist()))
+MUTABILITY_PATH = 'gctree/S5F/Mutability.csv'
+SUBSTITUTION_PATH = 'gctree/S5F/Substitution.csv'
 
 # Nest for replicates
 nest.add(
@@ -38,46 +42,72 @@ nest.add(
     lambda c: [c['replicate']],
     create_dir=False)
 
+@nest.add_target_with_env(localenv)
+def generate_theta(env, outdir, c):
+    cmd = ['python generate_theta.py',
+           '--mutability',
+           MUTABILITY_PATH,
+           '--substitution',
+           SUBSTITUTION_PATH,
+           '--motif-lens',
+           MOTIF_LEN,
+           '--positions_mutating',
+           MUTATING_POSITION,
+           '--use-shmulate-as-truth',
+           '--per-target',
+           '--output-model ${TARGETS[0]}']
+
+    return env.Command(
+        [join(outdir, 'true_theta.pkl')],
+        [],
+        ' '.join(map(str, cmd)))
+
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
-def generate(env, outdir, c):
+def generate_seqs(env, outdir, c):
     generate_cmd = ['python simulate_from_sampled_gls.py simulate',
            '--seed',
            c['seed'],
+           '--mutability',
+           MUTABILITY_PATH,
+           '--substitution',
+           SUBSTITUTION_PATH,
            '--use-v',
            '--use-immunized',
+           '--use-partis',
+           '--locus',
+           'igk',
            '--path-to-annotations',
            CUI_DATA_PATH,
             '--path-to-metadata',
            CUI_DATA_PATH + '/meta.csv',
            '--motif-lens',
            MOTIF_LEN,
-           '--n-germlines',
-           N_GERMLINES,
-           '--output-true-theta ${TARGETS[0]}',
-           '--output-genes ${TARGETS[1]}',
-           '--output-seqs ${TARGETS[2]}',
-           '--output-per-branch-genes ${TARGETS[3]}',
-           '--output-per-branch-seqs ${TARGETS[4]}']
+           '--n-clonal-families',
+           N_CLONAL_FAMILIES,
+           '--output-germline-seqs ${TARGETS[0]}',
+           '--output-seqs ${TARGETS[1]}',
+           '--output-per-branch-germline-seqs ${TARGETS[2]}',
+           '--output-per-branch-seqs ${TARGETS[3]}']
 
     process_cmd = ['python preprocess_data.py',
-           '--input-genes ${TARGETS[1]}',
-           '--input-seqs ${TARGETS[2]}',
+           '--input-genes ${TARGETS[0]}',
+           '--input-seqs ${TARGETS[1]}',
            '--motif-len',
            MOTIF_LEN,
            '--impute-ancestors',
            '--sample-from-family',
            '--scratch-directory',
            SCRATCH_DIR,
-           '--output-genes-imputed ${TARGETS[5]}',
-           '--output-seqs-imputed ${TARGETS[6]}',
-           '--output-genes-sampled ${TARGETS[7]}',
-           '--output-seqs-sampled ${TARGETS[8]}']
+           '--output-genes-imputed ${TARGETS[4]}',
+           '--output-seqs-imputed ${TARGETS[5]}',
+           '--output-genes-sampled ${TARGETS[6]}',
+           '--output-seqs-sampled ${TARGETS[7]}']
 
     cmd = generate_cmd + ['&&'] + process_cmd
 
     return env.Command(
-        [join(outdir, 'true_theta.pkl'), join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
+        [join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
          join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv'),
          join(outdir, 'genes_with_imputed_ancestors.csv'), join(outdir, 'seqs_with_imputed_ancestors.csv'),
          join(outdir, 'genes_sampled.csv'), join(outdir, 'seqs_sampled.csv')],
@@ -113,7 +143,7 @@ def write_truth(target, source, env):
 def convert_truth(env, outdir, c):
     return env.Command(
         join(outdir, 'true_theta.csv'),
-        c['generate'],
+        c['generate_theta'],
         write_truth,
         control=c)
 
@@ -147,7 +177,7 @@ def fit_shazam(env, outdir, c):
 
     return env.Command(
         [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
-        c['generate'],
+        c['generate_seqs'],
         ' '.join(map(str, cmd)))
 
 # fit survival
@@ -185,26 +215,27 @@ def fit_survival(env, outdir, c):
            SCRATCH_DIR,
            '--tuning-sample-ratio',
            0.1,
+           '--omit-hessian',
            '--out-file ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}',
            '--per-target-model']
 
     if c['data_type'] == 'true_ancestors':
-        cmd += ['--input-genes ${SOURCES[0][3]} --input-seqs ${SOURCES[0][4]}']
+        cmd += ['--input-genes ${SOURCES[3]} --input-file ${SOURCES[4]}']
     elif c['data_type'] == 'imputed_ancestors':
-        cmd += ['--input-genes ${SOURCES[1][0]} --input-seqs ${SOURCES[1][1]}']
+        cmd += ['--input-genes ${SOURCES[5]} --input-file ${SOURCES[6]}']
     elif c['data_type'] == 'sample_random':
-        cmd += ['--input-genes ${SOURCES[1][2]} --input-seqs ${SOURCES[1][3]}']
+        cmd += ['--input-genes ${SOURCES[7]} --input-file ${SOURCES[8]}']
     else:
-        cmd += ['--input-genes ${SOURCES[0][1]} --input-seqs ${SOURCES[0][2]}']
+        cmd += ['--input-genes ${SOURCES[1]} --input-file ${SOURCES[2]}']
 
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt'), join(outdir, 'fitted_train_seqs.csv'), join(outdir, 'fitted_train_genes.csv')],
-        [c['generate'], c['process']],
+        c['generate_seqs'],
         ' '.join(map(str, cmd)))
 
 @nest.add_target_with_env(localenv)
-def convert_fit(env, outdir, c):
+def convert_fit_shazam(env, outdir, c):
 
     def write_files(target, source, env):
         c = env['control']
@@ -232,8 +263,56 @@ def convert_fit(env, outdir, c):
             writer.writerows(data)
 
     c['compare_models'].append(env.Command(
-        join(outdir, 'fitted.csv'),
+        join(outdir, 'fitted_shazam.csv'),
         c['fit_shazam'],
+        write_files,
+        control=c))
+
+@nest.add_target_with_env(localenv)
+def convert_fit_survival(env, outdir, c):
+
+    def write_files(target, source, env):
+        c = env['control']
+        with open(str(source[0]), 'r') as f:
+            fitted_models = pickle.load(f)
+            best_model = pick_best_model(fitted_models)
+
+        hier_feat_gen = HierarchicalMotifFeatureGenerator(
+            motif_lens=best_model.motif_lens,
+            feats_to_remove=best_model.model_masks.feats_to_remove,
+            left_motif_flank_len_list=best_model.positions_mutating,
+        )
+        agg_feat_gen = HierarchicalMotifFeatureGenerator(
+            motif_lens=[MOTIF_LEN],
+            left_motif_flank_len_list=[[MUTATING_POSITION]],
+        )
+        theta = create_aggregate_theta(
+            hier_feat_gen,
+            agg_feat_gen,
+            best_model.refit_theta,
+            best_model.model_masks.zero_theta_mask_refit,
+            best_model.refit_possible_theta_mask,
+            keep_col0=False,
+        )
+
+        motif_list = agg_feat_gen.motif_list
+
+        columns = 'rep motif col theta model'.split()
+        data = []
+        for col in range(5):
+            for idx, motif in enumerate(motif_list):
+                data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'model': c['data_type']}
+                data_dict['theta'] = theta[idx, col]
+                data.append(data_dict)
+
+        with open(str(target[0]), 'wb') as f:
+            writer = csv.DictWriter(f, columns)
+            writer.writeheader()
+            writer.writerows(data)
+
+    c['compare_models'].append(env.Command(
+        join(outdir, 'fitted_surv.csv'),
+        c['fit_survival'],
         write_files,
         control=c))
 
