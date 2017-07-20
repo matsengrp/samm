@@ -350,7 +350,6 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     @param threshold: if proportion of "n"s in a sequence is larger than this then
         throw a warning
     """
-
     assert(len(start_seq) == len(end_seq))
 
     # replace all unknowns with an "n"
@@ -460,13 +459,14 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column, val_column_idx=None):
     """
     @param num_obs: number of observations
     @param feat_generator: submotif feature generator
     @param metadata: metadata to include variables to perform validation on
     @param tuning_sample_ratio: ratio of data to place in validation set
     @param validation_column: variable to perform validation on (if None then sample randomly)
+    @param val_column_idx: which index to pick for K-fold validation
 
     @return training and validation indices
     """
@@ -487,8 +487,13 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column):
         if tuning_sample_ratio > 0:
             val_size = max(val_size, 1)
 
-        # sample random categories from our validation variable
-        val_categories = set(random.sample(categories, val_size))
+        if val_column_idx is None:
+            # sample random categories from our validation variable
+            val_categories = set(random.sample(categories, val_size))
+        else:
+            # choose val_column_idx as validation item
+            val_categories = set([list(categories)[val_column_idx]])
+
         train_categories = categories - val_categories
         log.info("train_categories %s" % train_categories)
         log.info("val_categories %s" % val_categories)
@@ -598,7 +603,10 @@ def pick_best_model(fitted_models):
     """
     Select the one with largest (pseudo) log lik ratio
     """
-    good_models = [f_model for f_model in fitted_models if f_model.has_refit_data and f_model.variance_est is not None]
+    if isinstance(fitted_models[0], list):
+        good_models = [f_model for f_model_list in fitted_models for f_model in f_model_list if f_model.has_refit_data]
+    else:
+        good_models = [f_model for f_model in fitted_models if f_model.has_refit_data]
     if len(good_models) == 0:
         return None
 

@@ -44,6 +44,17 @@ class GermlineSimulatorPartis:
             lines = f.read().splitlines()
             for line_idx in range(len(lines)/2):
                 allele = lines[line_idx * 2].replace(">", "")
-                germline_seqs[allele] = lines[line_idx * 2 + 1]
+                allele_seq = lines[line_idx * 2 + 1]
+
+                # Trim allele until multiple of 3 - randomly pick a reading frame
+                mod_seq_len = len(allele_seq) % 3
+                if mod_seq_len != 0:
+                    offset = np.random.choice(mod_seq_len + 1)
+                    if mod_seq_len != offset:
+                        allele_seq = allele_seq[offset:-(mod_seq_len - offset)]
+                    else:
+                        allele_seq = allele_seq[offset:]
+
+                germline_seqs[allele] = allele_seq
 
         return germline_seqs, germline_freqs
