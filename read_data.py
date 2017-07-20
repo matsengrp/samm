@@ -387,16 +387,17 @@ def write_data_after_imputing(output_genes, output_seqs, gene_file_name, seq_fil
                 continue
         else:
             # otherwise, take it away dnapars
+            gl_name = 'gene'+str(gl_idx)
             pars_gene, pars_seq = impute_ancestors_dnapars(
                     seqs_in_cluster,
                     proc_gl_seq,
                     scratch_dir,
-                    gl_name='gene'+str(gl_idx),
+                    gl_name=gl_name,
                     verbose=verbose
                 )
             for seq_line in pars_seq:
                 current_seq = meta_in_cluster.copy()
-                current_seq['germline_name'] = seq_line[0]
+                current_seq['germline_name'] = gl_name
                 current_seq['sequence_name'] = seq_line[1]
                 current_seq['sequence'] = seq_line[2]
                 seqs_line.append(current_seq)
