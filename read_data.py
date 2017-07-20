@@ -85,7 +85,12 @@ def read_zero_motif_csv(csv_file_name, per_target_model):
                     target_pairs_to_remove[motif][mut_pos] = zero_thetas
     return motifs_to_remove, pos_to_remove, target_pairs_to_remove
 
-def get_partition_info(path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
+def get_partition_info(path_to_annotations, metadata):
+    """
+    Process partis annotations to obtain info from partitioned data
+
+    @return partition_info: list of dictionaries containing various bits of information about each cluster
+    """
     partition_info = []
     with open(metadata, 'r') as metafile:
         reader = csv.DictReader(metafile)
@@ -103,58 +108,10 @@ def get_partition_info(path_to_annotations, metadata, use_v=False, use_np=False,
                 current_info['group'] = None
             else:
                 current_info['group'] = line['group']
-            if use_immunized and current_info['group'] != 'immunized':
-                continue
             current_info['subject'] = line['subject']
             partition_info.append(current_info)
 
-    seqs_col = 'v_qr_seqs' if use_v else 'seqs'
-    gene_col = 'v_gl_seq' if use_v else 'naive_seq'
-
-    if use_np:
-        # return only nonproductive sequences
-        # here "nonproductive" is defined as having a stop codon or being
-        # out of frame or having a mutated conserved cysteine
-        good_seq = lambda seqs: seqs['stops'] or not seqs['in_frames'] or seqs['mutated_invariants']
-    else:
-        # return all sequences
-        good_seq = lambda seqs: [True for seq in seqs[seqs_col]]
-
-    return partition_info, good_seq
-
-def get_data_stats_from_partis(path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
-    '''
-    get data statistics from partis annotations
-    '''
-
-    partition_info, good_seq = get_partition_info(
-        path_to_annotations,
-        metadata,
-        use_v,
-        use_np,
-        use_immunized
-    )
-
-    clonal_family_sizes = []
-    for data_idx, data_info in enumerate(partition_info):
-        glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
-        with open(data_info['annotations_file'][0], "r") as csvfile:
-            reader = csv.DictReader(csvfile)
-            for idx, line in enumerate(reader):
-                # add goodies from partis
-                if len(line['input_seqs']) == 0:
-                    # sometimes data will have empty clusters
-                    continue
-                process_input_line(line)
-                add_implicit_info(glfo, line)
-                good_seq_idx = [i for i, is_good in enumerate(good_seq(line)) if is_good]
-                if not good_seq_idx:
-                    # no nonproductive sequences... skip
-                    continue
-                else:
-                    clonal_family_sizes.append(len(good_seq_idx))
-
-    return clonal_family_sizes
+    return partition_info
 
 def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
     """
@@ -170,13 +127,22 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
     @write genes to output_genes and seqs to output_seqs
     """
 
-    partition_info, good_seq = get_partition_info(
+    partition_info = get_partition_info(
         path_to_annotations,
         metadata,
-        use_v,
-        use_np,
-        use_immunized
     )
+
+    seqs_col = 'v_qr_seqs' if use_v else 'seqs'
+    gene_col = 'v_gl_seq' if use_v else 'naive_seq'
+
+    if use_np:
+        # return only nonproductive sequences
+        # here "nonproductive" is defined as having a stop codon or being
+        # out of frame or having a mutated conserved cysteine
+        good_seq = lambda seqs: seqs['stops'] or not seqs['in_frames'] or seqs['mutated_invariants']
+    else:
+        # return all sequences
+        good_seq = lambda seqs: [True for seq in seqs[seqs_col]]
 
     with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
         gene_writer = csv.DictWriter(genes_file, ['germline_name', 'germline_sequence'])
@@ -186,6 +152,8 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
+            if use_immunized and data_info['group'] != 'immunized':
+                continue
             glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
             with open(data_info['annotations_file'][0], "r") as csvfile:
                 reader = csv.DictReader(csvfile)
