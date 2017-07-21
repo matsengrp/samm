@@ -80,3 +80,6 @@ SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'imputed_ancestors_comparison'
 SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'shazam_vs_samm'
+SConscript(flag + '/sconscript', exports=['flag'])
