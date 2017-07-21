@@ -1,4 +1,6 @@
 import pandas as pd
+import matplotlib
+matplotlib.use('pdf')
 import seaborn as sns
 import matplotlib.pyplot as plt
 import numpy as np
@@ -90,7 +92,7 @@ def _plot_scatter(all_df, fname=''):
 
     model_legend = plt.legend(loc='lower right', title='model')
     xy_line = mlines.Line2D([], [], color='black', marker='', label='y=x')
-    xy_legend = plt.legend(loc='upper left', handles=[xy_line])
+    xy_legend = plt.legend([xy_line], loc='upper left')
     plt.gca().add_artist(xy_legend)
     plt.gca().add_artist(model_legend)
 
@@ -155,5 +157,5 @@ for sim_method in SIM_METHODS:
 
 for idx, sim_method in enumerate(SIM_METHODS):
     sub_df = all_df[all_df['sim_method'] == sim_method]
-    _plot_single_effect_size_overall(sub_df, true_categories=true_categories, fname='_output/box_%s.svg' % sim_method)
-    _plot_scatter(all_df, fname='_output/scatter_%s.svg' % sim_method)
+    _plot_single_effect_size_overall(sub_df, true_categories=true_categories, fname='_output/box_%s.pdf' % sim_method)
+    _plot_scatter(all_df, fname='_output/scatter_%s.pdf' % sim_method)
