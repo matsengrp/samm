@@ -67,14 +67,19 @@ def main(args=sys.argv[1:]):
     ]
 
     stat_funcs = [_get_agg_norm_diff, _get_agg_kendall, _get_agg_pearson]
+    stat_res = [{"shazam":[], "samm":[]} for i in stat_funcs]
     for true_m, samm_m, shazam_m in zip(true_models, samm_models, shazam_models):
-       print true_m - np.median(true_m)
-       print samm_m.agg_refit_theta - np.median(samm_m.agg_refit_theta)
-       print shazam_m.agg_refit_theta - np.median(shazam_m.agg_refit_theta)
-       print "shazam", _collect_statistics([shazam_m], args, None, true_m, stat_funcs[2])
-       print "samm", _collect_statistics([samm_m], args, None, true_m, stat_funcs[2])
+        for stat_i, stat_f in enumerate(stat_funcs):
+           stat_shazam = _collect_statistics([shazam_m], args, None, true_m, stat_f)
+           stat_samm = _collect_statistics([samm_m], args, None, true_m, stat_f)
+           stat_res[stat_i]["shazam"].append(stat_shazam)
+           stat_res[stat_i]["samm"].append(stat_samm)
+
+    for stat_r, stat_func in zip(stat_res, stat_funcs):
+        print stat_func.__name__, "mean (se)"
+        num_samples = len(stat_r["shazam"])
+        print "shazam", np.mean(stat_r["shazam"]), "(%f)" % np.sqrt(np.var(stat_r["shazam"])/num_samples)
+        print "samm", np.mean(stat_r["samm"]), "(%f)" % np.sqrt(np.var(stat_r["samm"])/num_samples)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-
-
