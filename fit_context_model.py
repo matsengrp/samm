@@ -45,11 +45,6 @@ def parse_args():
         type=str,
         help='sequence data in csv',
         default='_output/seqs.csv')
-    parser.add_argument('--sample-regime',
-        type=int,
-        default=1,
-        choices=(1, 2, 3),
-        help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
     parser.add_argument('--scratch-directory',
         type=str,
         help='where to write gibbs workers and dnapars files, if necessary',
@@ -121,22 +116,8 @@ def parse_args():
         type=int,
         help='number of threads to use for validation calculations',
         default=12)
-    parser.add_argument('--validation-column',
-        type=str,
-        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
-        default=None)
     parser.add_argument('--per-target-model',
         action='store_true')
-    parser.add_argument("--locus",
-        type=str,
-        choices=('','igh','igk','igl'),
-        help="locus (igh, igk or igl; default empty)",
-        default='')
-    parser.add_argument("--species",
-        type=str,
-        choices=('','mouse','human'),
-        help="species (mouse or human; default empty)",
-        default='')
     parser.add_argument("--z-stat",
         type=float,
         help="confidence interval z statistic",
@@ -223,16 +204,12 @@ def main(args=sys.argv[1:]):
         motif_len=args.max_motif_len,
         left_flank_len=args.max_left_flank,
         right_flank_len=args.max_right_flank,
-        sample=args.sample_regime,
-        locus=args.locus,
-        species=args.species,
     )
 
     train_idx, val_idx = split_train_val(
         len(obs_data),
         metadata,
         args.tuning_sample_ratio,
-        args.validation_column,
     )
     train_set = [obs_data[i] for i in train_idx]
     val_set = [obs_data[i] for i in val_idx]
@@ -316,4 +293,3 @@ def main(args=sys.argv[1:]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-                                                     
