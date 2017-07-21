@@ -459,7 +459,7 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column, val_column_idx=None):
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=None, val_column_idx=None):
     """
     @param num_obs: number of observations
     @param feat_generator: submotif feature generator
@@ -495,8 +495,6 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column, v
             val_categories = set([list(categories)[val_column_idx]])
 
         train_categories = categories - val_categories
-        log.info("train_categories %s" % train_categories)
-        log.info("val_categories %s" % val_categories)
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
