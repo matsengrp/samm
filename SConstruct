@@ -69,7 +69,7 @@ SConscript(flag + '/sconscript', exports=['flag'])
 flag = 'survival_hier_simulation'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'survival_ctmc'
+flag = 'multiple_mutations'
 SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'run_on_partis'
