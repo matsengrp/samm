@@ -1,5 +1,4 @@
 import numpy as np
-import pandas as pd
 import re
 import random
 import warnings
@@ -338,23 +337,6 @@ def soft_threshold(theta, thres):
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
 
-def read_germline_file(fasta):
-    """
-    Read fasta file containing germlines
-
-    @return dataframe with column "gene" for the name of the germline gene and
-    "base" for the nucleotide content
-    """
-
-    with open(fasta) as fasta_file:
-        genes = []
-        bases = []
-        for seq_record in SeqIO.parse(fasta_file, 'fasta'):
-            genes.append(seq_record.id)
-            bases.append(str(seq_record.seq))
-
-    return pd.DataFrame({'base': bases}, index=genes)
-
 def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
     """
     Process the degenerate characters in sequences:
@@ -369,7 +351,6 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     @param threshold: if proportion of "n"s in a sequence is larger than this then
         throw a warning
     """
-
     assert(len(start_seq) == len(end_seq))
 
     # replace all unknowns with an "n"
@@ -554,11 +535,10 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
     for i, feat_gen in enumerate(feat_generator.feat_gens):
         for m_idx, m in enumerate(feat_gen.motif_list):
             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
-            m_theta = theta[raw_theta_idx, 0]
 
             if col_idx != 0 and add_targets:
-                m_theta += theta[raw_theta_idx, col_idx]
-            elif col_idx != 0:
+                m_theta = theta[raw_theta_idx, 0] + theta[raw_theta_idx, col_idx]
+            else:
                 m_theta = theta[raw_theta_idx, col_idx]
 
             if feat_gen.motif_len == full_feat_generator.motif_len:

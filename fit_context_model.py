@@ -147,8 +147,11 @@ def parse_args():
         type=int,
         help="index of validation mouse",
         default=None)
+    parser.add_argument("--omit-hessian",
+        action="store_true",
+        help="do not calculate the hessian")
 
-    parser.set_defaults(per_target_model=False, conf_int_stop=False)
+    parser.set_defaults(per_target_model=False, conf_int_stop=False, omit_hessian=False)
     args = parser.parse_args()
 
     # Determine problem solver
@@ -296,87 +299,64 @@ def main(args=sys.argv[1:]):
     # Run EM on the lasso parameters from largest to smallest
     log.info("Running EM")
     num_val_samples = args.num_val_samples
-    all_results_list = [
-        [] for i in args.penalty_params
-    ]
-    num_nonzero_confint = 0
-    best_model_idxs = [0 for i in args.penalty_params]
+    results_list = []
+    val_set_evaluator = None
+    penalty_params_prev = None
+    prev_pen_theta = None
+    best_model_idx = 0
     for param_i, penalty_param in enumerate(args.penalty_params):
-        results_list = all_results_list[param_i]
-        val_set_evaluator = None
-        penalty_params_prev = None
-        prev_pen_theta = None
-        if args.per_target_model:
-            target_penalty_params = [penalty_param]
-        else:
-            target_penalty_params = [0.]
-        for target_param_i, target_penalty_param in enumerate(target_penalty_params):
-            log.info("==== Penalty parameters %f, %f ====" % (penalty_param, target_penalty_param))
-            penalty_params = (penalty_param, target_penalty_param)
-            curr_model_results = cmodel_algo.fit_penalized(
-                penalty_params,
-                max_em_iters=args.em_max_iters,
-                val_set_evaluator=val_set_evaluator,
-                init_theta=prev_pen_theta,
-                reference_pen_param=penalty_params_prev
-            )
-
-            # Create this val set evaluator for next time
-            val_set_evaluator = LikelihoodComparer(
-                val_set,
-                feat_generator,
-                theta_ref=curr_model_results.penalized_theta,
-                num_samples=num_val_samples,
-                burn_in=args.num_val_burnin,
-                num_jobs=args.num_jobs,
-                scratch_dir=args.scratch_dir,
-                pool=all_runs_pool,
-            )
-            # grab this many validation samples from now on
-            num_val_samples = val_set_evaluator.num_samples
-
-            # Save model results
-            results_list.append(curr_model_results)
-            with open(args.out_file, "w") as f:
-                pickle.dump(all_results_list, f)
-
-            ll_ratio = curr_model_results.log_lik_ratio
-            if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < -ZERO_THRES:
-                # Make sure that the penalty isnt so big that theta is empty
-                # This model is not better than the previous model. Stop trying penalty parameters.
-                # Time to refit the model
-                log.info("EM surrogate function is decreasing. Stop trying penalty parameters")
-                break
-            else:
-                best_model_idxs[param_i] = target_param_i
-                best_pen0_idx = param_i
-
-            penalty_params_prev = penalty_params
-            prev_pen_theta = curr_model_results.penalized_theta
-
-    if args.per_target_model:
-        best_model, best_pen0_idx = GreedyLikelihoodComparer.do_greedy_search(
-            val_set,
-            feat_generator,
-            [
-                result_list[best_model_idxs[i]] for i, result_list in enumerate(all_results_list)
-            ],
-            lambda m:m.penalized_num_nonzero,
-            args.num_val_burnin,
-            args.num_val_samples,
-            args.num_jobs,
-            args.scratch_dir,
-            pool=all_runs_pool,
+        target_penalty_param = penalty_param if args.per_target_model else 0
+        penalty_params = (penalty_param, target_penalty_param)
+        log.info("==== Penalty parameters %f, %f ====" % penalty_params)
+        curr_model_results = cmodel_algo.fit_penalized(
+            penalty_params,
+            max_em_iters=args.em_max_iters,
+            val_set_evaluator=val_set_evaluator,
+            init_theta=prev_pen_theta,
+            reference_pen_param=penalty_params_prev,
         )
 
+        # Create this val set evaluator for next time
+        val_set_evaluator = LikelihoodComparer(
+            val_set,
+            feat_generator,
+            theta_ref=curr_model_results.penalized_theta,
+            num_samples=num_val_samples,
+            burn_in=args.num_val_burnin,
+            num_jobs=args.num_jobs,
+            scratch_dir=args.scratch_dir,
+            pool=all_runs_pool,
+        )
+        # grab this many validation samples from now on
+        num_val_samples = val_set_evaluator.num_samples
+
+        # Save model results
+        results_list.append(curr_model_results)
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
+
+        ll_ratio = curr_model_results.log_lik_ratio
+        if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < -ZERO_THRES:
+            # Make sure that the penalty isnt so big that theta is empty
+            # This model is not better than the previous model. Stop trying penalty parameters.
+            # Time to refit the model
+            log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratio %f" % ll_ratio)
+            break
+        else:
+            best_model_idx = param_i
+
+        penalty_params_prev = penalty_params
+        prev_pen_theta = curr_model_results.penalized_theta
+
     cmodel_algo.refit_unpenalized(
-        model_result=all_results_list[best_pen0_idx][best_model_idxs[best_pen0_idx]],
+        model_result=results_list[best_model_idx],
         max_em_iters=args.em_max_iters,
+        get_hessian=not args.omit_hessian,
     )
 
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
-        pickle.dump(all_results_list, f)
+        pickle.dump(results_list, f)
 
     if all_runs_pool is not None:
         all_runs_pool.close()
