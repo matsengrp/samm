@@ -216,7 +216,8 @@ def main(args=sys.argv[1:]):
         h5f_theta = _read_mutability_probability_params(args)
         h5f_theta[h5f_theta == 0] = -np.inf
         h5f_theta[h5f_theta != -np.inf] = np.log(h5f_theta[h5f_theta != -np.inf])
-        dump_parameters(h5f_theta, h5f_theta, args, hier_feat_generator)
+        agg_h5f_theta = h5f_theta[:, 0:1] + h5f_theta[:, 1:]
+        dump_parameters(agg_h5f_theta, h5f_theta, args, hier_feat_generator)
     else:
         theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
         avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
