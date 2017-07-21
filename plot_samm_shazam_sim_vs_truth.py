@@ -15,7 +15,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 NSEEDS = 10
 MOTIF_LEN = 5
 MUT_POS = 2
-SIM_METHODS = ['survival', 'shmulate']
+SIM_METHODS = ['survival'] #, 'shmulate']
 TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/true_model.pkl"
 SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/fitted.pkl"
 SHAZAM_MUT_STR = "simulated_shazam_vs_samm/_output/%s/0%d/fitted_shazam_mut.csv"
@@ -127,6 +127,7 @@ for sim_method in SIM_METHODS:
         theta = theta[possible_agg_mask] - np.median(theta[possible_agg_mask])
         tmp_df = pd.DataFrame()
         tmp_df['theta'] = theta
+        print SAMM_MODEL_STR % (sim_method, seed)
         samm = load_fitted_model(
             SAMM_MODEL_STR % (sim_method, seed),
             MOTIF_LEN,
@@ -135,10 +136,12 @@ for sim_method in SIM_METHODS:
         ).agg_refit_theta
         samm = samm[possible_agg_mask] - np.median(samm[possible_agg_mask])
         tmp_df['samm'] = samm
-        shazam = get_shazam_target(
+        shazam_raw = get_shazam_theta(
             MOTIF_LEN,
+            SHAZAM_MUT_STR % (sim_method, seed),
             SHAZAM_SUB_STR % (sim_method, seed),
         )
+        shazam = shazam_raw[:,0:1] + shazam_raw[:,1:]
         shazam = shazam[possible_agg_mask] - np.median(shazam[possible_agg_mask])
         tmp_df['shazam'] = shazam
         tmp_df['samm_raw_diff'] = raw_diff(samm, theta)
