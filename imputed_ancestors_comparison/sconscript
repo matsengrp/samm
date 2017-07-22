@@ -27,9 +27,9 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 MOTIF_LEN = 5
 MUTATING_POSITION = 2
 N_CLONAL_FAMILIES = 1500
-PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-0.25)).tolist()))
-MUTABILITY_PATH = 'R/shmulate_params/mutability.csv'
-SUBSTITUTION_PATH = 'R/shmulate_params/substitution.csv'
+PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
+MUTABILITY_PATH = 'gctree/S5F/Mutability.csv'
+SUBSTITUTION_PATH = 'gctree/S5F/Substitution.csv'
 
 # Nest for replicates
 nest.add(
@@ -63,10 +63,12 @@ def generate_theta(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
+nest.add_aggregate('compare_models', list)
+
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate_seqs(env, outdir, c):
-    generate_cmd = ['python simulate_from_sampled_gls.py simulate',
+    cmd = ['python simulate_from_sampled_gls.py simulate',
            '--seed',
            c['seed'],
            '--mutability',
@@ -91,28 +93,46 @@ def generate_seqs(env, outdir, c):
            '--output-per-branch-germline-seqs ${TARGETS[2]}',
            '--output-per-branch-seqs ${TARGETS[3]}']
 
-    process_cmd = ['python preprocess_data.py',
-           '--input-genes ${TARGETS[0]}',
-           '--input-seqs ${TARGETS[1]}',
-           '--motif-len',
-           MOTIF_LEN,
-           '--impute-ancestors',
-           '--sample-from-family',
-           '--scratch-directory',
-           SCRATCH_DIR,
-           '--output-genes-imputed ${TARGETS[4]}',
-           '--output-seqs-imputed ${TARGETS[5]}',
-           '--output-genes-sampled ${TARGETS[6]}',
-           '--output-seqs-sampled ${TARGETS[7]}']
-
-    cmd = generate_cmd + ['&&'] + process_cmd
-
     return env.Command(
         [join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
-         join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv'),
-         join(outdir, 'genes_with_imputed_ancestors.csv'), join(outdir, 'seqs_with_imputed_ancestors.csv'),
-         join(outdir, 'genes_sampled.csv'), join(outdir, 'seqs_sampled.csv')],
+         join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv')],
         [],
+        ' '.join(map(str, cmd)))
+
+nest.add(
+    'data_type',
+    [
+        'true_ancestors',
+        'imputed_ancestors',
+        'all_data',
+        'sample_random',
+    ])
+
+@nest.add_target_with_env(localenv)
+def process_data(env, outdir, c):
+    cmd = ['python preprocess_data.py',
+               '--scratch-directory',
+               SCRATCH_DIR,
+               '--output-genes ${TARGETS[0]}',
+               '--output-seqs ${TARGETS[1]}']
+
+    if c['data_type'] == 'true_ancestors':
+        cmd += ['--input-genes ${SOURCES[2]}',
+            '--input-seqs ${SOURCES[3]}']
+    else:
+        cmd += ['--input-genes ${SOURCES[0]}',
+            '--input-seqs ${SOURCES[1]}']
+
+    if c['data_type'] == 'sample_random':
+        cmd += ['--sample-from-family']
+    elif c['data_type'] == 'imputed_ancestors':
+        cmd += ['--impute-ancestors']
+
+    return env.Command(
+        [
+            join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv'),
+        ],
+        c['generate_seqs'],
         ' '.join(map(str, cmd)))
 
 def write_truth(target, source, env):
@@ -148,37 +168,19 @@ def convert_truth(env, outdir, c):
         write_truth,
         control=c)
 
-nest.add_aggregate('compare_models', list)
-
-nest.add(
-    'data_type',
-    [
-        'true_ancestors',
-        'imputed_ancestors',
-        'all_data',
-        'sample_random',
-    ])
-
 @nest.add_target_with_env(localenv)
 def fit_shazam(env, outdir, c):
 
     cmd = ['python fit_shmulate_model.py',
+           '--input-genes ${SOURCES[0]}',
+           '--input-file ${SOURCES[1]}',
            '--model-pkl ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}',
            '--center-median']
 
-    if c['data_type'] == 'true_ancestors':
-        cmd += ['--input-genes ${SOURCES[2]} --input-file ${SOURCES[3]}']
-    elif c['data_type'] == 'imputed_ancestors':
-        cmd += ['--input-genes ${SOURCES[4]} --input-file ${SOURCES[5]}']
-    elif c['data_type'] == 'sample_random':
-        cmd += ['--input-genes ${SOURCES[6]} --input-file ${SOURCES[7]}']
-    else:
-        cmd += ['--input-genes ${SOURCES[0]} --input-file ${SOURCES[1]}']
-
     return env.Command(
         [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
-        c['generate_seqs'],
+        c['process_data'],
         ' '.join(map(str, cmd)))
 
 # fit survival
@@ -190,6 +192,8 @@ def fit_survival(env, outdir, c):
     penalty_params = PENALTY_PARAMS
 
     cmd = ['python fit_context_model.py',
+           '--input-genes ${SOURCES[0]}',
+           '--input-seqs ${SOURCES[1]}',
            '--seed',
            c['seed'],
            '--motif-lens',
@@ -221,18 +225,9 @@ def fit_survival(env, outdir, c):
            '--log-file ${TARGETS[1]}',
            '--per-target-model']
 
-    if c['data_type'] == 'true_ancestors':
-        cmd += ['--input-genes ${SOURCES[2]} --input-seqs ${SOURCES[3]}']
-    elif c['data_type'] == 'imputed_ancestors':
-        cmd += ['--input-genes ${SOURCES[4]} --input-seqs ${SOURCES[5]}']
-    elif c['data_type'] == 'sample_random':
-        cmd += ['--input-genes ${SOURCES[6]} --input-seqs ${SOURCES[7]}']
-    else:
-        cmd += ['--input-genes ${SOURCES[0]} --input-seqs ${SOURCES[1]}']
-
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
-        c['generate_seqs'],
+        c['process_data'],
         ' '.join(map(str, cmd)))
 
 @nest.add_target_with_env(localenv)
