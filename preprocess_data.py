@@ -8,6 +8,7 @@ import csv
 
 from read_data import write_partis_data_from_annotations, write_data_after_imputing, write_data_after_sampling
 from common import split_train_val
+from shutil import copyfile
 
 def parse_args():
     ''' parse command line arguments '''
@@ -130,23 +131,27 @@ def main(args=sys.argv[1:]):
         write_data_after_sampling(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs)
     elif args.impute_ancestors:
         write_data_after_imputing(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
+    else:
+        copyfile(args.input_genes, args.output_genes)
+        copyfile(args.input_seqs, args.output_seqs)
 
-    # convert pandas df to list of dicts
-    metadata = pd.read_csv(args.output_seqs).T.to_dict().values()
+    if args.output_train_seqs is not None:
+        # convert pandas df to list of dicts
+        metadata = pd.read_csv(args.output_seqs).T.to_dict().values()
 
-    train_idx, test_idx = split_train_val(
-        len(metadata),
-        metadata,
-        args.tuning_sample_ratio,
-        args.test_column,
-        args.test_idx,
-    )
-    train_set = [metadata[i] for i in train_idx]
-    test_set = [metadata[i] for i in test_idx]
+        train_idx, test_idx = split_train_val(
+            len(metadata),
+            metadata,
+            args.tuning_sample_ratio,
+            args.test_column,
+            args.test_idx,
+        )
+        train_set = [metadata[i] for i in train_idx]
+        test_set = [metadata[i] for i in test_idx]
 
-    # for fitting shazam and later validating
-    write_train_test(args.output_train_seqs, train_set)
-    write_train_test(args.output_test_seqs, test_set)
+        # for fitting shazam and later validating
+        write_train_test(args.output_train_seqs, train_set)
+        write_train_test(args.output_test_seqs, test_set)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
