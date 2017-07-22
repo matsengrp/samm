@@ -14,12 +14,9 @@ def parse_args():
     parser.add_argument('--in-samm-mult',
         type=str,
         help='comma separated samm pkl files, fit for multiple mut (assumes single mut)')
-    parser.add_argument('--true-model-one',
+    parser.add_argument('--true-models',
         type=str,
-        help='true model pkl, single mut')
-    parser.add_argument('--true-model-mult',
-        type=str,
-        help='true model pkl, multiple mut')
+        help='true model pkl')
     parser.add_argument('--agg-motif-len',
         type=int,
         default=3)
@@ -29,8 +26,7 @@ def parse_args():
     args = parser.parse_args()
     args.in_samm_one = args.in_samm_one.split(',')
     args.in_samm_mult = args.in_samm_mult.split(',')
-    args.true_model_one = args.true_model_one.split(',')
-    args.true_model_mult = args.true_model_mult.split(',')
+    args.true_models = args.true_models.split(',')
     return args
 
 def main(args=sys.argv[1:]):
@@ -55,19 +51,16 @@ def main(args=sys.argv[1:]):
         ) for samm_pkl in args.in_samm_mult
     ]
     example_model = samm_models_one[0]
-    true_models_one = [
-        load_true_model(tmodel_file) for tmodel_file in args.true_model_one
-    ]
-    true_models_mult = [
-        load_true_model(tmodel_file) for tmodel_file in args.true_model_mult
+    true_models = [
+        load_true_model(tmodel_file) for tmodel_file in args.true_models
     ]
 
     stat_funcs = [_get_agg_norm_diff, _get_agg_kendall, _get_agg_pearson]
     stat_res = [{"one":[], "mult":[]} for i in stat_funcs]
-    for true_one, samm_one, true_mult, samm_mult in zip(true_models_one, samm_models_one, true_models_mult, samm_models_mult):
+    for true_m, samm_one, true_mult, samm_mult in zip(true_models, samm_models_one, samm_models_mult):
         for stat_i, stat_f in enumerate(stat_funcs):
-           stat_samm_one = _collect_statistics([samm_one], args, None, true_one, stat_f)
-           stat_samm_mult = _collect_statistics([samm_mult], args, None, true_mult, stat_f)
+           stat_samm_one = _collect_statistics([samm_one], args, None, true_m, stat_f)
+           stat_samm_mult = _collect_statistics([samm_mult], args, None, true_m, stat_f)
            stat_res[stat_i]["one"].append(stat_samm_one)
            stat_res[stat_i]["mult"].append(stat_samm_mult)
 
