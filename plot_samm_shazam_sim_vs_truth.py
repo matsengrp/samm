@@ -62,7 +62,7 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
         hue='variable',
         data=melt_df,
         kind="box",
-        palette="Set1",
+        palette="Set2",
         order=true_categories.categories,
         legend=False,
     )
@@ -79,25 +79,30 @@ def _plot_scatter(all_df, fname=''):
     all_df.rename(index=str, columns={'samm': 'samm', 'shazam': 'SHazaM', 'theta': 'theta'}, inplace=True)
     melt_df = pd.melt(all_df, id_vars=['theta'])
 
+    xy_line = mlines.Line2D([], [], color='black', marker='', label='y=x')
+    line_obj = plt.gca().add_line(xy_line)
     sns_plot = sns.lmplot(
         x="theta",
         y="value",
         hue="variable",
+        lowess=True,
+        scatter=False,
         data=melt_df,
-        scatter_kws={'alpha':0.2},
+        line_kws={'lw':1.5},
         legend=False,
-        markers=["o", "x"],
-        palette="Set1",
+        palette="Set2",
     )
+    model_legend = plt.legend(loc='lower right')
 
-    model_legend = plt.legend(loc='lower right', title='model')
-    xy_line = mlines.Line2D([], [], color='black', marker='', label='y=x')
-    xy_legend = plt.legend([xy_line], loc='upper left')
-    plt.gca().add_artist(xy_legend)
-    plt.gca().add_artist(model_legend)
-
-    sns_plot.set(ylabel='fitted theta')
-    sns_plot.set(xlabel="true theta")
+    col_palette = sns.color_palette("Set2", 2)
+    #col_palette = [(c[0] * 0.75, c[1] * 0.75, c[2] * 0.75) for c in col_palette]
+    melt_df = melt_df.sample(frac=1).reset_index(drop=True)
+    for i in range(melt_df.shape[0]/20):
+        vari = melt_df.loc[i]['variable']
+        col = col_palette[0] if vari == 'samm' else col_palette[1]
+        plt.scatter(melt_df.loc[i]['theta'], melt_df.loc[i]['value'], color=col, alpha=0.1, s=15)
+    sns_plot.set(ylabel='Fitted theta')
+    sns_plot.set(xlabel="True theta")
 
     xmin, xmax = sns_plot.axes[0, 0].get_xlim()
     ymin, ymax = sns_plot.axes[0, 0].get_ylim()
