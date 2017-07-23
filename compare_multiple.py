@@ -8,10 +8,10 @@ from plot_simulation_section import _collect_statistics, _get_agg_pearson, _get_
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--in-samm-one',
+    parser.add_argument('--samm-one',
         type=str,
         help='comma separated samm pkl files, fit for single mut')
-    parser.add_argument('--in-samm-mult',
+    parser.add_argument('--samm-mult',
         type=str,
         help='comma separated samm pkl files, fit for multiple mut (assumes single mut)')
     parser.add_argument('--true-models',
@@ -24,8 +24,8 @@ def parse_args():
         type=int,
         default=1)
     args = parser.parse_args()
-    args.in_samm_one = args.in_samm_one.split(',')
-    args.in_samm_mult = args.in_samm_mult.split(',')
+    args.samm_one = args.samm_one.split(',')
+    args.samm_mult = args.samm_mult.split(',')
     args.true_models = args.true_models.split(',')
     return args
 
@@ -39,7 +39,7 @@ def main(args=sys.argv[1:]):
             args.agg_pos_mutating,
             keep_col0=False,
             add_targets=True,
-        ) for samm_pkl in args.in_samm_one
+        ) for samm_pkl in args.samm_one
     ]
     samm_models_mult = [
         load_fitted_model(
@@ -48,7 +48,7 @@ def main(args=sys.argv[1:]):
             args.agg_pos_mutating,
             keep_col0=False,
             add_targets=True,
-        ) for samm_pkl in args.in_samm_mult
+        ) for samm_pkl in args.samm_mult
     ]
     example_model = samm_models_one[0]
     true_models = [
@@ -57,7 +57,7 @@ def main(args=sys.argv[1:]):
 
     stat_funcs = [_get_agg_norm_diff, _get_agg_kendall, _get_agg_pearson]
     stat_res = [{"one":[], "mult":[]} for i in stat_funcs]
-    for true_m, samm_one, true_mult, samm_mult in zip(true_models, samm_models_one, samm_models_mult):
+    for true_m, samm_one, samm_mult in zip(true_models, samm_models_one, samm_models_mult):
         for stat_i, stat_f in enumerate(stat_funcs):
            stat_samm_one = _collect_statistics([samm_one], args, None, true_m, stat_f)
            stat_samm_mult = _collect_statistics([samm_mult], args, None, true_m, stat_f)
