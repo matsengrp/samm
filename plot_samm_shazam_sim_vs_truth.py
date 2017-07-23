@@ -66,11 +66,11 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
         order=true_categories.categories,
         legend=False,
     )
-    sns_plot.set(ylabel='fitted minus truth')
-    sns_plot.set(xlabel="true theta size")
+    sns_plot.set(ylabel='Fitted minus truth')
+    sns_plot.set(xlabel="True theta size")
     x = sns_plot.axes[0,0].get_xlim()
     sns_plot.axes[0,0].plot(x, len(x) * [0], 'k--', alpha=.4)
-    plt.legend(loc='upper right', title='model')
+    plt.legend(loc='upper right')
 
     sns_plot.savefig(fname)
 
@@ -95,7 +95,6 @@ def _plot_scatter(all_df, fname=''):
     model_legend = plt.legend(loc='lower right')
 
     col_palette = sns.color_palette("Set2", 2)
-    #col_palette = [(c[0] * 0.75, c[1] * 0.75, c[2] * 0.75) for c in col_palette]
     melt_df = melt_df.sample(frac=1).reset_index(drop=True)
     for i in range(melt_df.shape[0]/20):
         vari = melt_df.loc[i]['variable']
