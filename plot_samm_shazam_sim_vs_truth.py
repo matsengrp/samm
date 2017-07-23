@@ -79,8 +79,6 @@ def _plot_scatter(all_df, fname=''):
     all_df.rename(index=str, columns={'samm': 'samm', 'shazam': 'SHazaM', 'theta': 'theta'}, inplace=True)
     melt_df = pd.melt(all_df, id_vars=['theta'])
 
-    xy_line = mlines.Line2D([], [], color='black', marker='', label='y=x')
-    line_obj = plt.gca().add_line(xy_line)
     sns_plot = sns.lmplot(
         x="theta",
         y="value",
@@ -88,10 +86,11 @@ def _plot_scatter(all_df, fname=''):
         lowess=True,
         scatter=False,
         data=melt_df,
-        line_kws={'lw':1.5},
+        line_kws={'lw':3},
         legend=False,
         palette="Set2",
     )
+    sns_plot.axes[0][0].plot([-3,3],[-3,3], color="black", ls="--", label="y=x")
     model_legend = plt.legend(loc='lower right')
 
     col_palette = sns.color_palette("Set2", 2)
@@ -103,15 +102,6 @@ def _plot_scatter(all_df, fname=''):
     sns_plot.set(ylabel='Fitted theta')
     sns_plot.set(xlabel="True theta")
 
-    xmin, xmax = sns_plot.axes[0, 0].get_xlim()
-    ymin, ymax = sns_plot.axes[0, 0].get_ylim()
-
-    lims = [
-        np.max([xmin, ymin]),
-        np.min([xmax, ymax]),
-    ]
-
-    sns_plot.axes[0,0].plot(lims, lims, 'k-')
     sns_plot.savefig(fname)
 
 dense_agg_feat_gen = HierarchicalMotifFeatureGenerator(
