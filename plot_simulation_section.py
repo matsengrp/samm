@@ -43,7 +43,7 @@ def parse_args():
         default="25,50,100")
     parser.add_argument('--reps',
         type=int,
-        default=4)
+        default=10)
     parser.add_argument('--agg-motif-len',
         type=int,
         default=3)
@@ -315,7 +315,7 @@ def main(args=sys.argv[1:]):
                             tmp_df = pd.DataFrame(columns=COLS)
                             tmp_dat = {
                                 "model_type": model_type,
-                                "Percent effect size": (eff_size),
+                                "Percent effect size": int(eff_size),
                                 "Percent nonzeros": int(sparsity),
                                 "Number of samples": int(nsamples),
                                 "seed":seed,
