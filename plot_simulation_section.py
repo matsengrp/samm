@@ -342,9 +342,8 @@ def main(args=sys.argv[1:]):
         hue_kws={"linestyles":["-","--",":"]},
         palette="Set2",
     )
-    
-    
-    sns_plot.map(sns.pointplot, linestyles=["-","--",":"], markers=",", scale=1, errwidth=1, dodge=True)
+
+    sns_plot.map(sns.pointplot, linestyles=["-","--",":"], markers=".", scale=1, errwidth=1, dodge=True, capsize=0.2)
     # majro hack cause seaborn is broken i think
     col_palette = sns.color_palette("Set2", 3)
     p1 = matplotlib.lines.Line2D([0], [0], linestyle='-', c=col_palette[0], label=args.model_types[0])
