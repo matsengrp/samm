@@ -84,10 +84,10 @@ def parse_args():
         type=str,
         default='3,5',
         help='comma-separated motif lengths (odd only)')
-    parser_simulate.add_argument('--lambda0',
+    parser_simulate.add_argument('--lambda-mean',
         type=float,
-        default=None,
-        help='baseline mutation rate')
+        default=.01,
+        help='mean of poisson to generate num mutations')
     parser_simulate.add_argument('--r',
         type=float,
         default=1.,
@@ -149,10 +149,17 @@ def parse_args():
 def run_gctree(args, germline_seq, mutation_model, n_taxa):
     ''' somewhat cannibalized gctree simulation '''
 
-    if args.lambda0 is None:
-        args.lambda0 = max([1, int(.01*len(germline_seq))])
+    mutability_sum = 0.
+    with open(args.mutability, 'r') as f:
+        f.next()
+        for line in f:
+            motif, score = line.replace('"', '').split()[:2]
+            mutability_sum += float(score)
+
+    lambda0 = args.lambda_mean * len(germline_seq) * len(germline_seq) / mutability_sum
+
     tree = mutation_model.simulate(germline_seq,
-                                   lambda0=args.lambda0,
+                                   lambda0=lambda0,
                                    N=n_taxa,
                                    T=args.T,
                                    progeny=poisson(.9, loc=1))
