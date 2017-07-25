@@ -28,8 +28,8 @@ MOTIF_LEN = 5
 MUTATING_POSITION = 2
 N_CLONAL_FAMILIES = 1500
 PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
-MUTABILITY_PATH = 'gctree/S5F/Mutability.csv'
-SUBSTITUTION_PATH = 'gctree/S5F/Substitution.csv'
+MUTABILITY_PATH = 'R/shmulate_params/mutability.csv'
+SUBSTITUTION_PATH = 'R/shmulate_params/substitution.csv'
 
 # Nest for replicates
 nest.add(
@@ -62,6 +62,38 @@ def generate_theta(env, outdir, c):
         [join(outdir, 'true_theta.pkl')],
         [],
         ' '.join(map(str, cmd)))
+
+def write_truth(target, source, env):
+    c = env['control']
+    with open(str(source[0]), 'r') as f:
+        agg_theta, theta = pickle.load(f)
+
+    agg_theta -= np.median(agg_theta)
+
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
+    motif_list = feat_generator.motif_list
+
+    columns = 'rep motif col theta model'.split()
+    data = []
+    for col in range(4):
+        for idx, motif in enumerate(motif_list):
+            data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'model': 'truth'}
+            data_dict['theta'] = agg_theta[idx, col]
+
+            data.append(data_dict)
+
+    with open(str(target[0]), 'wb') as f:
+        writer = csv.DictWriter(f, columns)
+        writer.writeheader()
+        writer.writerows(data)
+
+@nest.add_target_with_env(localenv)
+def convert_truth(env, outdir, c):
+    return env.Command(
+        join(outdir, 'true_theta.csv'),
+        c['generate_theta'],
+        write_truth,
+        control=c)
 
 nest.add_aggregate('compare_models', list)
 
@@ -102,7 +134,7 @@ def generate_seqs(env, outdir, c):
 nest.add(
     'data_type',
     [
-        'true_ancestors',
+        #'true_ancestors',
         'imputed_ancestors',
         'all_data',
         'sample_random',
@@ -135,39 +167,6 @@ def process_data(env, outdir, c):
         c['generate_seqs'],
         ' '.join(map(str, cmd)))
 
-def write_truth(target, source, env):
-    c = env['control']
-    with open(str(source[0]), 'r') as f:
-        theta_mut, theta_sub = pickle.load(f)
-
-    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
-    motif_list = feat_generator.motif_list
-
-    columns = 'rep motif col theta model'.split()
-    data = []
-    for col in range(5):
-        for idx, motif in enumerate(motif_list):
-            data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'model': 'truth'}
-            if col == 0:
-                data_dict['theta'] = theta_mut.ravel()[idx]
-            else:
-                data_dict['theta'] = theta_sub[idx, col - 1]
-
-            data.append(data_dict)
-
-    with open(str(target[0]), 'wb') as f:
-        writer = csv.DictWriter(f, columns)
-        writer.writeheader()
-        writer.writerows(data)
-
-@nest.add_target_with_env(localenv)
-def convert_truth(env, outdir, c):
-    return env.Command(
-        join(outdir, 'true_theta.csv'),
-        c['generate_theta'],
-        write_truth,
-        control=c)
-
 @nest.add_target_with_env(localenv)
 def fit_shazam(env, outdir, c):
 
@@ -199,7 +198,7 @@ def fit_survival(env, outdir, c):
            '--motif-lens',
            '3,5',
            '--positions-mutating',
-           '1:2',
+           '0,1,2:2',
            '--penalty-params',
            PENALTY_PARAMS,
            '--num-cpu-threads',
@@ -236,21 +235,19 @@ def convert_fit_shazam(env, outdir, c):
     def write_files(target, source, env):
         c = env['control']
         with open(str(source[0]), 'r') as f:
-            theta_mut, (_, theta_sub) = pickle.load(f)
+            theta_mut, (theta_target, theta_sub) = pickle.load(f)
 
         feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
         motif_list = feat_generator.motif_list
 
+        theta_target -= np.median(theta_target)
+
         columns = 'rep motif col theta data model'.split()
         data = []
-        for col in range(5):
+        for col in range(4):
             for idx, motif in enumerate(motif_list):
                 data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'data': c['data_type'], 'model': 'SHazaM'}
-                if col == 0:
-                    data_dict['theta'] = theta_mut.ravel()[idx]
-                else:
-                    data_dict['theta'] = theta_sub[idx, col - 1]
-
+                data_dict['theta'] = theta_target[idx, col]
                 data.append(data_dict)
 
         with open(str(target[0]), 'wb') as f:
@@ -288,15 +285,16 @@ def convert_fit_survival(env, outdir, c):
             best_model.refit_theta,
             best_model.model_masks.zero_theta_mask_refit,
             best_model.refit_possible_theta_mask,
-            keep_col0=True,
-            add_targets=False,
+            keep_col0=False,
+            add_targets=True,
         )
+        theta -= np.median(theta)
 
         motif_list = agg_feat_gen.motif_list
 
         columns = 'rep motif col theta data model'.split()
         data = []
-        for col in range(5):
+        for col in range(4):
             for idx, motif in enumerate(motif_list):
                 data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'data': c['data_type'], 'model': 'samm'}
                 data_dict['theta'] = theta[idx, col]
