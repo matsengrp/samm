@@ -62,15 +62,15 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
         hue='variable',
         data=melt_df,
         kind="box",
-        palette="Set1",
+        palette="Set2",
         order=true_categories.categories,
         legend=False,
     )
-    sns_plot.set(ylabel='fitted minus truth')
-    sns_plot.set(xlabel="true theta size")
+    sns_plot.set(ylabel='Fitted minus truth')
+    sns_plot.set(xlabel="True theta size")
     x = sns_plot.axes[0,0].get_xlim()
     sns_plot.axes[0,0].plot(x, len(x) * [0], 'k--', alpha=.4)
-    plt.legend(loc='upper right', title='model')
+    plt.legend(loc='upper right')
 
     sns_plot.savefig(fname)
 
@@ -83,31 +83,25 @@ def _plot_scatter(all_df, fname=''):
         x="theta",
         y="value",
         hue="variable",
+        lowess=True,
+        scatter=False,
         data=melt_df,
-        scatter_kws={'alpha':0.2},
+        line_kws={'lw':3},
         legend=False,
-        markers=["o", "x"],
-        palette="Set1",
+        palette="Set2",
     )
+    sns_plot.axes[0][0].plot([-3,3],[-3,3], color="black", ls="--", label="y=x")
+    model_legend = plt.legend(loc='lower right')
 
-    model_legend = plt.legend(loc='lower right', title='model')
-    xy_line = mlines.Line2D([], [], color='black', marker='', label='y=x')
-    xy_legend = plt.legend([xy_line], loc='upper left')
-    plt.gca().add_artist(xy_legend)
-    plt.gca().add_artist(model_legend)
+    col_palette = sns.color_palette("Set2", 2)
+    melt_df = melt_df.sample(frac=1).reset_index(drop=True)
+    for i in range(melt_df.shape[0]/20):
+        vari = melt_df.loc[i]['variable']
+        col = col_palette[0] if vari == 'samm' else col_palette[1]
+        plt.scatter(melt_df.loc[i]['theta'], melt_df.loc[i]['value'], color=col, alpha=0.1, s=15)
+    sns_plot.set(ylabel='Fitted theta')
+    sns_plot.set(xlabel="True theta")
 
-    sns_plot.set(ylabel='fitted theta')
-    sns_plot.set(xlabel="true theta")
-
-    xmin, xmax = sns_plot.axes[0, 0].get_xlim()
-    ymin, ymax = sns_plot.axes[0, 0].get_ylim()
-
-    lims = [
-        np.max([xmin, ymin]),
-        np.min([xmax, ymax]),
-    ]
-
-    sns_plot.axes[0,0].plot(lims, lims, 'k-')
     sns_plot.savefig(fname)
 
 dense_agg_feat_gen = HierarchicalMotifFeatureGenerator(
