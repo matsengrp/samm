@@ -2,13 +2,18 @@ import sys
 import argparse
 import pickle
 import numpy as np
+import pandas as pd
 import scipy.stats
+
+import matplotlib
+matplotlib.use('pdf')
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from confidence_interval_maker import ConfidenceIntervalMaker
 from make_model_sparse import SparseModelMaker
 from common import *
-import matplotlib.pyplot as plt
 
 def parse_args():
     ''' parse command line arguments '''
@@ -17,23 +22,28 @@ def parse_args():
 
     parser.add_argument('--fitted-models',
         type=str,
-        help='fitted model pickle, comma separated, colon separated')
-    parser.add_argument('--title',
-        type=str,
-        default="")
-    parser.add_argument('--x-labels',
-        type=str,
-        help='x labels, colon separated',
-        default="40:120:360")
-    parser.add_argument('--x-lab',
-        type=str,
-        default="Samples")
+        default="simulation_section/_output/%s/sparsity%s/effect_size_%s/samples%s/0%d/samm/fitted.pkl",
+        help='fitted model pickle, comma separated, colon separated, colon colon separated')
     parser.add_argument('--true-models',
         type=str,
-        help='true model pickle file, colon separated')
+        default="simulation_section/_output/%s/sparsity%s/effect_size_%s/true_model.pkl",
+        help='true model pickle file, colon separated, colon colon separated')
     parser.add_argument('--model-types',
         type=str,
-        help='model name, colon separated')
+        default="3_targetFalse,3_targetTrue,2_3_targetFalse",
+        help='model names')
+    parser.add_argument('--effect-sizes',
+        type=str,
+        default="50,100,200")
+    parser.add_argument('--sample-sizes',
+        type=str,
+        default="40,120,360")
+    parser.add_argument('--sparsities',
+        type=str,
+        default="25,50,100")
+    parser.add_argument('--reps',
+        type=int,
+        default=10)
     parser.add_argument('--agg-motif-len',
         type=int,
         default=3)
@@ -43,25 +53,17 @@ def parse_args():
     parser.add_argument('--stats',
         type=str,
         default="norm,kendall,coverage",
-        # choices=("norm", "raw_norm", "coverage", "raw_coverage", "raw_pearson", "pearson", "support"),
     )
-    parser.add_argument('--outdir',
+    parser.add_argument('--outfile',
         type=str,
-        default="/Users/jeanfeng/Desktop")
-    parser.add_argument('--z',
-        type=float,
-        help="z statistic",
-        default=1.96)
+        default="_output/simulation3mer.pdf")
 
     args = parser.parse_args()
-    args.fitted_models = args.fitted_models.split(":")
-    for i, fmodels in enumerate(args.fitted_models):
-        args.fitted_models[i] = fmodels.split(",")
-    args.x_labels = args.x_labels.split(":")
-    args.x_labels = [int(l) for l in args.x_labels]
-    args.true_models = args.true_models.split(":")
-    args.model_types = args.model_types.split(":")
+    args.model_types = args.model_types.split(",")
     args.stats = args.stats.split(",")
+    args.sample_sizes = args.sample_sizes.split(",")
+    args.effect_sizes = args.effect_sizes.split(",")
+    args.sparsities = args.sparsities.split(",")
     return args
 
 def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
@@ -272,33 +274,14 @@ def _get_stat_func(stat):
 def main(args=sys.argv[1:]):
     args = parse_args()
 
-    fitted_models = {mtype : [] for mtype in set(args.model_types)}
-    for fnames, model_type in zip(args.fitted_models, args.model_types):
-        fitted_models[model_type].append(
-            [load_fitted_model(file_name, args.agg_motif_len, args.agg_pos_mutating) for file_name in fnames]
-        )
-    example_model = fitted_models[args.model_types[0]][0]
-
-    model_dict = {mtype : [] for mtype in set(args.model_types)}
-    for model_type, tmodel_file in zip(args.model_types, args.true_models):
-        example_model = fitted_models[model_type][0][0]
-        true_model = _load_true_model(
-            tmodel_file,
-            args.agg_motif_len,
-            args.agg_pos_mutating,
-            example_model.motif_lens,
-            example_model.positions_mutating,
-        )
-        model_dict[model_type].append(true_model)
-
     STAT_LABEL = {
         "coverage": "Coverage",
         "coverage_pos": "Coverage of Positive Theta",
         "coverage_neg": "Coverage of Negative Theta",
         "coverage_zero": "Coverage of Zero Theta",
-	"pearson": "Pearson",
+        "pearson": "Pearson",
         "kendall": "Kendall Tau",
-        "norm": "Theta Error",
+        "norm": "Relative theta error",
     }
     MODEL_LABEL = {
         "3_targetTrue": "3-mer per-target",
@@ -306,48 +289,72 @@ def main(args=sys.argv[1:]):
         "2_3_targetFalse": "2,3-mer",
     }
     LINE_STYLES = ["solid", "dashed", "dotted"]
-    JITTER = {
-        "3_targetTrue": -0.02 * max(args.x_labels),
-        "3_targetFalse": 0,
-        "2_3_targetFalse": 0.02 * max(args.x_labels),
-    }
-    YLIMS = {
-        "coverage": [0.65, 1],
-        "kendall": [0.5, 1],
-        "norm": [0.1, 1.1],
-    }
-    samm_means = {stat: {mtype : [] for mtype in set(args.model_types)} for stat in args.stats}
-    samm_se = {stat: {mtype : [] for mtype in set(args.model_types)} for stat in args.stats}
-    for stat in args.stats:
-        stat_func = _get_stat_func(stat)
 
-        for i, mtype in enumerate(set(args.model_types)):
-            for fmodels, true_model in zip(fitted_models[mtype], model_dict[mtype]):
-                samm_statistics = _collect_statistics(fmodels, args, true_model[1], true_model[0], stat_func)
-                mean = np.mean(samm_statistics)
-                se = 1.96 * np.sqrt(np.var(samm_statistics)/len(samm_statistics))
-                samm_means[stat][mtype].append(mean)
-                samm_se[stat][mtype].append(se)
-                print "MEAN", stat, mtype, mean, "(%f)" % se
-                if stat == "coverage" and mean < 0.8:
-                    print samm_statistics
+    COLS = ["model_type","Percent effect size","Percent nonzeros","Number of samples","seed"] + [STAT_LABEL[s] for s in args.stats]
+    all_df = pd.DataFrame(columns=COLS)
+    for i, model_type in enumerate(args.model_types):
+        for eff_size in args.effect_sizes:
+            for sparsity in args.sparsities:
+                for nsamples in args.sample_sizes:
+                    eff_same = eff_size == args.effect_sizes[1]
+                    sparse_same = sparsity == args.sparsities[1]
+                    samples_same = nsamples == args.sample_sizes[1]
+                    if eff_same + sparse_same + samples_same >= 2:
+                        for seed in range(args.reps):
+                            fitted_filename = args.fitted_models % (model_type, sparsity, eff_size, nsamples, seed)
+                            fitted_model = load_fitted_model(fitted_filename, args.agg_motif_len, args.agg_pos_mutating)
+                            tmodel_file = args.true_models % (model_type, sparsity, eff_size)
+                            true_model = _load_true_model(
+                                tmodel_file,
+                                args.agg_motif_len,
+                                args.agg_pos_mutating,
+                                fitted_model.motif_lens,
+                                fitted_model.positions_mutating,
+                            )
 
-    plt.clf()
-    f, axes = plt.subplots(len(args.stats), sharex=True, figsize=(5, 4 * len(args.stats)))
-    for i, (stat, ax) in enumerate(zip(args.stats, axes)):
-        for idx, mtype in enumerate(set(args.model_types)):
-            ax.errorbar(np.array(args.x_labels) + JITTER[mtype], samm_means[stat][mtype], samm_se[stat][mtype], linestyle=LINE_STYLES[idx], marker=".", label=MODEL_LABEL[mtype], capsize=3)
-        ax.set_ylabel(STAT_LABEL[stat])
-        ax.xaxis.set_ticks(args.x_labels)
-        ax.set_ylim(YLIMS[stat])
-        if i == len(args.stats) - 1:
-            ax.set_xlabel(args.x_lab)
-            lgd = ax.legend(frameon=False, loc='center left', bbox_to_anchor=(1, 0.5))
-    if args.title:
-        plt.title(args.title)
-    out_fig_name = "%s/%s_%s.pdf" % (args.outdir, "-".join(args.stats), args.x_lab.replace(" ", "_"))
-    print "out_fig_name", out_fig_name
-    plt.savefig(out_fig_name, bbox_extra_artists=(lgd,), bbox_inches='tight')
+                            tmp_df = pd.DataFrame(columns=COLS)
+                            tmp_dat = {
+                                "model_type": model_type,
+                                "Percent effect size": int(eff_size),
+                                "Percent nonzeros": int(sparsity),
+                                "Number of samples": int(nsamples),
+                                "seed":seed,
+                            }
+                            for stat in args.stats:
+                                stat_func = _get_stat_func(stat)
+                                samm_statistics = _collect_statistics(
+                                    [fitted_model],
+                                    args,
+                                    true_model[1],
+                                    true_model[0],
+                                    stat_func,
+                                )
+                                if len(samm_statistics):
+                                    tmp_dat[STAT_LABEL[stat]] = samm_statistics[0]
+                            tmp_df = tmp_df.append(tmp_dat, ignore_index=True)
+                            all_df = pd.concat((all_df, tmp_df))
+    sns.set_context(context="paper", font_scale=1.4)
+    sns_plot = sns.PairGrid(
+        data=all_df,
+        hue="model_type",
+        x_vars=["Number of samples", "Percent nonzeros", "Percent effect size"],
+        y_vars=[STAT_LABEL[s] for s in args.stats],
+        hue_kws={"linestyles":["-","--",":"]},
+        palette="Set2",
+    )
+
+    sns_plot.map(sns.pointplot, linestyles=["-","--",":"], markers=".", scale=1, errwidth=1, dodge=True, capsize=0.2)
+    # majro hack cause seaborn is broken i think
+    col_palette = sns.color_palette("Set2", 3)
+    p1 = matplotlib.lines.Line2D([0], [0], linestyle='-', c=col_palette[0], label=args.model_types[0])
+    p2 = matplotlib.lines.Line2D([0], [0], linestyle='--', c=col_palette[1], label=args.model_types[1])
+    p3 = matplotlib.lines.Line2D([0], [0], linestyle=':', c=col_palette[2],  label=args.model_types[2])
+    proxies = [p1,p2,p3]
+    descriptions = ["3-mer", "3-mer per-target", "2,3-mer"]
+    plt.gca().legend(proxies, descriptions, numpoints=1, markerscale=2, bbox_to_anchor=(1.05,0.4))
+
+    sns_plot.savefig(args.outfile)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
+
