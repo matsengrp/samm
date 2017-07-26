@@ -79,6 +79,7 @@ def _plot_scatter(all_df, fname=''):
     all_df.rename(index=str, columns={'samm': 'samm', 'shazam': 'SHazaM', 'theta': 'theta'}, inplace=True)
     melt_df = pd.melt(all_df, id_vars=['theta'])
 
+    sns.set_context(context="paper", font_scale=1.6)
     sns_plot = sns.lmplot(
         x="theta",
         y="value",
