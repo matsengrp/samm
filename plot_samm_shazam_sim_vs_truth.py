@@ -66,7 +66,7 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
         order=true_categories.categories,
         legend=False,
     )
-    sns_plot.set(ylabel='Fitted minus truth')
+    sns_plot.set(ylabel='Fitted minus true theta')
     sns_plot.set(xlabel="True theta size")
     x = sns_plot.axes[0,0].get_xlim()
     sns_plot.axes[0,0].plot(x, len(x) * [0], 'k--', alpha=.4)
