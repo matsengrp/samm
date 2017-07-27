@@ -280,7 +280,7 @@ def main(args=sys.argv[1:]):
         "coverage_neg": "Coverage of Negative Theta",
         "coverage_zero": "Coverage of Zero Theta",
         "pearson": "Pearson",
-        "kendall": "Kendall Tau",
+        "kendall": "Kendall's Tau",
         "norm": "Relative theta error",
     }
     MODEL_LABEL = {
