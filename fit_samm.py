@@ -63,7 +63,7 @@ def parse_args():
     parser.add_argument('--motif-lens',
         type=str,
         help='Comma-separated list of motif lengths for the motif model we are fitting',
-        default='5')
+        default='3')
     parser.add_argument('--positions-mutating',
         type=str,
         help="""
@@ -73,7 +73,7 @@ def parse_args():
         e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will be a 3mer with first and second mutating position
         and 5mer with first, second and third
         """,
-        default=None)
+        default="1")
     parser.add_argument('--em-max-iters',
         type=int,
         help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
@@ -149,15 +149,10 @@ def parse_args():
 
     args.max_motif_len = max(args.motif_lens)
 
-    if args.positions_mutating is None:
-        # default to central base mutating
-        args.max_left_flank = None
-        args.max_right_flank = None
-    else:
-        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
-        for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
-            for m in positions:
-                assert(m in range(motif_len))
+    args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
+    for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
+        for m in positions:
+            assert(m in range(motif_len))
 
         # Find the maximum left and right flanks of the motif with the largest length in the
         # hierarchy in order to process the data correctly

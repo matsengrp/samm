@@ -18,25 +18,12 @@ def parse_args():
 
     parser.add_argument('--input-pkl',
         type=str,
-        help='Pickle file with model parameters (theta values)')
+        help='Pickle file with model parameters (theta values)',
+        default='_output/context_model.pkl')
     parser.add_argument('--output-csv',
         type=str,
-        help='CSV output file',
+        help='place to output temporary CSV file',
         default='_output/out.csv')
-    parser.add_argument('--motif-lens',
-        type=str,
-        help='Comma-separated list of motif lengths for the motif model (must all be odd????????)',
-        default='3,5,7')
-    parser.add_argument('--positions-mutating',
-        type=str,
-        help="""
-        A colon-separated list of comma-separated lists indicating the positions that are mutating in the motif model.
-        The colons separate based on motif length. Each comma-separated list corresponds to the
-        positions that mutate for the same motif length. The positions are indexed starting from zero.
-        e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will be a 3mer with first and second mutating position
-        and 5mer with first, second and third
-        """,
-        default=None)
     parser.add_argument('--output-pdf',
         type=str,
         help='PDF file to save output to',
@@ -47,9 +34,6 @@ def parse_args():
     parser.add_argument('--center-median',
         action='store_true',
         help="Should center theta parameters by median")
-    parser.add_argument('--no-conf-int',
-        action='store_true',
-        help="Do not plot confidence intervals")
     parser.add_argument('--plot-separate',
         action='store_true',
         help="Plot hazard rates of different target nucleotides in separate PDFs")
@@ -101,37 +85,30 @@ def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, tar
     res = subprocess.call(cmd)
 
 def main(args=sys.argv[1:]):
-
     args = parse_args()
-
-    args.motif_len_vals = [int(m) for m in args.motif_lens.split(',')]
-
-    args.max_motif_len = max(args.motif_len_vals)
-
-    args.positions_mutating, args.max_mut_pos = process_mutating_positions(args.motif_len_vals, args.positions_mutating)
-
-    full_feat_generator = HierarchicalMotifFeatureGenerator(
-        motif_lens=[args.max_motif_len],
-        left_motif_flank_len_list=args.max_mut_pos,
-    )
 
     # Load fitted theta file
     with open(args.input_pkl, "r") as f:
         method_results = pickle.load(f)
         method_res = pick_best_model(method_results)
 
+    max_motif_len = max(method_res.motif_lens)
+    max_mut_pos = get_max_mut_pos(method_res.motif_lens, method_res.positions_mutating)
+
+    full_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[max_motif_len],
+        left_motif_flank_len_list=max_mut_pos,
+    )
+
     theta = method_res.refit_theta
     if args.center_median:
         theta -= np.median(theta)
 
-    covariance_est = method_res.variance_est
-
     feat_generator = HierarchicalMotifFeatureGenerator(
-        motif_lens=args.motif_len_vals,
+        motif_lens=method_res.motif_lens,
         feats_to_remove=method_res.model_masks.feats_to_remove,
-        left_motif_flank_len_list=args.positions_mutating,
+        left_motif_flank_len_list=method_res.positions_mutating,
     )
-    mutating_pos_list = feat_generator.mutating_pos_list
 
     full_theta = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
     theta_lower = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
@@ -156,11 +133,11 @@ def main(args=sys.argv[1:]):
         if args.plot_separate:
             for col_idx, target in enumerate(['N', 'A', 'C', 'G', 'T']):
                 output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
-                plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, output_pdf, target, full_feat_generator, args.max_motif_len)
+                plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, output_pdf, target, full_feat_generator, max_motif_len)
         else:
-            plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N,A,C,G,T', full_feat_generator, args.max_motif_len)
+            plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N,A,C,G,T', full_feat_generator, max_motif_len)
     else:
-        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N', full_feat_generator, args.max_motif_len)
+        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N', full_feat_generator, max_motif_len)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

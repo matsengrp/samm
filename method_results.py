@@ -1,5 +1,5 @@
 import numpy as np
-from common import *
+from common import get_num_nonzero
 
 class MethodResults:
     def __init__(self, penalty_params, motif_lens, positions_mutating):

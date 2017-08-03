@@ -35,7 +35,7 @@ def parse_args():
     parser.add_argument('--agg-motif-len',
         type=int,
         help='Length of k-mer motifs in the aggregate model -- assumes that the center position mutates',
-        default=5)
+        default=3)
     parser.add_argument('--input-model',
         type=str,
         help='Input file with true theta parameters',
@@ -61,8 +61,8 @@ def parse_args():
     parser.add_argument('--n-mutated',
         type=int,
         help='Average number of mutated sequences to generate per naive sequence',
-        default=4)
-    parser.add_argument('--n-germlines',
+        default=1)
+    parser.add_argument('--n-naive',
         type=int,
         help='Number of naive sequences to create, only used if not using partis',
         default=2)
@@ -91,10 +91,10 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
         # suppose all alleles have equal frequencies
-        germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
-        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
+        germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_naive)]
+        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_naive)]
         germline_seqs = {g:n for g,n in zip(germline_genes, germline_nucleotides)}
-        germline_freqs = {g:1.0/args.n_germlines for g in germline_genes}
+        germline_freqs = {g:1.0/args.n_naive for g in germline_genes}
 
     return germline_seqs, germline_freqs
 
