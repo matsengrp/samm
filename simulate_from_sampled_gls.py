@@ -266,16 +266,13 @@ def simulate(args):
 
     if args.n_taxa is None:
         clonal_family_sizes = _get_clonal_family_stats(args.path_to_annotations, args.path_to_metadata, use_np=args.use_np, use_immunized=args.use_immunized, locus=args.locus)
-        print min(clonal_family_sizes), max(clonal_family_sizes)
         large_clonal_families = [n_taxa for n_taxa in clonal_family_sizes if n_taxa > args.max_taxa_per_family]
         if large_clonal_families:
             warnings.warn("There were {0} clonal families with more than {1} taxa. Ignoring: {2}".format(len(large_clonal_families), args.max_taxa_per_family, large_clonal_families))
             clonal_family_sizes = [n_taxa for n_taxa in clonal_family_sizes if n_taxa <= args.max_taxa_per_family]
-
-    if args.n_clonal_families is None:
-        args.n_clonal_families = len(clonal_family_sizes)
-    else:
         clonal_family_sizes = np.random.choice(clonal_family_sizes, args.n_clonal_families)
+    else:
+        clonal_family_sizes = [args.n_taxa] * args.n_clonal_families
 
     all_germline_dicts = _get_germline_info(args)
 
