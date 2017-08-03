@@ -1,3 +1,9 @@
+"""
+Generate mutated sequences using the survival model, shmulate, or a tree given
+mutation model parameters. This can generate naive sequences using partis or
+construct random nucleotide sequences.
+"""
+
 import pickle
 import sys
 import argparse
