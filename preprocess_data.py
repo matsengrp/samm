@@ -131,7 +131,7 @@ def main(args=sys.argv[1:]):
         write_data_after_sampling(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs)
     elif args.impute_ancestors:
         write_data_after_imputing(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
-    else:
+    elif not args.read_from_partis:
         copyfile(args.input_genes, args.output_genes)
         copyfile(args.input_seqs, args.output_seqs)
 
