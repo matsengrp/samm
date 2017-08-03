@@ -22,23 +22,23 @@ def parse_args():
 
     parser.add_argument('--seed',
         type=int,
-        help='rng seed for replicability',
+        help='Random number generator seed for replicability',
         default=1)
     parser.add_argument('--mutability',
         type=str,
         default='gctree/S5F/Mutability.csv',
-        help='path to mutability model file')
+        help='Path to mutability model file - used for sampling distribution for theta')
     parser.add_argument('--substitution',
         type=str,
         default='gctree/S5F/Substitution.csv',
-        help='path to substitution model file')
+        help='Path to substitution model file - used for sampling distribution for theta')
     parser.add_argument('--output-model',
         type=str,
-        help='true theta pickle file',
+        help='Pickle file to output with true theta parameters',
         default='_output/true_model.pkl')
     parser.add_argument('--motif-lens',
         type=str,
-        help='comma-separated list of motif lengths',
+        help='Comma-separated list of motif lengths',
         default="5")
     parser.add_argument('--positions-mutating',
         type=str,
@@ -52,7 +52,7 @@ def parse_args():
         default=None)
     parser.add_argument('--effect-size',
         type=float,
-        help='how much to scale sampling distribution for theta',
+        help='How much to scale sampling distribution for theta',
         default=1.0)
     parser.add_argument('--nonzero-ratio',
         type=float,
