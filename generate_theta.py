@@ -43,11 +43,11 @@ def parse_args():
     parser.add_argument('--positions-mutating',
         type=str,
         help="""
-        A colon-separated list of comma-separated lists. The colons separate based on motif length.
-        Each comma-separated list corresponds to the positions that mutate for the same motif length.
-        The positions are indexed starting from zero.
-        e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
-        be a 3mer with first and second mutating position and 5mer with first, second and third
+        A colon-separated list of comma-separated lists indicating the positions that are mutating in the true model.
+        The colons separate based on motif length. Each comma-separated list corresponds to the
+        positions that mutate for the same motif length. The positions are indexed starting from zero.
+        e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will be a 3mer with first and second mutating position
+        and 5mer with first, second and third
         """,
         default=None)
     parser.add_argument('--effect-size',

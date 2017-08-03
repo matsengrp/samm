@@ -38,7 +38,7 @@ def parse_args():
         default=5)
     parser.add_argument('--input-model',
         type=str,
-        help='Pickle file to output with true theta parameters',
+        help='Input file with true theta parameters',
         default='_output/true_model.pkl')
     parser.add_argument('--use-partis',
         action="store_true",

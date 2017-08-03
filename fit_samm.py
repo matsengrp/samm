@@ -1,7 +1,5 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
 """
-Fit a context-sensitive motif model via MCMC-EM
+Fit a motif model using SAMM
 """
 
 import sys
@@ -23,10 +21,10 @@ from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
 from likelihood_evaluator import LikelihoodComparer, GreedyLikelihoodComparer
 from method_results import MethodResults
+from context_model_algo import ContextModelAlgo
 from common import *
 from read_data import *
 from matsen_grp_data import *
-from context_model_algo import ContextModelAlgo
 
 def parse_args():
     ''' parse command line arguments '''
@@ -35,16 +33,16 @@ def parse_args():
 
     parser.add_argument('--seed',
         type=int,
-        help='rng seed for replicability',
-        default=1533)
-    parser.add_argument('--input-genes',
+        help='Random number generator seed for replicability',
+        default=1)
+    parser.add_argument('--input-naive',
         type=str,
-        help='genes data in csv',
-        default='_output/genes.csv')
-    parser.add_argument('--input-seqs',
+        help='Input CSV file with naive sequences',
+        default='_output/naive.csv')
+    parser.add_argument('--input-mutated',
         type=str,
-        help='sequence data in csv',
-        default='_output/seqs.csv')
+        help='Input CSV file with naive sequences',
+        default='_output/mutated.csv')
     parser.add_argument('--sample-regime',
         type=int,
         default=1,
@@ -52,98 +50,86 @@ def parse_args():
         help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
     parser.add_argument('--scratch-directory',
         type=str,
-        help='where to write gibbs workers and dnapars files, if necessary',
+        help='Directory for writing temporary files',
         default='_output')
     parser.add_argument('--num-cpu-threads',
         type=int,
-        help='number of threads to use during M-step',
+        help='Number of threads to use',
         default=1)
     parser.add_argument('--num-jobs',
         type=int,
-        help='number of jobs to submit during E-step',
+        help='Number of jobs to submit to a Slurm cluster during E-step. (If using only 1 job, it does not submit to a cluster.)',
         default=1)
     parser.add_argument('--motif-lens',
         type=str,
-        help='length of motif (must be odd)',
+        help='Comma-separated list of motif lengths for the motif model we are fitting',
         default='5')
     parser.add_argument('--positions-mutating',
         type=str,
         help="""
-        length of left motif flank determining which position is mutating; comma-separated within
-        a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
-        be a 3mer with first and second mutating position and 5mer with first, second and third
+        A colon-separated list of comma-separated lists indicating the positions that are mutating in the motif model
+        we are fitting. The colons separate based on motif length. Each comma-separated list corresponds to the
+        positions that mutate for the same motif length. The positions are indexed starting from zero.
+        e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will be a 3mer with first and second mutating position
+        and 5mer with first, second and third
         """,
         default=None)
     parser.add_argument('--em-max-iters',
         type=int,
-        help='number of EM iterations',
+        help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
         default=20)
     parser.add_argument('--burn-in',
         type=int,
-        help='number of burn-in iterations for E-step',
+        help='Number of burn-in iterations used on the first E-step of each penalty parameter',
         default=10)
     parser.add_argument('--num-e-samples',
         type=int,
-        help='number of base samples to draw during E-step',
+        help='Number of mutation order samples to draw per observation during E-step',
         default=10)
     parser.add_argument('--log-file',
         type=str,
-        help='log file',
+        help='Log file',
         default='_output/context_log.txt')
     parser.add_argument('--out-file',
         type=str,
-        help='file with pickled context model',
+        help='Output file with pickled context model',
         default='_output/context_model.pkl')
-    parser.add_argument('--theta-file',
-        type=str,
-        help='true theta file',
-        default='')
     parser.add_argument("--penalty-params",
         type=str,
-        help="penalty parameters, comma separated",
+        help="Comma-separated list of penalty parameters",
         default="0.5, 0.25")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
-        help="""
-            proportion of data to use for tuning the penalty parameter.
-            if zero, tunes by number of confidence intervals for theta that do not contain zero
-            """,
+        help="Proportion of data to reserve for tuning the penalty parameter",
         default=0.1)
     parser.add_argument('--num-val-burnin',
         type=int,
-        help='Number of burn in iterations when estimating likelihood of validation data',
+        help='Number of burn-in iterations when estimating likelihood of validation data',
         default=10)
     parser.add_argument('--num-val-samples',
         type=int,
-        help='Number of burn in iterations when estimating likelihood of validation data',
+        help='Number of mutation order samples drawn per observation when estimating likelihood of validation data',
         default=10)
-    parser.add_argument('--num-val-threads',
-        type=int,
-        help='number of threads to use for validation calculations',
-        default=12)
     parser.add_argument('--validation-column',
         type=str,
-        help='column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
+        help='Optional: column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
         default=None)
     parser.add_argument('--per-target-model',
-        action='store_true')
+        action='store_true',
+        help='Fit a model that allows for different hazard rates for different target nucleotides')
     parser.add_argument("--locus",
         type=str,
         choices=('','igh','igk','igl'),
-        help="locus (igh, igk or igl; default empty)",
+        help="Filter sequence data for a particular locus (igh, igk or igl; default empty)",
         default='')
     parser.add_argument("--species",
         type=str,
         choices=('','mouse','human'),
-        help="species (mouse or human; default empty)",
+        help="Filter sequence data for a particular species (mouse or human; default empty)",
         default='')
-    parser.add_argument("--z-stat",
-        type=float,
-        help="confidence interval z statistic",
-        default=1.96)
     parser.add_argument("--omit-hessian",
         action="store_true",
-        help="do not calculate the hessian")
+        help="Do not calculate uncertainty intervals (omit calculating the hessian matrix)")
 
     parser.set_defaults(per_target_model=False, conf_int_stop=False, omit_hessian=False)
     args = parser.parse_args()
@@ -202,10 +188,6 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    true_theta = None
-    if args.theta_file != "":
-        true_theta, _ = load_true_model(args.theta_file)
-
     if args.num_cpu_threads > 1:
         all_runs_pool = Pool(args.num_cpu_threads)
     else:
@@ -218,8 +200,8 @@ def main(args=sys.argv[1:]):
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
-        args.input_genes,
-        args.input_seqs,
+        args.input_naive,
+        args.input_mutated,
         motif_len=args.max_motif_len,
         left_flank_len=args.max_left_flank,
         right_flank_len=args.max_right_flank,
