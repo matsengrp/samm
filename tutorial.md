@@ -23,7 +23,8 @@ python simulate_from_survival.py --agg-motif-len 3 --input-model _output/true_mo
 ```
 The argument `--agg-motif-len` specifies the length of the k-mer motifs in the aggregate form of the inputted mutation model (it assumes the motifs are centered).
 
-In addition, it will be impo,
+In addition, use the following arguments to modify characteristics of the sequence generation process:
+
 |  argument        |  description
 |------------------------|----------------------------------------------------------------------------
 |  --random-gene-len    |  the length of sequences
