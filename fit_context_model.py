@@ -281,6 +281,18 @@ def main(args=sys.argv[1:]):
         max_em_iters=args.em_max_iters,
         get_hessian=not args.omit_hessian,
     )
+    if np.diagonal(results_list[best_model_idx].variance_est < 0).any():
+        log.info("Variance estimates negative; trying previous penalty parameter")
+        if best_model_idx == 0:
+            log.info("No fits had positive variance estimates")
+        else:
+            best_model_idx -= 1
+            cmodel_algo.refit_unpenalized(
+                model_result=results_list[best_model_idx],
+                max_em_iters=args.em_max_iters,
+                get_hessian=not args.omit_hessian,
+            )
+
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
         pickle.dump(results_list, f)
