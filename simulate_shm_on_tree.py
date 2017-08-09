@@ -1,10 +1,3 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-'''
-    simulate sequences given germline sequences shmulate
-
-'''
-
 import subprocess
 import sys
 import argparse
@@ -31,115 +24,82 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description=__doc__)
 
-    subparsers = parser.add_subparsers()
-
-    ###
-    # for simulating
-
-    parser_simulate = subparsers.add_parser('simulate')
-
-    parser_simulate.add_argument('--n-taxa',
+    parser.add_argument('--n-taxa',
         type=int,
-        help='number of taxa to simulate',
+        help='number of taxa in each clonal family to simulate; if unspecified, use statistics from partis annotations',
         default=None)
-    parser_simulate.add_argument('--param-path',
-        type=str,
-        help='parameter file path',
-        default=GERMLINE_PARAM_FILE)
-    parser_simulate.add_argument('--path-to-annotations',
+    parser.add_argument('--n-clonal-families',
+        type=int,
+        help='number of clonal families to generate; if unspecified, use statistics from partis annotations',
+        default=None)
+    parser.add_argument('--path-to-annotations',
         type=str,
         help='''
-        data file path, if --n-taxa and --n-clonal-families unspecified then
-        compute these statistics from supplied dataset
+        path to partis annotations to determine --n-taxa and/or --n-clonal-families if they are not given
         ''',
         default=None)
-    parser_simulate.add_argument('--path-to-metadata',
+    parser.add_argument('--path-to-metadata',
         type=str,
-        help='metadata file path, same as for annotations',
+        help='path to partis metadata, same as for annotations',
         default=None)
-    parser_simulate.add_argument('--seed',
+    parser.add_argument('--seed',
         type=int,
         help='rng seed for replicability',
         default=1533)
-    parser_simulate.add_argument('--output-seqs',
-        type=str,
-        help='simulated data destination file',
-        default='_output/seqs.csv')
-    parser_simulate.add_argument('--output-germline-seqs',
-        type=str,
-        help='germline genes used in csv file',
-        default='_output/genes.csv')
-    parser_simulate.add_argument('--log-dir',
-        type=str,
-        help='log directory',
-        default='_output')
-    parser_simulate.add_argument('--n-clonal-families',
-        type=int,
-        help='number of clonal families to generate',
-        default=None)
-    parser_simulate.add_argument('--verbose',
-        action='store_true',
-        help='output R log')
-    parser_simulate.add_argument('--motif-lens',
+    parser.add_argument('--motif-lens',
         type=str,
         default='3,5',
         help='comma-separated motif lengths (odd only)')
-    parser_simulate.add_argument('--lambda0',
+    parser.add_argument('--lambda0',
         type=float,
         default=None,
         help='baseline mutation rate')
-    parser_simulate.add_argument('--r',
-        type=float,
-        default=1.,
-        help='sampling probability')
-    parser_simulate.add_argument('--T',
+    parser.add_argument('--T',
         type=int,
         default=None,
         help='observation time, if None we run until termination and take all leaves')
-    parser_simulate.add_argument('--frame',
-        type=int,
-        default=None,
-        help='codon frame')
-    parser_simulate.add_argument('--output-per-branch-germline-seqs',
+    parser.add_argument('--output-seqs',
+        type=str,
+        help='csv file with simulated sequence data',
+        default='_output/seqs.csv')
+    parser.add_argument('--output-germline-seqs',
+        type=str,
+        help='csv file with germline genes/nucleotides used',
+        default='_output/genes.csv')
+    parser.add_argument('--output-per-branch-seqs',
+        type=str,
+        default='_output/gctree_per_branch_seqs.csv',
+        help='csv file for additionally outputting genes from single branches with intermediate ancestors instead of leaves from germline')
+    parser.add_argument('--output-per-branch-germline-seqs',
         type=str,
         default='_output/gctree_per_branch_genes.csv',
-        help='additionally output genes from single branches with intermediate ancestors instead of leaves from germline')
-    parser_simulate.add_argument('--max-taxa-per-family',
+        help='csv file for additionally outputting genes from single branches with intermediate ancestors instead of leaves from germline')
+    parser.add_argument('--max-taxa-per-family',
         type=int,
         default=1000,
         help='the maximum taxa per family to simulate when getting clonal family size statistics')
-    parser_simulate.add_argument('--output-per-branch-seqs',
-        type=str,
-        default='_output/gctree_per_branch_seqs.csv',
-        help='additionally output genes from single branches with intermediate ancestors instead of leaves from germline')
-    parser_simulate.add_argument('--mutability',
+    parser.add_argument('--mutability',
         type=str,
         default='gctree/S5F/Mutability.csv',
         help='path to mutability model file')
-    parser_simulate.add_argument('--substitution',
+    parser.add_argument('--substitution',
         type=str,
         default='gctree/S5F/Substitution.csv',
         help='path to substitution model file')
-    parser_simulate.add_argument('--use-v',
+    parser.add_argument('--use-v',
         action="store_true",
-        help="use V gene only")
-    parser_simulate.add_argument('--use-np',
+        help="use V gene only; for computing clonal family statistics")
+    parser.add_argument('--use-np',
         action="store_true",
-        help="use nonproductive sequences")
-    parser_simulate.add_argument('--use-immunized',
+        help="use nonproductive sequences; for computing clonal family statistics")
+    parser.add_argument('--use-immunized',
         action="store_true",
-        help="use immunized mice")
-    parser_simulate.add_argument('--use-partis',
-        action="store_true",
-        help="use partis germline generation")
-    parser_simulate.add_argument('--locus',
+        help="use immunized mice; for computing clonal family statistics")
+    parser.add_argument('--locus',
         type=str,
         default='',
-        help="which locus to get statistics from")
-    parser_simulate.set_defaults(func=simulate, subcommand=simulate)
-
-    ###
-    # for parsing
+        help="which locus to use; for computing clonal family statistics")
+    parser.set_defaults(func=simulate, subcommand=simulate)
 
     args = parser.parse_args()
     args.motif_lens = sorted(map(int, args.motif_lens.split(",")))
@@ -147,8 +107,6 @@ def parse_args():
     return args
 
 def run_gctree(args, germline_seq, mutation_model, n_taxa):
-    ''' somewhat cannibalized gctree simulation '''
-
     if args.lambda0 is None:
         args.lambda0 = max([1, int(.01*len(germline_seq))])
     tree = mutation_model.simulate(germline_seq,
@@ -161,36 +119,16 @@ def run_gctree(args, germline_seq, mutation_model, n_taxa):
 
 def _get_germline_info(args):
     germline_info = []
-    if args.use_partis:
-        out_dir = os.path.dirname(os.path.realpath(args.output_germline_seqs))
-        g = GermlineSimulatorPartis(output_dir=out_dir)
-        germline_seqs, germline_freqs = g.generate_germline_set()
-        germline_info = []
-        for name in germline_seqs.keys():
-            germline_info.append({
-                'gene_name': name,
-                'germline_sequence': germline_seqs[name],
-                'freq': germline_freqs[name],
-            })
-    else:
-        # Read parameters from file
-        params = read_germline_file(args.param_path)
-
-        # Find germline genes with "N" and remove them so gctree is happy
-        genes_to_sample = [idx for idx, row in params.iterrows() if set(row['base'].lower()) == NUCLEOTIDE_SET]
-
-        # Select, with replacement, args.n_clonal_families germline genes from our
-        # parameter file and place them into a numpy array.
-        germline_genes = np.random.choice(genes_to_sample, size=args.n_clonal_families)
-
-        # Put the nucleotide content of each selected germline gene into a
-        # corresponding list.
-        for name, nucs in zip(germline_genes, [params.loc[gene]['base'] for gene in germline_genes]):
-            germline_info.append({
-                'gene_name': name,
-                'germline_sequence': nucs,
-                'freq': 1.0/args.n_clonal_families,
-            })
+    out_dir = os.path.dirname(os.path.realpath(args.output_germline_seqs))
+    g = GermlineSimulatorPartis(output_dir=out_dir)
+    germline_seqs, germline_freqs = g.generate_germline_set()
+    germline_info = []
+    for name in germline_seqs.keys():
+        germline_info.append({
+            'gene_name': name,
+            'germline_sequence': germline_seqs[name],
+            'freq': germline_freqs[name],
+        })
 
     return germline_info
 
@@ -246,8 +184,9 @@ def _get_clonal_family_stats(path_to_annotations, metadata, use_np=False, use_im
 
     return clonal_family_sizes
 
-def simulate(args):
-    ''' simulate submodule '''
+def main(args=sys.argv[1:]):
+
+    args = parse_args()
 
     # write empty sequence file before appending
     output_dir, _ = os.path.split(args.output_seqs)
@@ -259,7 +198,6 @@ def simulate(args):
 
     if args.n_taxa is None:
         clonal_family_sizes = _get_clonal_family_stats(args.path_to_annotations, args.path_to_metadata, use_np=args.use_np, use_immunized=args.use_immunized, locus=args.locus)
-        print min(clonal_family_sizes), max(clonal_family_sizes)
         large_clonal_families = [n_taxa for n_taxa in clonal_family_sizes if n_taxa > args.max_taxa_per_family]
         if large_clonal_families:
             warnings.warn("There were {0} clonal families with more than {1} taxa. Ignoring: {2}".format(len(large_clonal_families), args.max_taxa_per_family, large_clonal_families))
@@ -321,12 +259,6 @@ def simulate(args):
                         # we are at the leaf of the tree and can write into the "observed data" file
                         obs_seq_name = "%s-%s" % (germline_name, seq_name)
                         seq_file.writerow([germline_name, obs_seq_name, descendant.sequence.lower()])
-
-def main(args=sys.argv[1:]):
-    ''' run program '''
-
-    args = parse_args()
-    args.subcommand(args)
 
 
 if __name__ == "__main__":
