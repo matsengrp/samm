@@ -3,6 +3,7 @@ import re
 import random
 import warnings
 import itertools
+import logging as log
 
 from Bio import SeqIO
 
@@ -574,6 +575,9 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
             standard_err_est = np.sqrt(var_est)
             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - zstat * standard_err_est
             theta_upper[full_theta_idx] = full_theta[full_theta_idx] + zstat * standard_err_est
+    else:
+        theta_lower = full_theta
+        theta_upper = full_theta
 
     return full_theta, theta_lower, theta_upper
 

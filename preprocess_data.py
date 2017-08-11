@@ -52,6 +52,13 @@ def parse_args():
         type=str,
         help='output imputed sequence csv',
         default=None)
+        help='output sequence info')
+    parser.add_argument('--use-np',
+        action='store_true')
+    parser.add_argument('--use-v',
+        action='store_true')
+    parser.add_argument('--use-immunized',
+        action='store_true')
     parser.add_argument('--output-genes-sampled',
         type=str,
         help='output sampled germlines csv',
@@ -78,7 +85,7 @@ def main(args=sys.argv[1:]):
         write_data_after_sampling(args.output_genes_sampled, args.output_seqs_sampled, args.input_genes, args.input_seqs)
 
     if args.read_from_partis:
-        write_partis_data_from_annotations(args.input_genes, args.input_seqs, args.data_path, args.metadata_path)
+        write_partis_data_from_annotations(args.output_genes, args.output_seqs, args.data_path, args.metadata_path, use_np=args.use_np, use_v=args.use_v, use_immunized=args.use_immunized)
         if args.impute_ancestors:
             write_data_after_imputing(args.output_genes_imputed, args.output_seqs_imputed, args.input_genes, args.input_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
     elif args.impute_ancestors:

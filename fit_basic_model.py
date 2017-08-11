@@ -106,7 +106,7 @@ def main(args=sys.argv[1:]):
         germline_motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
 
         for key, value in germline_motifs.iteritems():
-            appearances[motif_list[value[0]]] += 1
+            appearances[motif_list[value]] += 1
 
         for mut_pos, mut_nuc in obs_seq.mutation_pos_dict.iteritems():
             feat_idx = (germline_motifs[mut_pos])[0]

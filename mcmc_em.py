@@ -129,7 +129,7 @@ class MCMC_EM:
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
         if get_hessian:
-            ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, possible_theta_mask, zero_theta_mask)
+            ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, possible_theta_mask, zero_theta_mask, feat_generator.mutating_pos_list)
             variance_est = ci_maker.run(theta, e_step_samples, problem)
         else:
             variance_est = None

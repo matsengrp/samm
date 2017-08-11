@@ -66,7 +66,7 @@ def parse_args():
     args.sparsities = args.sparsities.split(",")
     return args
 
-def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
+def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False):
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
         best_model = pick_best_model(fitted_models)
@@ -90,7 +90,7 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
         best_model.refit_theta,
         best_model.model_masks.zero_theta_mask_refit,
         best_model.refit_possible_theta_mask,
-        keep_col0=False,
+        keep_col0=keep_col0,
     )
     return best_model
 

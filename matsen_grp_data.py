@@ -12,9 +12,11 @@ import fnmatch
 
 PARTIS_PROCESSED_PATH = '/fh/fast/matsen_e/processed-data/partis'
 
-LAURA_DATA_PATH = PARTIS_PROCESSED_PATH+'/laura-mb'
-KATE_DATA_PATH = PARTIS_PROCESSED_PATH+'/kate-qrs'
+LAURA_DATA_PATH = PARTIS_PROCESSED_PATH+'/laura-mb/latest'
+KATE_DATA_PATH = PARTIS_PROCESSED_PATH+'/kate-qrs/latest'
 CUI_DATA_PATH = PARTIS_PROCESSED_PATH+'/cui-et-al'
+KATIE_DATA_PATH = PARTIS_PROCESSED_PATH+'/katie/latest'
+
 SCRATCH_DIR = '/fh/fast/matsen_e/dshaw/_tmp/samm/'
 
 def get_paths_to_partis_annotations_for_kate_and_laura(pth, chain='h', ig_class='G', pid=None):

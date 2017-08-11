@@ -1,0 +1,159 @@
+## Test model fits against one another
+
+import os
+import pickle
+import csv
+import numpy as np
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+from random import randint
+from matsen_grp_data import CUI_DATA_PATH
+from matsen_grp_data import SCRATCH_DIR
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
+SAMPLE_OR_IMPUTE = 2 # sample one sequence from each clonal family
+LOCUS = 'igk' # only kappa chain is relevant for Cui data
+VAL_COLUMN = 'subject' # validate on mice, not randomly
+
+# Nest for processing data
+# Not imputing so we don't need to pass motif length---this way data will only
+# be processed once
+@nest.add_target_with_env(localenv)
+def process_data(env, outdir, c):
+    cmd = ['python preprocess_data.py',
+               '--data-path',
+               CUI_DATA_PATH,
+               '--read-from-partis',
+               '--metadata-path',
+               CUI_DATA_PATH + '/meta.csv',
+               '--use-v',
+               '--use-immunized',
+               '--output-genes ${TARGETS[0]}',
+               '--output-seqs ${TARGETS[1]}']
+
+    return env.Command(
+        [join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+motif_params_dict = [
+    {
+        'motif_length': '5',
+        'left_motif_flanks': '2',
+        'penalty_params': ",".join(map(str, np.power(10, np.arange(-5.0, -8.0, step=-.5)).tolist())),
+    },
+    {
+        'motif_length': '3,5',
+        'left_motif_flanks': '1:2',
+        'penalty_params': ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist())),
+    },
+    {
+        'motif_length': '3,5',
+        'left_motif_flanks': '0,1,2:2',
+        'penalty_params': ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-.5)).tolist())),
+    },
+]
+
+nest.add(
+    'motif_params',
+    motif_params_dict,
+    label_func=lambda c: 'motif-' + c['motif_length'].replace(',','-') +
+        '-flank-' + c['left_motif_flanks'].replace(',', '-').replace(':', '--'))
+
+nest.add(
+    'per_target',
+    [
+         False,
+         True,
+    ]
+)
+
+nest.add(
+    'validation_mouse_idx',
+    range(4),
+)
+
+# fit survival
+@nest.add_target_with_env(localenv)
+def fit_survival(env, outdir, c):
+    cmd = []
+    motif_len = c['motif_params']['motif_length']
+    left_flanks = c['motif_params']['left_motif_flanks']
+    penalty_params = c['motif_params']['penalty_params']
+
+    cmd = ['python fit_context_model.py',
+           '--input-genes ${SOURCES[0]}',
+           '--input-seqs ${SOURCES[1]}',
+           '--locus',
+           LOCUS,
+           '--species',
+           'mouse',
+           '--seed',
+           c['validation_mouse_idx'],
+           '--motif-lens',
+           motif_len,
+           '--positions-mutating',
+           left_flanks,
+           '--penalty-params',
+           penalty_params,
+           '--num-cpu-threads',
+           4,
+           '--num-jobs',
+           20,
+           '--burn-in',
+           2,
+           '--num-e-samples',
+           4,
+           '--em-max-iters',
+           10,
+           '--num-val-burnin',
+           2,
+           '--num-val-samples',
+           4,
+           '--refit-on-training',
+           '--val-mouse-idx',
+           c['validation_mouse_idx'],
+           '--validation-column',
+           VAL_COLUMN,
+           '--sample-regime',
+           SAMPLE_OR_IMPUTE, # sample one seq from clonal family
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--tuning-sample-ratio',
+           0.1,
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    if c["per_target"]:
+        cmd += ['--per-target-model']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt'), join(outdir, 'fitted_train_seqs.csv'), join(outdir, 'fitted_train_genes.csv')],
+        c['process_data'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def fit_shazam(env, outdir, c):
+
+    cmd = ['python fit_shmulate_model.py',
+           '--input-file',
+           '${SOURCES[2]}',
+           '--input-genes',
+           '${SOURCES[3]}',
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+
+    return env.Command(
+        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
+        c['fit_survival'],
+        ' '.join(map(str, cmd)))
+

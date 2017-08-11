@@ -101,7 +101,7 @@ def parse_args():
     parser.add_argument("--penalty-params",
         type=str,
         help="penalty parameters, comma separated",
-        default="0.5, 0.25")
+        default='.1')
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help="""
@@ -127,6 +127,8 @@ def parse_args():
         default=None)
     parser.add_argument('--per-target-model',
         action='store_true')
+    parser.add_argument('--refit-on-training',
+        action='store_true')
     parser.add_argument("--locus",
         type=str,
         choices=('','igh','igk','igl'),
@@ -141,6 +143,10 @@ def parse_args():
         type=float,
         help="confidence interval z statistic",
         default=1.96)
+    parser.add_argument("--val-mouse-idx",
+        type=int,
+        help="index of validation mouse",
+        default=None)
     parser.add_argument("--omit-hessian",
         action="store_true",
         help="do not calculate the hessian")
@@ -189,13 +195,29 @@ def parse_args():
     if not os.path.exists(args.scratch_dir):
         os.makedirs(args.scratch_dir)
 
-    # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
 
     assert(args.tuning_sample_ratio > 0)
 
     return args
+
+def write_sampled_data(input_shazam_seqs, input_shazam_genes, sampled_set):
+    """
+    Write data after sampling so shazam and samm fit to the same data
+    """
+
+    with open(input_shazam_seqs, 'w') as shazam_seq_file, open(input_shazam_genes, 'w') as shazam_gene_file:
+                gene_writer = csv.DictWriter(shazam_gene_file, ['germline_name', 'germline_sequence'])
+                gene_writer.writeheader()
+                seq_writer = csv.DictWriter(shazam_seq_file, ['germline_name', 'sequence'])
+                seq_writer.writeheader()
+                for idx, obs_seq_mutation in enumerate(sampled_set):
+                    gl_name = 'germline' + str(idx)
+                    gene_writer.writerow({'germline_name': gl_name,
+                        'germline_sequence': obs_seq_mutation.start_seq_with_flanks})
+                    seq_writer.writerow({'germline_name': gl_name,
+                        'sequence': obs_seq_mutation.end_seq_with_flanks})
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -233,9 +255,36 @@ def main(args=sys.argv[1:]):
         metadata,
         args.tuning_sample_ratio,
         args.validation_column,
+        args.val_mouse_idx,
     )
     train_set = [obs_data[i] for i in train_idx]
     val_set = [obs_data[i] for i in val_idx]
+
+    # for fitting shazam and later validating
+    write_sampled_data(
+            args.out_file.replace('.pkl', '_train_seqs.csv'),
+            args.out_file.replace('.pkl', '_train_genes.csv'),
+            train_set
+    )
+
+    write_sampled_data(
+            args.out_file.replace('.pkl', '_val_seqs.csv'),
+            args.out_file.replace('.pkl', '_val_genes.csv'),
+            val_set
+    )
+
+    if args.refit_on_training:
+        # Only use the training set in computing and validating thetas
+        obs_data = train_set
+        train_idx, val_idx = split_train_val(
+            len(obs_data),
+            metadata,
+            args.tuning_sample_ratio,
+            validation_column=None,
+        )
+        train_set = [obs_data[i] for i in train_idx]
+        val_set = [obs_data[i] for i in val_idx]
+
     feat_generator.add_base_features_for_list(train_set)
     feat_generator.add_base_features_for_list(val_set)
 
@@ -245,10 +294,10 @@ def main(args=sys.argv[1:]):
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
 
-    log.info("Running EM")
     cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
+    log.info("Running EM")
     num_val_samples = args.num_val_samples
     results_list = []
     val_set_evaluator = None
@@ -304,6 +353,7 @@ def main(args=sys.argv[1:]):
         max_em_iters=args.em_max_iters,
         get_hessian=not args.omit_hessian,
     )
+
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
         pickle.dump(results_list, f)
@@ -316,4 +366,3 @@ def main(args=sys.argv[1:]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-                                                     

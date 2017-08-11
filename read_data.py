@@ -9,7 +9,6 @@ import glob
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from submotif_feature_generator import SubmotifFeatureGenerator
-from fit_shmulate_model import _read_shmulate_val
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -639,6 +638,10 @@ def read_germline_file(fasta):
             bases.append(str(seq_record.seq))
 
     return pd.DataFrame({'base': bases}, index=genes)
+
+def _read_shmulate_val(shmulate_value):
+    """ return the log so we can be sure we're comparing the same things!"""
+    return -np.inf if shmulate_value == "NA" or not shmulate_value else np.log(float(shmulate_value))
 
 def get_shazam_theta(motif_len, mutability_file, target_file=None):
     """
