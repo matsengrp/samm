@@ -187,6 +187,10 @@ def main(args=sys.argv[1:]):
         motif_lens=args.motif_lens,
         left_motif_flank_len_list=args.positions_mutating,
     )
+    full_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[args.max_motif_len],
+        left_motif_flank_len_list=args.max_mut_pos,
+    )
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
@@ -214,7 +218,7 @@ def main(args=sys.argv[1:]):
     log.info("Settings %s" % args)
 
     log.info("Running EM")
-    cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
+    cmodel_algo = ContextModelAlgo(feat_generator, full_feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
     num_val_samples = args.num_val_samples
@@ -278,42 +282,8 @@ def main(args=sys.argv[1:]):
         pickle.dump(results_list, f)
 
     if not args.omit_hessian:
-        full_feat_generator = HierarchicalMotifFeatureGenerator(
-            motif_lens=[args.max_motif_len],
-            left_motif_flank_len_list=args.max_mut_pos,
-        )
-        method_res = results_list[best_model_idx]
-        num_agg_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
-        agg_start_col = 1 if args.per_target_model else 0
-
-        try:
-            for col_idx in range(num_agg_cols):
-                full_theta, theta_lower, theta_upper = combine_thetas_and_get_conf_int(
-                    feat_generator,
-                    full_feat_generator,
-                    method_res.refit_theta,
-                    method_res.model_masks.zero_theta_mask_refit,
-                    method_res.refit_possible_theta_mask,
-                    method_res.variance_est,
-                    col_idx + agg_start_col,
-                )
-        except ValueError as e:
-            print(e)
-
-            log.info("Variance estimates negative; trying previous penalty parameter")
-            if best_model_idx == 0:
-                log.info("No fits had positive variance estimates")
-            else:
-                best_model_idx -= 1
-                cmodel_algo.refit_unpenalized(
-                    model_result=results_list[best_model_idx],
-                    max_em_iters=args.em_max_iters,
-                    get_hessian=not args.omit_hessian,
-                )
-
-        # Pickle the refitted theta
-        with open(args.out_file, "w") as f:
-            pickle.dump(results_list, f)
+        # Check if the Hessian is positive definite
+        print np.all(np.diag(results_list[best_model_idx].variance_est) > 0)
 
     if all_runs_pool is not None:
         all_runs_pool.close()

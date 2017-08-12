@@ -1,7 +1,5 @@
 import time
-import numpy as np
 import logging as log
-import pickle
 
 from models import *
 from common import *
@@ -28,7 +26,7 @@ class MCMC_EM:
         self.scratch_dir = scratch_dir
         self.per_target_model = per_target_model
 
-    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, intermed_file_prefix="", get_hessian=False):
+    def run(self, observed_data, feat_generator, full_feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, intermed_file_prefix="", get_hessian=False):
         """
         @param theta: initial value for theta in MCMC-EM
         @param feat_generator: an instance of a FeatureGenerator
@@ -117,12 +115,6 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-            # Save the e-step samples if we want to analyze later on
-            # e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
-            # log.info("Pickling E-step samples %s" % e_sample_file_name)
-            # with open(e_sample_file_name, "w") as f:
-            #     pickle.dump(e_step_samples, f)
-
             if lower_bound_is_negative or lower_bound < diff_thres or num_nonzero == 0:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
@@ -130,7 +122,33 @@ class MCMC_EM:
 
         if get_hessian:
             ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, possible_theta_mask, zero_theta_mask)
-            variance_est = ci_maker.run(theta, e_step_samples, problem)
+
+            # TODO: make a deep copy so we don't disturb the previous e samples?
+            # It's okay for now since this function is exiting anyways
+            full_feat_generator.add_base_features_for_list([sample.obs_seq_mutation for sample in e_step_samples])
+            assert(not self.per_target_model) # not working for per target yet!
+            agg_problem = self.problem_solver_cls(
+                full_feat_generator,
+                e_step_samples,
+                e_step_labels,
+                penalty_params, # Doesn't actually matter what is here
+                self.per_target_model,
+                pool=self.pool,
+            )
+            num_agg_cols = NUM_NUCLEOTIDES if self.per_target_model else 1
+            agg_start_col = 1 if self.per_target_model else 0
+
+            agg_theta, _, _ = combine_thetas_and_get_conf_int(
+                feat_generator,
+                full_feat_generator,
+                theta,
+                zero_theta_mask,
+                possible_theta_mask,
+                covariance_est=None,
+                col_idx=0 + agg_start_col,
+            )
+            agg_theta = agg_theta.reshape((full_feat_generator.feature_vec_len, num_agg_cols))
+            variance_est = ci_maker.run(agg_theta, e_step_samples, agg_problem)
         else:
             variance_est = None
         return theta, variance_est, all_traces

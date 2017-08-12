@@ -14,7 +14,7 @@ class ContextModelAlgo:
     """
     Performs fitting procedures
     """
-    def __init__(self, feat_generator, obs_data, train_set, args, all_runs_pool, true_theta=None):
+    def __init__(self, feat_generator, full_feat_generator, obs_data, train_set, args, all_runs_pool, true_theta=None):
         """
         @param feat_generator: feature generator
         @param obs_data: full data set - used in training for the refitting stage
@@ -25,6 +25,7 @@ class ContextModelAlgo:
         """
         self.args = args
         self.feat_generator = feat_generator
+        self.full_feat_generator = full_feat_generator
 
         self.obs_data = obs_data
         self.train_set = train_set
@@ -97,6 +98,7 @@ class ContextModelAlgo:
         penalized_theta, _, _ = self.em_algo.run(
             self.train_set,
             self.feat_generator,
+            full_feat_generator=None,
             theta=init_theta,
             possible_theta_mask=self.possible_theta_mask,
             zero_theta_mask=self.zero_theta_mask,
@@ -157,6 +159,7 @@ class ContextModelAlgo:
         refit_theta, variance_est, _ = self.em_algo.run(
             obs_data_stage2,
             feat_generator_stage2,
+            full_feat_generator=self.full_feat_generator,
             theta=init_theta, # initialize from the lasso version
             possible_theta_mask=possible_theta_mask_refit,
             zero_theta_mask=model_masks.zero_theta_mask_refit,
