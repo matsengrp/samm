@@ -144,25 +144,16 @@ def parse_args():
 
     args.max_motif_len = max(args.motif_lens)
 
-    if args.positions_mutating is None:
-        # default to central base mutating
-        args.max_left_flank = None
-        args.max_right_flank = None
-    else:
-        args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
-        for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
-            for m in positions:
-                assert(m in range(motif_len))
+    args.positions_mutating, args.max_mut_pos = process_mutating_positions(args.motif_lens, args.positions_mutating)
+    # Find the maximum left and right flanks of the motif with the largest length in the
+    # hierarchy in order to process the data correctly
+    args.max_left_flank = max(sum(args.positions_mutating, []))
+    args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
-        # Find the maximum left and right flanks of the motif with the largest length in the
-        # hierarchy in order to process the data correctly
-        args.max_left_flank = max(sum(args.positions_mutating, []))
-        args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
-
-        # Check if our full feature generator will conform to input
-        max_left_flanks = args.positions_mutating[args.motif_lens.index(args.max_motif_len)]
-        if args.max_left_flank > max(max_left_flanks) or args.max_right_flank > args.max_motif_len - min(max_left_flanks) - 1:
-            raise AssertionError('The maximum length motif does not contain all smaller length motifs.')
+    # Check if our full feature generator will conform to input
+    max_left_flanks = args.positions_mutating[args.motif_lens.index(args.max_motif_len)]
+    if args.max_left_flank > max(max_left_flanks) or args.max_right_flank > args.max_motif_len - min(max_left_flanks) - 1:
+        raise AssertionError('The maximum length motif does not contain all smaller length motifs.')
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
@@ -281,21 +272,48 @@ def main(args=sys.argv[1:]):
         max_em_iters=args.em_max_iters,
         get_hessian=not args.omit_hessian,
     )
-    if np.diagonal(results_list[best_model_idx].variance_est < 0).any():
-        log.info("Variance estimates negative; trying previous penalty parameter")
-        if best_model_idx == 0:
-            log.info("No fits had positive variance estimates")
-        else:
-            best_model_idx -= 1
-            cmodel_algo.refit_unpenalized(
-                model_result=results_list[best_model_idx],
-                max_em_iters=args.em_max_iters,
-                get_hessian=not args.omit_hessian,
-            )
 
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
         pickle.dump(results_list, f)
+
+    if not args.omit_hessian:
+        full_feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=[args.max_motif_len],
+            left_motif_flank_len_list=args.max_mut_pos,
+        )
+        method_res = results_list[best_model_idx]
+        num_agg_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
+        agg_start_col = 1 if args.per_target_model else 0
+
+        try:
+            for col_idx in range(num_agg_cols):
+                full_theta, theta_lower, theta_upper = combine_thetas_and_get_conf_int(
+                    feat_generator,
+                    full_feat_generator,
+                    method_res.refit_theta,
+                    method_res.model_masks.zero_theta_mask_refit,
+                    method_res.refit_possible_theta_mask,
+                    method_res.variance_est,
+                    col_idx + agg_start_col,
+                )
+        except ValueError as e:
+            print(e)
+
+            log.info("Variance estimates negative; trying previous penalty parameter")
+            if best_model_idx == 0:
+                log.info("No fits had positive variance estimates")
+            else:
+                best_model_idx -= 1
+                cmodel_algo.refit_unpenalized(
+                    model_result=results_list[best_model_idx],
+                    max_em_iters=args.em_max_iters,
+                    get_hessian=not args.omit_hessian,
+                )
+
+        # Pickle the refitted theta
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
 
     if all_runs_pool is not None:
         all_runs_pool.close()
