@@ -108,7 +108,6 @@ def write_train_test(output_seqs, sampled_set):
     """
     Write data after sampling so shazam and samm fit to the same data
     """
-
     with open(output_seqs, 'w') as seq_file:
         seq_writer = csv.DictWriter(seq_file, sampled_set[0].keys())
         seq_writer.writeheader()

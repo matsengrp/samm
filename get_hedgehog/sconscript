@@ -135,11 +135,9 @@ def plot_hedgehog(env, outdir, c):
            '--output-csv',
            '${TARGETS[0]}',
            '--output-pdf',
-           '${TARGETS[1]}',
-           '--center-median']
+           '${TARGETS[1]}']
 
     return env.Command(
         [join(outdir, 'fitted.csv'), join(outdir, 'fitted.pdf')],
         c['fit_survival'],
         ' '.join(map(str, cmd)))
-
