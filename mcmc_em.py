@@ -121,12 +121,27 @@ class MCMC_EM:
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
         if get_hessian:
-            ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, possible_theta_mask, zero_theta_mask)
-
             # TODO: make a deep copy so we don't disturb the previous e samples?
             # It's okay for now since this function is exiting anyways
             full_feat_generator.add_base_features_for_list([sample.obs_seq_mutation for sample in e_step_samples])
             assert(not self.per_target_model) # not working for per target yet!
+            num_agg_cols = NUM_NUCLEOTIDES if self.per_target_model else 1
+            agg_start_col = 1 if self.per_target_model else 0
+
+            # determine which motifs have values
+            agg_mask, _, _ = combine_thetas_and_get_conf_int(
+                feat_generator,
+                full_feat_generator,
+                np.ones(theta.shape),
+                zero_theta_mask,
+                possible_theta_mask,
+                covariance_est=None,
+                col_idx=0 + agg_start_col,
+            )
+            agg_mask = np.array(agg_mask, dtype=bool)
+
+            ci_maker = ConfidenceIntervalMaker(feat_generator.motif_list, self.per_target_model, np.ones(agg_mask.shape, dtype=bool), ~agg_mask)
+
             agg_problem = self.problem_solver_cls(
                 full_feat_generator,
                 e_step_samples,
@@ -135,8 +150,6 @@ class MCMC_EM:
                 self.per_target_model,
                 pool=self.pool,
             )
-            num_agg_cols = NUM_NUCLEOTIDES if self.per_target_model else 1
-            agg_start_col = 1 if self.per_target_model else 0
 
             agg_theta, _, _ = combine_thetas_and_get_conf_int(
                 feat_generator,
@@ -151,4 +164,5 @@ class MCMC_EM:
             variance_est = ci_maker.run(agg_theta, e_step_samples, agg_problem)
         else:
             variance_est = None
-        return theta, variance_est, all_traces
+            agg_mask = None
+        return theta, variance_est, agg_mask, all_traces

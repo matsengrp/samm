@@ -25,11 +25,11 @@ class ConfidenceIntervalMaker:
         log.info("Obtaining Confidence Interval Estimates...")
         sample_obs_information, _ = problem.get_hessian(theta)
         # Need to filter out all the theta values that are constant (negative infinity or zero constants)
-        # sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
+        sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
 
-        # if sample_obs_information.size == 0:
-        #     return None
-        return np.linalg.inv(sample_obs_information)
+        if sample_obs_information.size == 0:
+            return None
+        return np.linalg.pinv(sample_obs_information)
 
     def _get_confidence_interval_print_lines(self, conf_ints):
         """

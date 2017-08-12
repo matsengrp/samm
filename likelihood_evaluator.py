@@ -123,7 +123,7 @@ class LikelihoodComparer:
         )
         log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
 
-    def get_log_likelihood_ratio(self, theta, max_iters=2):
+    def get_log_likelihood_ratio(self, theta, max_iters=4):
         """
         Get the log likelihood ratio between theta and a reference theta
         @param theta: the model parameter to compare against
@@ -134,7 +134,7 @@ class LikelihoodComparer:
         ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE, mean_ll_ratio)
 
         curr_iter = 1
-        while lower_bound < 0 and upper_bound > 0 and self.num_samples * 2 * self.num_tot_obs < LikelihoodComparer.MAX_TOT_SAMPLES and curr_iter < max_iters:
+        while lower_bound < 0 and upper_bound > 0 and self.num_samples * (1 + curr_iter) * self.num_tot_obs < LikelihoodComparer.MAX_TOT_SAMPLES and curr_iter < max_iters:
             # If we aren't sure if the mean log likelihood ratio is negative or positive, grab more samples
             log.info("Get more samples likelihood comparer (lower,mean,upper)=(%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound))
             st_time = time.time()

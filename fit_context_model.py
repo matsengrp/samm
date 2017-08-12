@@ -227,6 +227,7 @@ def main(args=sys.argv[1:]):
     penalty_params_prev = None
     prev_pen_theta = None
     best_model_idx = 0
+    has_refit = False
     for param_i, penalty_param in enumerate(args.penalty_params):
         target_penalty_param = penalty_param if args.per_target_model else 0
         penalty_params = (penalty_param, target_penalty_param)
@@ -258,32 +259,44 @@ def main(args=sys.argv[1:]):
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        ll_ratio = curr_model_results.log_lik_ratio
-        if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < -ZERO_THRES:
+        ll_ratio = curr_model_results.log_lik_ratio_lower_bound
+        print curr_model_results.penalized_num_nonzero
+        print param_i, len(args.penalty_params) - 1
+        print ll_ratio
+        refit_cause_none_before = len(args.penalty_params) - 1 == param_i and not has_refit
+        refit_cause_negative = ll_ratio is not None and ll_ratio < -ZERO_THRES
+        if curr_model_results.penalized_num_nonzero > 0 and (refit_cause_none_before or refit_cause_negative):
             # Make sure that the penalty isnt so big that theta is empty
             # This model is not better than the previous model. Stop trying penalty parameters.
             # Time to refit the model
-            log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratio %f" % ll_ratio)
-            break
-        else:
-            best_model_idx = param_i
+            if refit_cause_none_before:
+                best_model_idx = param_i
+                log.info("Refitting cause last penalty param: idx %d" % best_model_idx)
+            else:
+                log.info("EM surrogate function is negative lower bound: ll_ratio %f, idx %d" % (ll_ratio, best_model_idx))
+
+            cmodel_algo.refit_unpenalized(
+                model_result=results_list[best_model_idx],
+                max_em_iters=args.em_max_iters,
+                get_hessian=not args.omit_hessian,
+            )
+            has_refit = True
+            # Pickle the refitted theta
+            with open(args.out_file, "w") as f:
+                pickle.dump(results_list, f)
+
+            if not args.omit_hessian:
+                # Check if the Hessian is positive definite
+                log.info("diag all positive? %d" % np.all(np.diag(results_list[best_model_idx].variance_est) > 0))
+                log.info(np.diag(results_list[best_model_idx].variance_est))
+            if curr_model_results.log_lik_ratio is not None and curr_model_results.log_lik_ratio < -ZERO_THRES:
+                log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratio %f" % curr_model_results.log_lik_ratio)
+                break
+
+        best_model_idx = param_i
 
         penalty_params_prev = penalty_params
         prev_pen_theta = curr_model_results.penalized_theta
-
-    cmodel_algo.refit_unpenalized(
-        model_result=results_list[best_model_idx],
-        max_em_iters=args.em_max_iters,
-        get_hessian=not args.omit_hessian,
-    )
-
-    # Pickle the refitted theta
-    with open(args.out_file, "w") as f:
-        pickle.dump(results_list, f)
-
-    if not args.omit_hessian:
-        # Check if the Hessian is positive definite
-        print np.all(np.diag(results_list[best_model_idx].variance_est) > 0)
 
     if all_runs_pool is not None:
         all_runs_pool.close()
