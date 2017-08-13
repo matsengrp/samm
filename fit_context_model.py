@@ -287,9 +287,14 @@ def main(args=sys.argv[1:]):
         agg_start_col = 1 if args.per_target_model else 0
 
         try:
+            feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
+                motif_lens=args.motif_lens,
+                feats_to_remove=method_res.model_masks.feats_to_remove,
+                left_motif_flank_len_list=args.positions_mutating,
+            )
             for col_idx in range(num_agg_cols):
                 full_theta, theta_lower, theta_upper = combine_thetas_and_get_conf_int(
-                    feat_generator,
+                    feat_generator_stage2,
                     full_feat_generator,
                     method_res.refit_theta,
                     method_res.model_masks.zero_theta_mask_refit,
@@ -297,6 +302,7 @@ def main(args=sys.argv[1:]):
                     method_res.variance_est,
                     col_idx + agg_start_col,
                 )
+                print np.vstack([full_theta, theta_lower, theta_upper])
         except ValueError as e:
             print(e)
 

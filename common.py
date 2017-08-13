@@ -514,7 +514,7 @@ def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
                 idx += 1
     return theta_idx_counter
 
-def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
+def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
     """
     Combine hierarchical and offset theta values
     """
@@ -561,17 +561,46 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
                     if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
                         theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
 
-    if covariance_est is not None:
+    if sample_obs_info is not None:
+        # Make the aggregation matrix
+        agg_matrix = np.zeros((full_theta.size, theta.size))
         for full_theta_idx, matches in theta_index_matches.iteritems():
-            var_est = 0
-            for i in matches:
-                for j in matches:
-                    var_est += covariance_est[i,j]
-            if var_est < 0:
-                raise ValueError("Unable to come up with valid variance estimate: %f" % var_est)
-            standard_err_est = np.sqrt(var_est)
-            theta_lower[full_theta_idx] = full_theta[full_theta_idx] - zstat * standard_err_est
-            theta_upper[full_theta_idx] = full_theta[full_theta_idx] + zstat * standard_err_est
+            agg_matrix[full_theta_idx, matches] = 1
+
+        # determine which aggregations are completely zero
+        agg_mask, _, _ = combine_thetas_and_get_conf_int(
+            feat_generator, full_feat_generator,
+            np.ones((theta.size, 1)),
+            zero_theta_mask,
+            possible_theta_mask,
+            col_idx=0,
+            zstat=zstat,
+            add_targets=add_targets,
+        )
+        agg_mask = np.array(agg_mask, dtype=bool)
+
+        # Prune the agg matrix
+        agg_matrix = agg_matrix[agg_mask, :]
+
+        # Now figure out what to multiply to get the aggregated theta
+        # Recall taylor series expansion:
+        #     info_matrix * sqrt(n) * (theta_hat - theta) = 1/sqrt(n) * score + o_p(1)
+        #     Multiply mult_mat on both sides such that the LHS is
+        #     sqrt(n) * (agg_theta_hat - agg_theta)
+        #     Then the variance of our estimator is mult_mat * variance of score * mult_mat.T
+        #     The variance of the score is the information matrix.
+        mult_mat, _, _, _ = np.linalg.lstsq(sample_obs_info, agg_matrix.T)
+        cov_mat_full = np.dot(np.dot(mult_mat.T, sample_obs_info), mult_mat)
+        if np.any(np.diag(cov_mat_full) < 0):
+            raise ValueError(
+                "Unable to come up with valid variance estimate: num neg: %d" %
+                np.sum(np.diag(cov_mat_full) > 0)
+            )
+        std_err = np.sqrt(np.diag(cov_mat_full))
+        full_std_err = np.zeros(full_theta.shape)
+        full_std_err[agg_mask] = std_err
+        theta_lower = full_theta - zstat * full_std_err
+        theta_upper = full_theta + zstat * full_std_err
 
     return full_theta, theta_lower, theta_upper
 
