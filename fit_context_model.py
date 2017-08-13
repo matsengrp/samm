@@ -299,7 +299,7 @@ def main(args=sys.argv[1:]):
                     method_res.refit_theta,
                     method_res.model_masks.zero_theta_mask_refit,
                     method_res.refit_possible_theta_mask,
-                    method_res.variance_est,
+                    method_res.sample_obs_info,
                     col_idx + agg_start_col,
                 )
                 print np.vstack([full_theta, theta_lower, theta_upper])
