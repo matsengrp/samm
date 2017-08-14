@@ -51,8 +51,8 @@ nest.add(
 def generate(env, outdir, c):
     shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
     cmd = ['python generate_theta.py',
-            '--mutability R/shmulate_params/mutability.csv',
-            '--substitution R/shmulate_params/substitution.csv',
+            '--mutability R/shmulate_params/mut_mouse.csv',
+            '--substitution R/shmulate_params/sub_mouse.csv',
             '--seed',
             c['seed'],
             '--motif-lens',

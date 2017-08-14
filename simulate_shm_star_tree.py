@@ -69,11 +69,11 @@ def parse_args():
     parser.add_argument('--min-percent-mutated',
         type=float,
         help='Minimum percent of sequence to mutate',
-        default=0.05)
+        default=0.01)
     parser.add_argument('--max-percent-mutated',
         type=float,
         help='Maximum percent of sequence to mutate',
-        default=0.15)
+        default=0.05)
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')

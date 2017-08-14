@@ -1,4 +1,4 @@
-## Test model fits against one another - data generated from a survival model
+# Test model fits against one another - data generated from a survival model
 
 import os
 
@@ -14,8 +14,8 @@ Import('env')
 localenv = env.Clone()
 
 SPARSITIES = [0.25, 0.5, 1.0]
-EFFECT_SIZES = [1.0] # [0.5, 1.0, 2.0]
-SIMULATION_SIZES = [40, 120, 360]
+EFFECT_SIZES = [0.5, 1.0, 2.0]
+SIMULATION_SIZES = [80, 240, 720]
 
 # Set up state
 base = {'nreps': localenv['NREPS'],
@@ -28,7 +28,6 @@ models = [
     {'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
     {'motif_lens': [3], 'positions_mutating': "1", 'per_target': True},
     {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': False},
-    # {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': True},
 ]
 
 nest.add(
@@ -38,9 +37,9 @@ nest.add(
 )
 
 nest.add(
-    'sparsity_ratio',
+    'nonzero_ratio',
     SPARSITIES,
-    label_func=lambda c: "sparsity%d" % int(c * 100),
+    label_func=lambda c: "nonzero%d" % int(c * 100),
 )
 
 nest.add(
@@ -49,9 +48,10 @@ nest.add(
     label_func=lambda c: "effect_size_%d" % int(c * 100),
 )
 
+
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    if c['effect_size'] != EFFECT_SIZES[int(len(EFFECT_SIZES)/2)] and c['sparsity_ratio'] != SPARSITIES[int(len(SPARSITIES)/2)]:
+    if c['effect_size'] != EFFECT_SIZES[int(len(EFFECT_SIZES)/2)] and c['nonzero_ratio'] != SPARSITIES[int(len(SPARSITIES)/2)]:
         return
 
     per_target_model_str = ""
@@ -59,6 +59,8 @@ def generate(env, outdir, c):
         per_target_model_str = "--per-target-model"
 
     cmd = ['python generate_theta.py',
+           '--mutability R/shmulate_params/mut_mouse.csv',
+           '--substitution R/shmulate_params/sub_mouse.csv',
            '--seed',
            0,
            '--motif-lens',
@@ -67,8 +69,8 @@ def generate(env, outdir, c):
            c["model"]["positions_mutating"],
            '--effect-size',
            c['effect_size'],
-           '--sparsity-ratio',
-           c['sparsity_ratio'],
+           '--nonzero-ratio',
+           c['nonzero_ratio'],
            per_target_model_str,
            '--output-model ${TARGETS[0]}']
     return env.Command(
@@ -85,7 +87,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(0,4),
+    range(1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -98,26 +100,27 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
     c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
-    c2 = c['sparsity_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
+    c2 = c['nonzero_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
     c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
     if np.sum([c1, c2, c3]) < 2:
         return
-    cmd = ['python simulate_from_survival.py',
+    cmd = ['python simulate_shm_star_tree.py',
            '--seed',
            c['seed'],
            '--agg-motif-len',
            max(c['model']['motif_lens']),
            '--input-model ${SOURCES[0]}',
-           '--n-taxa',
+           '--use-partis',
+           '--n-mutated',
            1,
-           '--n-germlines',
+           '--n-naive',
            c['simulation_size'],
-           '--random-gene-len',
-           250,
            '--min-percent-mutated',
+           0.01,
+           '--max-percent-mutated',
            0.05,
-           '--output-file ${TARGETS[0]}',
-           '--output-genes ${TARGETS[1]}']
+           '--output-mutated ${TARGETS[0]}',
+           '--output-naive ${TARGETS[1]}']
     return env.Command(
         [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
         c['generate'],
@@ -133,7 +136,7 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def fit_context_model(env, outdir, c):
     c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
-    c2 = c['sparsity_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
+    c2 = c['nonzero_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
     c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
     if np.sum([c1, c2, c3]) < 2:
         return
@@ -143,7 +146,7 @@ def fit_context_model(env, outdir, c):
     if c["model"]["per_target"]:
         per_target_model_str = "--per-target-model"
 
-    cmd = ['python fit_context_model.py',
+    cmd = ['python fit_samm.py',
            '--seed',
            c['seed'],
            '--motif-lens',
