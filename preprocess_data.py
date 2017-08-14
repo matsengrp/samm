@@ -4,7 +4,6 @@ import os
 import os.path
 import time
 
-from matsen_grp_data import get_paths_to_partis_annotations
 from read_data import write_partis_data_from_annotations, write_data_after_imputing, write_data_after_sampling
 
 def parse_args():

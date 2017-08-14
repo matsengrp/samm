@@ -1,4 +1,7 @@
-import pickle
+"""
+Assess how bad estimates are if we assume positions mutate at most once
+"""
+
 import numpy as np
 import argparse
 
