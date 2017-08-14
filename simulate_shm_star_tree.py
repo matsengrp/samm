@@ -1,3 +1,9 @@
+"""
+Generate mutated sequences using the survival model, shmulate, or a tree given
+mutation model parameters. This can generate naive sequences using partis or
+construct random nucleotide sequences.
+"""
+
 import pickle
 import sys
 import argparse
@@ -12,7 +18,6 @@ from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineSimulatorPartis
 from common import *
-from read_data import GERMLINE_PARAM_FILE
 
 def parse_args():
     ''' parse command line arguments '''
@@ -21,43 +26,45 @@ def parse_args():
 
     parser.add_argument('--seed',
         type=int,
-        help='rng seed for replicability',
-        default=1533)
+        help='Random number generator seed for replicability',
+        default=1)
     parser.add_argument('--random-gene-len',
         type=int,
-        help='Create random germline genes of this length. If zero, load true germline genes',
+        help='Create random naive sequences of this length, only used if not using partis',
         default=24)
     parser.add_argument('--agg-motif-len',
         type=int,
-        help='length of motif -- assume center mutates',
-        default=5)
+        help='Length of k-mer motifs in the aggregate model -- assumes that the center position mutates',
+        default=3)
     parser.add_argument('--input-model',
         type=str,
-        default='_output/true_model.pkl',
-        help='true model pickle file')
-    parser.add_argument('--germline-path',
+        help='Input file with true theta parameters',
+        default='_output/true_model.pkl')
+    parser.add_argument('--use-partis',
+        action="store_true",
+        help='Use partis to gernerate germline/naive sequences')
+    parser.add_argument('--use-shmulate',
+        action="store_true",
+        help='Use shmulate to do somatic hypermutation simulation')
+    parser.add_argument('--output-mutated',
         type=str,
-        help='germline file path',
-        default=GERMLINE_PARAM_FILE)
-    parser.add_argument('--output-file',
+        help='CSV file to output for mutated sequences',
+        default='_output/mutated.csv')
+    parser.add_argument('--output-naive',
         type=str,
-        help='simulated data destination file',
-        default='_output/seqs.csv')
-    parser.add_argument('--output-genes',
-        type=str,
-        help='germline genes used in csv file',
-        default='_output/genes.csv')
+        help='CSV file to output for naive sequences',
+        default='_output/naive.csv')
     parser.add_argument('--lambda0',
         type=float,
-        help='base hazard rate in cox proportional hazards model for a single motif (summing over targets)',
+        help='Baseline constant hazard rate in cox proportional hazards model',
         default=0.1)
-    parser.add_argument('--n-taxa',
+    parser.add_argument('--n-mutated',
         type=int,
-        help='average number of taxa per germline sequence',
-        default=4)
-    parser.add_argument('--n-germlines',
+        help='Average number of mutated sequences to generate per naive sequence',
+        default=1)
+    parser.add_argument('--n-naive',
         type=int,
-        help='number of germline genes to sample from (max 350). ignored if using partis',
+        help='Number of naive sequences to create, only used if not using partis',
         default=2)
     parser.add_argument('--min-percent-mutated',
         type=float,
@@ -70,43 +77,37 @@ def parse_args():
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')
-    parser.add_argument('--use-partis',
-        action="store_true",
-        help='Use partis to gernerate germline sequences')
-    parser.add_argument('--use-shmulate',
-        action="store_true",
-        help='Use shmulate to do SHM')
 
     parser.set_defaults(with_replacement=False, use_partis=False, use_shmulate=False)
     args = parser.parse_args()
-    args.output_gene_freqs = args.output_genes.replace(".csv", "_prevalence.csv")
+    args.output_naive_freqs = args.output_naive.replace(".csv", "_prevalence.csv")
     return args
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
-        out_dir = os.path.dirname(os.path.realpath(args.output_genes))
+        out_dir = os.path.dirname(os.path.realpath(args.output_naive))
         g = GermlineSimulatorPartis(output_dir=out_dir)
         germline_seqs, germline_freqs = g.generate_germline_set()
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
         # suppose all alleles have equal frequencies
-        germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_germlines)]
-        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_germlines)]
+        germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_naive)]
+        germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_naive)]
         germline_seqs = {g:n for g,n in zip(germline_genes, germline_nucleotides)}
-        germline_freqs = {g:1.0/args.n_germlines for g in germline_genes}
+        germline_freqs = {g:1.0/args.n_naive for g in germline_genes}
 
     return germline_seqs, germline_freqs
 
 def dump_germline_data(germline_seqs, germline_freqs, args):
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
-    with open(args.output_genes, 'w') as outgermlines:
+    with open(args.output_naive, 'w') as outgermlines:
         germline_file = csv.writer(outgermlines)
         germline_file.writerow(['germline_name','germline_sequence'])
         for gene, sequence in germline_seqs.iteritems():
             germline_file.writerow([gene,sequence])
 
-    with open(args.output_gene_freqs, 'w') as outgermlines:
+    with open(args.output_naive_freqs, 'w') as outgermlines:
         germline_freq_file = csv.writer(outgermlines)
         germline_freq_file.writerow(['germline_name','freq'])
         for gene, freq in germline_freqs.iteritems():
@@ -134,7 +135,7 @@ def run_survival(args, germline_seqs, germline_freqs):
     # For each germline gene, run survival model to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
     # used, name of simulated sequence and corresponding sequence.
-    with open(args.output_file, 'w') as outseqs:
+    with open(args.output_mutated, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name','sequence_name','sequence'])
         for gene, sequence in germline_seqs.iteritems():
@@ -165,13 +166,13 @@ def run_shmulate(args, germline_seqs, germline_freqs):
     cmd = [
         command,
         script_file,
-        args.output_genes,
-        args.output_gene_freqs,
+        args.output_naive,
+        args.output_naive_freqs,
         args.tot_taxa,
         args.seed,
         args.min_percent_mutated,
         args.max_percent_mutated,
-        args.output_file,
+        args.output_mutated,
     ]
     print "Calling:", " ".join(map(str, cmd))
     res = subprocess.call(map(str, cmd))
@@ -187,7 +188,7 @@ def main(args=sys.argv[1:]):
     # But there is an uneven distribution of allele frequencies, so we will make the number of taxa
     # for different alleles to be different. The number of taxa will just be proportional to the germline
     # frequency.
-    args.tot_taxa = args.n_taxa * len(germline_seqs)
+    args.tot_taxa = args.n_mutated * len(germline_seqs)
 
     if args.use_shmulate:
         run_shmulate(args, germline_seqs, germline_freqs)

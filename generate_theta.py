@@ -1,24 +1,19 @@
 """
-This can do offset motifs, but you need to have the center position of the longest motif mutate.
-And we will suppose that all the other shorter motifs are contained in the longest motif.
+Randomly generate a mutation model (the theta parameters) according to the specified
+motif model structure (e.g. 3-mer, 3,5-mers, or even with offsets).
+
+Currently this assumes that the aggregate model is a k-mer motif model where k is odd
+and the center position mutates.
 """
 import pickle
 import sys
 import argparse
-import itertools
 import numpy as np
-import os
-import os.path
 import csv
 import re
-import random
 
-from survival_model_simulator import SurvivalModelSimulatorSingleColumn
-from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
-from make_model_sparse import SparseModelMaker
 from common import *
-from read_data import GERMLINE_PARAM_FILE
 
 def parse_args():
     ''' parse command line arguments '''
@@ -27,55 +22,50 @@ def parse_args():
 
     parser.add_argument('--seed',
         type=int,
-        help='rng seed for replicability',
-        default=1533)
-    parser.add_argument('--random-gene-len',
-        type=int,
-        help='Create random germline genes of this length. If zero, load true germline genes',
-        default=24)
+        help='Random number generator seed for replicability',
+        default=1)
     parser.add_argument('--mutability',
         type=str,
         default='gctree/S5F/Mutability.csv',
-        help='path to mutability model file')
+        help='Path to mutability model file - used for sampling distribution for theta')
     parser.add_argument('--substitution',
         type=str,
         default='gctree/S5F/Substitution.csv',
-        help='path to substitution model file')
+        help='Path to substitution model file - used for sampling distribution for theta')
     parser.add_argument('--output-model',
         type=str,
-        help='true theta pickle file',
+        help='Pickle file to output with true theta parameters',
         default='_output/true_model.pkl')
     parser.add_argument('--motif-lens',
         type=str,
-        help='length of motifs, comma separated',
+        help='Comma-separated list of motif lengths',
         default="5")
     parser.add_argument('--positions-mutating',
         type=str,
         help="""
-        length of left motif flank determining which position is mutating; comma-separated within
-        a motif length, colon-separated between, e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will
-        be a 3mer with first and second mutating position and 5mer with first, second and third
+        A colon-separated list of comma-separated lists indicating the positions that are mutating in the true model.
+        The colons separate based on motif length. Each comma-separated list corresponds to the
+        positions that mutate for the same motif length. The positions are indexed starting from zero.
+        e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will be a 3mer with first and second mutating position
+        and 5mer with first, second and third
         """,
         default=None)
     parser.add_argument('--effect-size',
         type=float,
-        help='how much to scale sampling distribution for theta',
+        help='How much to scale sampling distribution for theta',
         default=1.0)
-    parser.add_argument('--sparsity-ratio',
+    parser.add_argument('--nonzero-ratio',
         type=float,
         help='Proportion of motifs to be nonzero',
         default=0.5)
     parser.add_argument('--per-target-model',
         action="store_true",
         help='Allow different hazard rates for different target nucleotides')
-    parser.add_argument('--shuffle',
-        action="store_true",
-        help='Use a shuffled version of the S5F parameters')
     parser.add_argument('--use-shmulate-as-truth',
         action="store_true",
         help='Use hs5f parameters as the truth (HH_S5F in shazam)')
 
-    parser.set_defaults(per_target_model=False, shuffle=False, use_shmulate_as_truth=False)
+    parser.set_defaults(per_target_model=False, use_shmulate_as_truth=False)
     args = parser.parse_args()
 
     args.motif_lens = [int(m) for m in args.motif_lens.split(",")]
@@ -133,7 +123,7 @@ def _make_theta_sampling_distribution(args):
 
 def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, theta_sampling_col_prob):
     """
-    Make a sparse version if sparsity_ratio > 0
+    Make a sparse version if nonzero_ratio > 0
     """
     num_cols = NUM_NUCLEOTIDES + 1 if args.per_target_model else 1
     theta_shape = (hier_feat_generator.feature_vec_len, num_cols)
@@ -152,7 +142,7 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, th
     # Zero parts of the first theta column
     indices_to_zero = np.random.choice(
         np.arange(theta_param.size),
-        size=int((1 - args.sparsity_ratio) * theta_param.size),
+        size=int((1 - args.nonzero_ratio) * theta_param.size),
         replace=False,
     )
     theta_param[indices_to_zero] = 0
@@ -168,7 +158,7 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, th
         # zero out certain rows -- set to equal prob 1/3
         col_probs_to_third = np.random.choice(
             np.arange(hier_feat_generator.feature_vec_len),
-            size=int((1 - args.sparsity_ratio) * hier_feat_generator.feature_vec_len),
+            size=int((1 - args.nonzero_ratio) * hier_feat_generator.feature_vec_len),
             replace=False,
         )
 
