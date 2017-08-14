@@ -60,7 +60,7 @@ def parse_args():
         default=0.1)
     parser.add_argument('--n-mutated',
         type=int,
-        help='Average number of mutated sequences to generate per naive sequence',
+        help='Roughly total number of mutated sequences',
         default=1)
     parser.add_argument('--n-naive',
         type=int,
@@ -188,7 +188,7 @@ def main(args=sys.argv[1:]):
     # But there is an uneven distribution of allele frequencies, so we will make the number of taxa
     # for different alleles to be different. The number of taxa will just be proportional to the germline
     # frequency.
-    args.tot_taxa = args.n_mutated * len(germline_seqs)
+    args.tot_taxa = args.n_mutated
 
     if args.use_shmulate:
         run_shmulate(args, germline_seqs, germline_freqs)
