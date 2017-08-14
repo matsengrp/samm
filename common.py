@@ -490,11 +490,13 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=No
         if val_column_idx is None:
             # sample random categories from our validation variable
             val_categories = set(random.sample(categories, val_size))
+            print val_categories
         else:
             # choose val_column_idx as validation item
             val_categories = set([list(categories)[val_column_idx]])
 
         train_categories = categories - val_categories
+        print train_categories
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
@@ -566,6 +568,9 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
         agg_matrix = np.zeros((full_theta.size, theta.size))
         for full_theta_idx, matches in theta_index_matches.iteritems():
             agg_matrix[full_theta_idx, matches] = 1
+        old_var = np.dot(np.dot(agg_matrix, np.linalg.pinv(sample_obs_info)), agg_matrix.T)
+        print "old", np.sum(np.diag(old_var) < 0)
+        print np.sort(np.diag(old_var))
 
         # determine which aggregations are completely zero
         agg_mask, _, _ = combine_thetas_and_get_conf_int(
@@ -589,12 +594,24 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
         #     sqrt(n) * (agg_theta_hat - agg_theta)
         #     Then the variance of our estimator is mult_mat * variance of score * mult_mat.T
         #     The variance of the score is the information matrix.
-        mult_mat, _, _, _ = np.linalg.lstsq(sample_obs_info, agg_matrix.T)
-        cov_mat_full = np.dot(np.dot(mult_mat.T, sample_obs_info), mult_mat)
+        rcond = 1e-4
+        tt = 0.5 * (sample_obs_info + sample_obs_info.T)
+        print np.sort(np.linalg.eigvals(tt))
+        mult_mat, resid, r, s = np.linalg.lstsq(tt, agg_matrix.T, rcond=rcond)
+        print "s len", s.size
+        print "s", np.sort(s)[:100]
+        print "r", r
+        print "rcond", rcond
+        print "norm dif", np.linalg.norm(np.dot(tt.T, mult_mat) - agg_matrix.T)/np.linalg.norm(agg_matrix.T)
+        print np.dot(tt.T, mult_mat) - agg_matrix.T
+        cov_mat = np.dot(agg_matrix, mult_mat)
+        print np.sort(np.diag(cov_mat))
+        cov_mat_full = np.dot(np.dot(mult_mat.T, tt), mult_mat)
+        print np.sort(np.diag(cov_mat_full))
         if np.any(np.diag(cov_mat_full) < 0):
             raise ValueError(
                 "Unable to come up with valid variance estimate: num neg: %d" %
-                np.sum(np.diag(cov_mat_full) > 0)
+                np.sum(np.diag(cov_mat_full) < 0)
             )
         std_err = np.sqrt(np.diag(cov_mat_full))
         full_std_err = np.zeros(full_theta.shape)
