@@ -59,8 +59,6 @@ def generate(env, outdir, c):
         per_target_model_str = "--per-target-model"
 
     cmd = ['python generate_theta.py',
-           '--mutability R/shmulate_params/mut_mouse.csv',
-           '--substitution R/shmulate_params/sub_mouse.csv',
            '--seed',
            0,
            '--motif-lens',
