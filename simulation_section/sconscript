@@ -168,8 +168,8 @@ def fit_context_model(env, outdir, c):
            SCRATCH_DIR,
            '--tuning-sample-ratio',
            0.1,
-           '--input-seqs ${SOURCES[0]}',
-           '--input-genes ${SOURCES[1]}',
+           '--input-mutated ${SOURCES[0]}',
+           '--input-naive ${SOURCES[1]}',
            '--out-file ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}']
     return env.Command(

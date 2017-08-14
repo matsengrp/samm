@@ -80,11 +80,11 @@ def parse_args():
         help='the maximum taxa per family to simulate when getting clonal family size statistics')
     parser.add_argument('--mutability',
         type=str,
-        default='gctree/S5F/Mutability.csv',
+        default='R/shmulate_params/mut_mouse.csv',
         help='path to mutability model file')
     parser.add_argument('--substitution',
         type=str,
-        default='gctree/S5F/Substitution.csv',
+        default='R/shmulate_params/sub_mouse.csv',
         help='path to substitution model file')
     parser.add_argument('--use-v',
         action="store_true",
