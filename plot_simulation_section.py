@@ -187,7 +187,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
             fmodel.refit_theta,
             fmodel.model_masks.zero_theta_mask_refit,
             fmodel.refit_possible_theta_mask,
-            fmodel.variance_est,
+            np.linalg.pinv(fmodel.variance_est),
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=1.96,
         )
