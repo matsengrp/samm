@@ -66,6 +66,10 @@ def parse_args():
         type=int,
         help='Number of naive sequences to create, only used if not using partis',
         default=2)
+    parser.add_argument('--n-subjects',
+        type=int,
+        help='Number of subjects (so number of germline sets) - used by partis',
+        default=1)
     parser.add_argument('--min-percent-mutated',
         type=float,
         help='Minimum percent of sequence to mutate',
@@ -87,7 +91,7 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
         out_dir = os.path.dirname(os.path.realpath(args.output_naive))
         g = GermlineSimulatorPartis(output_dir=out_dir)
-        germline_seqs, germline_freqs = g.generate_germline_set()
+        germline_seqs, germline_freqs = g.generate_germline_sets(num_sets=args.n_subjects)
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
         # suppose all alleles have equal frequencies
