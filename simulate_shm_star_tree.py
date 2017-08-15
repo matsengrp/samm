@@ -204,6 +204,8 @@ def main(args=sys.argv[1:]):
     if args.use_shmulate:
         run_shmulate(args, germline_seqs, germline_freqs)
     else:
+        1/0
+        # The problem is that it doesn't draw exactly the number of sequences asked for!
         run_survival(args, germline_seqs, germline_freqs)
 
 if __name__ == "__main__":
