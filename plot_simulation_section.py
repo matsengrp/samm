@@ -209,6 +209,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
+        print agg_fitted_lower_small - agg_fitted_upper_small
         #print np.hstack([
         #    agg_fitted_lower_small.reshape((agg_fitted_lower_small.size, 1)),
         #    agg_true_theta_small.reshape((agg_true_theta_small.size, 1)),
@@ -296,9 +297,9 @@ def main(args=sys.argv[1:]):
         for eff_size in args.effect_sizes:
             for sparsity in args.sparsities:
                 for nsamples in args.sample_sizes:
-                    eff_same = eff_size == args.effect_sizes[1]
-                    sparse_same = sparsity == args.sparsities[1]
-                    samples_same = nsamples == args.sample_sizes[1]
+                    eff_same = True #eff_size == args.effect_sizes[1]
+                    sparse_same = True #sparsity == args.sparsities[1]
+                    samples_same = True #nsamples == args.sample_sizes[1]
                     if eff_same + sparse_same + samples_same >= 2:
                         for seed in range(args.reps):
                             fitted_filename = args.fitted_models % (model_type, sparsity, eff_size, nsamples, seed)
@@ -329,6 +330,8 @@ def main(args=sys.argv[1:]):
                                     true_model[0],
                                     stat_func,
                                 )
+                                print stat
+                                print samm_statistics
                                 if len(samm_statistics):
                                     tmp_dat[STAT_LABEL[stat]] = samm_statistics[0]
                             tmp_df = tmp_df.append(tmp_dat, ignore_index=True)

@@ -139,6 +139,8 @@ def run_survival(args, germline_seqs, germline_freqs):
     # For each germline gene, run survival model to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
     # used, name of simulated sequence and corresponding sequence.
+    tot_mutated = 0
+    tot_germline = len(germline_seqs)
     with open(args.output_mutated, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name', 'sequence_name', 'sequence'])
