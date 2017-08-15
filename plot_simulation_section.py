@@ -22,11 +22,11 @@ def parse_args():
 
     parser.add_argument('--fitted-models',
         type=str,
-        default="simulation_section/_output/%s/sparsity%s/effect_size_%s/samples%s/0%d/samm/fitted.pkl",
+        default="simulation_section/_output/%s/nonzero%s/effect_size_%s/samples%s/0%d/samm/fitted.pkl",
         help='fitted model pickle, comma separated, colon separated, colon colon separated')
     parser.add_argument('--true-models',
         type=str,
-        default="simulation_section/_output/%s/sparsity%s/effect_size_%s/true_model.pkl",
+        default="simulation_section/_output/%s/nonzero%s/effect_size_%s/true_model.pkl",
         help='true model pickle file, colon separated, colon colon separated')
     parser.add_argument('--model-types',
         type=str,
