@@ -119,7 +119,7 @@ nest.add_aggregate('compare_models', list)
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate_seqs(env, outdir, c):
-    cmd = ['python simulate_from_sampled_gls.py simulate',
+    cmd = ['python simulate_shm_on_tree.py simulate',
            '--seed',
            c['seed'],
            '--mutability',
@@ -213,9 +213,9 @@ def fit_survival(env, outdir, c):
 
     if not c['data_type'] == 'sample_random' and not c['tree_size']['size'] == 'one_big_tree':
         # don't sample for the big family simulation
-        cmd = ['python fit_context_model.py',
-               '--input-genes ${SOURCES[0]}',
-               '--input-seqs ${SOURCES[1]}',
+        cmd = ['python fit_samm.py',
+               '--input-mutated ${SOURCES[0]}',
+               '--input-naive ${SOURCES[1]}',
                '--seed',
                c['seed'],
                '--motif-lens',

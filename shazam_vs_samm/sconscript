@@ -36,9 +36,8 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
-               '--data-path',
+               '--path-to-annotations',
                CUI_DATA_PATH,
-               '--read-from-partis',
                '--metadata-path',
                CUI_DATA_PATH + '/meta.csv',
                '--use-v',
@@ -109,9 +108,9 @@ def fit_survival(env, outdir, c):
     left_flanks = c['motif_params']['left_motif_flanks']
     penalty_params = c['motif_params']['penalty_params']
 
-    cmd = ['python fit_context_model.py',
-           '--input-genes ${SOURCES[0]}',
-           '--input-seqs ${SOURCES[2]}',
+    cmd = ['python fit_samm.py',
+           '--input-naive ${SOURCES[0]}',
+           '--input-mutated ${SOURCES[2]}',
            '--seed',
            c['test_mouse'],
            '--motif-lens',

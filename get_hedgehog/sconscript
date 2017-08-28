@@ -37,9 +37,8 @@ def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--seed',
                c['replicate'],
-               '--data-path',
+               '--path-to-annotations',
                CUI_DATA_PATH,
-               '--read-from-partis',
                '--metadata-path',
                CUI_DATA_PATH + '/meta.csv',
                '--use-v',
@@ -63,8 +62,8 @@ def process_data(env, outdir, c):
 
 motif_params_dict = [
     {
-        'motif_length': '3,5',
-        'left_motif_flanks': '1:2',
+        'motif_length': '5',
+        'left_motif_flanks': '2',
         'penalty_params': ",".join(map(str, np.power(10, np.arange(-2.5, -7.0, step=-.5)).tolist())),
     },
 ]
@@ -90,11 +89,11 @@ def fit_survival(env, outdir, c):
     left_flanks = c['motif_params']['left_motif_flanks']
     penalty_params = c['motif_params']['penalty_params']
 
-    cmd = ['python fit_context_model.py',
+    cmd = ['python fit_samm.py',
            '--seed',
            c['replicate'],
-           '--input-genes ${SOURCES[0]}',
-           '--input-seqs ${SOURCES[1]}',
+           '--input-naive ${SOURCES[0]}',
+           '--input-mutated ${SOURCES[1]}',
            '--motif-lens',
            motif_len,
            '--positions-mutating',
@@ -134,13 +133,9 @@ def plot_hedgehog(env, outdir, c):
     motif_len = c['motif_params']['motif_length']
     left_flanks = c['motif_params']['left_motif_flanks']
 
-    cmd = ['python create_bar_plots.py',
+    cmd = ['python plot_samm.py',
            '--input-pkl',
            '${SOURCES[0]}',
-           '--motif-lens',
-           motif_len,
-           '--positions-mutating',
-           left_flanks,
            '--output-csv',
            '${TARGETS[0]}',
            '--output-pdf',
