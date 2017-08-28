@@ -47,7 +47,7 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
-               '--data-path',
+               '--path-to-annotations',
                c['data_path'],
                '--read-from-partis',
                '--metadata-path',

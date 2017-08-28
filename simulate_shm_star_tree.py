@@ -204,10 +204,10 @@ def main(args=sys.argv[1:]):
     args.tot_taxa = args.n_mutated
 
     if args.use_shmulate:
-        run_shmulate(args, germline_seqs, germline_freqs)
-    else:
         1/0
         # The problem is that it doesn't draw exactly the number of sequences asked for!
+        run_shmulate(args, germline_seqs, germline_freqs)
+    else:
         run_survival(args, germline_seqs, germline_freqs)
 
 if __name__ == "__main__":
