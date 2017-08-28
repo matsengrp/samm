@@ -110,23 +110,9 @@ def parse_args():
         type=int,
         help='Number of mutation order samples drawn per observation when estimating likelihood of validation data',
         default=10)
-    parser.add_argument('--validation-column',
-        type=str,
-        help='Optional: column in the dataset to split training/validation on (e.g., subject, clonal_family, etc.)',
-        default=None)
     parser.add_argument('--per-target-model',
         action='store_true',
         help='Fit a model that allows for different hazard rates for different target nucleotides')
-    parser.add_argument("--locus",
-        type=str,
-        choices=('','igh','igk','igl'),
-        help="Filter sequence data for a particular locus (igh, igk or igl; default empty)",
-        default='')
-    parser.add_argument("--species",
-        type=str,
-        choices=('','mouse','human'),
-        help="Filter sequence data for a particular species (mouse or human; default empty)",
-        default='')
     parser.add_argument("--omit-hessian",
         action="store_true",
         help="Do not calculate uncertainty intervals (omit calculating the hessian matrix)")
@@ -149,20 +135,16 @@ def parse_args():
 
     args.max_motif_len = max(args.motif_lens)
 
-    args.positions_mutating = [[int(m) for m in positions.split(',')] for positions in args.positions_mutating.split(':')]
-    for motif_len, positions in zip(args.motif_lens, args.positions_mutating):
-        for m in positions:
-            assert(m in range(motif_len))
+    args.positions_mutating, args.max_mut_pos = process_mutating_positions(args.motif_lens, args.positions_mutating)
+    # Find the maximum left and right flanks of the motif with the largest length in the
+    # hierarchy in order to process the data correctly
+    args.max_left_flank = max(sum(args.positions_mutating, []))
+    args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
 
-        # Find the maximum left and right flanks of the motif with the largest length in the
-        # hierarchy in order to process the data correctly
-        args.max_left_flank = max(sum(args.positions_mutating, []))
-        args.max_right_flank = max([motif_len - 1 - min(left_flanks) for motif_len, left_flanks in zip(args.motif_lens, args.positions_mutating)])
-
-        # Check if our full feature generator will conform to input
-        max_left_flanks = args.positions_mutating[args.motif_lens.index(args.max_motif_len)]
-        if args.max_left_flank > max(max_left_flanks) or args.max_right_flank > args.max_motif_len - min(max_left_flanks) - 1:
-            raise AssertionError('The maximum length motif does not contain all smaller length motifs.')
+    # Check if our full feature generator will conform to input
+    max_left_flanks = args.positions_mutating[args.motif_lens.index(args.max_motif_len)]
+    if args.max_left_flank > max(max_left_flanks) or args.max_right_flank > args.max_motif_len - min(max_left_flanks) - 1:
+        raise AssertionError('The maximum length motif does not contain all smaller length motifs.')
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
@@ -200,16 +182,12 @@ def main(args=sys.argv[1:]):
         motif_len=args.max_motif_len,
         left_flank_len=args.max_left_flank,
         right_flank_len=args.max_right_flank,
-        sample=args.sample_regime,
-        locus=args.locus,
-        species=args.species,
     )
 
     train_idx, val_idx = split_train_val(
         len(obs_data),
         metadata,
         args.tuning_sample_ratio,
-        args.validation_column,
     )
     train_set = [obs_data[i] for i in train_idx]
     val_set = [obs_data[i] for i in val_idx]
@@ -281,9 +259,54 @@ def main(args=sys.argv[1:]):
         max_em_iters=args.em_max_iters,
         get_hessian=not args.omit_hessian,
     )
+
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
         pickle.dump(results_list, f)
+
+    if not args.omit_hessian:
+        full_feat_generator = HierarchicalMotifFeatureGenerator(
+            motif_lens=[args.max_motif_len],
+            left_motif_flank_len_list=args.max_mut_pos,
+        )
+        method_res = results_list[best_model_idx]
+        num_agg_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
+        agg_start_col = 1 if args.per_target_model else 0
+
+        try:
+            feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
+                motif_lens=args.motif_lens,
+                feats_to_remove=method_res.model_masks.feats_to_remove,
+                left_motif_flank_len_list=args.positions_mutating,
+            )
+            for col_idx in range(num_agg_cols):
+                full_theta, theta_lower, theta_upper = combine_thetas_and_get_conf_int(
+                    feat_generator_stage2,
+                    full_feat_generator,
+                    method_res.refit_theta,
+                    method_res.model_masks.zero_theta_mask_refit,
+                    method_res.refit_possible_theta_mask,
+                    method_res.sample_obs_info,
+                    col_idx + agg_start_col,
+                )
+                print np.vstack([full_theta, theta_lower, theta_upper])
+        except ValueError as e:
+            print(e)
+
+            log.info("Variance estimates negative; trying previous penalty parameter")
+            if best_model_idx == 0:
+                log.info("No fits had positive variance estimates")
+            else:
+                best_model_idx -= 1
+                cmodel_algo.refit_unpenalized(
+                    model_result=results_list[best_model_idx],
+                    max_em_iters=args.em_max_iters,
+                    get_hessian=not args.omit_hessian,
+                )
+
+        # Pickle the refitted theta
+        with open(args.out_file, "w") as f:
+            pickle.dump(results_list, f)
 
     if all_runs_pool is not None:
         all_runs_pool.close()
@@ -293,4 +316,3 @@ def main(args=sys.argv[1:]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-                                                     

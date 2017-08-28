@@ -464,7 +464,7 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column, val_column_idx=None):
+def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=None, val_column_idx=None):
     """
     @param num_obs: number of observations
     @param feat_generator: submotif feature generator
@@ -500,8 +500,6 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column, v
             val_categories = set([list(categories)[val_column_idx]])
 
         train_categories = categories - val_categories
-        log.info("train_categories %s" % train_categories)
-        log.info("val_categories %s" % val_categories)
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
@@ -619,7 +617,7 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 
     return full_theta, theta_lower, theta_upper
 
-# 
+#
 # def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
 #     """
 #     Combine hierarchical and offset theta values
@@ -629,27 +627,27 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 #     # stores which hierarchical theta values were used to construct the full theta
 #     # important for calculating covariance
 #     theta_index_matches = {i:[] for i in range(full_theta_size)}
-# 
+#
 #     full_theta = np.zeros(full_theta_size)
 #     theta_lower = np.zeros(full_theta_size)
 #     theta_upper = np.zeros(full_theta_size)
-# 
+#
 #     full_feat_gen = full_feat_generator.feat_gens[0]
 #     for i, feat_gen in enumerate(feat_generator.feat_gens):
 #         for m_idx, m in enumerate(feat_gen.motif_list):
 #             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
-# 
+#
 #             if col_idx != 0 and add_targets:
 #                 m_theta = theta[raw_theta_idx, 0] + theta[raw_theta_idx, col_idx]
 #             else:
 #                 m_theta = theta[raw_theta_idx, col_idx]
-# 
+#
 #             if feat_gen.motif_len == full_feat_generator.motif_len:
 #                 assert(full_feat_gen.left_motif_flank_len == feat_gen.left_motif_flank_len)
 #                 # Already at maximum motif length, so nothing to combine
 #                 full_m_idx = full_feat_generator.motif_dict[m][full_feat_gen.left_motif_flank_len]
 #                 full_theta[full_m_idx] += m_theta
-# 
+#
 #                 if theta_idx_counter[raw_theta_idx, 0] != -1:
 #                     theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
 #                 if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
@@ -661,12 +659,12 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 #                     full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
 #                     full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
 #                     full_theta[full_m_idx] += m_theta
-# 
+#
 #                     if theta_idx_counter[raw_theta_idx, 0] != -1:
 #                         theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
 #                     if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
 #                         theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
-# 
+#
 #     if covariance_est is not None:
 #         for full_theta_idx, matches in theta_index_matches.iteritems():
 #             var_est = 0

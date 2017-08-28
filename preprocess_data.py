@@ -5,6 +5,8 @@ import os.path
 import time
 import pandas as pd
 import csv
+import random
+import numpy as np
 
 from read_data import write_partis_data_from_annotations, write_data_after_imputing, write_data_after_sampling
 from common import split_train_val
@@ -15,6 +17,10 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description=__doc__)
 
+    parser.add_argument('--seed',
+        type=int,
+        help='Random number generator seed for replicability',
+        default=1)
     parser.add_argument('--path-to-annotations',
         type=str,
         help='path to partis annotations')
@@ -114,7 +120,9 @@ def write_train_test(output_seqs, sampled_set):
 
 def main(args=sys.argv[1:]):
     args = parse_args()
-
+    print args
+    random.seed(args.seed)
+    np.random.seed(args.seed)
     scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
     if not os.path.exists(scratch_dir):
         os.makedirs(scratch_dir)
