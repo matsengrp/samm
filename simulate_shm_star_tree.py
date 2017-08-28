@@ -58,7 +58,7 @@ def parse_args():
         type=float,
         help='Baseline constant hazard rate in cox proportional hazards model',
         default=0.1)
-    parser.add_argument('--n-mutated',
+    parser.add_argument('--tot-mutated',
         type=int,
         help='Roughly total number of mutated sequences',
         default=1)
@@ -146,7 +146,7 @@ def run_survival(args, germline_seqs, germline_freqs):
         seq_file.writerow(['germline_name', 'sequence_name', 'sequence'])
         germline_keys = germline_seqs.keys()
         mult_sample = np.random.multinomial(
-            args.tot_taxa,
+            args.tot_mutated,
             [germline_freqs[g_key] for g_key in germline_keys],
         )
         for idx, gene in enumerate(germline_keys):
@@ -181,7 +181,7 @@ def run_shmulate(args, germline_seqs, germline_freqs):
         script_file,
         args.output_naive,
         args.output_naive_freqs,
-        args.tot_taxa,
+        args.tot_mutated,
         args.seed,
         args.min_percent_mutated,
         args.max_percent_mutated,
@@ -201,11 +201,7 @@ def main(args=sys.argv[1:]):
     # But there is an uneven distribution of allele frequencies, so we will make the number of taxa
     # for different alleles to be different. The number of taxa will just be proportional to the germline
     # frequency.
-    args.tot_taxa = args.n_mutated
-
     if args.use_shmulate:
-        1/0
-        # The problem is that it doesn't draw exactly the number of sequences asked for!
         run_shmulate(args, germline_seqs, germline_freqs)
     else:
         run_survival(args, germline_seqs, germline_freqs)

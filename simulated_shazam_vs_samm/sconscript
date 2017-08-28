@@ -1,16 +1,11 @@
 ## Test model fits against one another
 
-import os
-import pickle
-import csv
 import numpy as np
 
 from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
-from random import randint
-from matsen_grp_data import CUI_DATA_PATH
 from matsen_grp_data import SCRATCH_DIR
 
 Import('env')
@@ -57,7 +52,7 @@ def generate(env, outdir, c):
             ",".join([str(m) for m in c['model']['motif_lens']]),
             '--positions-mutating',
             c["model"]["positions_mutating"],
-            '--sparsity-ratio',
+            '--nonzero-ratio',
             SPARSITY_RATIO,
             '--per-target-model',
             shmulate_flag,
@@ -72,20 +67,22 @@ def generate(env, outdir, c):
 def simulate(env, outdir, c):
     shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
 
-    cmd = ['python simulate_from_survival.py',
+    cmd = ['python simulate_shm_star_tree.py',
             '--seed',
             c['seed'],
             '--agg-motif-len',
             max(c['model']['motif_lens']),
             '--input-model ${SOURCES[0]}',
-            '--n-taxa',
-            40,
+            '--n-subjects',
+            3,
+            '--tot-mutated',
+            1500,
             '--min-percent-mutated',
-            0.05,
+            0.01,
             '--max-percent-mutated',
-            0.15,
-            '--output-file ${TARGETS[0]}',
-            '--output-genes ${TARGETS[1]}',
+            0.05,
+            '--output-mutated ${TARGETS[0]}',
+            '--output-naive ${TARGETS[1]}',
             shmulate_flag,
             '--use-partis',
         ]
@@ -101,9 +98,9 @@ def fit_survival(env, outdir, c):
     left_flanks = c['model']['positions_mutating']
     penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
 
-    cmd = ['python fit_context_model.py',
-        '--input-genes ${SOURCES[1]}',
-        '--input-seqs ${SOURCES[0]}',
+    cmd = ['python fit_samm.py',
+        '--input-naive ${SOURCES[1]}',
+        '--input-mutated ${SOURCES[0]}',
         '--seed',
         c['seed'],
         '--motif-lens',

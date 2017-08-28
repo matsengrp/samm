@@ -22,29 +22,36 @@ run_shmulate <- function(germline) {
 
 genes <- read.csv(gene_file, stringsAsFactors=FALSE)
 gene_freqs <- read.csv(gene_freq_file, stringsAsFactors=FALSE)
-
 genes <- merge(genes, gene_freqs, by="germline_name")
+taxa_per_genes <- data.frame(
+  germline_name=gene_freqs$germline_name,
+  n_taxa=rmultinom(1, tot_taxa, prob=gene_freqs$freq)
+)
+genes <- merge(genes, taxa_per_genes, by="germline_name")
 
 seqs <- apply(genes, 1, function(gene_data) {
   gene_name <- gene_data[1]
   gene_seq <- gene_data[2]
   gene_freq <- as.numeric(gene_data[3])
+  n_germ_taxa <- as.numeric(gene_data[4])
 
-  n_germ_taxa <- floor(tot_taxa * gene_freq + 1)
-  print(paste(gene_name, n_germ_taxa))
   mutated_seqs <- replicate(n_germ_taxa, run_shmulate(gene_seq))
   seq_names <- paste0(gene_name, '-', seq(n_germ_taxa))
-  data.frame(
-    germline_name=gene_name,
-    locus='',
-    species='',
-    # each sequence is one clonal family
-    clonal_family=seq_names,
-    group='',
-    subject='',
-    sequence_name=seq_names,
-    sequence=mutated_seqs
-  )
+  if (n_germ_taxa > 0) {
+    data.frame(
+      germline_name=gene_name,
+      locus='',
+      species='',
+      # each sequence is one clonal family
+      clonal_family=seq_names,
+      group='',
+      subject='',
+      sequence_name=seq_names,
+      sequence=mutated_seqs
+    )
+  } else {
+    data.frame()
+  }
 })
 seq_data_frame <- do.call("rbind", seqs)
 
