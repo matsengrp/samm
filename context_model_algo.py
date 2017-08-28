@@ -1,12 +1,9 @@
-import pickle
 import copy
 import logging as log
 
-from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from method_results import MethodResults
-from confidence_interval_maker import ConfidenceIntervalMaker
 from model_truncation import ModelTruncation
 from common import *
 
@@ -53,7 +50,6 @@ class ContextModelAlgo:
         self.intermediate_out_dir = args.intermediate_out_dir
         self.motif_lens = args.motif_lens
         self.positions_mutating = args.positions_mutating
-        self.z_stat = args.z_stat
         self.burn_in = args.burn_in
 
     def _get_theta_err(self, theta, theta_mask):
@@ -106,7 +102,7 @@ class ContextModelAlgo:
             max_e_samples=self.num_e_samples * 4,
             intermed_file_prefix="%s/e_samples_%s_" % (self.intermediate_out_dir, "-".join([str(p) for p in penalty_params])),
         )
-        curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating, self.z_stat)
+        curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating)
 
         #### Calculate validation log likelihood (EM surrogate), use to determine if model is any good.
         log_lik_ratio_lower_bound, log_lik_ratio = self._do_validation_set_checks(

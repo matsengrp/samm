@@ -160,3 +160,5 @@ def fit_shazam(env, outdir, c):
         [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
         c['simulate'],
         ' '.join(map(str, cmd)))
+
+# Compare models using compare_simulated_shazam_vs_samm.py

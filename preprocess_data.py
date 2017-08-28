@@ -18,41 +18,40 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
 
     parser.add_argument('--seed',
-        type=int)
-    parser.add_argument('--data-path',
+        type=int,
+        help='Random number generator seed for replicability',
+        default=1)
+    parser.add_argument('--path-to-annotations',
         type=str,
-        help='location of data')
+        help='path to partis annotations')
     parser.add_argument('--input-genes',
         type=str,
         default=None,
-        help='input germline info')
+        help='csv input germline info if not using partis annotations')
     parser.add_argument('--input-seqs',
         type=str,
         default=None,
-        help='input sequence info')
+        help='csv input sequence info if not using partis annotations')
     parser.add_argument('--output-genes',
         type=str,
         default=None,
-        help='input germline info')
+        help='csv file with output germline info')
     parser.add_argument('--output-seqs',
         type=str,
         default=None,
-        help='input sequence info')
+        help='csv file with output sequence info')
     parser.add_argument('--output-train-seqs',
         type=str,
         default=None,
-        help='input sequence info')
+        help='csv file with output sequence info on the training set')
     parser.add_argument('--output-test-seqs',
         type=str,
         default=None,
-        help='input sequence info')
+        help='csv file with output sequence info on the testing set')
     parser.add_argument('--motif-len',
         type=int,
-        help='length of motif (must be odd)',
+        help='comma-separated motif lengths (odd only)',
         default=5)
-    parser.add_argument('--read-from-partis',
-        action='store_true',
-        help='read data from partis annotations')
     parser.add_argument('--impute-ancestors',
         action='store_true',
         help='impute ancestors using dnapars')
@@ -62,12 +61,12 @@ def parse_args():
     parser.add_argument("--locus",
         type=str,
         choices=('','igh','igk','igl'),
-        help="locus (igh, igk or igl; default empty)",
+        help="locus for use in partis annotations (igh, igk or igl; default selects all loci)",
         default='')
     parser.add_argument("--species",
         type=str,
         choices=('','mouse','human'),
-        help="species (mouse or human; default empty)",
+        help="species for use in partis annotations (mouse or human; default selects all species in data)",
         default='')
     parser.add_argument('--scratch-directory',
         type=str,
@@ -75,7 +74,7 @@ def parse_args():
         default='_output')
     parser.add_argument('--metadata-path',
         type=str,
-        help='metadata with subject/species/etc information',
+        help='metadata with subject/species/locus information',
         default=None)
     parser.add_argument('--use-v',
         action='store_true',
@@ -98,7 +97,7 @@ def parse_args():
         type=float,
         help="""
             proportion of data to use for tuning the penalty parameter.
-            if zero, tunes by number of confidence intervals for theta that do not contain zero
+            if zero, training data will be the full data
             """,
         default=0.1)
 
@@ -112,6 +111,7 @@ def write_train_test(output_seqs, sampled_set):
     """
     Write data after sampling so shazam and samm fit to the same data
     """
+
     with open(output_seqs, 'w') as seq_file:
         seq_writer = csv.DictWriter(seq_file, sampled_set[0].keys())
         seq_writer.writeheader()
@@ -127,16 +127,39 @@ def main(args=sys.argv[1:]):
     if not os.path.exists(scratch_dir):
         os.makedirs(scratch_dir)
 
-    if args.read_from_partis:
-        write_partis_data_from_annotations(args.output_genes, args.output_seqs, args.data_path, args.metadata_path, use_v=args.use_v, use_np=args.use_np, use_immunized=args.use_immunized, locus=args.locus, species=args.species)
+    if args.path_to_annotations is not None:
+        write_partis_data_from_annotations(
+            args.output_genes,
+            args.output_seqs,
+            args.path_to_annotations,
+            args.metadata_path,
+            use_v=args.use_v,
+            use_np=args.use_np,
+            use_immunized=args.use_immunized,
+            locus=args.locus,
+            species=args.species
+        )
         args.input_genes = args.output_genes
         args.input_seqs = args.output_seqs
 
     if args.sample_from_family:
-        write_data_after_sampling(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs)
+        write_data_after_sampling(
+            args.output_genes,
+            args.output_seqs,
+            args.input_genes,
+            args.input_seqs
+        )
     elif args.impute_ancestors:
-        write_data_after_imputing(args.output_genes, args.output_seqs, args.input_genes, args.input_seqs, motif_len=args.motif_len, verbose=False, scratch_dir=scratch_dir)
-    elif not args.read_from_partis:
+        write_data_after_imputing(
+            args.output_genes,
+            args.output_seqs,
+            args.input_genes,
+            args.input_seqs,
+            motif_len=args.motif_len,
+            verbose=False,
+            scratch_dir=scratch_dir
+        )
+    elif args.path_to_annotations is None:
         copyfile(args.input_genes, args.output_genes)
         copyfile(args.input_seqs, args.output_seqs)
 

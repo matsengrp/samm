@@ -76,11 +76,16 @@ def process_mutating_positions(motif_len_vals, positions_mutating):
         max_mut_pos = [[max_motif_len/2]]
     else:
         positions_mutating = [[int(m) for m in positions.split(',')] for positions in positions_mutating.split(':')]
-        for motif_len, positions in zip(motif_len_vals, positions_mutating):
-            for m in positions:
-                assert(m in range(motif_len))
-        max_mut_pos = [mut_pos for mut_pos, motif_len in zip(positions_mutating, motif_len_vals) if motif_len == max_motif_len]
+        max_mut_pos = get_max_mut_pos(motif_len_vals, positions_mutating)
     return positions_mutating, max_mut_pos
+
+def get_max_mut_pos(motif_len_vals, positions_mutating):
+    max_motif_len = max(motif_len_vals)
+    for motif_len, positions in zip(motif_len_vals, positions_mutating):
+        for m in positions:
+            assert(m in range(motif_len))
+    max_mut_pos = [mut_pos for mut_pos, motif_len in zip(positions_mutating, motif_len_vals) if motif_len == max_motif_len]
+    return max_mut_pos
 
 def get_batched_list(my_list, num_batches):
     batch_size = max(len(my_list)/num_batches, 1)
