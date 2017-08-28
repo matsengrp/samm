@@ -110,7 +110,7 @@ def simulate(env, outdir, c):
            '--input-model ${SOURCES[0]}',
            '--use-partis',
            '--n-subjects',
-           2,
+           1,
            '--n-mutated',
            c["simulation_size"],
            '--min-percent-mutated',
