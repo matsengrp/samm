@@ -113,7 +113,7 @@ def get_partition_info(path_to_annotations, metadata):
 
     return partition_info
 
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False, locus='', species=''):
     """
     Function to read partis annotations csv
 
@@ -153,6 +153,10 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
             if use_immunized and data_info['group'] != 'immunized':
+                continue
+            if locus and data_info['locus'] != locus:
+                continue
+            if species and data_info['species'] != species:
                 continue
             glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
             with open(data_info['annotations_file'][0], "r") as csvfile:
@@ -454,9 +458,6 @@ def read_gene_seq_csv_data(
         motif_len=3,
         left_flank_len=None,
         right_flank_len=None,
-        sample=1,
-        locus='',
-        species='',
         ):
     """
     @param gene_file_name: csv file with germline names and sequences
@@ -464,14 +465,9 @@ def read_gene_seq_csv_data(
     @param motif_len: length of motif we're using; used to collapse series of "n"s
     @param left_flank_len: maximum left flank length for this motif length
     @param right_flank_len: maximum right flank length for this motif length
-    @param sample: 1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)
-    @param subset_cols: list of names of columns to take subset of data on (e.g., ['chain', 'species'])
-    @param subset_vals: list of values of these variables to subset on (e.g., ['k', 'mouse'])
 
     @return ObservedSequenceMutations from processed data
     """
-
-    assert(sample in range(1, 4))
 
     if left_flank_len is None or right_flank_len is None:
         # default to central base mutating
@@ -480,10 +476,6 @@ def read_gene_seq_csv_data(
 
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
-    if locus:
-        seqs.where(seqs['locus'] == locus, inplace=True)
-    if species:
-        seqs.where(seqs['species'] == species, inplace=True)
 
     full_data = pd.merge(genes, seqs, on='germline_name')
 
@@ -491,11 +483,10 @@ def read_gene_seq_csv_data(
     metadata = []
     for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
         gl_seq = cluster['germline_sequence'].values[0].lower()
-        if sample == 2:
-            # Sample a single sequence from a clonal family randomly
-            sampled_index = random.choice(cluster.index)
-            row = cluster.loc[sampled_index]
-            start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, row['sequence'].lower(), motif_len)
+        for idx, elt in cluster.iterrows():
+            n_mutes = 0
+            current_obs_seq_mutation = None
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
 
             obs_seq_mutation = ObservedSequenceMutations(
                     start_seq=start_seq,
@@ -508,30 +499,6 @@ def read_gene_seq_csv_data(
             if obs_seq_mutation.num_mutations > 0:
                 # don't consider pairs where mutations occur in flanking regions
                 obs_data.append(obs_seq_mutation)
-                metadata.append(row)
-        else:
-            for idx, elt in cluster.iterrows():
-                n_mutes = 0
-                current_obs_seq_mutation = None
-                start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
-
-                obs_seq_mutation = ObservedSequenceMutations(
-                        start_seq=start_seq,
-                        end_seq=end_seq,
-                        motif_len=motif_len,
-                        left_flank_len=left_flank_len,
-                        right_flank_len=right_flank_len,
-                )
-
-                if sample == 1 and obs_seq_mutation.num_mutations > 0:
-                    # don't consider pairs where mutations occur in flanking regions
-                    obs_data.append(obs_seq_mutation)
-                    metadata.append(elt)
-                elif sample == 3 and obs_seq_mutation.num_mutations > n_mutes:
-                    current_obs_seq_mutation = obs_seq_mutation
-
-            if sample == 3:
-                obs_data.append(current_obs_seq_mutation)
                 metadata.append(elt)
 
     assert(len(obs_data) == len(metadata))

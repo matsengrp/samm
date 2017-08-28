@@ -29,7 +29,7 @@ class ConfidenceIntervalMaker:
 
         if sample_obs_information.size == 0:
             return None
-        return np.linalg.pinv(sample_obs_information)
+        return np.linalg.pinv(sample_obs_information), sample_obs_information
 
     def _get_confidence_interval_print_lines(self, conf_ints):
         """

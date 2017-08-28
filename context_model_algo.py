@@ -90,7 +90,7 @@ class ContextModelAlgo:
         if init_theta is None:
             init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
 
-        penalized_theta, _, _ = self.em_algo.run(
+        penalized_theta, _, _, _ = self.em_algo.run(
             self.train_set,
             self.feat_generator,
             theta=init_theta,
@@ -150,7 +150,7 @@ class ContextModelAlgo:
         # Refit over the support from the penalized problem
         init_theta = model_result.penalized_theta[~model_masks.feats_to_remove_mask,:]
         init_theta[model_masks.zero_theta_mask_refit] = 0
-        refit_theta, variance_est, _ = self.em_algo.run(
+        refit_theta, variance_est, sample_obs_info, _ = self.em_algo.run(
             obs_data_stage2,
             feat_generator_stage2,
             theta=init_theta, # initialize from the lasso version
@@ -170,5 +170,6 @@ class ContextModelAlgo:
         model_result.set_refit_theta(
             refit_theta,
             variance_est,
+            sample_obs_info,
             possible_theta_mask_refit,
         )

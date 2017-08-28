@@ -110,10 +110,13 @@ def main(args=sys.argv[1:]):
         left_motif_flank_len_list=method_res.positions_mutating,
     )
 
-    full_theta = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
-    theta_lower = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
-    theta_upper = np.zeros((full_feat_generator.feature_vec_len, theta.shape[1]))
-    for col_idx in range(theta.shape[1]):
+    num_agg_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
+    agg_start_col = 1 if args.per_target_model else 0
+
+    full_theta = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
+    theta_lower = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
+    theta_upper = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
+    for col_idx in range(num_agg_cols):
         full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = combine_thetas_and_get_conf_int(
             feat_generator,
             full_feat_generator,
@@ -121,7 +124,7 @@ def main(args=sys.argv[1:]):
             method_res.model_masks.zero_theta_mask_refit,
             method_res.refit_possible_theta_mask,
             method_res.variance_est,
-            col_idx,
+            col_idx + agg_start_col,
         )
 
     agg_possible_motif_mask = get_possible_motifs_to_targets(full_feat_generator.motif_list, full_theta.shape, full_feat_generator.mutating_pos_list)
@@ -130,12 +133,12 @@ def main(args=sys.argv[1:]):
     theta_upper[~agg_possible_motif_mask] = -np.inf
 
     if args.per_target_model:
-        if args.plot_separate:
-            for col_idx, target in enumerate(['N', 'A', 'C', 'G', 'T']):
-                output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
-                plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, output_pdf, target, full_feat_generator, max_motif_len)
-        else:
-            plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N,A,C,G,T', full_feat_generator, max_motif_len)
+        # if args.plot_separate:
+        #     for col_idx, target in enumerate(['A', 'C', 'G', 'T']):
+        #         output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
+        #         plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, output_pdf, target, full_feat_generator, args.max_motif_len)
+        # else:
+        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'A,C,G,T', full_feat_generator, args.max_motif_len)
     else:
         plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N', full_feat_generator, max_motif_len)
 
