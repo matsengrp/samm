@@ -28,7 +28,7 @@ models = [
 nest.add(
     'model',
     models,
-    label_func=lambda c: c["simulation"],
+    label_func=lambda c: "%s_m%s" % (c["simulation"], "-".join(map(str, c["motif_lens"]))),
 )
 
 nest.add(
