@@ -60,20 +60,24 @@ def parse_args():
         default=0.1)
     parser.add_argument('--n-mutated',
         type=int,
-        help='Average number of mutated sequences to generate per naive sequence',
+        help='Roughly total number of mutated sequences',
         default=1)
     parser.add_argument('--n-naive',
         type=int,
         help='Number of naive sequences to create, only used if not using partis',
         default=2)
+    parser.add_argument('--n-subjects',
+        type=int,
+        help='Number of subjects (so number of germline sets) - used by partis',
+        default=1)
     parser.add_argument('--min-percent-mutated',
         type=float,
         help='Minimum percent of sequence to mutate',
-        default=0.05)
+        default=0.01)
     parser.add_argument('--max-percent-mutated',
         type=float,
         help='Maximum percent of sequence to mutate',
-        default=0.15)
+        default=0.05)
     parser.add_argument('--with-replacement',
         action="store_true",
         help='Allow same position to mutate multiple times')
@@ -87,7 +91,7 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
         out_dir = os.path.dirname(os.path.realpath(args.output_naive))
         g = GermlineSimulatorPartis(output_dir=out_dir)
-        germline_seqs, germline_freqs = g.generate_germline_set()
+        germline_seqs, germline_freqs = g.generate_germline_sets(num_sets=args.n_subjects)
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
         # suppose all alleles have equal frequencies
@@ -135,28 +139,37 @@ def run_survival(args, germline_seqs, germline_freqs):
     # For each germline gene, run survival model to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
     # used, name of simulated sequence and corresponding sequence.
+    tot_mutated = 0
+    tot_germline = len(germline_seqs)
     with open(args.output_mutated, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
-        seq_file.writerow(['germline_name','sequence_name','sequence'])
-        for gene, sequence in germline_seqs.iteritems():
+        seq_file.writerow(['germline_name', 'sequence_name', 'sequence'])
+        germline_keys = germline_seqs.keys()
+        mult_sample = np.random.multinomial(
+            args.tot_taxa,
+            [germline_freqs[g_key] for g_key in germline_keys],
+        )
+        for idx, gene in enumerate(germline_keys):
+            sequence = germline_seqs[gene]
             # Decide amount to mutate -- just random uniform
             percent_to_mutate = np.random.uniform(low=args.min_percent_mutated, high=args.max_percent_mutated)
             # Decide number of taxa. Must be at least one.
-            n_germ_taxa = int(args.tot_taxa * germline_freqs[gene] + 1)
-            full_data_samples = [
-                simulator.simulate(
-                    start_seq=sequence.lower(),
-                    percent_mutated=percent_to_mutate,
-                    with_replacement=args.with_replacement,
-                ) for i in range(n_germ_taxa)
-            ]
+            n_germ_taxa = mult_sample[idx]
+            if n_germ_taxa > 0:
+                full_data_samples = [
+                    simulator.simulate(
+                        start_seq=sequence.lower(),
+                        percent_mutated=percent_to_mutate,
+                        with_replacement=args.with_replacement,
+                    ) for i in range(n_germ_taxa)
+                ]
 
-            # write to file in csv format
-            num_mutations = []
-            for i, sample in enumerate(full_data_samples):
-                num_mutations.append(len(sample.mutations))
-                seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
-            print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
+                # write to file in csv format
+                num_mutations = []
+                for i, sample in enumerate(full_data_samples):
+                    num_mutations.append(len(sample.mutations))
+                    seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
+                print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
 
 def run_shmulate(args, germline_seqs, germline_freqs):
     # Call Rscript
@@ -188,9 +201,11 @@ def main(args=sys.argv[1:]):
     # But there is an uneven distribution of allele frequencies, so we will make the number of taxa
     # for different alleles to be different. The number of taxa will just be proportional to the germline
     # frequency.
-    args.tot_taxa = args.n_mutated * len(germline_seqs)
+    args.tot_taxa = args.n_mutated
 
     if args.use_shmulate:
+        1/0
+        # The problem is that it doesn't draw exactly the number of sequences asked for!
         run_shmulate(args, germline_seqs, germline_freqs)
     else:
         run_survival(args, germline_seqs, germline_freqs)

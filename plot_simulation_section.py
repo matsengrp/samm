@@ -22,11 +22,11 @@ def parse_args():
 
     parser.add_argument('--fitted-models',
         type=str,
-        default="simulation_section/_output/%s/sparsity%s/effect_size_%s/samples%s/0%d/samm/fitted.pkl",
+        default="simulation_section/_output/%s/nonzero%s/effect_size_%s/samples%s/0%d/samm/fitted.pkl",
         help='fitted model pickle, comma separated, colon separated, colon colon separated')
     parser.add_argument('--true-models',
         type=str,
-        default="simulation_section/_output/%s/sparsity%s/effect_size_%s/true_model.pkl",
+        default="simulation_section/_output/%s/nonzero%s/effect_size_%s/true_model.pkl",
         help='true model pickle file, colon separated, colon colon separated')
     parser.add_argument('--model-types',
         type=str,
@@ -187,7 +187,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
             fmodel.refit_theta,
             fmodel.model_masks.zero_theta_mask_refit,
             fmodel.refit_possible_theta_mask,
-            fmodel.variance_est,
+            np.linalg.pinv(fmodel.variance_est),
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=1.96,
         )
@@ -209,6 +209,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
+        print agg_fitted_lower_small - agg_fitted_upper_small
         #print np.hstack([
         #    agg_fitted_lower_small.reshape((agg_fitted_lower_small.size, 1)),
         #    agg_true_theta_small.reshape((agg_true_theta_small.size, 1)),
@@ -296,9 +297,9 @@ def main(args=sys.argv[1:]):
         for eff_size in args.effect_sizes:
             for sparsity in args.sparsities:
                 for nsamples in args.sample_sizes:
-                    eff_same = eff_size == args.effect_sizes[1]
-                    sparse_same = sparsity == args.sparsities[1]
-                    samples_same = nsamples == args.sample_sizes[1]
+                    eff_same = True #eff_size == args.effect_sizes[1]
+                    sparse_same = True #sparsity == args.sparsities[1]
+                    samples_same = True #nsamples == args.sample_sizes[1]
                     if eff_same + sparse_same + samples_same >= 2:
                         for seed in range(args.reps):
                             fitted_filename = args.fitted_models % (model_type, sparsity, eff_size, nsamples, seed)
@@ -329,6 +330,8 @@ def main(args=sys.argv[1:]):
                                     true_model[0],
                                     stat_func,
                                 )
+                                print stat
+                                print samm_statistics
                                 if len(samm_statistics):
                                     tmp_dat[STAT_LABEL[stat]] = samm_statistics[0]
                             tmp_df = tmp_df.append(tmp_dat, ignore_index=True)

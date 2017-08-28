@@ -568,9 +568,12 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 
     if sample_obs_info is not None:
         # Make the aggregation matrix
-        agg_matrix = np.zeros((full_theta.size, theta.size))
+        agg_matrix = np.zeros((full_theta.size, np.max(theta_idx_counter) + 1))
         for full_theta_idx, matches in theta_index_matches.iteritems():
             agg_matrix[full_theta_idx, matches] = 1
+        print agg_matrix.shape, sample_obs_info.shape
+        old_var = np.dot(np.dot(agg_matrix, np.linalg.pinv(sample_obs_info)), agg_matrix.T)
+        print "old var est", np.sort(np.diag(old_var))
 
         # determine which aggregations are completely zero
         agg_mask, _, _ = combine_thetas_and_get_conf_int(
@@ -594,12 +597,17 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
         #     sqrt(n) * (agg_theta_hat - agg_theta)
         #     Then the variance of our estimator is mult_mat * variance of score * mult_mat.T
         #     The variance of the score is the information matrix.
-        mult_mat, _, _, _ = np.linalg.lstsq(sample_obs_info, agg_matrix.T)
-        cov_mat_full = np.dot(np.dot(mult_mat.T, sample_obs_info), mult_mat)
+        rcond = 1e-10
+        tt = 0.5 * (sample_obs_info + sample_obs_info.T)
+        mult_mat, resid, r, s = np.linalg.lstsq(tt, agg_matrix.T, rcond=rcond)
+        print "rcond", rcond
+        print "norm dif", np.linalg.norm(np.dot(tt.T, mult_mat) - agg_matrix.T)/np.linalg.norm(agg_matrix.T)
+        cov_mat_full = np.dot(np.dot(mult_mat.T, tt), mult_mat)
+        print "new var ests", np.sort(np.diag(cov_mat_full))
         if np.any(np.diag(cov_mat_full) < 0):
             raise ValueError(
                 "Unable to come up with valid variance estimate: num neg: %d" %
-                np.sum(np.diag(cov_mat_full) > 0)
+                np.sum(np.diag(cov_mat_full) < 0)
             )
         std_err = np.sqrt(np.diag(cov_mat_full))
         full_std_err = np.zeros(full_theta.shape)
@@ -609,6 +617,70 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
 
     return full_theta, theta_lower, theta_upper
 
+#
+# def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, zero_theta_mask, possible_theta_mask, covariance_est=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
+#     """
+#     Combine hierarchical and offset theta values
+#     """
+#     full_theta_size = full_feat_generator.feature_vec_len
+#     theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
+#     # stores which hierarchical theta values were used to construct the full theta
+#     # important for calculating covariance
+#     theta_index_matches = {i:[] for i in range(full_theta_size)}
+#
+#     full_theta = np.zeros(full_theta_size)
+#     theta_lower = np.zeros(full_theta_size)
+#     theta_upper = np.zeros(full_theta_size)
+#
+#     full_feat_gen = full_feat_generator.feat_gens[0]
+#     for i, feat_gen in enumerate(feat_generator.feat_gens):
+#         for m_idx, m in enumerate(feat_gen.motif_list):
+#             raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
+#
+#             if col_idx != 0 and add_targets:
+#                 m_theta = theta[raw_theta_idx, 0] + theta[raw_theta_idx, col_idx]
+#             else:
+#                 m_theta = theta[raw_theta_idx, col_idx]
+#
+#             if feat_gen.motif_len == full_feat_generator.motif_len:
+#                 assert(full_feat_gen.left_motif_flank_len == feat_gen.left_motif_flank_len)
+#                 # Already at maximum motif length, so nothing to combine
+#                 full_m_idx = full_feat_generator.motif_dict[m][full_feat_gen.left_motif_flank_len]
+#                 full_theta[full_m_idx] += m_theta
+#
+#                 if theta_idx_counter[raw_theta_idx, 0] != -1:
+#                     theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+#                 if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+#                     theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
+#             else:
+#                 # Combine hierarchical feat_gens for given left_motif_len
+#                 flanks = itertools.product(["a", "c", "g", "t"], repeat=full_feat_gen.motif_len - feat_gen.motif_len)
+#                 for f in flanks:
+#                     full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
+#                     full_m_idx = full_feat_generator.motif_dict[full_m][full_feat_gen.left_motif_flank_len]
+#                     full_theta[full_m_idx] += m_theta
+#
+#                     if theta_idx_counter[raw_theta_idx, 0] != -1:
+#                         theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+#                     if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+#                         theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
+#
+#     if covariance_est is not None:
+#         for full_theta_idx, matches in theta_index_matches.iteritems():
+#             var_est = 0
+#             for i in matches:
+#                 for j in matches:
+#                     var_est += covariance_est[i,j]
+#             if var_est < 0:
+#                 raise ValueError("Unable to come up with valid variance estimate: %f" % var_est)
+#             standard_err_est = np.sqrt(var_est)
+#             theta_lower[full_theta_idx] = full_theta[full_theta_idx] - zstat * standard_err_est
+#             theta_upper[full_theta_idx] = full_theta[full_theta_idx] + zstat * standard_err_est
+#     else:
+#         theta_lower = full_theta
+#         theta_upper = full_theta
+#     return full_theta, theta_lower, theta_upper
+
 def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True, add_targets=True):
     def _combine_thetas(col_idx):
         theta_col, _, _ = combine_thetas_and_get_conf_int(
@@ -617,7 +689,7 @@ def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_
             theta,
             zero_theta_mask,
             possible_theta_mask,
-            covariance_est=None,
+            sample_obs_info=None,
             col_idx=col_idx,
             add_targets=add_targets,
         )

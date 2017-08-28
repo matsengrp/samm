@@ -26,11 +26,11 @@ def parse_args():
         default=1)
     parser.add_argument('--mutability',
         type=str,
-        default='gctree/S5F/Mutability.csv',
+        default='R/shmulate_params/mut_mouse.csv',
         help='Path to mutability model file - used for sampling distribution for theta')
     parser.add_argument('--substitution',
         type=str,
-        default='gctree/S5F/Substitution.csv',
+        default='R/shmulate_params/sub_mouse.csv',
         help='Path to substitution model file - used for sampling distribution for theta')
     parser.add_argument('--output-model',
         type=str,

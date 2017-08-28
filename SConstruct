@@ -7,7 +7,8 @@ import os
 from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
-from SCons.Script import Environment, Command, AddOption
+from SCons.Script import Environment
+from SCons.Script import AddOption
 
 # Command line options
 
@@ -51,31 +52,16 @@ Export('env')
 
 env.SConsignFile()
 
-flag = 'coverage_simulations'
-SConscript(flag + '/sconscript', exports=['flag'])
-
 flag = 'simulation_section'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'params_for_shmulate'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'compare_models'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'survival_compare_models'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'survival_hier_simulation'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'multiple_mutations'
+flag = 'simulated_shazam_vs_samm'
 SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'run_on_partis'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'simulated_shazam_vs_samm'
+flag = 'multiple_mutations'
 SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'imputed_ancestors_comparison'

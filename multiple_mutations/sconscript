@@ -32,8 +32,6 @@ nest.add(
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
     cmd = ['python generate_theta.py',
-            '--mutability R/shmulate_params/mutability.csv',
-            '--substitution R/shmulate_params/substitution.csv',
             '--seed',
             c['seed'],
             '--motif-lens',
