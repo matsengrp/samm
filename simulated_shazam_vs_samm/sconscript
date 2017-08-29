@@ -42,10 +42,16 @@ nest.add(
     lambda c: [c['replicate']],
     create_dir=False)
 
+nest.add(
+    'target',
+    [True, False]
+)
+
 # simulate data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
     shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
+    per_target_flag = "--per-target-model" if c["target"] else ""
     cmd = ['python generate_theta.py',
             '--seed',
             c['seed'],
@@ -55,7 +61,7 @@ def generate(env, outdir, c):
             c["model"]["positions_mutating"],
             '--nonzero-ratio',
             SPARSITY_RATIO,
-            '--per-target-model',
+            per_target_flag,
             shmulate_flag,
             '--output-model ${TARGETS[0]}',
     ]
@@ -97,6 +103,7 @@ def simulate(env, outdir, c):
 def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
+    per_target_flag = "--per-target-model" if c["target"] else ""
     penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
 
     cmd = ['python fit_samm.py',
@@ -115,7 +122,7 @@ def fit_survival(env, outdir, c):
         '--num-cpu-threads',
         4,
         '--num-jobs',
-        20,
+        10,
         '--burn-in',
         2,
         '--num-e-samples',
@@ -132,7 +139,7 @@ def fit_survival(env, outdir, c):
         0.1,
         '--out-file ${TARGETS[0]}',
         '--log-file ${TARGETS[1]}',
-        '--per-target-model',
+        per_target_flag,
         # DO NOT omit hessian -- we want to see if we can come up with
         # sensible confidence intervals
         # '--omit-hessian',
