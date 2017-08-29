@@ -1,5 +1,7 @@
 import copy
 import logging as log
+import numpy as np
+import scipy.stats
 
 from mcmc_em import MCMC_EM
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator

@@ -1,7 +1,6 @@
 import time
 import numpy as np
 import logging as log
-import pickle
 
 from models import *
 from common import *
@@ -39,12 +38,13 @@ class MCMC_EM:
         @param max_e_samples: maximum number of e-samples to grab per observed sequence
         @param train_and_val: whether to train on both train and validation data
         """
-        motif_list = feat_generator.motif_list
-
         st = time.time()
         num_data = len(observed_data)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
-        init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in observed_data]
+        init_orders = [
+            np.random.permutation(obs_seq.mutation_pos_dict.keys())
+            for obs_seq in observed_data
+        ]
         all_traces = []
         # burn in only at the very beginning
         for run in range(max_em_iters):

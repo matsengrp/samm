@@ -125,7 +125,7 @@ def fit_survival(env, outdir, c):
         '--num-val-burnin',
         2,
         '--num-val-samples',
-        4,
+        8,
         '--scratch-directory',
         SCRATCH_DIR,
         '--tuning-sample-ratio',
