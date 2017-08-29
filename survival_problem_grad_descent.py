@@ -5,7 +5,6 @@ from scipy.sparse import csr_matrix, dok_matrix
 
 import logging as log
 from survival_problem import SurvivalProblem
-from submotif_feature_generator import SubmotifFeatureGenerator
 from parallel_worker import MultiprocessingManager, ParallelWorker
 from common import *
 from profile_support import profile

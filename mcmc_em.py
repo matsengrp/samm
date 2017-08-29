@@ -42,7 +42,7 @@ class MCMC_EM:
         num_data = len(observed_data)
         # stores the initialization for the gibbs samplers for the next iteration's e-step
         init_orders = [
-            np.random.permutation(obs_seq.mutation_pos_dict.keys())
+            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
             for obs_seq in observed_data
         ]
         all_traces = []
