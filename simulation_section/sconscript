@@ -13,8 +13,8 @@ from matsen_grp_data import SCRATCH_DIR
 Import('env')
 localenv = env.Clone()
 
-SPARSITIES = [0.5] #[0.25, 0.5, 1.0]
-EFFECT_SIZES = [1.0] #[0.5, 1.0, 2.0]
+SPARSITIES = [0.25, 0.5, 1.0]
+EFFECT_SIZES = [0.5, 1.0, 2.0]
 SIMULATION_SIZES = [100, 200, 400]
 
 # Set up state
@@ -85,7 +85,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(1),
+    range(1, 5),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -111,7 +111,7 @@ def simulate(env, outdir, c):
            '--use-partis',
            '--n-subjects',
            1,
-           '--n-mutated',
+           '--tot-mutated',
            c["simulation_size"],
            '--min-percent-mutated',
            0.01,

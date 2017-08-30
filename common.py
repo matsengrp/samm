@@ -488,7 +488,7 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=No
         # tuning_sample_ratio
         categories = set([elt[validation_column] for elt in metadata])
         num_categories = len(categories)
-        val_size = int(tuning_sample_ratio * num_categories)
+        val_size = int(tuning_sample_ratio * num_categories) + 1
         if tuning_sample_ratio > 0:
             val_size = max(val_size, 1)
 

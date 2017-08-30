@@ -91,7 +91,7 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
         out_dir = os.path.dirname(os.path.realpath(args.output_naive))
         g = GermlineSimulatorPartis(output_dir=out_dir)
-        germline_seqs, germline_freqs = g.generate_germline_sets(num_sets=args.n_subjects)
+        germline_seqs, germline_freqs, germline_seqs_same = g.generate_germline_sets(num_sets=args.n_subjects)
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
         # suppose all alleles have equal frequencies
@@ -99,17 +99,24 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
         germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_naive)]
         germline_seqs = {g:n for g,n in zip(germline_genes, germline_nucleotides)}
         germline_freqs = {g:1.0/args.n_naive for g in germline_genes}
+        germline_seqs_same = None
 
-    return germline_seqs, germline_freqs
+    return germline_seqs, germline_freqs, germline_seqs_same
 
-def dump_germline_data(germline_seqs, germline_freqs, args):
+def dump_germline_data(germline_seqs, germline_freqs, germline_seqs_same, args):
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
     with open(args.output_naive, 'w') as outgermlines:
         germline_file = csv.writer(outgermlines)
-        germline_file.writerow(['germline_name','germline_sequence'])
+        if germline_seqs_same is not None:
+            germline_file.writerow(['germline_name','germline_sequence', 'germline_shared_name'])
+        else:
+            germline_file.writerow(['germline_name','germline_sequence'])
         for gene, sequence in germline_seqs.iteritems():
-            germline_file.writerow([gene,sequence])
+            if germline_seqs_same is not None:
+                germline_file.writerow([gene,sequence, germline_seqs_same[gene]])
+            else:
+                germline_file.writerow([gene,sequence])
 
     with open(args.output_naive_freqs, 'w') as outgermlines:
         germline_freq_file = csv.writer(outgermlines)
@@ -194,8 +201,8 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     np.random.seed(args.seed)
 
-    germline_seqs, germline_freqs = _get_germline_nucleotides(args)
-    dump_germline_data(germline_seqs, germline_freqs, args)
+    germline_seqs, germline_freqs, germline_seqs_same = _get_germline_nucleotides(args)
+    dump_germline_data(germline_seqs, germline_freqs, germline_seqs_same, args)
 
     # If there were an even distribution, we would have this many taxa
     # But there is an uneven distribution of allele frequencies, so we will make the number of taxa

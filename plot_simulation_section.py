@@ -37,7 +37,7 @@ def parse_args():
         default="50,100,200")
     parser.add_argument('--sample-sizes',
         type=str,
-        default="40,120,360")
+        default="100,200,400")
     parser.add_argument('--sparsities',
         type=str,
         default="25,50,100")
@@ -297,9 +297,9 @@ def main(args=sys.argv[1:]):
         for eff_size in args.effect_sizes:
             for sparsity in args.sparsities:
                 for nsamples in args.sample_sizes:
-                    eff_same = True #eff_size == args.effect_sizes[1]
-                    sparse_same = True #sparsity == args.sparsities[1]
-                    samples_same = True #nsamples == args.sample_sizes[1]
+                    eff_same = eff_size == args.effect_sizes[1]
+                    sparse_same = sparsity == args.sparsities[1]
+                    samples_same = nsamples == args.sample_sizes[1]
                     if eff_same + sparse_same + samples_same >= 2:
                         for seed in range(args.reps):
                             fitted_filename = args.fitted_models % (model_type, sparsity, eff_size, nsamples, seed)
