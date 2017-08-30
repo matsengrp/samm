@@ -63,7 +63,8 @@ class MutationOrderGibbsSampler(Sampler):
 
             curr_gibbs_step_info = None
             curr_order = init_order
-            for i in range(burn_in + num_samples):
+            num_iters = num_samples * sampling_rate if sampling_rate > 0 else num_samples
+            for i in range(burn_in + num_iters):
                 gibbs_orders, curr_gibbs_step_info, trace = self._do_gibbs_sweep(positions_to_sample, curr_order, curr_gibbs_step_info)
                 curr_order = gibbs_orders[-1]
                 if i >= burn_in:

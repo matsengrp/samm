@@ -111,7 +111,7 @@ def simulate(env, outdir, c):
            '--use-partis',
            '--n-subjects',
            1,
-           '--n-mutated',
+           '--tot-mutated',
            c["simulation_size"],
            '--min-percent-mutated',
            0.01,
