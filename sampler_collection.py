@@ -37,18 +37,20 @@ class SamplerCollection:
         self.feat_generator = feat_generator
         self.observed_data = observed_data
 
-    def get_samples(self, init_orders_for_iter, num_samples, burn_in_sweeps=0, get_full_sweep=False):
+    def get_samples(self, init_orders_for_iter, num_samples, burn_in_sweeps=0, sampling_rate=1):
         """
         @param init_orders_for_iter: what order to initialize each gibbs sampler
         @param num_samples: number of samples to retrieve from the sampler
         @param burn_in_sweeps: number of samplers to run initially for burn in
-        @param get_full_sweep: whether to return all the gibbs samples (so all steps, not just each sweep)
+        @param sampling_rate: (non-negative integer)
+            if 0, then get all the samples in a gibbs sweep
+            if K for K > 0, get 1 sample per K gibbs sweeps
         @param conditional_partial_order: list of position for a partial mutation order. if non-empty, then
                                             condition on this conditional_partial_order
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
         """
         rand_seed = get_randint()
-        shared_obj = SamplerPoolWorkerShared(self.sampler_cls, self.theta, self.feat_generator, num_samples, burn_in_sweeps, get_full_sweep)
+        shared_obj = SamplerPoolWorkerShared(self.sampler_cls, self.theta, self.feat_generator, num_samples, burn_in_sweeps, sampling_rate)
         worker_list = [
             SamplerPoolWorker(rand_seed + i, obs_data, init_order)
             for i, (obs_data, init_order) in enumerate(zip(self.observed_data, init_orders_for_iter))
@@ -65,13 +67,13 @@ class SamplerCollection:
         return sampled_orders_list
 
 class SamplerPoolWorkerShared:
-    def __init__(self, sampler_cls, theta, feat_generator, num_samples, burn_in_sweeps, get_full_sweep):
+    def __init__(self, sampler_cls, theta, feat_generator, num_samples, burn_in_sweeps, sampling_rate):
         self.sampler_cls = sampler_cls
         self.theta = theta
         self.feat_generator = feat_generator
         self.num_samples = num_samples
         self.burn_in_sweeps = burn_in_sweeps
-        self.get_full_sweep = get_full_sweep
+        self.sampling_rate = sampling_rate
 
 class SamplerPoolWorker(ParallelWorker):
     """
@@ -88,7 +90,7 @@ class SamplerPoolWorker(ParallelWorker):
             shared_obj.feat_generator,
             self.obs_seq
         )
-        sampler_res = sampler.run(self.init_order, shared_obj.burn_in_sweeps, shared_obj.num_samples, shared_obj.get_full_sweep)
+        sampler_res = sampler.run(self.init_order, shared_obj.burn_in_sweeps, shared_obj.num_samples, shared_obj.sampling_rate)
         return sampler_res
 
     def __str__(self):

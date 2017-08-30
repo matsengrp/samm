@@ -82,6 +82,10 @@ def parse_args():
         type=int,
         help='Number of mutation order samples to draw per observation during E-step',
         default=10)
+    parser.add_argument('--sampling-rate',
+        type=int,
+        help='Number of gibbs sweep to perform to get one sample',
+        default=1)
     parser.add_argument('--log-file',
         type=str,
         help='Log file',
