@@ -58,9 +58,6 @@ SConscript(flag + '/sconscript', exports=['flag'])
 flag = 'simulated_shazam_vs_samm'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'run_on_partis'
-SConscript(flag + '/sconscript', exports=['flag'])
-
 flag = 'multiple_mutations'
 SConscript(flag + '/sconscript', exports=['flag'])
 

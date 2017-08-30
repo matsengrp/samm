@@ -6,21 +6,17 @@ import sys
 import argparse
 import os
 import os.path
-import csv
 import pickle
 import logging as log
 import time
-import random
 from multiprocessing import Pool
 
 import numpy as np
-import scipy.stats
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
-from likelihood_evaluator import LikelihoodComparer, GreedyLikelihoodComparer
-from method_results import MethodResults
+from likelihood_evaluator import LikelihoodComparer
 from context_model_algo import ContextModelAlgo
 from common import *
 from read_data import *

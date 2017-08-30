@@ -101,7 +101,10 @@ class LikelihoodComparer:
 
         # Get samples drawn from the distribution P(order | start, end, theta reference)
         self.num_tot_obs = len(obs_data)
-        self.init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in obs_data]
+        self.init_orders = [
+            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
+            for obs_seq in obs_data
+        ]
         sampler_results = self.sampler_collection.get_samples(
             self.init_orders,
             self.num_samples,

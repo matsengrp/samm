@@ -1,16 +1,11 @@
 ## Test model fits against one another
 
-import os
-import pickle
-import csv
 import numpy as np
 
 from os.path import join
 from nestly.scons import SConsWrap
 from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
-from random import randint
-from matsen_grp_data import CUI_DATA_PATH
 from matsen_grp_data import SCRATCH_DIR
 
 Import('env')
@@ -25,19 +20,20 @@ SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 1.0
 
 models = [
+    {'simulation': 'survival', 'motif_lens': [5], 'positions_mutating': "2"},
     {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
-    #{'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    # {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
 
 nest.add(
     'model',
     models,
-    label_func=lambda c: c["simulation"],
+    label_func=lambda c: "%s_m%s" % (c["simulation"], "-".join(map(str, c["motif_lens"]))),
 )
 
 nest.add(
     'replicate',
-    range(0,2),
+    range(0,1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -46,10 +42,16 @@ nest.add(
     lambda c: [c['replicate']],
     create_dir=False)
 
+nest.add(
+    'target',
+    [True, False]
+)
+
 # simulate data
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
     shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
+    per_target_flag = "--per-target-model" if c["target"] else ""
     cmd = ['python generate_theta.py',
             '--seed',
             c['seed'],
@@ -57,9 +59,9 @@ def generate(env, outdir, c):
             ",".join([str(m) for m in c['model']['motif_lens']]),
             '--positions-mutating',
             c["model"]["positions_mutating"],
-            '--sparsity-ratio',
+            '--nonzero-ratio',
             SPARSITY_RATIO,
-            '--per-target-model',
+            per_target_flag,
             shmulate_flag,
             '--output-model ${TARGETS[0]}',
     ]
@@ -72,20 +74,22 @@ def generate(env, outdir, c):
 def simulate(env, outdir, c):
     shmulate_flag = "" if c["model"]["simulation"] == 'survival' else "--use-shmulate"
 
-    cmd = ['python simulate_from_survival.py',
+    cmd = ['python simulate_shm_star_tree.py',
             '--seed',
             c['seed'],
             '--agg-motif-len',
             max(c['model']['motif_lens']),
             '--input-model ${SOURCES[0]}',
-            '--n-taxa',
-            40,
+            '--n-subjects',
+            3,
+            '--tot-mutated',
+            1500,
             '--min-percent-mutated',
-            0.05,
+            0.01,
             '--max-percent-mutated',
-            0.15,
-            '--output-file ${TARGETS[0]}',
-            '--output-genes ${TARGETS[1]}',
+            0.05,
+            '--output-mutated ${TARGETS[0]}',
+            '--output-naive ${TARGETS[1]}',
             shmulate_flag,
             '--use-partis',
         ]
@@ -99,11 +103,12 @@ def simulate(env, outdir, c):
 def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
+    per_target_flag = "--per-target-model" if c["target"] else ""
     penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
 
-    cmd = ['python fit_context_model.py',
-        '--input-genes ${SOURCES[1]}',
-        '--input-seqs ${SOURCES[0]}',
+    cmd = ['python fit_samm.py',
+        '--input-naive ${SOURCES[1]}',
+        '--input-mutated ${SOURCES[0]}',
         '--seed',
         c['seed'],
         '--motif-lens',
@@ -117,7 +122,7 @@ def fit_survival(env, outdir, c):
         '--num-cpu-threads',
         4,
         '--num-jobs',
-        20,
+        10,
         '--burn-in',
         2,
         '--num-e-samples',
@@ -127,15 +132,17 @@ def fit_survival(env, outdir, c):
         '--num-val-burnin',
         2,
         '--num-val-samples',
-        4,
+        8,
         '--scratch-directory',
         SCRATCH_DIR,
         '--tuning-sample-ratio',
         0.1,
         '--out-file ${TARGETS[0]}',
         '--log-file ${TARGETS[1]}',
-        '--per-target-model',
-        '--omit-hessian',
+        per_target_flag,
+        # DO NOT omit hessian -- we want to see if we can come up with
+        # sensible confidence intervals
+        # '--omit-hessian',
     ]
 
     return env.Command(
