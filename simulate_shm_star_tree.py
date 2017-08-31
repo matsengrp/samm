@@ -16,7 +16,7 @@ import subprocess
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
-from simulate_germline import GermlineSimulatorPartis
+from simulate_germline import GermlineSimulatorPartis, GermlineMetadata
 from common import *
 
 def parse_args():
@@ -91,40 +91,32 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
     if args.use_partis:
         out_dir = os.path.dirname(os.path.realpath(args.output_naive))
         g = GermlineSimulatorPartis(output_dir=out_dir)
-        germline_seqs, germline_freqs, germline_seqs_same = g.generate_germline_sets(num_sets=args.n_subjects)
+        germline_seqs = g.generate_germline_sets(num_sets=args.n_subjects)
     else:
         # generate germline sequences at random by drawing from ACGT multinomial
         # suppose all alleles have equal frequencies
         germline_genes = ["FAKE-GENE-%d" % i for i in range(args.n_naive)]
         germline_nucleotides = [get_random_dna_seq(args.random_gene_len) for i in range(args.n_naive)]
-        germline_seqs = {g:n for g,n in zip(germline_genes, germline_nucleotides)}
-        germline_freqs = {g:1.0/args.n_naive for g in germline_genes}
-        germline_seqs_same = None
+        germline_seqs = {g:GermlineMetadata(n, g, 1.0/args.n_naive, g) for g,n in zip(germline_genes, germline_nucleotides)}
 
-    return germline_seqs, germline_freqs, germline_seqs_same
+    return germline_seqs
 
-def dump_germline_data(germline_seqs, germline_freqs, germline_seqs_same, args):
+def dump_germline_data(germline_seqs, args):
     # Write germline genes to file with two columns: name of gene and
     # corresponding sequence.
     with open(args.output_naive, 'w') as outgermlines:
         germline_file = csv.writer(outgermlines)
-        if germline_seqs_same is not None:
-            germline_file.writerow(['germline_name','germline_sequence', 'germline_shared_name'])
-        else:
-            germline_file.writerow(['germline_name','germline_sequence'])
-        for gene, sequence in germline_seqs.iteritems():
-            if germline_seqs_same is not None:
-                germline_file.writerow([gene,sequence, germline_seqs_same[gene]])
-            else:
-                germline_file.writerow([gene,sequence])
+        germline_file.writerow(['germline_name','germline_sequence', 'germline_family'])
+        for gene, seq_metadata in germline_seqs.iteritems():
+            germline_file.writerow([gene, seq_metadata.val, seq_metadata.family])
 
     with open(args.output_naive_freqs, 'w') as outgermlines:
         germline_freq_file = csv.writer(outgermlines)
         germline_freq_file.writerow(['germline_name','freq'])
-        for gene, freq in germline_freqs.iteritems():
-            germline_freq_file.writerow([gene,freq])
+        for gene, seq_metadata in germline_seqs.iteritems():
+            germline_freq_file.writerow([gene, seq_metadata.freq])
 
-def run_survival(args, germline_seqs, germline_freqs):
+def run_survival(args, germline_seqs):
     feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=[args.agg_motif_len],
         left_motif_flank_len_list=[[args.agg_motif_len/2]],
@@ -154,10 +146,10 @@ def run_survival(args, germline_seqs, germline_freqs):
         germline_keys = germline_seqs.keys()
         mult_sample = np.random.multinomial(
             args.tot_mutated,
-            [germline_freqs[g_key] for g_key in germline_keys],
+            [germline_seqs[g_key].freq for g_key in germline_keys],
         )
         for idx, gene in enumerate(germline_keys):
-            sequence = germline_seqs[gene]
+            sequence = germline_seqs[gene].val
             # Decide amount to mutate -- just random uniform
             percent_to_mutate = np.random.uniform(low=args.min_percent_mutated, high=args.max_percent_mutated)
             # Decide number of taxa. Must be at least one.
@@ -178,7 +170,7 @@ def run_survival(args, germline_seqs, germline_freqs):
                     seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
                 print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
 
-def run_shmulate(args, germline_seqs, germline_freqs):
+def run_shmulate(args):
     # Call Rscript
     command = 'Rscript'
     script_file = 'R/shmulate_sequences.R'
@@ -201,17 +193,17 @@ def main(args=sys.argv[1:]):
     args = parse_args()
     np.random.seed(args.seed)
 
-    germline_seqs, germline_freqs, germline_seqs_same = _get_germline_nucleotides(args)
-    dump_germline_data(germline_seqs, germline_freqs, germline_seqs_same, args)
+    germline_seqs = _get_germline_nucleotides(args)
+    dump_germline_data(germline_seqs, args)
 
     # If there were an even distribution, we would have this many taxa
     # But there is an uneven distribution of allele frequencies, so we will make the number of taxa
     # for different alleles to be different. The number of taxa will just be proportional to the germline
     # frequency.
     if args.use_shmulate:
-        run_shmulate(args, germline_seqs, germline_freqs)
+        run_shmulate(args)
     else:
-        run_survival(args, germline_seqs, germline_freqs)
+        run_survival(args, germline_seqs)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
