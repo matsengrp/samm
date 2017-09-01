@@ -74,7 +74,7 @@ class MCMC_EM:
                     burn_in,
                 )
                 # Don't use burn-in from now on
-                burn_in = 0
+                # burn_in = 0
                 all_traces.append([res.trace for res in sampler_results])
                 sampled_orders_list = [res.samples for res in sampler_results]
 

@@ -98,6 +98,9 @@ def parse_args():
         type=float,
         help="Proportion of data to reserve for tuning the penalty parameter",
         default=0.1)
+    parser.add_argument('--validation-col',
+        type=str,
+        default=None)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn-in iterations when estimating likelihood of validation data',
@@ -184,6 +187,7 @@ def main(args=sys.argv[1:]):
         len(obs_data),
         metadata,
         args.tuning_sample_ratio,
+        validation_column=args.validation_col,
     )
     train_set = [obs_data[i] for i in train_idx]
     val_set = [obs_data[i] for i in val_idx]
