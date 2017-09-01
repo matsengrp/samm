@@ -44,6 +44,7 @@ class ContextModelAlgo:
             scratch_dir=args.scratch_dir,
             pool=all_runs_pool,
             per_target_model=args.per_target_model,
+            sampling_rate=args.sampling_rate,
         )
         self.em_max_iters = args.em_max_iters
 
