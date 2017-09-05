@@ -114,12 +114,13 @@ class LikelihoodComparer:
         sampled_orders_list = [res.samples for res in sampler_results]
         self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
         self.samples = [o for orders in sampled_orders_list for o in orders]
+        self.sample_labels = [i for i, orders in enumerate(sampled_orders_list) for o in orders]
         # Setup a problem so that we can extract the log likelihood ratio
         st_time = time.time()
         self.prob = SurvivalProblemLasso(
             feat_generator,
             self.samples,
-            sample_labels=None,
+            sample_labels=self.sample_labels,
             penalty_params=[0],
             per_target_model=self.per_target_model,
             pool=self.pool,
@@ -133,8 +134,16 @@ class LikelihoodComparer:
         @return Q(theta | theta ref) - Q(theta ref | theta ref)
         """
         ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
+        # Reshape the log likelihood ratio vector
+        ll_ratio_dict = [[] for i in range(ll_ratio_vec.size/self.num_samples)]
+        for v, label in zip(ll_ratio_vec.tolist(), self.sample_labels):
+            ll_ratio_dict[label].append(v)
+        ll_ratio_reshape = (np.array(ll_ratio_dict)).T
+        ll_ratio_vec_sums = ll_ratio_reshape.sum(axis=1)/(self.num_samples/self.num_samples)
+
         mean_ll_ratio = np.mean(ll_ratio_vec)
-        ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
+        ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec_sums, ZSCORE_95, mean_ll_ratio)
+        log.info("Likelihood comparer (lower,mean,upper)=(%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound))
 
         curr_iter = 1
         while lower_bound < 0 and upper_bound > 0 and self.num_samples * (1 + curr_iter) * self.num_tot_obs < LikelihoodComparer.MAX_TOT_SAMPLES and curr_iter < max_iters:
@@ -149,8 +158,8 @@ class LikelihoodComparer:
             log.info("Finished getting samples, time %s" % (time.time() - st_time))
             sampled_orders_list = [res.samples for res in sampler_results]
             self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
-
             self.samples += [s for res in sampler_results for s in res.samples]
+            self.sample_labels = [i for i, orders in enumerate(sampled_orders_list) for o in orders]
             self.num_samples += self.num_samples
             # Setup a problem so that we can extract the log likelihood ratio
             self.prob = SurvivalProblemLasso(
