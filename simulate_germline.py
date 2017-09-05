@@ -4,6 +4,7 @@ import numpy as np
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 import glutils
+from common import NUCLEOTIDE_SET
 
 class GermlineMetadata:
     def __init__(self, seq_val, seq_name, seq_freq, seq_family):
@@ -23,7 +24,7 @@ class GermlineSimulatorPartis:
 
     def __init__(self, organism="mouse", output_dir="_output"):
         assert(organism in ["human", "mouse"])
-        self.glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + organism, "igh")
+        self.organism = organism
         self.output_dir = output_dir
         self.allele_freq_file = self.output_dir + "/allele_freq.csv"
         self.ighv_file = self.output_dir + "/igh/ighv.fasta"
@@ -38,23 +39,23 @@ class GermlineSimulatorPartis:
         germline_seqs_dict = dict()
         for set_i in range(num_sets):
             germline_seqs, germline_freqs = self._generate_germline_set(
-                num_sets,
                 n_genes_per_region,
                 n_sim_alleles_per_gene,
                 min_sim_allele_prevalence_freq,
             )
             for seq_key, seq_val in germline_seqs.iteritems():
                 seq_key_all = "s%d-%s" % (set_i, seq_key)
-                seq_gene = seq_key.split("*", 1)[0]
-                print seq_gene
+                seq_gene_fam = ((seq_key.split("*", 1)[0]).split("-", 1)[0]).split("S", 1)[0]
+                print seq_gene_fam
                 seq_freq = germline_freqs[seq_key]
-                germline_seqs_dict[seq_key_all] = GermlineMetadata(seq_val, seq_key_all, seq_freq/num_sets, seq_gene)
+                germline_seqs_dict[seq_key_all] = GermlineMetadata(seq_val, seq_key_all, seq_freq/num_sets, seq_gene_fam)
 
         return germline_seqs_dict
 
-    def _generate_germline_set(self, num_sets=1, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1,2:1:1", min_sim_allele_prevalence_freq=0.1):
-        glutils.generate_germline_set(self.glfo, n_genes_per_region, n_sim_alleles_per_gene, min_sim_allele_prevalence_freq, self.allele_freq_file)
-        glutils.write_glfo(self.output_dir, self.glfo)
+    def _generate_germline_set(self, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1,2:1:1", min_sim_allele_prevalence_freq=0.1):
+        glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + self.organism, "igh")
+        glutils.generate_germline_set(glfo, n_genes_per_region, n_sim_alleles_per_gene, min_sim_allele_prevalence_freq, self.allele_freq_file)
+        glutils.write_glfo(self.output_dir, glfo)
 
         # Read allele prevalences
         germline_freqs = dict()
@@ -81,6 +82,10 @@ class GermlineSimulatorPartis:
                         allele_seq = allele_seq[offset:-(mod_seq_len - offset)]
                     else:
                         allele_seq = allele_seq[offset:]
+
+                # Make sure no N in the germline sequence
+                while "N" in allele_seq:
+                    allele_seq = allele_seq.replace("N", np.random.choice(list(NUCLEOTIDE_SET)), 1) 
 
                 germline_seqs[allele] = allele_seq
 

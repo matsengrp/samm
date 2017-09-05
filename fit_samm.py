@@ -245,7 +245,7 @@ def main(args=sys.argv[1:]):
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        ll_ratio = curr_model_results.log_lik_ratio
+        ll_ratio = curr_model_results.log_lik_ratio_lower_bound
         if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < -ZERO_THRES:
             # Make sure that the penalty isnt so big that theta is empty
             # This model is not better than the previous model. Stop trying penalty parameters.
