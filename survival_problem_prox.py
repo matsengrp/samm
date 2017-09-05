@@ -88,12 +88,13 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 # Calculate lower bound to determine if we need to rerun
                 # Get the confidence interval around the penalized log likelihood (not the log likelihood itself!)
                 log_lik_ratio_vec = potential_log_lik_vec - log_lik_vec_init
+                num_uniq_samples = self.num_samples/self.num_reps_per_obs
                 # Reshape the log likelihood ratio vector
-                ll_ratio_dict = [[] for i in range(log_lik_ratio_vec.size/self.num_reps_per_obs)]
+                ll_ratio_dict = [[] for i in range(num_uniq_samples)]
                 for v, label in zip(log_lik_ratio_vec.tolist(), self.sample_labels):
                     ll_ratio_dict[label].append(v)
                 ll_ratio_reshape = (np.array(ll_ratio_dict)).T
-                ll_ratio_vec_sums = ll_ratio_reshape.sum(axis=1)/(self.num_samples/self.num_reps_per_obs)
+                ll_ratio_vec_sums = ll_ratio_reshape.sum(axis=1)/num_uniq_samples
                 # Upper bound becomes the lower bound when we consider the negative of this!
                 _, _, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec_sums, ZSCORE, potential_value - init_value)
 
