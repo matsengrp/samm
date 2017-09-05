@@ -165,7 +165,7 @@ class LikelihoodComparer:
             self.prob = SurvivalProblemLasso(
                 self.feat_generator,
                 self.samples,
-                sample_labels=None,
+                sample_labels=self.sample_labels,
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
                 pool=self.pool,
