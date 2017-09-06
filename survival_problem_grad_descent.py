@@ -95,7 +95,17 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         raise NotImplementedError()
 
-    def calculate_log_lik_ratio_vec(self, theta1, theta2):
+    def _group_log_lik_ratio_vec(self, ll_ratio_vec):
+        num_unique_samples = len(set(self.sample_labels))
+        # Reshape the log likelihood ratio vector
+        ll_ratio_dict = [[] for _ in range(num_unique_samples)]
+        for v, label in zip(ll_ratio_vec.tolist(), self.sample_labels):
+            ll_ratio_dict[label].append(v)
+        ll_ratio_reshape = (np.array(ll_ratio_dict)).T
+        ll_ratio_vec_sums = ll_ratio_reshape.sum(axis=1)/num_unique_samples
+        return ll_ratio_vec_sums
+
+    def calculate_log_lik_ratio_vec(self, theta1, theta2, group_by_sample=False):
         """
         @param theta: the theta in the numerator
         @param prev_theta: the theta in the denominator
@@ -103,8 +113,11 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         ll_vec1 = self._get_log_lik_parallel(theta1)
         ll_vec2 = self._get_log_lik_parallel(theta2)
-        return ll_vec1 - ll_vec2
-
+        ll_ratio_vec = ll_vec1 - ll_vec2
+        if group_by_sample:
+            return self._group_log_lik_ratio_vec(ll_ratio_vec)
+        else:
+            return ll_ratio_vec
 
     def _get_log_lik_parallel(self, theta):
         """

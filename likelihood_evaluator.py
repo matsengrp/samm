@@ -133,16 +133,9 @@ class LikelihoodComparer:
         @param theta: the model parameter to compare against
         @return Q(theta | theta ref) - Q(theta ref | theta ref)
         """
-        ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
-        num_unique_samples = ll_ratio_vec.size/self.num_samples
-        # Reshape the log likelihood ratio vector
-        ll_ratio_dict = [[] for _ in range(num_unique_samples)]
-        for v, label in zip(ll_ratio_vec.tolist(), self.sample_labels):
-            ll_ratio_dict[label].append(v)
-        ll_ratio_reshape = (np.array(ll_ratio_dict)).T
-        ll_ratio_vec_sums = ll_ratio_reshape.sum(axis=1)/num_unique_samples
+        ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref, group_by_sample=True)
         mean_ll_ratio = np.mean(ll_ratio_vec)
-        ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec_sums, ZSCORE_95, mean_ll_ratio)
+        ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
         log.info("Likelihood comparer (lower,mean,upper)=(%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound))
 
         curr_iter = 1
@@ -170,16 +163,9 @@ class LikelihoodComparer:
                 per_target_model=self.per_target_model,
                 pool=self.pool,
             )
-            ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
-            num_unique_samples = ll_ratio_vec.size/self.num_samples
-            # Reshape the log likelihood ratio vector
-            ll_ratio_dict = [[] for _ in range(num_unique_samples)]
-            for v, label in zip(ll_ratio_vec.tolist(), self.sample_labels):
-                ll_ratio_dict[label].append(v)
-            ll_ratio_reshape = (np.array(ll_ratio_dict)).T
-            ll_ratio_vec_sums = ll_ratio_reshape.sum(axis=1)/num_unique_samples
+            ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref, group_by_sample=True)
             mean_ll_ratio = np.mean(ll_ratio_vec)
-            ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec_sums, ZSCORE_95, mean_ll_ratio)
+            ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
             curr_iter += 1
 
         return mean_ll_ratio, lower_bound, upper_bound
