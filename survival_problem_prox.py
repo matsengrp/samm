@@ -90,7 +90,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 log_lik_ratio_vec = potential_log_lik_vec - log_lik_vec_init
                 num_uniq_samples = self.num_samples/self.num_reps_per_obs
                 # Reshape the log likelihood ratio vector
-                ll_ratio_dict = [[] for i in range(num_uniq_samples)]
+                ll_ratio_dict = [[] for _ in range(num_uniq_samples)]
                 for v, label in zip(log_lik_ratio_vec.tolist(), self.sample_labels):
                     ll_ratio_dict[label].append(v)
                 ll_ratio_reshape = (np.array(ll_ratio_dict)).T
