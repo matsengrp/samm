@@ -136,7 +136,7 @@ class LikelihoodComparer:
         ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
         num_unique_samples = ll_ratio_vec.size/self.num_samples
         # Reshape the log likelihood ratio vector
-        ll_ratio_dict = [[] for i in range(num_unique_samples)]
+        ll_ratio_dict = [[] for _ in range(num_unique_samples)]
         for v, label in zip(ll_ratio_vec.tolist(), self.sample_labels):
             ll_ratio_dict[label].append(v)
         ll_ratio_reshape = (np.array(ll_ratio_dict)).T
@@ -173,7 +173,7 @@ class LikelihoodComparer:
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
             num_unique_samples = ll_ratio_vec.size/self.num_samples
             # Reshape the log likelihood ratio vector
-            ll_ratio_dict = [[] for i in range(num_unique_samples)]
+            ll_ratio_dict = [[] for _ in range(num_unique_samples)]
             for v, label in zip(ll_ratio_vec.tolist(), self.sample_labels):
                 ll_ratio_dict[label].append(v)
             ll_ratio_reshape = (np.array(ll_ratio_dict)).T
