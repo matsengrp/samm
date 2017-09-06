@@ -159,7 +159,7 @@ class LikelihoodComparer:
             sampled_orders_list = [res.samples for res in sampler_results]
             self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
             self.samples += [s for res in sampler_results for s in res.samples]
-            self.sample_labels = [i for i, orders in enumerate(sampled_orders_list) for o in orders]
+            self.sample_labels += [i for i, orders in enumerate(sampled_orders_list) for o in orders]
             self.num_samples += self.num_samples
             # Setup a problem so that we can extract the log likelihood ratio
             self.prob = SurvivalProblemLasso(
