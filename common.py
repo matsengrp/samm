@@ -494,7 +494,8 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=No
 
         if val_column_idx is None:
             # sample random categories from our validation variable
-            val_categories = set(random.sample(categories, val_size))
+            val_categories_idx = np.random.choice(len(categories), size=val_size, replace=False)
+            val_categories = set([list(categories)[j] for j in val_categories_idx])
         else:
             # choose val_column_idx as validation item
             val_categories = set([list(categories)[val_column_idx]])
