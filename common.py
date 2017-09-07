@@ -291,6 +291,7 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
         the standard error of the values correcting for auto-correlation between the values
         the lower bound of the mean of the total penalized value using the standard error and the given zscore
         the upper bound of the mean of the total penalized value using the standard error and the given zscore
+        effective sample size (negative if the values are essentially constant)
     Calculate the autocorrelation, then the effective sample size, scale the standard error appropriately the effective sample size
     """
     mean = np.mean(values)
@@ -299,7 +300,7 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     # If the values are essentially constant, then the autocorrelation is zero.
     # (There are numerical stability issues if we go thru the usual calculations)
     if var < 1e-10:
-        return 0, mean, mean
+        return 0, mean, mean, -1
 
     # Calculate auto-correlation
     # Definition from p. 151 of Carlin/Louis:
@@ -317,18 +318,17 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     neg_idx = result.size
     if len(neg_indices) > 0 and neg_indices[0].size > 1:
         neg_idx = np.where(result < 0)[0][0]
-
     autocorr = 1 + 2*np.sum(result[1:neg_idx])
 
     # Effective sample size calculation
     ess = values.size/autocorr
 
     if var/ess < 0:
-        return None, -np.inf, np.inf
+        return None, -np.inf, np.inf, ess
     else:
         # Corrected standard error
         ase = np.sqrt(var/ess)
-        return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
+        return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase, ess
 
 def soft_threshold(theta, thres):
     """

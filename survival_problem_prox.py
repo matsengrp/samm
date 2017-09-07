@@ -50,6 +50,8 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         step_size = init_step_size
         diff = 0
         upper_bound = 0
+        ase = None
+        ess = None
 
         # Calculate loglikelihood of current theta
         init_value, log_lik_vec_init = self._get_value_parallel(theta)
@@ -58,6 +60,8 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
         for i in range(max_iters):
             if i % self.print_iter == 0:
                 log.info("PROX iter %d, val %f, time %f" % (i, current_value, time.time() - st))
+                if ase is not None and ess is not None:
+                    log.info("  ase %f, ess %f" % (ase, ess))
 
             # Calculate gradient of the smooth part
             grad = self._get_gradient_log_lik(theta)
@@ -90,7 +94,7 @@ class SurvivalProblemProximal(SurvivalProblemCustom):
                 log_lik_ratio_vec = potential_log_lik_vec - log_lik_vec_init
                 ll_ratio_vec_grouped = self._group_log_lik_ratio_vec(log_lik_ratio_vec)
                 # Upper bound becomes the lower bound when we consider the negative of this!
-                _, _, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec_grouped, ZSCORE, potential_value - init_value)
+                ase, _, upper_bound, ess = get_standard_error_ci_corrected(ll_ratio_vec_grouped, ZSCORE, potential_value - init_value)
 
                 # Calculate difference in objective function
                 theta = potential_theta
