@@ -119,7 +119,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         else:
             return ll_ratio_vec
 
-    def _get_log_lik_parallel(self, theta):
+    def _get_log_lik_parallel(self, theta, batch_factor=4):
         """
         JUST KIDDING - parallel is not faster
         @param theta: the theta to calculate the likelihood for
@@ -127,12 +127,19 @@ class SurvivalProblemCustom(SurvivalProblem):
                             We make `num_threads` * `batch_factor` batches
         @return vector of log likelihood values
         """
+        def _get_parallel(worker_list, shared_obj):
+            if self.pool is not None and len(worker_list) > 10000:
+                multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=shared_obj, num_approx_batches=self.pool._processes * batch_factor)
+                res = multiproc_manager.run()
+            else:
+                res = [worker.run(shared_obj) for worker in worker_list]
+            return np.array(res)
+
         rand_seed = get_randint()
         worker_list = [
             ObjectiveValueWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
-        ll = [worker.run(theta) for worker in worker_list]
-        return np.array(ll)
+        return _get_parallel(worker_list, theta)
 
     def get_hessian(self, theta, batch_factor=4):
         """
@@ -194,7 +201,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
         return fisher_info, -1.0/self.num_samples * hessian_sum
 
-    def _get_gradient_log_lik(self, theta):
+    def _get_gradient_log_lik(self, theta, batch_factor=4):
         """
         JUST KIDDING - parallel is not faster
         @param theta: the theta to calculate the likelihood for
@@ -203,12 +210,20 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         Calculate the gradient of the negative log likelihood - delegates to separate cpu threads if threads > 1
         """
+        def _get_parallel(worker_list, shared_obj):
+            if self.pool is not None and len(worker_list) > 10000:
+                multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=shared_obj, num_approx_batches=self.pool._processes * batch_factor)
+                res = multiproc_manager.run()
+            else:
+                res = [worker.run(shared_obj) for worker in worker_list]
+            return res
+
         rand_seed = get_randint()
         worker_list = [
             GradientWorker(rand_seed + i, sample_data, self.per_target_model) for i, sample_data in enumerate(self.precalc_data)
         ]
-        l = [worker.run(theta) for worker in worker_list]
-        grad_ll_dtheta = np.sum(l, axis=0)
+        grad_ll_raw = _get_parallel(worker_list, theta)
+        grad_ll_dtheta = np.sum(grad_ll_raw, axis=0)
 
         # Zero out all gradients that affect the constant theta values.
         if self.zero_theta_mask is not None:
