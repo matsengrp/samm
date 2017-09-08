@@ -304,8 +304,11 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         current_seq = meta_in_cluster.copy()
         if cmp(proc_seq, proc_gl_seq):
             # There are mutations so add to output
-            genes_line.append({'germline_name': gl_name,
-                'germline_sequence': proc_gl_seq})
+            genes_line.append({
+                'germline_name': gl_name,
+                'germline_sequence': proc_gl_seq,
+                'germline_family': gl_name.split("-")[2],
+            })
             current_seq['germline_name'] = gl_name
             current_seq['sequence_name'] = elt['sequence_name']
             current_seq['sequence'] = proc_seq
