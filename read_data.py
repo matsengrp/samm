@@ -321,7 +321,7 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         out_seqs += seqs_line
 
     with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
-        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values))
+        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values) + ["germline_family"])
         gene_writer.writeheader()
         gene_writer.writerows(out_genes)
         seq_writer = csv.DictWriter(seqs_file, list(seqs.columns.values))
