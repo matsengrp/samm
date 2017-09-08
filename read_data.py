@@ -304,8 +304,11 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         current_seq = meta_in_cluster.copy()
         if cmp(proc_seq, proc_gl_seq):
             # There are mutations so add to output
-            genes_line.append({'germline_name': gl_name,
-                'germline_sequence': proc_gl_seq})
+            genes_line.append({
+                'germline_name': gl_name,
+                'germline_sequence': proc_gl_seq,
+                'germline_family': gl_name.split("-")[2],
+            })
             current_seq['germline_name'] = gl_name
             current_seq['sequence_name'] = elt['sequence_name']
             current_seq['sequence'] = proc_seq
@@ -318,7 +321,7 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         out_seqs += seqs_line
 
     with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
-        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values))
+        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values) + ["germline_family"])
         gene_writer.writeheader()
         gene_writer.writerows(out_genes)
         seq_writer = csv.DictWriter(seqs_file, list(seqs.columns.values))
