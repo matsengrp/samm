@@ -128,7 +128,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         @return vector of log likelihood values
         """
         def _get_parallel(worker_list, shared_obj):
-            if self.pool is not None and len(worker_list) > 10000:
+            if False and self.pool is not None and len(worker_list) > 10000:
                 multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=shared_obj, num_approx_batches=self.pool._processes * batch_factor)
                 res = multiproc_manager.run()
             else:
@@ -211,7 +211,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         Calculate the gradient of the negative log likelihood - delegates to separate cpu threads if threads > 1
         """
         def _get_parallel(worker_list, shared_obj):
-            if self.pool is not None and len(worker_list) > 10000:
+            if False and self.pool is not None and len(worker_list) > 10000:
                 multiproc_manager = MultiprocessingManager(self.pool, worker_list, shared_obj=shared_obj, num_approx_batches=self.pool._processes * batch_factor)
                 res = multiproc_manager.run()
             else:
