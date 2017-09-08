@@ -33,13 +33,13 @@ nest.add(
 
 nest.add(
     'replicate',
-    range(12,13),
+    range(1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
 nest.add(
     'seed',
-    [4],
+    [0],
     #lambda c: [c['replicate']],
     create_dir=False)
 
