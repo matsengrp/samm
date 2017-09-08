@@ -260,7 +260,7 @@ def main(args=sys.argv[1:]):
 
     cmodel_algo.refit_unpenalized(
         model_result=results_list[best_model_idx],
-        max_em_iters=args.em_max_iters,
+        max_em_iters=args.em_max_iters * 3,
         get_hessian=not args.omit_hessian,
     )
 

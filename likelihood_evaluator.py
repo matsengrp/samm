@@ -114,12 +114,13 @@ class LikelihoodComparer:
         sampled_orders_list = [res.samples for res in sampler_results]
         self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
         self.samples = [o for orders in sampled_orders_list for o in orders]
+        self.sample_labels = [i for i, orders in enumerate(sampled_orders_list) for o in orders]
         # Setup a problem so that we can extract the log likelihood ratio
         st_time = time.time()
         self.prob = SurvivalProblemLasso(
             feat_generator,
             self.samples,
-            sample_labels=None,
+            sample_labels=self.sample_labels,
             penalty_params=[0],
             per_target_model=self.per_target_model,
             pool=self.pool,
@@ -132,14 +133,15 @@ class LikelihoodComparer:
         @param theta: the model parameter to compare against
         @return Q(theta | theta ref) - Q(theta ref | theta ref)
         """
-        ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
+        ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref, group_by_sample=True)
         mean_ll_ratio = np.mean(ll_ratio_vec)
-        ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
+        ase, lower_bound, upper_bound, ess = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
+        log.info("Likelihood comparer (lower,mean,upper, ess)=(%f,%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound, ess))
 
         curr_iter = 1
         while lower_bound < 0 and upper_bound > 0 and self.num_samples * (1 + curr_iter) * self.num_tot_obs < LikelihoodComparer.MAX_TOT_SAMPLES and curr_iter < max_iters:
             # If we aren't sure if the mean log likelihood ratio is negative or positive, grab more samples
-            log.info("Get more samples likelihood comparer (lower,mean,upper)=(%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound))
+            log.info("Get more samples likelihood comparer (lower,mean,upper,ess)=(%f,%f,%f,%f)" % (lower_bound, mean_ll_ratio, upper_bound, ess))
             st_time = time.time()
             sampler_results = self.sampler_collection.get_samples(
                 self.init_orders,
@@ -149,21 +151,21 @@ class LikelihoodComparer:
             log.info("Finished getting samples, time %s" % (time.time() - st_time))
             sampled_orders_list = [res.samples for res in sampler_results]
             self.init_orders = [sampled_orders[-1].mutation_order for sampled_orders in sampled_orders_list]
-
             self.samples += [s for res in sampler_results for s in res.samples]
+            self.sample_labels += [i for i, orders in enumerate(sampled_orders_list) for o in orders]
             self.num_samples += self.num_samples
             # Setup a problem so that we can extract the log likelihood ratio
             self.prob = SurvivalProblemLasso(
                 self.feat_generator,
                 self.samples,
-                sample_labels=None,
+                sample_labels=self.sample_labels,
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
                 pool=self.pool,
             )
-            ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref)
+            ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref, group_by_sample=True)
             mean_ll_ratio = np.mean(ll_ratio_vec)
-            ase, lower_bound, upper_bound = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
+            ase, lower_bound, upper_bound, ess = get_standard_error_ci_corrected(ll_ratio_vec, ZSCORE_95, mean_ll_ratio)
             curr_iter += 1
 
         return mean_ll_ratio, lower_bound, upper_bound

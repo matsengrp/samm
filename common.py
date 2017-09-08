@@ -291,6 +291,7 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
         the standard error of the values correcting for auto-correlation between the values
         the lower bound of the mean of the total penalized value using the standard error and the given zscore
         the upper bound of the mean of the total penalized value using the standard error and the given zscore
+        effective sample size (negative if the values are essentially constant)
     Calculate the autocorrelation, then the effective sample size, scale the standard error appropriately the effective sample size
     """
     mean = np.mean(values)
@@ -299,7 +300,7 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     # If the values are essentially constant, then the autocorrelation is zero.
     # (There are numerical stability issues if we go thru the usual calculations)
     if var < 1e-10:
-        return 0, mean, mean
+        return 0, mean, mean, -1
 
     # Calculate auto-correlation
     # Definition from p. 151 of Carlin/Louis:
@@ -317,18 +318,17 @@ def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     neg_idx = result.size
     if len(neg_indices) > 0 and neg_indices[0].size > 1:
         neg_idx = np.where(result < 0)[0][0]
-
     autocorr = 1 + 2*np.sum(result[1:neg_idx])
 
     # Effective sample size calculation
     ess = values.size/autocorr
 
     if var/ess < 0:
-        return None, -np.inf, np.inf
+        return None, -np.inf, np.inf, ess
     else:
         # Corrected standard error
         ase = np.sqrt(var/ess)
-        return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase
+        return ase, pen_val_diff - zscore * ase, pen_val_diff + zscore * ase, ess
 
 def soft_threshold(theta, thres):
     """
@@ -494,12 +494,15 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=No
 
         if val_column_idx is None:
             # sample random categories from our validation variable
-            val_categories = set(random.sample(categories, val_size))
+            val_categories_idx = np.random.choice(len(categories), size=val_size, replace=False)
+            val_categories = set([list(categories)[j] for j in val_categories_idx])
         else:
             # choose val_column_idx as validation item
             val_categories = set([list(categories)[val_column_idx]])
 
         train_categories = categories - val_categories
+        print "val cate", val_categories
+        print "train cate", train_categories
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
 
@@ -573,7 +576,7 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
             agg_matrix[full_theta_idx, matches] = 1
         print agg_matrix.shape, sample_obs_info.shape
         old_var = np.dot(np.dot(agg_matrix, np.linalg.pinv(sample_obs_info)), agg_matrix.T)
-        print "old var est", np.sort(np.diag(old_var))
+        print "old var est", np.sort(np.diag(old_var))[:10]
 
         # determine which aggregations are completely zero
         agg_mask, _, _ = combine_thetas_and_get_conf_int(
@@ -597,13 +600,13 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
         #     sqrt(n) * (agg_theta_hat - agg_theta)
         #     Then the variance of our estimator is mult_mat * variance of score * mult_mat.T
         #     The variance of the score is the information matrix.
-        rcond = 1e-10
+        rcond = 1e-15
         tt = 0.5 * (sample_obs_info + sample_obs_info.T)
         mult_mat, resid, r, s = np.linalg.lstsq(tt, agg_matrix.T, rcond=rcond)
         print "rcond", rcond
-        print "norm dif", np.linalg.norm(np.dot(tt.T, mult_mat) - agg_matrix.T)/np.linalg.norm(agg_matrix.T)
+        print "norm dif", np.linalg.norm(np.dot(tt, mult_mat) - agg_matrix.T)/np.linalg.norm(agg_matrix.T)
         cov_mat_full = np.dot(np.dot(mult_mat.T, tt), mult_mat)
-        print "new var ests", np.sort(np.diag(cov_mat_full))
+        print "new var ests", np.sort(np.diag(cov_mat_full))[:10]
         if np.any(np.diag(cov_mat_full) < 0):
             raise ValueError(
                 "Unable to come up with valid variance estimate: num neg: %d" %
