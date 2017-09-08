@@ -10,7 +10,8 @@ class SurvivalProblemCVXPY(SurvivalProblem):
 
     Warning: will be very slow for large datasets
     """
-    def calculate_log_lik_ratio_vec(self, theta, prev_theta):
+    def calculate_log_lik_ratio_vec(self, theta, prev_theta, group_by_sample=False):
+        assert(not group_by_sample)
         log_lik_vec = zeros(len(self.samples))
         for sample_id, sample in enumerate(self.samples):
             log_lik_vec[sample_id] = self.calculate_per_sample_log_lik(theta, sample).value - \
