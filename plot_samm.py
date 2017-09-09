@@ -123,8 +123,8 @@ def main(args=sys.argv[1:]):
             method_res.refit_theta,
             method_res.model_masks.zero_theta_mask_refit,
             method_res.refit_possible_theta_mask,
-            method_res.variance_est,
-            col_idx + agg_start_col,
+            sample_obs_info=method_res.sample_obs_info,
+            col_idx=col_idx + agg_start_col,
         )
 
     agg_possible_motif_mask = get_possible_motifs_to_targets(full_feat_generator.motif_list, full_theta.shape, full_feat_generator.mutating_pos_list)

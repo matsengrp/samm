@@ -601,12 +601,16 @@ def combine_thetas_and_get_conf_int(feat_generator, full_feat_generator, theta, 
         #     Then the variance of our estimator is mult_mat * variance of score * mult_mat.T
         #     The variance of the score is the information matrix.
         rcond = 1e-15
-        tt = 0.5 * (sample_obs_info + sample_obs_info.T)
-        mult_mat, resid, r, s = np.linalg.lstsq(tt, agg_matrix.T, rcond=rcond)
-        print "rcond", rcond
-        print "norm dif", np.linalg.norm(np.dot(tt, mult_mat) - agg_matrix.T)/np.linalg.norm(agg_matrix.T)
-        cov_mat_full = np.dot(np.dot(mult_mat.T, tt), mult_mat)
-        print "new var ests", np.sort(np.diag(cov_mat_full))[:10]
+        tts = [0.5 * (sample_obs_info + sample_obs_info.T), sample_obs_info]
+        for tt in tts:
+            mult_mat, resid, r, s = np.linalg.lstsq(tt, agg_matrix.T, rcond=rcond)
+            print "rcond", rcond
+            print "norm dif", np.linalg.norm(np.dot(tt, mult_mat) - agg_matrix.T)/np.linalg.norm(agg_matrix.T)
+            cov_mat_full = np.dot(np.dot(mult_mat.T, tt), mult_mat)
+            print "new var ests", np.sort(np.diag(cov_mat_full))[:10]
+            if not np.any(np.diag(cov_mat_full) < 0):
+                break
+
         if np.any(np.diag(cov_mat_full) < 0):
             raise ValueError(
                 "Unable to come up with valid variance estimate: num neg: %d" %
