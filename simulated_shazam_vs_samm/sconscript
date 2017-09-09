@@ -20,7 +20,7 @@ SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 1.0
 
 models = [
-    {'simulation': 'survival', 'motif_lens': [5], 'positions_mutating': "2"},
+    #{'simulation': 'survival', 'motif_lens': [5], 'positions_mutating': "2"},
     {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
     # {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
@@ -39,13 +39,13 @@ nest.add(
 # Set the seed to be the replicate number.
 nest.add(
     'seed',
-    [0],
+    lambda c: [c["replicate"]],
     #lambda c: [c['replicate']],
     create_dir=False)
 
 nest.add(
     'target',
-    [False]
+    [True]
 )
 
 # simulate data
@@ -105,7 +105,7 @@ def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
     per_target_flag = "--per-target-model" if c["target"] else ""
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -7.0, step=-.5)).tolist()))
 
     cmd = ['python fit_samm.py',
         '--input-naive ${SOURCES[1]}',

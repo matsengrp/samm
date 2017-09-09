@@ -138,7 +138,7 @@ def main(args=sys.argv[1:]):
 
 def _read_shmulate_val(shmulate_value):
     """ return the log so we can be sure we're comparing the same things!"""
-    return -np.inf if shmulate_value == "NA" or not shmulate_value else np.log(float(shmulate_value))
+    return -np.inf if (shmulate_value == "NA" or shmulate_value == "0") else np.log(float(shmulate_value))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
