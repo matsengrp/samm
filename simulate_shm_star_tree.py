@@ -188,6 +188,10 @@ def run_shmulate(args):
     ]
     print "Calling:", " ".join(map(str, cmd))
     res = subprocess.call(map(str, cmd))
+    print """
+        WARNING: these simulations ignore the input model.
+        It uses MK_RS5NF as the targeting model.
+    """
 
 def main(args=sys.argv[1:]):
     args = parse_args()
