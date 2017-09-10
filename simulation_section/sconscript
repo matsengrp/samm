@@ -85,7 +85,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(1, 5),
+    range(1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -151,8 +151,6 @@ def fit_context_model(env, outdir, c):
            ",".join([str(m) for m in c['model']['motif_lens']]),
            '--positions-mutating',
            c["model"]["positions_mutating"],
-           '--em-max-iters',
-           10,
            '--penalty-params',
            ",".join(map(str, penalty_params)),
            '--num-cpu-threads',
@@ -160,14 +158,23 @@ def fit_context_model(env, outdir, c):
            '--num-jobs',
            min(int(c['simulation_size']/40), 10),
            '--burn-in',
-           2,
+           16,
            '--num-e-samples',
            4,
+           '--sampling-rate',
+           8,
+           '--em-max-iters',
+           10,
+           '--num-val-burnin',
+           16,
+           '--num-val-samples',
+           16,
            per_target_model_str,
            '--scratch-directory',
            SCRATCH_DIR,
            '--tuning-sample-ratio',
-           0.1,
+           0.2,
+           '--validation-col germline_family',
            '--input-mutated ${SOURCES[0]}',
            '--input-naive ${SOURCES[1]}',
            '--out-file ${TARGETS[0]}',
