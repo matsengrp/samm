@@ -28,19 +28,18 @@ models = [
 nest.add(
     'model',
     models,
-    label_func=lambda c: "%s_m%s" % (c["simulation"], "-".join(map(str, c["motif_lens"]))),
+    label_func=lambda c: "final_%s_m%s" % (c["simulation"], "-".join(map(str, c["motif_lens"]))),
 )
 
 nest.add(
     'replicate',
-    range(1),
+    range(10),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
 nest.add(
     'seed',
     lambda c: [c["replicate"]],
-    #lambda c: [c['replicate']],
     create_dir=False)
 
 nest.add(
@@ -82,9 +81,9 @@ def simulate(env, outdir, c):
             max(c['model']['motif_lens']),
             '--input-model ${SOURCES[0]}',
             '--n-subjects',
-            3,
+            4,
             '--tot-mutated',
-            1500,
+            2000,
             '--min-percent-mutated',
             0.01,
             '--max-percent-mutated',
@@ -105,7 +104,7 @@ def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
     per_target_flag = "--per-target-model" if c["target"] else ""
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -7.0, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-.5)).tolist()))
 
     cmd = ['python fit_samm.py',
         '--input-naive ${SOURCES[1]}',
@@ -144,9 +143,7 @@ def fit_survival(env, outdir, c):
         '--out-file ${TARGETS[0]}',
         '--log-file ${TARGETS[1]}',
         per_target_flag,
-        # DO NOT omit hessian -- we want to see if we can come up with
-        # sensible confidence intervals
-        # '--omit-hessian',
+        '--omit-hessian',
     ]
 
     return env.Command(
