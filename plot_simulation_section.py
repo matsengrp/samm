@@ -12,7 +12,6 @@ import seaborn as sns
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from confidence_interval_maker import ConfidenceIntervalMaker
-from make_model_sparse import SparseModelMaker
 from common import *
 
 def parse_args():
@@ -360,4 +359,3 @@ def main(args=sys.argv[1:]):
 
 if __name__ == "__main__":
     main(sys.argv[1:])
-

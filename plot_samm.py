@@ -37,8 +37,11 @@ def parse_args():
     parser.add_argument('--plot-separate',
         action='store_true',
         help="Plot hazard rates of different target nucleotides in separate PDFs")
+    parser.add_argument('--no-conf-int',
+        action='store_true',
+        help="Remove confidence interval estimates")
 
-    args = parser.parse_args()
+    args = parser.parse_args(no_conf_int=False)
 
     return args
 
@@ -131,6 +134,10 @@ def main(args=sys.argv[1:]):
     full_theta[~agg_possible_motif_mask] = -np.inf
     theta_lower[~agg_possible_motif_mask] = -np.inf
     theta_upper[~agg_possible_motif_mask] = -np.inf
+
+    if args.no_conf_int:
+        theta_lower = full_theta
+        theta_upper = full_theta
 
     if args.per_target_model:
         # if args.plot_separate:

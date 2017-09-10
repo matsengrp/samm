@@ -17,15 +17,15 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 NSEEDS = 10
 MOTIF_LEN = 5
 MUT_POS = 2
-SIM_METHODS = ['survival'] #, 'shmulate']
-TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/true_model.pkl"
-SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/fitted.pkl"
-SHAZAM_MUT_STR = "simulated_shazam_vs_samm/_output/%s/0%d/fitted_shazam_mut.csv"
-SHAZAM_SUB_STR = "simulated_shazam_vs_samm/_output/%s/0%d/fitted_shazam_sub.csv"
+SIM_METHODS = ['final_survival_m3-5'] #, 'shmulate']
+TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/true_model.pkl"
+SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted.pkl"
+SHAZAM_MUT_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_mut.csv"
+SHAZAM_SUB_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_sub.csv"
 THETA_MIN = -4
 THETA_MAX = 4
 # what step size to use to divide true theta by effect size
-STEP = 1.5
+STEP = 2
 
 def raw_diff(agg_fit_theta, agg_true_theta):
     possible_agg_true_theta = agg_true_theta - np.median(agg_true_theta)
@@ -102,6 +102,8 @@ def _plot_scatter(all_df, fname=''):
         plt.scatter(melt_df.loc[i]['theta'], melt_df.loc[i]['value'], color=col, alpha=0.1, s=15)
     sns_plot.set(ylabel='Fitted theta')
     sns_plot.set(xlabel="True theta")
+    sns_plot.set(ylim=(-4, 4))
+    sns_plot.set(xlim=(-4, 4))
 
     sns_plot.savefig(fname)
 
