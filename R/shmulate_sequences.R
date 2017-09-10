@@ -33,7 +33,7 @@ seqs <- apply(genes, 1, function(gene_data) {
   gene_name <- gene_data[1]
   gene_seq <- gene_data[2]
   gene_freq <- as.numeric(gene_data[3])
-  n_germ_taxa <- as.numeric(gene_data[4])
+  n_germ_taxa <- as.numeric(gene_data[5])
 
   mutated_seqs <- replicate(n_germ_taxa, run_shmulate(gene_seq))
   seq_names <- paste0(gene_name, '-', seq(n_germ_taxa))
