@@ -1,4 +1,4 @@
-sim_type = "shmulate" # "survival"
+sim_type = "final_survival_m3-5"
 seedrange = range(10)
 
 fitted_str = ""
@@ -7,10 +7,10 @@ shazam_muts = []
 shazam_subs = []
 samms = []
 for seed in seedrange:
-    true_model = "simulated_shazam_vs_samm/_output/%s/0%d/true_model.pkl" % (sim_type, seed)
-    samm_m = "simulated_shazam_vs_samm/_output/%s/0%d/fitted.pkl" % (sim_type, seed)
-    shazam_sub = "simulated_shazam_vs_samm/_output/%s/0%d/fitted_shazam_sub.csv" % (sim_type, seed)
-    shazam_mut = "simulated_shazam_vs_samm/_output/%s/0%d/fitted_shazam_mut.csv" % (sim_type, seed)
+    true_model = "simulated_shazam_vs_samm/_output/%s/0%d/True/true_model.pkl" % (sim_type, seed)
+    samm_m = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted.pkl" % (sim_type, seed)
+    shazam_sub = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_sub.csv" % (sim_type, seed)
+    shazam_mut = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_mut.csv" % (sim_type, seed)
     true_models.append(true_model)
     samms.append(samm_m)
     shazam_subs.append(shazam_sub)
