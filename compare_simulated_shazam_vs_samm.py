@@ -70,16 +70,26 @@ def main(args=sys.argv[1:]):
     stat_res = [{"shazam":[], "samm":[]} for i in stat_funcs]
     for true_m, samm_m, shazam_m in zip(true_models, samm_models, shazam_models):
         for stat_i, stat_f in enumerate(stat_funcs):
-           stat_shazam = _collect_statistics([shazam_m], args, None, true_m, stat_f)
+           try:
+               stat_shazam = _collect_statistics([shazam_m], args, None, true_m, stat_f)
+               if not np.isinf(stat_shazam):
+                   stat_res[stat_i]["shazam"].append(stat_shazam)
+               else:
+                   raise ValueError("infinite value for statistic")
+           except Exception as e:
+               print "WARNING: Shazam has a bad estimate!"
            stat_samm = _collect_statistics([samm_m], args, None, true_m, stat_f)
-           stat_res[stat_i]["shazam"].append(stat_shazam)
            stat_res[stat_i]["samm"].append(stat_samm)
 
     for stat_r, stat_func in zip(stat_res, stat_funcs):
         print stat_func.__name__, "mean (se)"
-        num_samples = len(stat_r["shazam"])
-        print "shazam", np.mean(stat_r["shazam"]), "(%f)" % np.sqrt(np.var(stat_r["shazam"])/num_samples)
-        print "samm", np.mean(stat_r["samm"]), "(%f)" % np.sqrt(np.var(stat_r["samm"])/num_samples)
+        if len(stat_r["shazam"]):
+            print "shazam", np.mean(stat_r["shazam"]), "(%f)" % np.sqrt(np.var(stat_r["shazam"])/len(stat_r["shazam"]))
+        else:
+            print "shazam", "all estimates are broken"
+        print "samm", np.mean(stat_r["samm"]), "(%f)" % np.sqrt(np.var(stat_r["samm"])/len(stat_r["samm"]))
+        if len(stat_r["shazam"]) != len(stat_r["samm"]):
+            print "WARNING: Shazam had some bad estimates!"
 
 if __name__ == "__main__":
     main(sys.argv[1:])
