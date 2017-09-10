@@ -23,6 +23,8 @@ run_shmulate <- function(germline) {
 genes <- read.csv(gene_file, stringsAsFactors=FALSE)
 gene_freqs <- read.csv(gene_freq_file, stringsAsFactors=FALSE)
 genes <- merge(genes, gene_freqs, by="germline_name")
+print(gene_freqs$germline_name)
+print(gene_freqs$freq)
 taxa_per_genes <- data.frame(
   germline_name=gene_freqs$germline_name,
   n_taxa=rmultinom(1, tot_taxa, prob=gene_freqs$freq)
