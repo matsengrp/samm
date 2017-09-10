@@ -148,3 +148,37 @@ def plot_hedgehog(env, outdir, c):
         [join(outdir, 'fitted.csv'), join(outdir, 'fitted.pdf')],
         c['fit_survival'],
         ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def fit_shazam(env, outdir, c):
+
+    cmd = ['python fit_shmulate_model.py',
+           '--input-file',
+           '${SOURCES[1]}',
+           '--input-genes',
+           '${SOURCES[0]}',
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+
+    return env.Command(
+        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt'), join(outdir, 'fitted_shazam_mut.csv')],
+        c['process_data'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def plot_hedgehog_shazam(env, outdir, c):
+    motif_len = c['motif_params']['motif_length']
+    left_flanks = c['motif_params']['left_motif_flanks']
+
+    cmd = ['python plot_shazam.py',
+           '--mut',
+           '${SOURCES[0]}',
+           '--output-csv',
+           '${TARGETS[0]}',
+           '--output-pdf',
+           '${TARGETS[1]}']
+
+    return env.Command(
+        [join(outdir, 'fitted_shazam.csv'), join(outdir, 'fitted_shazam.pdf')],
+        [join(outdir, 'fitted_shazam_mut.csv')],
+        ' '.join(map(str, cmd)))
