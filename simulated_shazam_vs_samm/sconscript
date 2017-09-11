@@ -121,7 +121,7 @@ def fit_survival(env, outdir, c):
         '--num-cpu-threads',
         4,
         '--num-jobs',
-        10,
+        4,
         '--burn-in',
         16,
         '--num-e-samples',
