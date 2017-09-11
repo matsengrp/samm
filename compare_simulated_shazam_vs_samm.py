@@ -76,14 +76,14 @@ def main(args=sys.argv[1:]):
     for true_m, samm_m, shazam_m in zip(true_models, samm_models, shazam_models):
         for stat_i, stat_f in enumerate(stat_funcs):
            try:
-               stat_shazam = _collect_statistics([shazam_m], args, None, true_m, stat_f)
+               stat_shazam = _collect_statistics([shazam_m], args, true_m, stat_f)
                if not np.isinf(stat_shazam):
                    stat_res[stat_i]["shazam"].append(stat_shazam)
                else:
                    raise ValueError("infinite value for statistic")
            except Exception as e:
                print "WARNING: Shazam has a bad estimate!"
-           stat_samm = _collect_statistics([samm_m], args, None, true_m, stat_f)
+           stat_samm = _collect_statistics([samm_m], args, true_m, stat_f)
            stat_res[stat_i]["samm"].append(stat_samm)
 
     for stat_r, stat_func in zip(stat_res, stat_funcs):
