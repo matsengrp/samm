@@ -93,7 +93,7 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
     )
     return best_model
 
-def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, stat_func):
+def _collect_statistics(fitted_models, args, agg_true_theta, stat_func):
     dense_agg_feat_gen = HierarchicalMotifFeatureGenerator(
         motif_lens=[args.agg_motif_len],
         left_motif_flank_len_list=[[args.agg_pos_mutating]],
@@ -108,46 +108,26 @@ def _collect_statistics(fitted_models, args, raw_true_theta, agg_true_theta, sta
     for fmodel in fitted_models:
         if fmodel is not None:
             try:
-                s = stat_func(fmodel, dense_agg_feat_gen, raw_true_theta, agg_true_theta, possible_agg_mask)
+                s = stat_func(fmodel, dense_agg_feat_gen, agg_true_theta, possible_agg_mask)
                 if s is not None:
                     statistics.append(s)
             except ValueError as e:
                 print(e)
     return statistics
 
-def _get_support(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    raw_refit_theta = np.zeros(raw_true_theta.shape)
-    raw_refit_theta[~fmodel.model_masks.feats_to_remove_mask, :] = fmodel.refit_theta
-    support_refit_theta = (raw_refit_theta != -np.inf) & (raw_refit_theta != 0)
-    true_support = (raw_true_theta != -np.inf) & (raw_true_theta != 0)
-    return float(np.sum(support_refit_theta & true_support))/np.sum(support_refit_theta)
-
-def _get_raw_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    raw_refit_theta = np.zeros(raw_true_theta.shape)
-    raw_refit_theta[~fmodel.model_masks.feats_to_remove_mask, :] = fmodel.refit_theta
-    possible_raw_mask = raw_true_theta != -np.inf
-    return scipy.stats.pearsonr(raw_true_theta[possible_raw_mask], raw_refit_theta[possible_raw_mask])[0]
-
-def _get_agg_pearson(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+def _get_agg_pearson(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
     return scipy.stats.pearsonr(
         agg_true_theta[possible_agg_mask],
         fmodel.agg_refit_theta[possible_agg_mask],
     )[0]
 
-def _get_agg_kendall(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+def _get_agg_kendall(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
     return scipy.stats.kendalltau(
         agg_true_theta[possible_agg_mask],
         fmodel.agg_refit_theta[possible_agg_mask],
     )[0]
 
-def _get_raw_norm_diff(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    raw_refit_theta = np.zeros(raw_true_theta.shape)
-    raw_refit_theta[~fmodel.model_masks.feats_to_remove_mask, :] = fmodel.refit_theta
-    possible_raw_mask = raw_true_theta != -np.inf
-    tot_elems = np.sum(possible_raw_mask)
-    return np.linalg.norm(raw_true_theta[possible_raw_mask] - raw_refit_theta[possible_raw_mask])/np.sqrt(tot_elems)
-
-def _get_agg_norm_diff(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+def _get_agg_norm_diff(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
     tot_elems = np.sum(possible_agg_mask)
 
     # Subtract the median
@@ -156,19 +136,22 @@ def _get_agg_norm_diff(fmodel, full_feat_generator, raw_true_theta, agg_true_the
 
     return np.linalg.norm(possible_agg_refit_theta - possible_agg_true_theta)/np.linalg.norm(possible_agg_true_theta)
 
-def _get_agg_coverage_all(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask)
-def _get_agg_coverage_negative(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    compare_func = lambda x: x < 0
-    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func)
-def _get_agg_coverage_positive(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
-    compare_func = lambda x: x > 0 #np.percentile(x, 75)
-    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func)
+def _get_agg_coverage_all(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
+    return _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask)
 
-def _get_agg_coverage_zero(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask):
+def _get_agg_coverage_negative(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
+    compare_func = lambda x: x < 0
+    return _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask, compare_func)
+
+def _get_agg_coverage_positive(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
+    compare_func = lambda x: x > 0 #np.percentile(x, 75)
+    return _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask, compare_func)
+
+def _get_agg_coverage_zero(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask):
     compare_func = lambda x: x == 0
-    return _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func)
-def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_theta, possible_agg_mask, compare_func=None):
+    return _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask, compare_func)
+
+def _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_mask, compare_func=None):
     hier_feat_gen = HierarchicalMotifFeatureGenerator(
         motif_lens=fmodel.motif_lens,
         feats_to_remove=fmodel.model_masks.feats_to_remove,
@@ -197,9 +180,13 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
 
     agg_true_theta -= np.median(agg_true_theta[agg_true_theta != -np.inf])
     for col_idx, (agg_fitted_theta, agg_fitted_lower, agg_fitted_upper) in enumerate(agg_fitted_thetas):
+        inf_mask = agg_fitted_theta != -np.inf
+        agg_fitted_upper = agg_fitted_upper[inf_mask]
+        agg_fitted_lower = agg_fitted_lower[inf_mask]
+        agg_fitted_theta = agg_fitted_theta[inf_mask]
         agg_fitted_lower -= med_theta
         agg_fitted_upper -= med_theta
-        agg_true_theta_col = agg_true_theta[:,col_idx]
+        agg_true_theta_col = agg_true_theta[inf_mask,col_idx]
         comparison_mask = np.abs(agg_fitted_lower - agg_fitted_upper) > 1e-5 # only look at things with confidence intervals
         if compare_func is not None:
             comparison_mask = np.ones(agg_fitted_lower.shape, dtype=bool)
@@ -208,7 +195,6 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         agg_fitted_lower_small = agg_fitted_lower[comparison_mask]
         agg_fitted_upper_small = agg_fitted_upper[comparison_mask]
         agg_true_theta_small = agg_true_theta_col[comparison_mask]
-        print agg_fitted_lower_small - agg_fitted_upper_small
         #print np.hstack([
         #    agg_fitted_lower_small.reshape((agg_fitted_lower_small.size, 1)),
         #    agg_true_theta_small.reshape((agg_true_theta_small.size, 1)),
@@ -219,23 +205,6 @@ def _get_agg_coverage(fmodel, full_feat_generator, raw_true_theta, agg_true_thet
         tot_considered += num_considered
 
     return tot_covered/float(tot_considered) if tot_considered > 0 else None
-
-def _get_raw_coverage(fmodel, full_feat_generator, raw_true_theta, true_theta, possible_agg_mask):
-    conf_int = ConfidenceIntervalMaker.create_confidence_intervals(
-        fmodel.refit_theta,
-        np.sqrt(np.diag(fmodel.variance_est)),
-        fmodel.refit_possible_theta_mask,
-        fmodel.model_masks.zero_theta_mask_refit,
-        z=ZSCORE_95,
-    )
-
-    theta_mask = fmodel.refit_possible_theta_mask & ~fmodel.model_masks.zero_theta_mask_refit
-    theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
-
-    true_theta_trunc = np.array(raw_true_theta[~fmodel.model_masks.feats_to_remove_mask, :])
-    true_theta_trunc = true_theta_trunc.reshape((true_theta_trunc.size,), order="F")
-    true_theta_trunc = true_theta_trunc[theta_mask_flat]
-    return np.mean((conf_int[:,0] <= true_theta_trunc) & (true_theta_trunc <= conf_int[:,2]))
 
 def _load_true_model(file_name, agg_motif_len, agg_pos_mutating, hier_motif_lens, hier_positions_mutating):
     with open(file_name, "r") as f:
@@ -251,21 +220,15 @@ def _load_true_model(file_name, agg_motif_len, agg_pos_mutating, hier_motif_lens
         left_motif_flank_len_list=hier_positions_mutating,
     )
 
-    sparse_raw_theta = SparseModelMaker.solve(true_model_agg, dense_hier_feat_gen, dense_agg_feat_gen, raw_theta=true_model)
-    possible_raw_theta_mask = get_possible_motifs_to_targets(dense_hier_feat_gen.motif_list, sparse_raw_theta.shape, dense_hier_feat_gen.mutating_pos_list)
-    sparse_raw_theta[~possible_raw_theta_mask] = -np.inf
-    return np.array(true_model_agg), np.array(sparse_raw_theta)
+    return np.array(true_model_agg)
 
 def _get_stat_func(stat):
     STAT_FUNC_DICT = {
         "norm": _get_agg_norm_diff,
-        "raw_norm": _get_raw_norm_diff,
-        "raw_coverage": _get_raw_coverage,
         "coverage": _get_agg_coverage_all,
         "coverage_pos": _get_agg_coverage_positive,
         "coverage_neg": _get_agg_coverage_negative,
         "coverage_zero": _get_agg_coverage_zero,
-        "raw_pearson": _get_raw_pearson,
         "pearson": _get_agg_pearson,
         "kendall": _get_agg_kendall,
     }
@@ -325,16 +288,14 @@ def main(args=sys.argv[1:]):
                                 samm_statistics = _collect_statistics(
                                     [fitted_model],
                                     args,
-                                    true_model[1],
-                                    true_model[0],
+                                    true_model,
                                     stat_func,
                                 )
-                                print stat
-                                print samm_statistics
                                 if len(samm_statistics):
                                     tmp_dat[STAT_LABEL[stat]] = samm_statistics[0]
                             tmp_df = tmp_df.append(tmp_dat, ignore_index=True)
                             all_df = pd.concat((all_df, tmp_df))
+
     sns.set_context(context="paper", font_scale=1.4)
     sns_plot = sns.PairGrid(
         data=all_df,
