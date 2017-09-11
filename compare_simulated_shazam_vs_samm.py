@@ -42,6 +42,8 @@ class ShazamModel:
             self.agg_refit_theta = refit_theta[:,0:1] + refit_theta[:,1:]
         else:
             self.agg_refit_theta = refit_theta[:,0:1]
+        print "SHAZAM contains nan in the estimates", np.any(np.isnan(self.agg_refit_theta))
+        self.agg_refit_theta[np.isnan(self.agg_refit_theta)] = 0
 
 def main(args=sys.argv[1:]):
     args = parse_args()
