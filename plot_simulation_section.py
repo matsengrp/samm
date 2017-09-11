@@ -310,11 +310,12 @@ def main(args=sys.argv[1:]):
     # majro hack cause seaborn is broken i think
     col_palette = sns.color_palette("Set2", 3)
     p1 = matplotlib.lines.Line2D([0], [0], linestyle='-', c=col_palette[0], label=args.model_types[0])
-    p2 = matplotlib.lines.Line2D([0], [0], linestyle='--', c=col_palette[1], label=args.model_types[1])
-    p3 = matplotlib.lines.Line2D([0], [0], linestyle=':', c=col_palette[2],  label=args.model_types[2])
-    proxies = [p1,p2,p3]
-    descriptions = ["3-mer", "3-mer per-target", "2,3-mer"]
-    plt.gca().legend(proxies, descriptions, numpoints=1, markerscale=2, bbox_to_anchor=(1.05,0.4))
+    if len(args.model_types) > 1:
+        p2 = matplotlib.lines.Line2D([0], [0], linestyle='--', c=col_palette[1], label=args.model_types[1])
+        p3 = matplotlib.lines.Line2D([0], [0], linestyle=':', c=col_palette[2],  label=args.model_types[2])
+        proxies = [p1,p2,p3]
+        descriptions = ["3-mer", "3-mer per-target", "2,3-mer"]
+        plt.gca().legend(proxies, descriptions, numpoints=1, markerscale=2, bbox_to_anchor=(1.05,0.4))
 
     sns_plot.savefig(args.outfile)
 

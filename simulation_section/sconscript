@@ -85,7 +85,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(1),
+    range(2, 5),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.

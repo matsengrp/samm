@@ -41,7 +41,8 @@ def parse_args():
         action='store_true',
         help="Remove confidence interval estimates")
 
-    args = parser.parse_args(no_conf_int=False)
+    parser.set_defaults(no_conf_int=False)
+    args = parser.parse_args()
 
     return args
 
