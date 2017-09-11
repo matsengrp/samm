@@ -20,9 +20,8 @@ SCRATCH_DIRECTORY = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 1.0
 
 models = [
-    #{'simulation': 'survival', 'motif_lens': [5], 'positions_mutating': "2"},
-    {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
-    # {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    # {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
+    {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
 ]
 
 nest.add(
