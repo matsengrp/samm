@@ -148,7 +148,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         gene_writer = csv.DictWriter(genes_file, ['germline_name', 'germline_sequence'])
         gene_writer.writeheader()
 
-        seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'sequence_name', 'sequence']
+        seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'nonproductive', 'sequence_name', 'sequence']
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
@@ -184,6 +184,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
                             'species': data_info['species'],
                             'group': data_info['group'],
                             'subject': data_info['subject'],
+                            'nonproductive': line['stops'][good_idx] or not line['in_frames'][good_idx] or line['mutated_invariants'][good_idx],
                             'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
                             'sequence': line[seqs_col][good_idx].lower()})
 
@@ -484,8 +485,6 @@ def read_gene_seq_csv_data(
     for gl_idx, (germline, cluster) in enumerate(full_data.groupby(['germline_name'])):
         gl_seq = cluster['germline_sequence'].values[0].lower()
         for idx, elt in cluster.iterrows():
-            n_mutes = 0
-            current_obs_seq_mutation = None
             start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
 
             obs_seq_mutation = ObservedSequenceMutations(

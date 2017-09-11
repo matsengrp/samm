@@ -1,0 +1,84 @@
+## Test model fits against one another
+
+import os
+import pickle
+import csv
+import numpy as np
+#import pandas as pd
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+from random import randint
+from itertools import izip
+from common import process_degenerates_and_impute_nucleotides
+from models import ObservedSequenceMutations
+
+Import('env')
+localenv = env.Clone()
+
+# Set up state
+base = {'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+PARTIS_PROCESSED_PATH = '/fh/fast/matsen_e/processed-data/partis'
+CUI_DATA_PATH = PARTIS_PROCESSED_PATH+'/cui-et-al'
+SCRATCH_DIR = '/fh/fast/matsen_e/dshaw/_tmp/samm/'
+LOCUS = 'igk'
+VAL_COLUMN = 'subject'
+
+@nest.add_target_with_env(localenv)
+def process_data(env, outdir, c):
+    cmd = ['python preprocess_data.py',
+               '--path-to-annotations',
+               CUI_DATA_PATH,
+               '--metadata-path',
+               CUI_DATA_PATH + '/meta.csv',
+               '--use-v',
+               '--locus',
+               LOCUS,
+               '--species',
+               'mouse',
+               '--scratch-directory',
+               SCRATCH_DIR,
+               '--output-genes ${TARGETS[0]}',
+               '--output-seqs ${TARGETS[1]}']
+
+    return env.Command(
+        [
+            join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv'),
+        ],
+        [],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def calculate_stats(env, outdir, c):
+    def pandafy_data(target, source, env):
+        genes = pd.read_csv(str(source[0]))
+        seqs = pd.read_csv(str(source[1]))
+        full_data = pd.merge(genes, seqs, on='germline_name')
+
+        for idx, elt in enumerate(full_data.iterrows()):
+            full_data.set_value(idx, 'unprocessed_mutes', sum(c1 != c2 for c1, c2 in izip(elt['germline_sequence'].lower(), elt['sequence'].lower())))
+            start_seq, end_seq = process_degenerates_and_impute_nucleotides(elt['germline_sequence'].lower(), elt['sequence'].lower(), MOTIF_LEN)
+            full_data.set_value(idx, 'processed_mutes_flanks', sum(c1 != c2 for c1, c2 in izip(start_seq, end_seq)))
+            
+            obs_seq_mutation = ObservedSequenceMutations(
+                    start_seq=start_seq,
+                    end_seq=end_seq,
+                    motif_len=MOTIF_LEN,
+                    left_flank_len=MOTIF_LEN/2,
+                    right_flank_len=MOTIF_LEN/2,
+            )
+            
+            full_data.set_value(idx, 'processed_mutes', obs_seq_mutation.num_mutations)
+
+            full_data.to_csv(str(target[0]))
+
+    return env.Command(
+        join(outdir, 'processed_mutations.csv'),
+        c['process_data'],
+        pandafy_data)
+
