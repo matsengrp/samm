@@ -14,16 +14,18 @@ from read_data import *
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 
 # some constants---pass these through as variables?
-NSEEDS = 10
+NSEEDS = [0,1,2,4,5]
+NSEEDS = range(10)
 MOTIF_LEN = 5
 MUT_POS = 2
-SIM_METHODS = ['final_survival_m3-5'] #, 'shmulate']
+SIM_METHODS = ['final_shmulate_m3-5_s4000']
+SIM_METHODS = ['final_shmulate_m3-5']
 TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/true_model.pkl"
 SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted.pkl"
 SHAZAM_MUT_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_mut.csv"
 SHAZAM_SUB_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_sub.csv"
-THETA_MIN = -4
-THETA_MAX = 4
+THETA_MIN = -5
+THETA_MAX = 5
 # what step size to use to divide true theta by effect size
 STEP = 2
 
@@ -31,7 +33,7 @@ def raw_diff(agg_fit_theta, agg_true_theta):
     possible_agg_true_theta = agg_true_theta - np.median(agg_true_theta)
     possible_agg_refit_theta = agg_fit_theta - np.median(agg_fit_theta)
 
-    return possible_agg_refit_theta - possible_agg_true_theta
+    return np.abs(possible_agg_refit_theta - possible_agg_true_theta)
 
 def mean_raw_diff(agg_fit_theta, agg_true_theta):
     possible_agg_true_theta = agg_true_theta - np.median(agg_true_theta)
@@ -66,8 +68,9 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
         order=true_categories.categories,
         legend=False,
     )
-    sns_plot.set(ylabel='Fitted minus true theta')
+    sns_plot.set(ylabel='Absolute diff. from true theta')
     sns_plot.set(xlabel="True theta size")
+    sns_plot.set(ylim=(0, 4.5))
     x = sns_plot.axes[0,0].get_xlim()
     sns_plot.axes[0,0].plot(x, len(x) * [0], 'k--', alpha=.4)
     plt.legend(loc='upper right')
@@ -91,7 +94,7 @@ def _plot_scatter(all_df, fname=''):
         legend=False,
         palette="Set2",
     )
-    sns_plot.axes[0][0].plot([-3,3],[-3,3], color="black", ls="--", label="y=x")
+    sns_plot.axes[0][0].plot([THETA_MIN, THETA_MAX],[THETA_MIN,THETA_MAX], color="black", ls="--", label="y=x")
     model_legend = plt.legend(loc='lower right')
 
     col_palette = sns.color_palette("Set2", 2)
@@ -102,8 +105,8 @@ def _plot_scatter(all_df, fname=''):
         plt.scatter(melt_df.loc[i]['theta'], melt_df.loc[i]['value'], color=col, alpha=0.1, s=15)
     sns_plot.set(ylabel='Fitted theta')
     sns_plot.set(xlabel="True theta")
-    sns_plot.set(ylim=(-4, 4))
-    sns_plot.set(xlim=(-4, 4))
+    sns_plot.set(ylim=(THETA_MIN, THETA_MAX))
+    sns_plot.set(xlim=(THETA_MIN, THETA_MAX))
 
     sns_plot.savefig(fname)
 
@@ -114,7 +117,7 @@ dense_agg_feat_gen = HierarchicalMotifFeatureGenerator(
 
 all_df = pd.DataFrame(columns=['theta', 'samm_fit', 'shazam_fit', 'sim_method', 'seed'])
 for sim_method in SIM_METHODS:
-    for seed in range(NSEEDS):
+    for seed in NSEEDS:
         with open(TRUE_MODEL_STR % (sim_method, seed), 'r') as f:
             theta, _ = pickle.load(f)
         model_shape = theta.shape
@@ -154,5 +157,9 @@ for sim_method in SIM_METHODS:
 
 for idx, sim_method in enumerate(SIM_METHODS):
     sub_df = all_df[all_df['sim_method'] == sim_method]
+    print np.max(sub_df['samm']), np.min(sub_df['samm'])
+    print np.max(sub_df['shazam']), np.min(sub_df['shazam'])
+    print np.max(sub_df['theta']), np.min(sub_df['theta'])
     _plot_single_effect_size_overall(sub_df, true_categories=true_categories, fname='_output/box_%s.pdf' % sim_method)
     _plot_scatter(all_df, fname='_output/scatter_%s.pdf' % sim_method)
+

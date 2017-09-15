@@ -43,7 +43,7 @@ class ShazamModel:
         else:
             self.agg_refit_theta = refit_theta[:,0:1]
         print "SHAZAM contains nan in the estimates", np.any(np.isnan(self.agg_refit_theta))
-        self.agg_refit_theta[np.isnan(self.agg_refit_theta)] = 0
+        #self.agg_refit_theta[np.isnan(self.agg_refit_theta)] = 0
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -77,17 +77,18 @@ def main(args=sys.argv[1:]):
         for stat_i, stat_f in enumerate(stat_funcs):
            try:
                stat_shazam = _collect_statistics([shazam_m], args, true_m, stat_f)
-               if not np.isinf(stat_shazam):
+               if np.isfinite(stat_shazam):
                    stat_res[stat_i]["shazam"].append(stat_shazam)
                else:
                    raise ValueError("infinite value for statistic")
            except Exception as e:
                print "WARNING: Shazam has a bad estimate!"
+               continue
            stat_samm = _collect_statistics([samm_m], args, true_m, stat_f)
            stat_res[stat_i]["samm"].append(stat_samm)
 
     for stat_r, stat_func in zip(stat_res, stat_funcs):
-        print stat_func.__name__, "mean (se)"
+        print stat_func.__name__, "mean (se)", len(stat_r["shazam"])
         if len(stat_r["shazam"]):
             print "shazam", np.mean(stat_r["shazam"]), "(%f)" % np.sqrt(np.var(stat_r["shazam"])/len(stat_r["shazam"]))
         else:
