@@ -203,7 +203,6 @@ def main(args=sys.argv[1:]):
     log.info("  Number of sequences: Train %d, Val %d" % (len(train_idx), len(val_idx)))
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
-
     log.info("Running EM")
     cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
