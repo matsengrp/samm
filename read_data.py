@@ -6,6 +6,7 @@ import os.path
 import pickle
 import pandas as pd
 import glob
+import numpy as np
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from submotif_feature_generator import SubmotifFeatureGenerator
@@ -19,7 +20,7 @@ import glutils
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
 
-from gctree.bin.gctree import phylip_parse
+#from gctree.bin.gctree import phylip_parse
 
 from common import *
 from models import ObservedSequenceMutations
@@ -148,7 +149,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         gene_writer = csv.DictWriter(genes_file, ['germline_name', 'germline_sequence'])
         gene_writer.writeheader()
 
-        seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'sequence_name', 'sequence']
+        seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'germline_family', 'sequence_name', 'sequence']
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
@@ -184,6 +185,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
                             'species': data_info['species'],
                             'group': data_info['group'],
                             'subject': data_info['subject'],
+                            'germline_family': line['v_gene'].split("-")[0],
                             'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
                             'sequence': line[seqs_col][good_idx].lower()})
 
@@ -480,7 +482,7 @@ def read_gene_seq_csv_data(
     genes = pd.read_csv(gene_file_name)
     seqs = pd.read_csv(seq_file_name)
 
-    full_data = pd.merge(genes, seqs, on='germline_name')
+    full_data = pd.merge(genes, seqs, on='germline_name', suffixes=('', '_y'))
 
     obs_data = []
     metadata = []
@@ -564,7 +566,7 @@ def load_true_model(file_name):
         true_model_agg, true_model = pickle.load(f)
     return np.array(true_model_agg)
 
-def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False, add_targets=True):
+def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False, add_targets=True, center_median=False):
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
         best_model = pick_best_model(fitted_models)
@@ -591,6 +593,9 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         keep_col0=keep_col0,
         add_targets=add_targets,
     )
+    if center_median:
+        best_model.agg_refit_theta -= np.median(best_model.agg_refit_theta)
+
     return best_model
 
 def read_germline_file(fasta):

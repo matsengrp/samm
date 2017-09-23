@@ -257,11 +257,13 @@ def main(args=sys.argv[1:]):
         penalty_params_prev = penalty_params
         prev_pen_theta = curr_model_results.penalized_theta
 
-    cmodel_algo.refit_unpenalized(
-        model_result=results_list[best_model_idx],
-        max_em_iters=args.em_max_iters * 3,
-        get_hessian=not args.omit_hessian,
-    )
+    # Fit best model and one larger than it
+    for model_idx in [best_model_idx, best_model_idx + 1]:
+        cmodel_algo.refit_unpenalized(
+            model_result=results_list[model_idx],
+            max_em_iters=args.em_max_iters,
+            get_hessian=not args.omit_hessian,
+        )
 
     # Pickle the refitted theta
     with open(args.out_file, "w") as f:
