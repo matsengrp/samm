@@ -19,6 +19,8 @@ from simulate_germline import GermlineSimulatorPartis
 
 from gctree.bin.gctree import MutationModel, CollapsedTree
 
+AVG_SEQ_MUTABILITY = .003
+
 def parse_args():
     ''' parse command line arguments '''
 
@@ -50,10 +52,10 @@ def parse_args():
         type=str,
         default='3,5',
         help='comma-separated motif lengths (odd only)')
-    parser.add_argument('--lambda0',
+    parser.add_argument('--pct-mutated',
         type=float,
-        default=None,
-        help='baseline mutation rate')
+        default=0.01,
+        help='what percent of sequence should be mutated')
     parser.add_argument('--T',
         type=int,
         default=None,
@@ -99,7 +101,6 @@ def parse_args():
         type=str,
         default='',
         help="which locus to use; for computing clonal family statistics")
-    parser.set_defaults(func=simulate, subcommand=simulate)
 
     args = parser.parse_args()
     args.motif_lens = sorted(map(int, args.motif_lens.split(",")))
@@ -107,8 +108,7 @@ def parse_args():
     return args
 
 def run_gctree(args, germline_seq, mutation_model, n_taxa):
-    if args.lambda0 is None:
-        args.lambda0 = max([1, int(.01*len(germline_seq))])
+    args.lambda0 = [int(args.pct_mutated*len(germline_seq)/AVG_SEQ_MUTABILITY)]
     tree = mutation_model.simulate(germline_seq,
                                    lambda0=args.lambda0,
                                    N=n_taxa,
@@ -121,7 +121,7 @@ def _get_germline_info(args):
     germline_info = []
     out_dir = os.path.dirname(os.path.realpath(args.output_germline_seqs))
     g = GermlineSimulatorPartis(output_dir=out_dir)
-    germline_seqs, germline_freqs = g.generate_germline_set()
+    germline_seqs, germline_freqs = g._generate_germline_set()
     germline_info = []
     for name in germline_seqs.keys():
         germline_info.append({
@@ -202,6 +202,8 @@ def main(args=sys.argv[1:]):
         if large_clonal_families:
             warnings.warn("There were {0} clonal families with more than {1} taxa. Ignoring: {2}".format(len(large_clonal_families), args.max_taxa_per_family, large_clonal_families))
             clonal_family_sizes = [n_taxa for n_taxa in clonal_family_sizes if n_taxa <= args.max_taxa_per_family]
+    else:
+        clonal_family_sizes = [args.n_taxa] * args.n_clonal_families
 
     if args.n_clonal_families is None:
         args.n_clonal_families = len(clonal_family_sizes)
@@ -236,7 +238,7 @@ def main(args=sys.argv[1:]):
             # The seed is modified so we aren't generating the same
             # mutations on each run
             gl_file.writerow([germline_name, germline_dict['germline_sequence']])
-            tree = run_gctree(args, germline_dict['germline_sequence'], mutation_model, clonal_family_sizes[run])
+            tree = run_gctree(args, germline_dict['germline_sequence'].upper(), mutation_model, clonal_family_sizes[run])
             for idx, descendant in enumerate(tree.traverse('preorder')):
                 # internal nodes will have frequency zero, so for providing output
                 # along a branch we need to consider these cases! otherwise the leaves
