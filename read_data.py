@@ -304,15 +304,20 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         # beginning and end of sequences
         proc_gl_seq = disambiguate(gl_seq)
         if sample_highest_mutated:
-            num_mutations = 0
+            max_mutations = 0
             # choose at random if they all have same number of mutations
-            sampled_index = random.choice(cluster.index)
+            sampled_indices = [random.choice(cluster.index)]
             for idx, elt in cluster.iterrows():
                 proc_seq = disambiguate(elt['sequence'].lower())
+                current_num_mutations = sum([c1 != c2 for c1, c2 in zip(proc_seq, proc_gl_seq)])
                 if len(proc_seq) != len(proc_gl_seq):
                     continue
-                elif sum([c1 != c2 for c1, c2 in zip(proc_seq, proc_gl_seq)]) > num_mutations:
-                    sampled_index = idx
+                elif current_num_mutations > max_mutations:
+                    sampled_indices = [idx]
+                    max_mutations = current_num_mutations
+                elif current_num_mutations == max_mutations:
+                    sampled_indices.append(idx)
+            sampled_index = random.choice(sampled_indices)
         else:
             sampled_index = random.choice(cluster.index)
 
@@ -321,10 +326,7 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         meta_in_cluster = cluster.iloc[0].to_dict()
         meta_in_cluster.pop('germline_sequence', None)
 
-        proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'].lower())
-        proc_seq = re.sub('^n+|n+$', '', proc_seq)
-        if len(proc_seq) != len(proc_gl_seq):
-            continue
+        proc_seq = disambiguate(elt['sequence'].lower())
 
         current_seq = meta_in_cluster.copy()
         if cmp(proc_seq, proc_gl_seq):
