@@ -58,6 +58,9 @@ def parse_args():
     parser.add_argument('--sample-from-family',
         action='store_true',
         help='sample sequence from clonal family')
+    parser.add_argument('--sample-highest-mutated',
+        action='store_true',
+        help='sample highest mutated sequence from each clonal family')
     parser.add_argument("--locus",
         type=str,
         choices=('','igh','igk','igl'),
@@ -142,12 +145,13 @@ def main(args=sys.argv[1:]):
         args.input_genes = args.output_genes
         args.input_seqs = args.output_seqs
 
-    if args.sample_from_family:
+    if args.sample_from_family or args.sample_highest_mutated:
         write_data_after_sampling(
             args.output_genes,
             args.output_seqs,
             args.input_genes,
-            args.input_seqs
+            args.input_seqs,
+            sample_highest_mutated=args.sample_highest_mutated,
         )
     elif args.impute_ancestors:
         write_data_after_imputing(

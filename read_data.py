@@ -268,12 +268,22 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
 
     return genes_line, seq_line
 
-def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_file_name):
+def disambiguate(seq):
+    """
+    @param seq: sequence
+
+    @return sequence where only unknown nucleotides are "n"s and where flanking "n"s have been collapsed
+    """
+    proc_seq = re.sub('[^acgtn]', 'n', seq)
+    return re.sub('^n+|n+$', '', proc_seq)
+
+def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_file_name, sample_highest_mutated=False):
     """
     @param output_genes: where to write processed germline data, if wanted
     @param output_genes: where to write processed sequence data, if wanted
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
+    @param sample_highest_mutated: sample sequence from each clonal family with most mutations
     """
 
     genes = pd.read_csv(gene_file_name)
@@ -292,9 +302,20 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
 
         # First process sequences to remove unknown nucleotides at the
         # beginning and end of sequences
-        proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
-        proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
-        sampled_index = random.choice(cluster.index)
+        proc_gl_seq = disambiguate(gl_seq)
+        if sample_highest_mutated:
+            num_mutations = 0
+            # choose at random if they all have same number of mutations
+            sampled_index = random.choice(cluster.index)
+            for idx, elt in cluster.iterrows():
+                proc_seq = disambiguate(elt['sequence'].lower())
+                if len(proc_seq) != len(proc_gl_seq):
+                    continue
+                elif sum([c1 != c2 for c1, c2 in zip(proc_seq, proc_gl_seq)]) > num_mutations:
+                    sampled_index = idx
+        else:
+            sampled_index = random.choice(cluster.index)
+
         elt = cluster.loc[sampled_index]
 
         meta_in_cluster = cluster.iloc[0].to_dict()
