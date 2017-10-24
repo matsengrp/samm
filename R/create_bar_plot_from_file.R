@@ -28,6 +28,8 @@ raw_data['motif'] <- apply(raw_data['motif'], 2, function(motif) gsub('N', 'Z', 
 
 # Plot for multiple nucleotides
 center_nucs <- c('A', 'T', 'G', 'C')
+
+# Change the following to adjust y-limits in the plot
 y_lim <- c(
     floor(min(raw_data['theta_lower'], na.rm=TRUE)),
     ceiling(max(raw_data['theta_upper'], na.rm=TRUE))
@@ -39,5 +41,9 @@ plot_list <- plotBarchart(raw_data,
                           bar.size=.25,
                           y_lim=y_lim,
                           rect_height=0.6)
-image <- do.call('grid.arrange', args = c(plot_list, ncol = length(center_nucs)/2))
-ggsave(file=output_file, plot=image, width=15, height=8*length(target_nucs) * 2)
+image <- do.call('grid.arrange', args = c(plot_list, ncol = max(1, length(center_nucs)/2)))
+if (length(center_nucs) > 1) {
+    ggsave(file=output_file, plot=image, width=15, height=8*length(target_nucs) * 2)
+} else {
+    ggsave(file=output_file, plot=image, width=8, height=8*length(target_nucs))
+}
