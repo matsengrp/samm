@@ -339,7 +339,7 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
             current_seq['germline_name'] = gl_name
             current_seq['sequence_name'] = elt['sequence_name']
             current_seq['sequence'] = proc_seq
-            seqs_line.append(meta_in_cluster)
+            seqs_line.append(current_seq)
         else:
             # No mutations, skip
             continue
