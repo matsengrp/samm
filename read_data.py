@@ -9,7 +9,6 @@ import glob
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from submotif_feature_generator import SubmotifFeatureGenerator
-from fit_shmulate_model import _read_shmulate_val
 
 PARTIS_PATH = './partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
@@ -610,9 +609,19 @@ def read_germline_file(fasta):
 
     return pd.DataFrame({'base': bases}, index=genes)
 
-def get_shazam_theta(motif_len, mutability_file, target_file=None):
+def read_shmulate_val(shmulate_value):
+    """ return the log so we can be sure we're comparing the same things!"""
+    # the shazam csv puts an NA if we can never mutate to that target nucleotide
+    # shazam csv puts a zero if there are not enough observations for that motif
+    return -np.inf if shmulate_value == "NA" else (np.nan if shmulate_value == "0" else np.log(float(shmulate_value)))
+
+def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
     """
     Take shazam csv files and turn them into our theta vector
+
+    @param feat_generator: feature generator for model
+    @param mutability_file: csv of mutability fit from SHazaM
+    @param substitution_file: csv of substitution fit from SHazaM
     """
 
     # Read in the results from the shmulate model-fitter
@@ -629,11 +638,11 @@ def get_shazam_theta(motif_len, mutability_file, target_file=None):
             mut_motif_dict[motif.lower()] = motif_val
 
     num_theta_cols = 1
-    if target_file is not None:
+    if substitution_file is not None:
         num_theta_cols = NUM_NUCLEOTIDES + 1
         # Read substitution matrix
         sub_motif_dict = dict()
-        with open(target_file, "r") as model_file:
+        with open(substitution_file, "r") as model_file:
             csv_reader = csv.reader(model_file)
             # Assume header is ACGT
             header = csv_reader.next()
@@ -651,9 +660,9 @@ def get_shazam_theta(motif_len, mutability_file, target_file=None):
     # Reconstruct theta in the right order
     theta = np.zeros((feat_gen.feature_vec_len, num_theta_cols))
     for motif_idx, motif in enumerate(motif_list):
-        theta[motif_idx, 0] = _read_shmulate_val(mut_motif_dict[motif])
+        theta[motif_idx, 0] = read_shmulate_val(mut_motif_dict[motif])
         if num_theta_cols > 1:
             for nuc in NUCLEOTIDES:
-                theta[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = _read_shmulate_val(sub_motif_dict[motif][nuc])
+                theta[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = read_shmulate_val(sub_motif_dict[motif][nuc])
 
     return theta
