@@ -6,7 +6,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from read_data import get_sequence_mutations_from_tree, get_shazam_theta
 from likelihood_evaluator import LogLikelihoodEvaluator
 
-def likelihood_of_tree_from_shazam(tree, mutability_file, substitution_file=None, num_jobs=1, scratch_dir='_output', num_samples=1000, burn_in=0):
+def likelihood_of_tree_from_shazam(tree, mutability_file, substitution_file=None, num_jobs=1, scratch_dir='_output', num_samples=1000, burn_in=0, num_tries=5):
     """
     Given an ETE tree and theta vector, compute the likelihood of that tree
 
@@ -17,6 +17,7 @@ def likelihood_of_tree_from_shazam(tree, mutability_file, substitution_file=None
     @param scratch_dir: where to put temporary output if running more than one job
     @param num_samples: number of chibs samples
     @param burn_in: number of burn-in iterations
+    @param num_tries: number of tries for Chibs sampler
 
     @return: log likelihood of a tree given a SHazaM fit
     """
@@ -45,5 +46,6 @@ def likelihood_of_tree_from_shazam(tree, mutability_file, substitution_file=None
         theta_ref,
         num_samples=num_samples,
         burn_in=burn_in,
+        num_tries=num_tries,
     )
 
