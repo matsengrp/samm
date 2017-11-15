@@ -120,7 +120,6 @@ def write_train_test(output_seqs, sampled_set):
 
 def main(args=sys.argv[1:]):
     args = parse_args()
-    print args
     random.seed(args.seed)
     np.random.seed(args.seed)
     scratch_dir = os.path.join(args.scratch_directory, str(time.time()))

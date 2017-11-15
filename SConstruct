@@ -69,3 +69,6 @@ SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'get_hedgehog'
 SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'compare_stats'
+SConscript(flag + '/sconscript', exports=['flag'])
