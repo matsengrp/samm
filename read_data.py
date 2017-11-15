@@ -10,7 +10,7 @@ import glob
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from submotif_feature_generator import SubmotifFeatureGenerator
 
-PARTIS_PATH = './partis'
+PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 from utils import add_implicit_info, process_input_line
 import glutils
@@ -631,10 +631,11 @@ def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
     # Read mutability matrix
     mut_motif_dict = dict()
     with open(mutability_file, "r") as model_file:
-        csv_reader = csv.reader(model_file)
-        motifs = csv_reader.next()[1:]
-        motif_vals = csv_reader.next()[1:]
-        for motif, motif_val in zip(motifs, motif_vals):
+        csv_reader = csv.reader(model_file, delimiter=' ')
+        header = csv_reader.next()
+        for line in csv_reader:
+            motif = line[0].lower()
+            motif_val = line[1]
             mut_motif_dict[motif.lower()] = motif_val
 
     num_theta_cols = 1
@@ -643,7 +644,7 @@ def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
         # Read substitution matrix
         sub_motif_dict = dict()
         with open(substitution_file, "r") as model_file:
-            csv_reader = csv.reader(model_file)
+            csv_reader = csv.reader(model_file, delimiter=' ')
             # Assume header is ACGT
             header = csv_reader.next()
             for i in range(NUM_NUCLEOTIDES):
