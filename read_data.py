@@ -10,7 +10,7 @@ import glob
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from submotif_feature_generator import SubmotifFeatureGenerator
 
-PARTIS_PATH = './partis'
+PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
 sys.path.insert(1, PARTIS_PATH + '/python')
 from utils import add_implicit_info, process_input_line
 import glutils
