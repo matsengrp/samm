@@ -166,7 +166,7 @@ class BatchSubmissionManager(ParallelWorkerManager):
                     cmd_input_file,
                     protocol=cPickle.HIGHEST_PROTOCOL,
                 )
-                cmd_str = "python run_worker.py --input-file %s --output-file %s" % (input_file_name, output_file_name)
+                cmd_str = "python %s/run_worker.py --input-file %s --output-file %s" % (os.path.dirname(os.path.realpath(__file__)), input_file_name, output_file_name)
                 batch_cmd = CustomCommand(
                     cmd_str,
                     outfname=output_file_name,

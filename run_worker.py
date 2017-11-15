@@ -6,6 +6,9 @@ Pickles results to an output file
 import sys
 import argparse
 import cPickle
+import os
+
+sys.path.append(os.path.dirname(os.path.realpath(__file__)) + '/../')
 
 def parse_args():
     ''' parse command line arguments '''
