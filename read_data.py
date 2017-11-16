@@ -613,7 +613,7 @@ def read_shmulate_val(shmulate_value):
     """ return the log so we can be sure we're comparing the same things!"""
     # the shazam csv puts an NA if we can never mutate to that target nucleotide
     # shazam csv puts a zero if there are not enough observations for that motif
-    return -np.inf if shmulate_value == "NA" else (np.nan if shmulate_value == "0" else np.log(float(shmulate_value)))
+    return -np.inf if shmulate_value == "NA" or shmulate_value == "0" else np.log(float(shmulate_value))
 
 def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
     """
@@ -631,10 +631,11 @@ def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
     # Read mutability matrix
     mut_motif_dict = dict()
     with open(mutability_file, "r") as model_file:
-        csv_reader = csv.reader(model_file)
-        motifs = csv_reader.next()[1:]
-        motif_vals = csv_reader.next()[1:]
-        for motif, motif_val in zip(motifs, motif_vals):
+        csv_reader = csv.reader(model_file, delimiter=' ')
+        header = csv_reader.next()
+        for line in csv_reader:
+            motif = line[0].lower()
+            motif_val = line[1]
             mut_motif_dict[motif.lower()] = motif_val
 
     num_theta_cols = 1
@@ -643,7 +644,7 @@ def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
         # Read substitution matrix
         sub_motif_dict = dict()
         with open(substitution_file, "r") as model_file:
-            csv_reader = csv.reader(model_file)
+            csv_reader = csv.reader(model_file, delimiter=' ')
             # Assume header is ACGT
             header = csv_reader.next()
             for i in range(NUM_NUCLEOTIDES):

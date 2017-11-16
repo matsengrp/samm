@@ -35,7 +35,7 @@ class MutationOrderChibsSampler(Sampler):
     Each of these log probability terms is estimated using the empirical distribution of a (conditional) gibbs sampler.
     Note that the last term can be calculated analytically.
     """
-    def run(self, init_order, burn_in, num_samples, get_full_sweep=False, num_tries=5):
+    def run(self, init_order, burn_in, num_samples, sampling_rate=0):
         """
         Perform Chibs method to calculate the marginal likelihood of observing a particular ending sequence
         given the starting sequence
@@ -45,14 +45,14 @@ class MutationOrderChibsSampler(Sampler):
         @param burn_in: number of iterations for burn in for the first gibbs sampler
         @param num_samples: number of samples to collect for each gibbs sampler
         """
-        for _ in range(num_tries):
+        for _ in range(self.num_tries):
             # Sample gibbs again but not conditional on any partial ordering
             gibbs_sampler = MutationOrderGibbsSampler(self.theta, self.feature_generator, self.obs_seq_mutation)
             first_sampler_res = gibbs_sampler.run(
                 init_order,
                 burn_in,
                 num_samples,
-                get_full_sweep=get_full_sweep,
+                sampling_rate=sampling_rate,
             )
 
             # Choose reference order to be the most commonly seen mutation order
@@ -116,7 +116,7 @@ class MutationOrderChibsSampler(Sampler):
                     reference_order,
                     burn_in=0,
                     num_samples=num_samples,
-                    get_full_sweep=True,
+                    sampling_rate=0,
                     conditional_partial_order=ref_partial_order,
                 )
 
