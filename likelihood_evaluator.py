@@ -193,7 +193,9 @@ class LogLikelihoodEvaluator:
         """
         Get the log likelihood of the data
         @param theta: the model parameter to evaluate this for
+        @param num_samples: number of gibbs samples
         @param burn_in: number of burn in iterations for gibbs
+        @param num_tries: number of tries for Chibs sampler
         """
         sampler_collection = SamplerCollection(
             self.obs_data,

@@ -106,6 +106,7 @@ class Sampler:
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
         @param obs_seq_mutation: ObservedSequenceMutationsFeatures
+        @param num_tries: number of tries for Chibs sampler
         """
         self.theta = theta
         self.exp_theta = np.exp(theta)
