@@ -292,7 +292,6 @@ def main(args=sys.argv[1:]):
                     method_res.sample_obs_info,
                     col_idx + agg_start_col,
                 )
-                print np.vstack([full_theta, theta_lower, theta_upper])
         except ValueError as e:
             print(e)
 

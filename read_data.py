@@ -10,15 +10,9 @@ import glob
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from submotif_feature_generator import SubmotifFeatureGenerator
 
-PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
-sys.path.insert(1, PARTIS_PATH + '/python')
-from utils import add_implicit_info, process_input_line
-import glutils
 
 # needed to read partis files
 csv.field_size_limit(sys.maxsize)
-
-from gctree.bin.gctree import phylip_parse
 
 from common import *
 from models import ObservedSequenceMutations
@@ -125,6 +119,10 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
 
     @write genes to output_genes and seqs to output_seqs
     """
+    PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
+    sys.path.insert(1, PARTIS_PATH + '/python')
+    from utils import add_implicit_info, process_input_line
+    import glutils
 
     partition_info = get_partition_info(
         path_to_annotations,
@@ -198,6 +196,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     @return genes_line: information needed to output imputed germline data
     @return seqs_line: information needed to output imputed sequence data
     """
+    from gctree.bin.gctree import phylip_parse
 
     assert(len(gl_name) < 10)
 

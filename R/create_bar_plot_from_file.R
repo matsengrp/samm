@@ -5,7 +5,6 @@ library(methods)
 library(ggplot2)
 library(dplyr)
 library(lazyeval)
-library(alakazam)
 library(gridExtra)
 source('R/plotBarchart.R')
 
