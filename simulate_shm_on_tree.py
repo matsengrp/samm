@@ -200,6 +200,10 @@ def _get_clonal_family_stats(path_to_annotations, metadata, use_np=False, use_im
             continue
         if not locus or data_info['locus'] != locus:
             continue
+        PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
+        sys.path.insert(1, PARTIS_PATH + '/python')
+        from utils import add_implicit_info, process_input_line
+        import glutils
         glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
         with open(data_info['annotations_file'][0], "r") as csvfile:
             reader = csv.DictReader(csvfile)
