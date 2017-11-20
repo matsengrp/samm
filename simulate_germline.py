@@ -1,9 +1,6 @@
 import sys
 import csv
 import numpy as np
-PARTIS_PATH = './partis'
-sys.path.insert(1, PARTIS_PATH + '/python')
-import glutils
 from common import NUCLEOTIDE_SET
 
 class GermlineMetadata:
@@ -23,6 +20,9 @@ class GermlineSimulatorPartis:
     GERMLINE_FOLDER = "./partis/data/germlines"
 
     def __init__(self, organism="mouse", output_dir="_output"):
+        PARTIS_PATH = './partis'
+        sys.path.insert(1, PARTIS_PATH + '/python')
+        import glutils
         assert(organism in ["human", "mouse"])
         self.organism = organism
         self.output_dir = output_dir
