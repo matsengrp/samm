@@ -1,9 +1,6 @@
 import sys
 import csv
 import numpy as np
-PARTIS_PATH = './partis'
-sys.path.insert(1, PARTIS_PATH + '/python')
-import glutils
 from common import NUCLEOTIDE_SET
 
 class GermlineMetadata:
@@ -53,6 +50,9 @@ class GermlineSimulatorPartis:
         return germline_seqs_dict
 
     def _generate_germline_set(self, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1,2:1:1", min_sim_allele_prevalence_freq=0.1):
+        PARTIS_PATH = './partis'
+        sys.path.insert(1, PARTIS_PATH + '/python')
+        import glutils
         glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + self.organism, "igk")
         glutils.generate_germline_set(glfo, n_genes_per_region, n_sim_alleles_per_gene, min_sim_allele_prevalence_freq, self.allele_freq_file)
         glutils.write_glfo(self.output_dir, glfo)
@@ -85,7 +85,7 @@ class GermlineSimulatorPartis:
 
                 # Make sure no N in the germline sequence
                 while "N" in allele_seq:
-                    allele_seq = allele_seq.replace("N", np.random.choice(list(NUCLEOTIDE_SET)), 1) 
+                    allele_seq = allele_seq.replace("N", np.random.choice(list(NUCLEOTIDE_SET)), 1)
 
                 germline_seqs[allele] = allele_seq
 

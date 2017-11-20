@@ -28,9 +28,6 @@ def parse_args():
         type=str,
         help='PDF file to save output to',
         default='_output/out.pdf')
-    parser.add_argument('--per-target-model',
-        action='store_true',
-        help='Plot hazard rates for different target nucleotides separately')
     parser.add_argument('--center-median',
         action='store_true',
         help="Should center theta parameters by median")
@@ -95,6 +92,7 @@ def main(args=sys.argv[1:]):
     with open(args.input_pkl, "r") as f:
         method_results = pickle.load(f)
         method_res = pick_best_model(method_results)
+        per_target_model = method_res.refit_theta.shape[1] == NUM_NUCLEOTIDES + 1
 
     max_motif_len = max(method_res.motif_lens)
     max_mut_pos = get_max_mut_pos(method_res.motif_lens, method_res.positions_mutating)
@@ -114,8 +112,8 @@ def main(args=sys.argv[1:]):
         left_motif_flank_len_list=method_res.positions_mutating,
     )
 
-    num_agg_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
-    agg_start_col = 1 if args.per_target_model else 0
+    num_agg_cols = NUM_NUCLEOTIDES if per_target_model else 1
+    agg_start_col = 1 if per_target_model else 0
 
     full_theta = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
     theta_lower = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
@@ -140,7 +138,7 @@ def main(args=sys.argv[1:]):
         theta_lower = full_theta
         theta_upper = full_theta
 
-    if args.per_target_model:
+    if per_target_model:
         # if args.plot_separate:
         #     for col_idx, target in enumerate(['A', 'C', 'G', 'T']):
         #         output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)

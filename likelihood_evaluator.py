@@ -189,11 +189,13 @@ class LogLikelihoodEvaluator:
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir
 
-    def get_log_lik(self, theta, num_samples=1000, burn_in=0):
+    def get_log_lik(self, theta, num_samples=1000, burn_in=0, num_tries=5):
         """
         Get the log likelihood of the data
         @param theta: the model parameter to evaluate this for
+        @param num_samples: number of gibbs samples
         @param burn_in: number of burn in iterations for gibbs
+        @param num_tries: number of tries for Chibs sampler
         """
         sampler_collection = SamplerCollection(
             self.obs_data,
@@ -202,6 +204,7 @@ class LogLikelihoodEvaluator:
             self.feat_generator,
             num_jobs=self.num_jobs,
             scratch_dir=self.scratch_dir,
+            num_tries=num_tries,
         )
 
         # Get samples drawn from the distribution P(order | start, end, theta)
@@ -211,7 +214,7 @@ class LogLikelihoodEvaluator:
             self.init_orders,
             num_samples,
             burn_in,
-            get_full_sweep=True,
+            sampling_rate=0,
         )
         # Store the sampled orders for faster runs next time
         self.init_orders = [res.gibbs_samples[-1].mutation_order for res in sampler_results]

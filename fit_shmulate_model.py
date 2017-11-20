@@ -20,6 +20,7 @@ from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
 from submotif_feature_generator import SubmotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
+from read_data import read_shmulate_val
 from common import *
 
 def parse_args():
@@ -123,11 +124,11 @@ def main(args=sys.argv[1:]):
     mut_model_array = np.zeros((feat_gen.feature_vec_len, 1))
     sub_model_array = np.zeros((feat_gen.feature_vec_len, NUM_NUCLEOTIDES))
     for motif_idx, motif in enumerate(motif_list):
-        mut_model_array[motif_idx] = _read_shmulate_val(mut_motif_dict[motif])
+        mut_model_array[motif_idx] = read_shmulate_val(mut_motif_dict[motif])
         log.info("%s:%f" % (motif, mut_model_array[motif_idx]))
         for nuc in NUCLEOTIDES:
-            target_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(target_motif_dict[motif][nuc])
-            sub_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = _read_shmulate_val(sub_motif_dict[motif][nuc])
+            target_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = read_shmulate_val(target_motif_dict[motif][nuc])
+            sub_model_array[motif_idx, NUCLEOTIDE_DICT[nuc]] = read_shmulate_val(sub_motif_dict[motif][nuc])
 
     if args.center_median:
         if np.isfinite(np.median(mut_model_array)):
@@ -135,12 +136,6 @@ def main(args=sys.argv[1:]):
 
     # keep mut_model_array in same position as mutabilities from fit_context
     pickle.dump((mut_model_array, (target_model_array, sub_model_array)), open(args.model_pkl, 'w'))
-
-def _read_shmulate_val(shmulate_value):
-    """ return the log so we can be sure we're comparing the same things!"""
-    # the shazam csv puts an NA if we can never mutate to that target nucleotide
-    # shazam csv puts a zero if there are not enough observations for that motif
-    return -np.inf if shmulate_value == "NA" else (np.nan if shmulate_value == "0" else np.log(float(shmulate_value)))
 
 if __name__ == "__main__":
     main(sys.argv[1:])
