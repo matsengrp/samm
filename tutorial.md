@@ -19,15 +19,15 @@ You can also skip this step and use a pre-specified mutation model, but it shoul
 
 Now we would like to simulate sequences given a mutation model. This can be done by the command
 ```
-python simulate_from_survival.py --agg-motif-len 3 --input-model _output/true_model.pkl --n-germlines <number-of-naive-sequences>
+python simulate_shm_star_tree.py --agg-motif-len 3 --input-model _output/true_model.pkl --n-naive 30 --tot-mutated 30 --output-mutated _output/mutated.csv --output-naive _output/naive.csv --random-gene-len 100
 ```
+The above code generates 30 naive sequences each 100 nucleotides-long and generates 30 mutated sequences based on the naive sequences.
 The argument `--agg-motif-len` specifies the length of the k-mer motifs in the aggregate form of the inputted mutation model (it assumes the motifs are centered).
 
 In addition, use the following arguments to modify characteristics of the sequence generation process:
 
 |  argument        |  description
 |------------------------|----------------------------------------------------------------------------
-|  --random-gene-len    |  the length of sequences
 |  --min-percent-mutated | the minimum amount to mutate a sequence
 |  --max-percent-mutated | the maximum amount to mutate a sequence
 
@@ -35,14 +35,18 @@ In addition, use the following arguments to modify characteristics of the sequen
 
 To fit a model given naive and mutated sequences, run a command like the following:
 ```
-python fit_context_model.py --motif-lens 3 --positions-mutating 1 --penalty-params 0.1 --input-seqs _input/seqs.csv --input-genes _input/genes.csv
+python fit_samm.py --motif-lens 3 --positions-mutating 1 --penalty-params 0.1 --input-mutated _output/mutated.csv --input-naive _output/naive.csv --out-file _output/fitted.pkl --em-max-iters 5
 ```
 Above we are fitting a 3-mer motif model where the center position mutates. (To fit a hierarchical model, see comment above.)
+We only use a single penalty parameter. One can also provide many penalty parameters (in decreasing order) so that `samm` can tune the penalty parameter.
+We only run the MCEM for 5 iterations above, as this is a tutorial. We recommend running at least 10 iterations for typical situations.
+
+The code will take a couple minutes. If you plan on running a lot of data in `fit_samm.py`, we recommend using the multithreading option (`--num-threads`) and our job-submission option (`--num-jobs`).
+Currently we assume the job scheduling system is Slurm.
 
 ## Visualizing the model
 
 Finally, we can visualize the fitted model.
 ```
-python create_bar_plots.py --input-pkl _output/fitted.pkl ?????
+python plot_samm.py --input-pkl _output/fitted.pkl --output-pdf _output/fitted.pdf
 ```
-TBD: Needs to be updated.
