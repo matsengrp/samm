@@ -254,6 +254,11 @@ def main(args=sys.argv[1:]):
         else:
             best_model_idx = param_i
 
+        if curr_model_results.penalized_num_nonzero == feat_generator.feature_vec_len:
+            # Model is saturated so stop fitting new parameters
+            log.info("Model is saturated with %d parameters. Stop fitting." % curr_model_results.penalized_num_nonzero)
+            break
+
         penalty_params_prev = penalty_params
         prev_pen_theta = curr_model_results.penalized_theta
 

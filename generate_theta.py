@@ -63,7 +63,7 @@ def parse_args():
         help='Allow different hazard rates for different target nucleotides')
     parser.add_argument('--use-shmulate-as-truth',
         action="store_true",
-        help='Use hs5f parameters as the truth (HH_S5F in shazam)')
+        help='Use s5nf parameters as the truth (MK_S5F in shazam)')
 
     parser.set_defaults(per_target_model=False, use_shmulate_as_truth=False)
     args = parser.parse_args()

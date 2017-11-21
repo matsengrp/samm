@@ -1,4 +1,4 @@
-## Test model fits against one another
+## Compare imputing ancestors to sampling
 
 import os
 import pickle
@@ -27,20 +27,10 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 MOTIF_LEN = 5
 MUTATING_POSITION = 2
 N_CLONAL_FAMILIES = 3000
-PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
-PENALTY_PARAMS_SAMPLE = ",".join(map(str, np.power(10, np.arange(-2.0, -5.0, step=-0.5)).tolist()))
-
-# Nest for replicates
-nest.add(
-    'replicate',
-    range(localenv['NREPS']),
-    label_func='{:02d}'.format)
-
-# Set the seed to be the replicate number.
-nest.add(
-    'seed',
-    lambda c: [c['replicate']],
-    create_dir=False)
+RATIO_NONZERO = .75
+#PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
+PENALTY_PARAMS = ",".join(map(str, [0]))
+PENALTY_PARAMS_SAMPLE = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-0.5)).tolist()))
 
 @nest.add_target_with_env(localenv)
 def generate_theta(env, outdir, c):
@@ -49,8 +39,8 @@ def generate_theta(env, outdir, c):
            MOTIF_LEN,
            '--positions-mutating',
            MUTATING_POSITION,
-           '--use-shmulate-as-truth',
-           '--per-target-model',
+           '--nonzero-ratio',
+           RATIO_NONZERO,
            '--output-model ${TARGETS[0]}']
 
     return env.Command(
@@ -58,19 +48,31 @@ def generate_theta(env, outdir, c):
         [],
         ' '.join(map(str, cmd)))
 
+# Nest for replicates
+nest.add(
+    'replicate',
+    range(localenv['NREPS']),
+    label_func='replicate{:02d}'.format)
+
+# Set the seed to be the replicate number.
+nest.add(
+    'seed',
+    lambda c: [c['replicate']],
+    create_dir=False)
+
 def write_truth(target, source, env):
     c = env['control']
     with open(str(source[0]), 'r') as f:
         agg_theta, theta = pickle.load(f)
 
-    agg_theta -= np.median(agg_theta)
+    agg_theta = theta - np.median(theta)
 
     feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
     motif_list = feat_generator.motif_list
 
     columns = 'rep motif col theta model'.split()
     data = []
-    for col in range(4):
+    for col in range(theta.shape[1]):
         for idx, motif in enumerate(motif_list):
             data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'model': 'truth'}
             data_dict['theta'] = agg_theta[idx, col]
@@ -82,6 +84,47 @@ def write_truth(target, source, env):
         writer.writeheader()
         writer.writerows(data)
 
+def truth_to_csv(target, source, env):
+    c = env['control']
+    with open(str(source[0]), 'r') as f:
+        agg_theta, theta = pickle.load(f)
+
+    agg_theta -= np.median(agg_theta)
+
+    feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
+    motif_list = feat_generator.motif_list
+
+    mut_columns = ["motif", "mutability"]
+    mut_data = []
+    sub_columns = ["motif", "A", "C", "G", "T"]
+    sub_data = []
+    for idx, motif in enumerate(motif_list):
+        mut_dict = {'motif': "%s" % motif.upper(), 'mutability': np.exp(agg_theta[idx, 0])}
+        mut_data.append(mut_dict)
+
+        sub_dict = {'motif': '%s' % motif.upper()}
+        for nuc in 'ACGT':
+            sub_dict['%s' % nuc] = 0. if motif[2].upper()==nuc else 1./3
+        sub_data.append(sub_dict)
+
+    with open(str(target[0]), 'wb') as f:
+        writer = csv.DictWriter(f, mut_columns, delimiter=" ")
+        writer.writeheader()
+        writer.writerows(mut_data)
+
+    with open(str(target[1]), 'wb') as f:
+        writer = csv.DictWriter(f, sub_columns, delimiter=" ")
+        writer.writeheader()
+        writer.writerows(sub_data)
+
+@nest.add_target_with_env(localenv)
+def write_gctree_truth(env, outdir, c):
+    return env.Command(
+        [join(outdir, 'mut_theta.csv'), join(outdir, 'sub_theta.csv')],
+        c['generate_theta'],
+        truth_to_csv,
+        control=c)
+
 @nest.add_target_with_env(localenv)
 def convert_truth(env, outdir, c):
     return env.Command(
@@ -91,11 +134,11 @@ def convert_truth(env, outdir, c):
         control=c)
 
 tree_size_dict = [
-    {
-        'n_taxa': N_CLONAL_FAMILIES,
-        'n_clonal_families': 2,
-        'size': 'one_big_tree',
-    },
+    #{
+    #    'n_taxa': N_CLONAL_FAMILIES,
+    #    'n_clonal_families': 2,
+    #    'size': 'one_big_tree',
+    #},
     {
         'n_taxa': None,
         'n_clonal_families': N_CLONAL_FAMILIES,
@@ -108,19 +151,32 @@ nest.add(
     tree_size_dict,
     label_func=lambda c: c['size'])
 
+nest.add(
+    'pct_mutated',
+    [
+        .025,
+        #.05,
+    ],
+    label_func='pct_mutated{:.3f}'.format)
+
 nest.add_aggregate('compare_models', list)
 
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def generate_seqs(env, outdir, c):
-    cmd = ['python simulate_shm_on_tree.py simulate',
+    cmd = ['python simulate_shm_on_tree.py',
            '--seed',
            c['seed'],
+           '--mutability',
+           '${SOURCES[0]}',
+           '--substitution',
+           '${SOURCES[1]}',
            '--use-v',
            '--use-immunized',
-           '--use-partis',
            '--locus',
            'igk',
+           '--pct-mutated',
+           c['pct_mutated'],
            '--path-to-annotations',
            CUI_DATA_PATH,
             '--path-to-metadata',
@@ -128,9 +184,7 @@ def generate_seqs(env, outdir, c):
            '--motif-lens',
            MOTIF_LEN,
            '--output-germline-seqs ${TARGETS[0]}',
-           '--output-seqs ${TARGETS[1]}',
-           '--output-per-branch-germline-seqs ${TARGETS[2]}',
-           '--output-per-branch-seqs ${TARGETS[3]}']
+           '--output-seqs ${TARGETS[1]}']
 
     if c['tree_size']['size'] == 'one_big_tree':
         cmd += ['--n-clonal-families', c['tree_size']['n_clonal_families'],
@@ -139,9 +193,8 @@ def generate_seqs(env, outdir, c):
         cmd += ['--n-clonal-families', c['tree_size']['n_clonal_families']]
 
     return env.Command(
-        [join(outdir, 'genes.csv'), join(outdir, 'seqs.csv'),
-         join(outdir, 'genes_with_ancestors.csv'), join(outdir, 'seqs_with_ancestors.csv')],
-        [],
+        [join(outdir, 'genes.csv'), join(outdir, 'seqs.csv')],
+        c['write_gctree_truth'],
         ' '.join(map(str, cmd)))
 
 nest.add(
@@ -150,6 +203,7 @@ nest.add(
         'imputed_ancestors',
         'all_data',
         'sample_random',
+        #'sample_highest_mutated',
     ])
 
 @nest.add_target_with_env(localenv)
@@ -167,6 +221,8 @@ def process_data(env, outdir, c):
         cmd += ['--sample-from-family']
     elif c['data_type'] == 'imputed_ancestors':
         cmd += ['--impute-ancestors']
+    elif c['data_type'] == 'sample_highest_mutated':
+        cmd += ['--sample-highest-mutated']
 
     return env.Command(
         [
@@ -178,12 +234,15 @@ def process_data(env, outdir, c):
 @nest.add_target_with_env(localenv)
 def fit_shazam(env, outdir, c):
 
-    cmd = ['python fit_shmulate_model.py',
-           '--input-genes ${SOURCES[0]}',
-           '--input-file ${SOURCES[1]}',
-           '--model-pkl ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}',
-           '--center-median']
+    cmd = []
+    if not c['data_type'] == 'sample_random' or not c['tree_size']['size'] == 'one_big_tree':
+        # don't sample for the big family simulation
+        cmd = ['python fit_shmulate_model.py',
+               '--input-genes ${SOURCES[0]}',
+               '--input-file ${SOURCES[1]}',
+               '--model-pkl ${TARGETS[0]}',
+               '--log-file ${TARGETS[1]}',
+               '--center-median']
 
     return env.Command(
         [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
@@ -196,46 +255,47 @@ def fit_survival(env, outdir, c):
     cmd = []
     motif_len = MOTIF_LEN
     left_flanks = MUTATING_POSITION
-    if c['data_type'] == 'sample_random':
+    if c['data_type'] == 'sample_random' or c['data_type'] == 'sample_highest_mutated':
         penalty_params = PENALTY_PARAMS_SAMPLE
     else:
         penalty_params = PENALTY_PARAMS
 
-    if not c['data_type'] == 'sample_random' and not c['tree_size']['size'] == 'one_big_tree':
+    if not c['data_type'] == 'sample_random' or not c['tree_size']['size'] == 'one_big_tree':
         # don't sample for the big family simulation
         cmd = ['python fit_samm.py',
-               '--input-mutated ${SOURCES[0]}',
-               '--input-naive ${SOURCES[1]}',
+               '--input-naive ${SOURCES[0]}',
+               '--input-mutated ${SOURCES[1]}',
                '--seed',
                c['seed'],
                '--motif-lens',
-               '3,5',
+               MOTIF_LEN,
                '--positions-mutating',
-               '0,1,2:2',
+               MUTATING_POSITION,
                '--penalty-params',
                penalty_params,
                '--num-cpu-threads',
-               4,
+               10,
                '--num-jobs',
-               20,
+               80,
                '--burn-in',
-               2,
+               16,
                '--num-e-samples',
                4,
+               '--sampling-rate',
+               8,
                '--em-max-iters',
                10,
                '--num-val-burnin',
-               2,
+               16,
                '--num-val-samples',
-               4,
+               16,
                '--scratch-directory',
                SCRATCH_DIR,
                '--tuning-sample-ratio',
-               0.1,
+               0.2,
                '--omit-hessian',
                '--out-file ${TARGETS[0]}',
-               '--log-file ${TARGETS[1]}',
-               '--per-target-model']
+               '--log-file ${TARGETS[1]}']
 
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
@@ -250,17 +310,19 @@ def convert_fit_shazam(env, outdir, c):
         with open(str(source[0]), 'r') as f:
             theta_mut, (theta_target, theta_sub) = pickle.load(f)
 
+        theta_mut[np.isnan(theta_mut)] = -np.inf
+
         feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
         motif_list = feat_generator.motif_list
 
-        theta_target -= np.median(theta_target)
+        theta_mut -= np.median(theta_mut)
 
         columns = 'rep motif col theta data model'.split()
         data = []
-        for col in range(4):
+        for col in range(1):
             for idx, motif in enumerate(motif_list):
                 data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'data': c['data_type'], 'model': 'SHazaM'}
-                data_dict['theta'] = theta_target[idx, col]
+                data_dict['theta'] = theta_mut[idx, col]
                 data.append(data_dict)
 
         with open(str(target[0]), 'wb') as f:
@@ -307,7 +369,7 @@ def convert_fit_survival(env, outdir, c):
 
         columns = 'rep motif col theta data model'.split()
         data = []
-        for col in range(4):
+        for col in range(theta.shape[1]):
             for idx, motif in enumerate(motif_list):
                 data_dict = {'rep': c['replicate'], 'motif': motif, 'col': col, 'data': c['data_type'], 'model': 'samm'}
                 data_dict['theta'] = theta[idx, col]

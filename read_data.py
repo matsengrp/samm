@@ -88,25 +88,25 @@ def get_partition_info(path_to_annotations, metadata):
     with open(metadata, 'r') as metafile:
         reader = csv.DictReader(metafile)
         for line in reader:
-            annotations = glob.glob(os.path.join(path_to_annotations, 'partitions', line['dataset']+'*-cluster-annotations.csv'))
+            annotations = glob.glob(os.path.join(
+                path_to_annotations,
+                'partitions',
+                line['dataset']+'*-cluster-annotations.csv',
+            ))
             if not annotations:
                 # no annotations for this dataset (yet?)
                 continue
-            current_info = {}
-            current_info['germline_file'] = os.path.join(path_to_annotations, line['dataset'], 'hmm/germline-sets')
-            current_info['annotations_file'] = annotations
-            current_info['locus'] = line['locus']
-            current_info['species'] = line['species']
-            if 'group' not in line.keys():
-                current_info['group'] = None
-            else:
-                current_info['group'] = line['group']
-            current_info['subject'] = line['subject']
-            partition_info.append(current_info)
+            line['germline_file'] = os.path.join(
+                path_to_annotations,
+                line['dataset'],
+                'hmm/germline-sets'
+            )
+            line['annotations_file'] = annotations
+            partition_info.append(line)
 
     return partition_info
 
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, use_immunized=False, locus='', species=''):
+def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, filters={'group': ['immunized'], 'locus': ['igk'], 'species': ['mouse']}):
     """
     Function to read partis annotations csv
 
@@ -114,8 +114,7 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
     @param metadata: csv file of metadata; if None defaults will be used for chain/species
     @param use_v: use just the V gene or use the whole sequence?
     @param use_np: use nonproductive sequences only
-    @param use_immunized: use immunized mice only
-    @param inferred_gls: list of paths to partis-inferred germlines
+    @param filters: dictionary of lists with keys as column name and items as those values of the column variable to retain
 
     @write genes to output_genes and seqs to output_seqs
     """
@@ -145,16 +144,20 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         gene_writer = csv.DictWriter(genes_file, ['germline_name', 'germline_sequence'])
         gene_writer.writeheader()
 
-        seq_header = ['germline_name', 'locus', 'clonal_family', 'species', 'group', 'subject', 'sequence_name', 'sequence']
+        seq_header = [
+            'germline_name',
+            'sequence_name',
+            'sequence',
+        ]
+        for key, _ in filters.iteritems():
+            seq_header += [key]
+
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
-            if use_immunized and data_info['group'] != 'immunized':
-                continue
-            if locus and data_info['locus'] != locus:
-                continue
-            if species and data_info['species'] != species:
-                continue
+            for key, values in filters.iteritems():
+                if data_info[key] not in values:
+                    continue
             glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
             with open(data_info['annotations_file'][0], "r") as csvfile:
                 reader = csv.DictReader(csvfile)
@@ -175,14 +178,15 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
                         'germline_sequence': line[gene_col].lower()})
 
                     for good_idx in good_seq_idx:
-                        seq_writer.writerow({'germline_name': gl_name,
-                            'locus': data_info['locus'],
-                            'clonal_family': gl_name,
-                            'species': data_info['species'],
-                            'group': data_info['group'],
-                            'subject': data_info['subject'],
+                        base_dict = {
+                            'germline_name': gl_name,
                             'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
-                            'sequence': line[seqs_col][good_idx].lower()})
+                            'sequence': line[seqs_col][good_idx].lower()
+                        }
+                        for key, _ in filters.iteritems():
+                            base_dict[key] = data_info[key]
+
+                        seq_writer.writerow(base_dict)
 
 def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verbose=True):
     """
@@ -245,7 +249,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     res = subprocess.call([" ".join(cmd)], shell=True)
 
     # phew, finally got some trees
-    trees = phylip_parse(outfile, countfile=None, naive=gl_name)
+    trees = phylip_parse.parse_outfile(outfile, countfile=None, naive=gl_name)
 
     # take first parsimony tree
     genes_line = []
@@ -262,12 +266,22 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
 
     return genes_line, seq_line
 
-def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_file_name):
+def disambiguate(seq):
+    """
+    @param seq: sequence
+
+    @return sequence where only unknown nucleotides are "n"s and where flanking "n"s have been collapsed
+    """
+    proc_seq = re.sub('[^acgtn]', 'n', seq)
+    return re.sub('^n+|n+$', '', proc_seq)
+
+def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_file_name, sample_highest_mutated=False):
     """
     @param output_genes: where to write processed germline data, if wanted
     @param output_genes: where to write processed sequence data, if wanted
     @param gene_file_name: csv file with germline names and sequences
     @param seq_file_name: csv file with sequence names and sequences, with corresponding germline name
+    @param sample_highest_mutated: sample sequence from each clonal family with most mutations
     """
 
     genes = pd.read_csv(gene_file_name)
@@ -286,18 +300,31 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
 
         # First process sequences to remove unknown nucleotides at the
         # beginning and end of sequences
-        proc_gl_seq = re.sub('[^acgtn]', 'n', gl_seq)
-        proc_gl_seq = re.sub('^n+|n+$', '', proc_gl_seq)
-        sampled_index = random.choice(cluster.index)
+        proc_gl_seq = disambiguate(gl_seq)
+        if sample_highest_mutated:
+            max_mutations = 0
+            # choose at random if they all have same number of mutations
+            sampled_indices = [random.choice(cluster.index)]
+            for idx, elt in cluster.iterrows():
+                proc_seq = disambiguate(elt['sequence'].lower())
+                current_num_mutations = sum([c1 != c2 for c1, c2 in zip(proc_seq, proc_gl_seq)])
+                if len(proc_seq) != len(proc_gl_seq):
+                    continue
+                elif current_num_mutations > max_mutations:
+                    sampled_indices = [idx]
+                    max_mutations = current_num_mutations
+                elif current_num_mutations == max_mutations:
+                    sampled_indices.append(idx)
+            sampled_index = random.choice(sampled_indices)
+        else:
+            sampled_index = random.choice(cluster.index)
+
         elt = cluster.loc[sampled_index]
 
         meta_in_cluster = cluster.iloc[0].to_dict()
         meta_in_cluster.pop('germline_sequence', None)
 
-        proc_seq = re.sub('[^acgtn]', 'n', elt['sequence'].lower())
-        proc_seq = re.sub('^n+|n+$', '', proc_seq)
-        if len(proc_seq) != len(proc_gl_seq):
-            continue
+        proc_seq = disambiguate(elt['sequence'].lower())
 
         current_seq = meta_in_cluster.copy()
         if cmp(proc_seq, proc_gl_seq):
@@ -310,7 +337,7 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
             current_seq['germline_name'] = gl_name
             current_seq['sequence_name'] = elt['sequence_name']
             current_seq['sequence'] = proc_seq
-            seqs_line.append(meta_in_cluster)
+            seqs_line.append(current_seq)
         else:
             # No mutations, skip
             continue
