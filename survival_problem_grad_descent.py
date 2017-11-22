@@ -172,7 +172,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         expected_scores = {label: 0 for label in sorted_sample_labels}
         for g, sample_label in zip(grad_log_lik, self.sample_labels):
             g = g.reshape((g.size, 1), order="F")
-            expected_scores[sample_label] += g
+            expected_scores[sample_label] += csr_matrix(g)
 
         # Calculate the score score (second summand)
         num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
@@ -544,7 +544,7 @@ class ScoreScoreWorker(ParallelWorker):
         """
         ss = 0
         for g in self.grad_log_liks:
-            g = g.reshape((g.size, 1), order="F")
+            g = csr_matrix(g.reshape((g.size, 1), order="F"))
             ss += g * g.T
         return ss
 
@@ -567,4 +567,5 @@ class ScoreCrossWorker(ParallelWorker):
         s = 0
         for label1, label2 in self.idx_pair_list:
             s += expected_scores[label1] * expected_scores[label2].T
+
         return s
