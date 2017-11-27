@@ -5,7 +5,7 @@ from os.path import join
 import numpy as np
 from nestly.scons import SConsWrap
 from nestly import Nest
-from matsen_grp_data import SCRATCH_DIR
+from data_paths import SCRATCH_DIR
 
 Import('env')
 localenv = env.Clone()

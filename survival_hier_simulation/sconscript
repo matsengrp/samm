@@ -8,7 +8,7 @@ from nestly import Nest
 from SCons.Script import Environment, Command, AddOption
 import numpy as np
 
-from matsen_grp_data import SCRATCH_DIR
+from data_paths import SCRATCH_DIR
 
 Import('env')
 localenv = env.Clone()

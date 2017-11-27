@@ -17,3 +17,10 @@ To visualize the model by creating the rainbow barcharts, the code calls out to
 `R`. Required packages include `ggplot2`, `dplyr`, `gridExtra`, `methods`,
 `lazyeval`.
 
+## Running `scons` scripts
+
+If you want to run the `scons` scripts, you will need a file `data_paths.py` that has two directory paths in it:
+
+- `SCRATCH_DIR`: where intermediate output from Gibbs sampling will be sent
+- `CUI_DATA_PATH`: where `partis`-processed data from Cui et al. (2016) lives, if running `get_hedgehog` or `imputed_ancestors_comparison`
+
