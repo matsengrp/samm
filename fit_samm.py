@@ -20,7 +20,6 @@ from likelihood_evaluator import LikelihoodComparer
 from context_model_algo import ContextModelAlgo
 from common import *
 from read_data import *
-from matsen_grp_data import *
 
 def parse_args():
     ''' parse command line arguments '''
