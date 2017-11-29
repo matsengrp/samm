@@ -6,6 +6,8 @@ library(ggplot2)
 library(dplyr)
 library(lazyeval)
 library(gridExtra)
+library(seqinr)
+library(tidyr)
 source('R/plotBarchart.R')
 
 arg <- commandArgs(TRUE)

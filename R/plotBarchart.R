@@ -54,7 +54,7 @@ plotBarchart <- function (model,
 
     mut_scores <- mut_scores[!grepl("N", mut_words)]
     mut_scores[!is.finite(mut_scores)] <- 0
-    mut_positions <- as.data.frame(t(sapply(mut_words, seqinr::s2c)))
+    mut_positions <- as.data.frame(t(sapply(mut_words, s2c)))
     motif_len <- ncol(mut_positions)
     if (!(motif_len %% 2) | !(motif_len > 1)) {
         stop("Motif length must be odd and greater than one.")
@@ -77,12 +77,12 @@ plotBarchart <- function (model,
 
     # Setting up plotting environment
     base_theme <- theme_bw() +
-        theme(panel.margin = grid::unit(0, "lines"),
+        theme(panel.margin = unit(0, "lines"),
               panel.background = element_blank()) +
-        theme(axis.text = element_text(margin = grid::unit(0, "lines"))) +
+        theme(axis.text = element_text(margin = unit(0, "lines"))) +
         theme(text = element_text(size = 10 * size),
               title = element_text(size = 10 * size),
-              legend.margin = grid::unit(0, "lines"),
+              legend.margin = unit(0, "lines"),
               legend.background = element_blank())
     score_offset <- 0
     score_scale <- 15
@@ -125,12 +125,12 @@ plotBarchart <- function (model,
             sub_df <- mut_df[mut_df[,center_nuc_col] == center_nuc & mut_df$target == target_nuc, ]
             if ((center_nuc %in% c("A", "C") & left_motif_len == motif_len %/% 2) | left_motif_len < motif_len %/% 2) {
                 # 3' for A/C or offset
-                sub_df <- dplyr::arrange_(sub_df, .dots = flank_cols)
+                sub_df <- arrange_(sub_df, .dots = flank_cols)
                 sub_df$x <- -.5 + 1:nrow(sub_df)
             }
             else if ((center_nuc %in% c("G", "T") & left_motif_len == motif_len %/% 2) | left_motif_len > motif_len %/% 2) {
                 # 5' for G/T or offset
-                sub_df <- dplyr::arrange_(sub_df, .dots = rev(flank_cols))
+                sub_df <- arrange_(sub_df, .dots = rev(flank_cols))
                 sub_df$x <- -.5 + 1:nrow(sub_df)
             }
             else {
@@ -139,7 +139,7 @@ plotBarchart <- function (model,
 
             # Create coordinates for nucleotide rectangles
             sub_melt <- sub_df %>%
-                tidyr::gather_("pos", "char", colnames(mut_positions)) %>%
+                gather_("pos", "char", colnames(mut_positions)) %>%
                 select_(.dots = c("x", "pos", "char"))
             sub_melt$pos <- as.numeric(gsub("pos", "", sub_melt$pos))
             sub_text <- list()
@@ -170,12 +170,12 @@ plotBarchart <- function (model,
             sub_text <- lapply(
                 sub_text,
                 function(x) {
-                    dplyr::mutate_(x,
+                    mutate_(x,
                                    text_y = interp(~y + text_offset + motif_offset,
                                                    y = as.name("text_y")))
                 })
 
-            sub_rect <- dplyr::bind_rows(sub_text) %>%
+            sub_rect <- bind_rows(sub_text) %>%
                 mutate_(rect_width = interp(~y - x,
                                             x = as.name("rect_min"),
                                             y = as.name("rect_max")),
@@ -250,7 +250,7 @@ plotBarchart <- function (model,
                 # ggplot special sauce for hedgehog plot
                 y_limits <- c(text_offset - 1, score_scale + score_offset)
                 p1 <- p1 +
-                    theme(plot.margin = grid::unit(c(0, 0, 0, 0), "lines"),
+                    theme(plot.margin = unit(c(0, 0, 0, 0), "lines"),
                           panel.grid = element_blank(),
                           panel.border = element_blank(),
                           axis.title = element_blank(),
@@ -279,7 +279,7 @@ plotBarchart <- function (model,
                 y_limits <- c(text_offset + motif_offset, y_lim[2] + score_offset)
                 sub_colors <- motif_colors[names(motif_colors) %in% sub_df$motif]
                 p1 <- p1 +
-                    theme(plot.margin = grid::unit(c(1, 1, 1, 1), "lines"),
+                    theme(plot.margin = unit(c(1, 1, 1, 1), "lines"),
                           panel.grid = element_blank(),
                           panel.border = element_rect(color = "black"),
                           axis.text.x = element_blank(),
