@@ -5,6 +5,8 @@ from nestly.scons import SConsWrap
 from nestly import Nest
 import numpy as np
 
+from data_paths import SCRATCH_DIR
+
 Import('env')
 localenv = env.Clone()
 
@@ -13,7 +15,6 @@ base = {'output_name': localenv['OUTPUT_NAME']}
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-SCRATCH_DIR = '/fh/fast/matsen_e/dshaw/_tmp/samm'
 SPARSITY_RATIO = 0.5
 
 # Nest for replicates
