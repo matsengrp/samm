@@ -168,11 +168,13 @@ class SurvivalProblemCustom(SurvivalProblem):
         sorted_sample_labels = sorted(list(set(self.sample_labels)))
         log.info("Obtained gradients %s" % (time.time() - st))
 
-        # Get the expected scores
+        # Get the expected scores and their sum
         expected_scores = {label: 0 for label in sorted_sample_labels}
+        expected_scores_sum = 0
         for g, sample_label in zip(grad_log_lik, self.sample_labels):
             g = g.reshape((g.size, 1), order="F")
             expected_scores[sample_label] += g
+            expected_scores_sum += g
 
         # Calculate the score score (second summand)
         num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
@@ -184,10 +186,10 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained score scores %s" % (time.time() - st))
 
         # Calculate the cross scores (third summand)
-        all_pairs = [(label1, label2) for i, label1 in enumerate(sorted_sample_labels) for label2 in sorted_sample_labels[i + 1:]]
-        batched_pairs = get_batched_list(all_pairs, num_batches)
-        expected_score_worker_list = [ScoreCrossWorker(rand_seed + i, pairs) for pairs in batched_pairs]
-        tot_cross_expected_scores = _get_parallel_sum(expected_score_worker_list, expected_scores)
+        batched_labels = get_batched_list(sorted_sample_labels, num_batches)
+        expected_score_worker_list = [ScoreCrossWorker(rand_seed + i, labels) for i, labels in enumerate(batched_labels)]
+        tot_cross_expected_scores = expected_scores_sum * expected_scores_sum.T
+        tot_cross_expected_scores -= _get_parallel_sum(expected_score_worker_list, expected_scores)
         log.info("Obtained cross scores %s" % (time.time() - st))
 
         # Calculate the hessian (first summand)
@@ -198,7 +200,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         hessian_sum = _get_parallel_sum(hessian_worker_list, theta)
         log.info("Obtained Hessian %s" % (time.time() - st))
 
-        fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - 2 * np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
+        fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
         return fisher_info, -1.0/self.num_samples * hessian_sum
 
     def _get_gradient_log_lik(self, theta, batch_factor=4):
@@ -550,21 +552,21 @@ class ScoreScoreWorker(ParallelWorker):
 
 class ScoreCrossWorker(ParallelWorker):
     """
-    Calculate the product of expected scores between different observations (indexed by idx pairs)
+    Calculate the product of expected scores between itself (indexed by labels)
     """
-    def __init__(self, seed, idx_pair_list):
+    def __init__(self, seed, label_list):
         """
-        @param idx_pair_list: a list of pairs to process
+        @param label_list: a list of labels to process
         """
         self.seed = seed
-        self.idx_pair_list = idx_pair_list
+        self.label_list = label_list
 
     def run_worker(self, expected_scores):
         """
         @param expected_scores: the expected scores
-        @return the sum of the product of expected scores for the given idx_pair_list
+        @return the sum of the product of expected scores for the given label_list
         """
-        s = 0
-        for label1, label2 in self.idx_pair_list:
-            s += expected_scores[label1] * expected_scores[label2].T
-        return s
+        ss = 0
+        for label in self.label_list:
+            ss += expected_scores[label] * expected_scores[label].T
+        return ss
