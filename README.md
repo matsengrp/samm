@@ -37,6 +37,10 @@ git submodule update --init --recursive
 ```
 then install these packages according to their instructions.
 
+## Imputing ancestors
+
+Imputing ancestors with parsimony requires `PyQt4`, which is most easily installed via `conda`.
+
 ## Tutorial
 
 ### Creating a mutation model
