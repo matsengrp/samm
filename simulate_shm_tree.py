@@ -24,7 +24,7 @@ from submotif_feature_generator import SubmotifFeatureGenerator
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineSimulatorPartis
 
-from gctree.bin.gctree import MutationModel, CollapsedTree
+from gctree.bin.mutation_model import MutationModel
 
 def parse_args():
     ''' parse command line arguments '''
