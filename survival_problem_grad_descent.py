@@ -170,11 +170,14 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         # Get the expected scores and their sum
         expected_scores = {label: 0 for label in sorted_sample_labels}
-        expected_scores_sum = 0
         for g, sample_label in zip(grad_log_lik, self.sample_labels):
             g = g.reshape((g.size, 1), order="F")
             expected_scores[sample_label] += g
-            expected_scores_sum += g
+
+        expected_scores_sum = 0
+        for sample_label in sorted_sample_labels:
+            expected_scores_sum += expected_scores[sample_label]
+        log.info("Obtained expected scores %s" % (time.time() - st))
 
         # Calculate the score score (second summand)
         num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
@@ -186,10 +189,12 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained score scores %s" % (time.time() - st))
 
         # Calculate the cross scores (third summand)
+        # Instead of calculating \sum_{i \neq j} ES_i ES_j^T directly we calculate
+        # (\sum_{i} ES_i) ( \sum_{i} ES_i)^T - \sum_{i} ES_i ES_i^T
         batched_labels = get_batched_list(sorted_sample_labels, num_batches)
-        expected_score_worker_list = [ScoreCrossWorker(rand_seed + i, labels) for i, labels in enumerate(batched_labels)]
-        tot_cross_expected_scores = expected_scores_sum * expected_scores_sum.T
-        tot_cross_expected_scores -= _get_parallel_sum(expected_score_worker_list, expected_scores)
+        expected_score_worker_list = [ExpectedScoreScoreWorker(rand_seed + i, labels) for i, labels in enumerate(batched_labels)]
+        tot_expected_score_score = _get_parallel_sum(expected_score_worker_list, expected_scores)
+        tot_cross_expected_scores = expected_scores_sum * expected_scores_sum.T - tot_expected_score_score
         log.info("Obtained cross scores %s" % (time.time() - st))
 
         # Calculate the hessian (first summand)
@@ -550,7 +555,7 @@ class ScoreScoreWorker(ParallelWorker):
             ss += g * g.T
         return ss
 
-class ScoreCrossWorker(ParallelWorker):
+class ExpectedScoreScoreWorker(ParallelWorker):
     """
     Calculate the product of expected scores between itself (indexed by labels)
     """
