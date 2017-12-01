@@ -5,11 +5,15 @@ The method is based on a survival analysis model and uses MCEM to find parameter
 
 ## Installation
 
-Note: `samm` requires Biopython version 1.65.
+Note: `samm` requires `python` 2.7.
 
-To install the necessary `python` packages, run
+The necessary `python` packages required to run `samm` are
 ```
-pip install --user numpy scipy pandas biopython ete3
+- numpy
+- scipy
+- pandas
+- biopython >= 1.65
+- ete3
 ```
 
 To visualize the model by creating the rainbow barcharts, the code calls out to `R`.
