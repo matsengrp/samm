@@ -19,7 +19,6 @@ from models import ObservedSequenceMutations
 from Bio.Seq import Seq
 from Bio.SeqIO import SeqRecord
 from Bio.AlignIO import MultipleSeqAlignment
-from Bio.Phylo.TreeConstruction import ParsimonyScorer, NNITreeSearcher, ParsimonyTreeConstructor
 from ete3 import Tree
 from itertools import izip
 
@@ -200,7 +199,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     @return genes_line: information needed to output imputed germline data
     @return seqs_line: information needed to output imputed sequence data
     """
-    from gctree.bin.gctree import phylip_parse
+    from gctree.bin import phylip_parse
 
     assert(len(gl_name) < 10)
 
