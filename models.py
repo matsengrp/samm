@@ -58,9 +58,11 @@ class ObservedSequenceMutations:
         end_seq = end_seq[start_idx + left_flank_len:end_idx - right_flank_len]
 
         self.mutation_pos_dict = dict()
+        self.mutated_indicator = [0.] * len(start_seq)
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
                 self.mutation_pos_dict[i] = end_seq[i]
+                self.mutated_indicator[i] = 1.
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
         self.left_flank_len = len(self.left_flank)
