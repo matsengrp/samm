@@ -61,7 +61,7 @@ class MultiFeatureMutationStep:
         indices for these positions. If we use the denominator from the previous step, we need to subtract
         out the old exp(psi * theta)) and add in new exp(psi * theta)
     """
-    def __init__(self, mutating_pos_feat=None, neighbors_feat_old=None, neighbors_feat_new=None):
+    def __init__(self, mutating_pos_feat=None, mutating_pos=None, neighbors_feat_old=None, neighbors_feat_new=None):
         """
         @param mutating_pos_feats: the feature index of the position that mutated
         @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
@@ -70,8 +70,10 @@ class MultiFeatureMutationStep:
         """
         if mutating_pos_feat is not None:
             self.mutating_pos_feats = np.array([mutating_pos_feat], dtype=int)
+            self.mutating_pos = np.array([mutating_pos], dtype=int)
         else:
             self.mutating_pos_feats = np.array([], dtype=int)
+            self.mutating_pos = np.array([], dtype=int)
         self.neighbors_feat_old = dict()
         self.neighbors_feat_new = dict()
         if neighbors_feat_old is not None:
@@ -85,6 +87,7 @@ class MultiFeatureMutationStep:
         """
         if feat_mut_step.mutating_pos_feats is not None:
             self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feats + feature_offset)
+            self.mutating_pos = np.append(self.mutating_pos, feat_mut_step.mutating_pos)
         self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
         self._merge_dicts(self.neighbors_feat_new, feat_mut_step.neighbors_feat_new, feature_offset)
 
@@ -114,13 +117,15 @@ class FeatureMutationStep:
         indices for these positions. If we use the denominator from the previous step, we need to subtract
         out the old exp(psi * theta)) and add in new exp(psi * theta)
     """
-    def __init__(self, mutating_pos_feat, neighbors_feat_old=dict(), neighbors_feat_new=dict()):
+    def __init__(self, mutating_pos_feat, mutating_pos, neighbors_feat_old=dict(), neighbors_feat_new=dict()):
         """
         @param mutating_pos_feat: the feature index of the position that mutated
+        @param mutating_pos: position in sequence that mutated
         @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
         @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
         """
         self.mutating_pos_feat = mutating_pos_feat
+        self.mutating_pos = mutating_pos
         self.neighbors_feat_old = neighbors_feat_old
         self.neighbors_feat_new = neighbors_feat_new
 

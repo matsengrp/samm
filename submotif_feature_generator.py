@@ -188,6 +188,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             )
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat,
+                mutation_pos,
                 neighbors_feat_old=feat_dict_prev,
                 neighbors_feat_new=feat_dict_curr,
             ))
@@ -242,6 +243,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
             # print mutation_step, "mutating_pos_feat, feat_dict_curr, feat_dict_future", mutating_pos_feat, feat_dict_curr, feat_dict_future
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat,
+                mutation_pos,
                 neighbors_feat_old=feat_dict_prev,
                 neighbors_feat_new=feat_dict_curr,
             ))
@@ -304,6 +306,7 @@ class SubmotifFeatureGenerator(FeatureGenerator):
 
         return first_mut_pos_feat, MultiFeatureMutationStep(
             second_mut_pos_feat,
+            second_mutation_pos,
             neighbors_feat_old=feat_dict_future,
             neighbors_feat_new=feat_dict_curr,
         )
