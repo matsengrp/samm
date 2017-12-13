@@ -33,7 +33,8 @@ class ObservedSequenceMutations:
         start_idx = 0
         end_idx = len(start_seq)
 
-        skipped_mutations = 0
+        skipped_left = 0
+        skipped_right= 0
 
         # Go through half the sequence forward to find beginning conserved nucleotides
         for flank_start_idx in range(len(start_seq)/2):
@@ -41,7 +42,7 @@ class ObservedSequenceMutations:
                 break
             elif start_seq[flank_start_idx] != end_seq[flank_start_idx]:
                 start_idx = flank_start_idx + 1
-                skipped_mutations += 1
+                skipped_left += 1
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides
         for flank_end_idx in reversed(range(len(start_seq)/2, len(start_seq))):
@@ -49,7 +50,7 @@ class ObservedSequenceMutations:
                 break
             elif start_seq[flank_end_idx] != end_seq[flank_end_idx]:
                 end_idx = flank_end_idx + 1
-                skipped_mutations += 1
+                skipped_right += 1
 
         self.left_flank = start_seq[start_idx:start_idx + left_flank_len]
         self.right_flank = start_seq[end_idx - right_flank_len:end_idx]
@@ -66,7 +67,9 @@ class ObservedSequenceMutations:
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
         self.left_flank_len = len(self.left_flank)
-        self.skipped_mutations = skipped_mutations
+        self.skipped_mutations = skipped_left + skipped_right
+        self.left_position_offset = left_flank_len + skipped_left
+        self.right_position_offset = right_flank_len + skipped_right
         self.start_seq = start_seq
         self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank
         self.end_seq = end_seq

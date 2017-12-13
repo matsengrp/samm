@@ -25,19 +25,19 @@ class GibbsStepInfo:
     """
     Store the state of each gibbs sample and intermediate computations
     """
-    def __init__(self, order, log_numerators, denominators, acc_risks=None):
+    def __init__(self, order, log_numerators, denominators, all_risks=None):
         """
         @param order: a list with positions in the order the mutations happened
         @param log_numerators: the log of the exp(theta * psi) term in the numerator of the likelihood
                             at each mutation step
         @param denominators: the sum of the exp(theta * psi) terms in the denominator of the likelihood
                             at each mutation step
-        @param acc_risks: list of accumulated risk values for this Gibbs step (summands in denominator)
+        @param all_risks: list of risk values for this Gibbs step (summands in denominator)
         """
         self.order = order
         self.log_numerators = log_numerators
         self.denominators = denominators
-        self.acc_risks = acc_risks
+        self.all_risks = all_risks
 
 class MutationOrderGibbsSampler(Sampler):
     """
@@ -58,9 +58,9 @@ class MutationOrderGibbsSampler(Sampler):
 
         traces = []
         residuals = []
-        if self.num_mutations < 2:
+        if self.num_mutations < 2 and not self.get_residuals:
             # If there are zero or one mutations then the same initial order will be returned for
-            # every sample
+            # every sample. We can still get residuals in this case, though
             samples = [init_order] * (num_samples)
         else:
             samples = []
@@ -80,6 +80,7 @@ class MutationOrderGibbsSampler(Sampler):
                         samples += [gibbs_orders[-1]]
                         residuals += curr_residuals
                 traces += trace
+        residuals = np.nanmean(residuals, axis=0)
 
         return GibbsSamplerResult(
             [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in samples],
@@ -114,11 +115,8 @@ class MutationOrderGibbsSampler(Sampler):
             curr_order = gibbs_step_info.order
             # Output probabilities for trace
             trace.append(log_lik)
-            # TODO: do we need to un-offset this for flanks/hierarchical model?
             residuals.append(
-                [
-                    mutated - risk for mutated, risk in zip(self.obs_seq_mutation.mutated_indicator, gibbs_step_info.acc_risks)
-                ]
+                self._calculate_unoffset_residuals(np.nansum(gibbs_step_info.all_risks, axis=0).ravel())
             )
             gibbs_step_orders.append(list(curr_order))
         return gibbs_step_orders, gibbs_step_info, trace, residuals
@@ -138,11 +136,11 @@ class MutationOrderGibbsSampler(Sampler):
         # First consider the full ordering with position under consideration mutating last
         order_last = partial_order + [position]
         if gibbs_step_info is None:
-            feat_mutation_steps, log_numerators, denominators, acc_risks = self._compute_log_probs_from_scratch(
+            feat_mutation_steps, log_numerators, denominators, all_risks = self._compute_log_probs_from_scratch(
                 order_last,
             )
         else:
-            feat_mutation_steps, log_numerators, denominators, acc_risks = self._compute_log_probs_with_reference(
+            feat_mutation_steps, log_numerators, denominators, all_risks = self._compute_log_probs_with_reference(
                 order_last,
                 gibbs_step_info,
                 update_step_start=pos_order_idx,
@@ -169,6 +167,7 @@ class MutationOrderGibbsSampler(Sampler):
         )
         already_mutated_pos_set = set(partial_order)
         # iterate through the remaining possible full mutation orders consistent with this partial order
+        # TODO: update the risks here, too?
         for idx, i in enumerate(reversed(range(self.num_mutations - 1))):
             possible_full_order = partial_order[:i] + [position] + partial_order[i:]
 
@@ -225,7 +224,8 @@ class MutationOrderGibbsSampler(Sampler):
             denominator_hist,
             log_numerator_hist,
         )
-        gibbs_step_info.acc_risks = acc_risks
+        gibbs_step_info.all_risks = all_risks
+
         return gibbs_step_info, log_lik, all_log_probs
 
     def _sample_order(self, all_log_probs, partial_order, position, denominator_hist, log_numerator_hist):
@@ -287,7 +287,7 @@ class MutationOrderGibbsSampler(Sampler):
             1. feature mutation steps
             2. the log numerators in the log likelihood of each mutation step
             3. the denominator in the log likelihood of each mutation step
-            4. acc_risks, i.e., summands in the denominators; None if get_residuals is False
+            4. all_risks, i.e., summands in the denominators; None if get_residuals is False
         """
         feat_mutation_steps = self.feature_generator.create_for_mutation_steps(
             ImputedSequenceMutations(
@@ -351,7 +351,7 @@ class MutationOrderGibbsSampler(Sampler):
                 theta_sum += self.theta[mut_step.mutating_pos_feats, col_idx].sum()
             log_numerators.append(theta_sum)
 
-        all_risk_vecs = gibbs_step_base.acc_risks[:update_step_start + 1] if self.get_residuals else None
+        all_risk_vecs = gibbs_step_base.all_risks[:update_step_start + 1] if self.get_residuals else None
         denominators = gibbs_step_base.denominators[:update_step_start + 1]
         prev_feat_mut_step = feat_mutation_steps[0]
         for i in range(update_step_start, self.num_mutations - 1):
@@ -364,7 +364,6 @@ class MutationOrderGibbsSampler(Sampler):
             denominators.append(new_denom)
 
         return feat_mutation_steps, log_numerators, denominators, all_risk_vecs
-
 
     def _get_denom_update(self, old_denominator, prev_feat_idxs, feat_mut_step):
         """
@@ -414,3 +413,21 @@ class MutationOrderGibbsSampler(Sampler):
             elif feat_idxs.size:
                 new_risk_vec[feat_pos] = self.exp_theta_sum[feat_idxs]
         return new_risk_vec
+
+    def _calculate_unoffset_residuals(self, acc_risks):
+        """
+        Get position-wise residuals
+        """
+
+        def _pad_vec_with_nan(vec):
+            return np.concatenate((
+                [np.nan] * self.obs_seq_mutation.left_position_offset,
+                vec,
+                [np.nan] * self.obs_seq_mutation.right_position_offset
+            ))
+
+        # pad the indicator vector to take into account flanks and skipped bases
+        padded_risks = _pad_vec_with_nan(acc_risks)
+        padded_mutated_indicator = _pad_vec_with_nan(self.obs_seq_mutation.mutated_indicator)
+
+        return [mutated - risk for mutated, risk in zip(padded_mutated_indicator, padded_risks)]
