@@ -357,8 +357,6 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     """
     assert(len(start_seq) == len(end_seq))
 
-    # TODO: if we want residuals, we'll need to keep track of which sites got removed/collapsed here
-
     # replace all unknowns with an "n"
     processed_start_seq = re.sub('[^agctn]', 'n', start_seq)
     processed_end_seq = re.sub('[^agctn]', 'n', end_seq)
