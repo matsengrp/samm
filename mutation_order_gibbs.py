@@ -430,6 +430,9 @@ class MutationOrderGibbsSampler(Sampler):
     def _calculate_unoffset_residuals(self, acc_risks):
         """
         Get position-wise residuals
+
+        These are martingale residuals padded with nans where we ignored positions due to
+        mutations in the flanks.
         """
 
         def _pad_vec_with_nan(vec):

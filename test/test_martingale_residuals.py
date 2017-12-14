@@ -99,5 +99,6 @@ class Residuals_TestCase(unittest.TestCase):
     def test_residuals(self):
         # TODO: do stuff with these residuals; plot them and whatnot
         residuals = self._get_residuals()
-        print residuals.shape
+        # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
+        self.assertTrue(np.nanmax(residuals) <= 1.)
 
