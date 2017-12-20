@@ -115,9 +115,10 @@ class MutationOrderGibbsSampler(Sampler):
             curr_order = gibbs_step_info.order
             # Output probabilities for trace
             trace.append(log_lik)
-            residuals.append(
-                self._calculate_unoffset_residuals(np.nansum(gibbs_step_info.sampled_risks, axis=0).ravel())
-            )
+            if gibbs_step_info.sampled_risks is not None:
+                residuals.append(
+                    self._calculate_unoffset_residuals(np.nansum(gibbs_step_info.sampled_risks, axis=0).ravel())
+                )
             gibbs_step_orders.append(list(curr_order))
         return gibbs_step_orders, gibbs_step_info, trace, residuals
 
@@ -158,7 +159,10 @@ class MutationOrderGibbsSampler(Sampler):
         log_numerator_hist = [[log_n] for log_n in log_numerators]
         log_numerator_hist[-1].append(log_numerators[-1])
         denominator_hist = [[d] for d in denominators]
-        risk_hist = [[r] for r in all_risks]
+        if self.get_residuals:
+            risk_hist = [[r] for r in all_risks]
+        else:
+            risk_hist = None
 
         # Now unmutate the string by one mutation step so that we can figure out the features at the positions
         flanked_seq = unmutate_string(
@@ -218,7 +222,8 @@ class MutationOrderGibbsSampler(Sampler):
             log_numerator_hist[i].append(log_numerators[i])
             log_numerator_hist[i + 1].append(log_numerators[i + 1])
             denominator_hist[i+1].append(denominators[i + 1])
-            risk_hist[i+1].append(all_risks[i + 1])
+            if self.get_residuals:
+                risk_hist[i+1].append(all_risks[i + 1])
 
         # Now sample and reconstruct our decision from the numerator/denominator histories
         gibbs_step_info, log_lik = self._sample_order(
@@ -232,7 +237,7 @@ class MutationOrderGibbsSampler(Sampler):
 
         return gibbs_step_info, log_lik, all_log_probs
 
-    def _sample_order(self, all_log_probs, partial_order, position, denominator_hist, log_numerator_hist, risk_hist):
+    def _sample_order(self, all_log_probs, partial_order, position, denominator_hist, log_numerator_hist, risk_hist=None):
         """
         Sample mutation order from all the possible full mutation orders
         Reconstruct the intermediate calculations for this sampled order for faster future computations
@@ -265,11 +270,14 @@ class MutationOrderGibbsSampler(Sampler):
             + [log_numerator_hist[self.num_mutations - sampled_idx - 1][1]]
             + [log_numerator_hist[i][2] for i in range(self.num_mutations - sampled_idx, self.num_mutations)]
         )
-        sampled_risks = (
-            [risk_hist[0][0]]
-            + [risk_hist[i][0] for i in range(1, self.num_mutations - sampled_idx)]
-            + [risk_hist[i][1] for i in range(self.num_mutations - sampled_idx, self.num_mutations)]
-        )
+        if risk_hist is not None:
+            sampled_risks = (
+                [risk_hist[0][0]]
+                + [risk_hist[i][0] for i in range(1, self.num_mutations - sampled_idx)]
+                + [risk_hist[i][1] for i in range(self.num_mutations - sampled_idx, self.num_mutations)]
+            )
+        else:
+            sampled_risks = None
 
         gibbs_step_sample = GibbsStepInfo(
             sampled_order,
