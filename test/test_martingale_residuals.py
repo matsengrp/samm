@@ -1,5 +1,8 @@
 import unittest
 import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
 
 from sampler_collection import SamplerCollection
 from mutation_order_gibbs import MutationOrderGibbsSampler
@@ -69,7 +72,7 @@ class Residuals_TestCase(unittest.TestCase):
 
         return theta, obs_data
 
-    def _get_residuals(self):
+    def _get_residuals(self, get_residuals=True):
         """
         Calculate residuals from Gibbs samples
         """
@@ -82,7 +85,7 @@ class Residuals_TestCase(unittest.TestCase):
             self.feat_gen,
             self.num_jobs,
             self.scratch_dir,
-            get_residuals=True,
+            get_residuals=get_residuals,
         )
         init_orders = [
             np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
@@ -97,8 +100,18 @@ class Residuals_TestCase(unittest.TestCase):
         return np.array([res.residuals for res in sampler_results])
 
     def test_residuals(self):
-        # TODO: do stuff with these residuals; plot them and whatnot
-        residuals = self._get_residuals()
         # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
+        residuals = self._get_residuals(get_residuals=True)
+        index_vec = range(residuals.shape[1])
+        for idx, resid in zip(index_vec, residuals.T):
+            plt.scatter([idx] * len(resid), resid)
+        plt.savefig('test/_output/residuals.svg')
         self.assertTrue(np.nanmax(residuals) <= 1.)
+        residual_mean = np.nanmean(residuals, axis=0)
+        residual_mean = residual_mean[~np.isnan(residual_mean)]
+        # TODO: below is false, and doesn't change with more samples; is something wrong?
+        #self.assertTrue(np.allclose(residual_mean, np.zeros(np.shape(residual_mean))))
+
+        # Negative control: run gibbs sampling without getting residuals
+        residuals = self._get_residuals(get_residuals=False)
 
