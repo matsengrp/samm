@@ -3,12 +3,15 @@ import numpy as np
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style('white')
+sns.set_style('ticks')
 
 from sampler_collection import SamplerCollection
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineMetadata
-from survival_model_simulator import SurvivalModelSimulatorSingleColumn
+from survival_model_simulator import SurvivalModelSimulatorSingleColumn, SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
 from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES
 
@@ -32,7 +35,7 @@ class Residuals_TestCase(unittest.TestCase):
         cls.burn_in = 1
         cls.nonzero_ratio = 0.5
 
-    def _generate_data(self, n_naive=100, random_gene_len=20):
+    def _generate_data(self, n_naive=100, random_gene_len=20, position_bias=False):
         """
         Generate both theta and data (randomly sample nucleotides)
         """
@@ -52,7 +55,14 @@ class Residuals_TestCase(unittest.TestCase):
         probability_matrix = np.ones(target_shape) * 1.0/3
         possible_motifs_mask = get_possible_motifs_to_targets(self.feat_gen.motif_list, target_shape, self.feat_gen.mutating_pos_list)
         probability_matrix[~possible_motifs_mask] = 0.
-        simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, self.feat_gen, lambda0=0.1)
+
+        # the first half of the gene mutates less, second half mutates more
+        if position_bias:
+            pos_risk = [-3] * (random_gene_len / 2) + [3] * (random_gene_len / 2)
+            simulator = SurvivalModelSimulatorPositionDependent(theta, probability_matrix, self.feat_gen,
+                                                                lambda0=0.1, pos_risk=pos_risk)
+        else:
+            simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, self.feat_gen, lambda0=0.1)
 
         obs_data = []
         for _ in range(n_naive):
@@ -72,11 +82,11 @@ class Residuals_TestCase(unittest.TestCase):
 
         return theta, obs_data
 
-    def _get_residuals(self, get_residuals=True):
+    def _get_residuals(self, get_residuals=True, position_bias=False):
         """
         Calculate residuals from Gibbs samples
         """
-        theta, obs_data = self._generate_data()
+        theta, obs_data = self._generate_data(position_bias=position_bias)
         self.feat_gen.add_base_features_for_list(obs_data)
         sampler_collection = SamplerCollection(
             obs_data,
@@ -102,15 +112,16 @@ class Residuals_TestCase(unittest.TestCase):
     def test_residuals(self):
         # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
         residuals = self._get_residuals(get_residuals=True)
-        index_vec = range(residuals.shape[1])
-        for idx, resid in zip(index_vec, residuals.T):
-            plt.scatter([idx] * len(resid), resid)
+        xval = np.array(range(residuals.shape[1]) * residuals.shape[0])
+        sns.regplot(xval, residuals.flatten(), dropna=True)
         plt.savefig('test/_output/residuals.svg')
+        plt.clf()
         self.assertTrue(np.nanmax(residuals) <= 1.)
-        residual_mean = np.nanmean(residuals, axis=0)
-        residual_mean = residual_mean[~np.isnan(residual_mean)]
-        # TODO: below is false, and doesn't change with more samples; is something wrong?
-        #self.assertTrue(np.allclose(residual_mean, np.zeros(np.shape(residual_mean))))
+
+        residuals = self._get_residuals(get_residuals=True, position_bias=True)
+        sns.regplot(xval, residuals.flatten(), dropna=True)
+        plt.savefig('test/_output/residuals_position_bias.svg')
+        self.assertTrue(np.nanmax(residuals) <= 1.)
 
         # Negative control: run gibbs sampling without getting residuals
         residuals = self._get_residuals(get_residuals=False)
