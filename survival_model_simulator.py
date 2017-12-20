@@ -154,3 +154,47 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         mutate_pos = mutate_positions[sampled_idx]
         nucleotide_target = target_nucleotides[sampled_idx]
         return mutate_time_delta, mutate_pos, nucleotide_target
+
+class SurvivalModelSimulatorPositionDependent(SurvivalModelSimulator):
+    """
+    A model that will mutate sequences based on a survival model
+    incorporating motif and position dependence. We assume the hazard
+    is constant over time.
+    """
+    def __init__(self, thetas, probability_matrix, feature_generator, lambda0, pos_risk):
+        """
+        @param thetas: Numpy array(p,1) where p is the number of
+        motifs. Each element is the rate at which the motif mutates.
+        @param probability_matrix: The probability of a target
+        nucleotide given that the motif mutated.  @param
+        feature_generator: FeatureGenerator @param lambda0: A constant
+        hazard rate @param pos_risk: Numpy array(n, 1) where n is the
+        length of the sequence. Each element describes how much more
+        or less likely the position is to mutate.
+        """
+        self.thetas = thetas
+        self.probability_matrix = probability_matrix
+        self.feature_generator = feature_generator
+        self.motif_list = self.feature_generator.motif_list
+        self.lambda0 = lambda0
+        self.pos_risk = pos_risk
+
+    def _sample_mutation(self, feature_vec_dict, intermediate_seq, pos_to_mutate):
+        hazard_weights = []
+        mutate_positions = []
+        for p in pos_to_mutate:
+            motif_idx = feature_vec_dict[p]
+            hazard_weights.append(np.exp(self.thetas[motif_idx,0].sum(axis=0) + self.pos_risk[p]))
+            mutate_positions.append(p)
+
+        unif_sample = np.random.rand(1)
+        denom = np.sum(hazard_weights)
+        mutate_time_delta = - 1/self.lambda0 * np.log(1 - unif_sample) / denom
+
+        sampled_idx = sample_multinomial(hazard_weights)
+        mutate_pos = mutate_positions[sampled_idx]
+        mutate_feat_idx = feature_vec_dict[mutate_pos]
+        nucleotide_target_idx = sample_multinomial(
+            self.probability_matrix[mutate_feat_idx,:].sum(axis=0)
+        )
+        return mutate_time_delta, mutate_pos, NUCLEOTIDES[nucleotide_target_idx]
