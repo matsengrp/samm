@@ -112,14 +112,21 @@ class Residuals_TestCase(unittest.TestCase):
     def test_residuals(self):
         # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
         residuals = self._get_residuals(get_residuals=True)
-        xval = np.array(range(residuals.shape[1]) * residuals.shape[0])
-        sns.regplot(xval, residuals.flatten(), dropna=True)
+        seq_len = residuals.shape[1]
+        xval = np.array(range(seq_len) * residuals.shape[0])
+        ax = sns.regplot(xval, residuals.flatten(), dropna=True)
+        ax.set(xlabel='nucleotide position', ylabel='residual')
+        ax.set_xticks(np.arange(0, seq_len, seq_len / 4))
+        ax.set_xticklabels(np.arange(0, seq_len, seq_len / 4))
         plt.savefig('test/_output/residuals.svg')
         plt.clf()
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
         residuals = self._get_residuals(get_residuals=True, position_bias=True)
-        sns.regplot(xval, residuals.flatten(), dropna=True)
+        ax = sns.regplot(xval, residuals.flatten(), dropna=True)
+        ax.set(xlabel='nucleotide position', ylabel='residual')
+        ax.set_xticks(np.arange(0, seq_len, seq_len / 4))
+        ax.set_xticklabels(np.arange(0, seq_len, seq_len / 4))
         plt.savefig('test/_output/residuals_position_bias.svg')
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
