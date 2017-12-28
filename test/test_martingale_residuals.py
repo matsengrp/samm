@@ -1,6 +1,7 @@
 import unittest
 import numpy as np
 import matplotlib
+import itertools
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -35,7 +36,7 @@ class Residuals_TestCase(unittest.TestCase):
         cls.burn_in = 1
         cls.nonzero_ratio = 0.5
 
-    def _generate_data(self, n_naive=100, random_gene_len=20, position_bias=False):
+    def _generate_data(self, n_naive=100, min_gene_len=20, max_gene_len=None, position_bias=False):
         """
         Generate both theta and data (randomly sample nucleotides)
         """
@@ -56,17 +57,21 @@ class Residuals_TestCase(unittest.TestCase):
         possible_motifs_mask = get_possible_motifs_to_targets(self.feat_gen.motif_list, target_shape, self.feat_gen.mutating_pos_list)
         probability_matrix[~possible_motifs_mask] = 0.
 
-        # the first half of the gene mutates less, second half mutates more
-        if position_bias:
-            pos_risk = [-3] * (random_gene_len / 2) + [3] * (random_gene_len / 2)
-            simulator = SurvivalModelSimulatorPositionDependent(theta, probability_matrix, self.feat_gen,
-                                                                lambda0=0.1, pos_risk=pos_risk)
-        else:
-            simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, self.feat_gen, lambda0=0.1)
+        # Default simulator
+        simulator = SurvivalModelSimulatorSingleColumn(theta, probability_matrix, self.feat_gen, lambda0=0.1)
 
         obs_data = []
         for _ in range(n_naive):
-            germline_sequence = get_random_dna_seq(random_gene_len)
+            if max_gene_len is None:
+                curr_gene_len = min_gene_len
+            else:
+                curr_gene_len = np.random.randint(min_gene_len, max_gene_len)
+            germline_sequence = get_random_dna_seq(curr_gene_len)
+            if position_bias:
+                # the first half of the gene mutates less, second half mutates more
+                pos_risk = [-3] * (curr_gene_len / 2) + [3] * (curr_gene_len / 2)
+                simulator = SurvivalModelSimulatorPositionDependent(theta, probability_matrix, self.feat_gen,
+                                                                    lambda0=0.1, pos_risk=pos_risk)
             sample = simulator.simulate(
                 start_seq=germline_sequence.lower(),
                 percent_mutated=np.random.uniform(low=.05, high=.20),
@@ -82,11 +87,11 @@ class Residuals_TestCase(unittest.TestCase):
 
         return theta, obs_data
 
-    def _get_residuals(self, get_residuals=True, position_bias=False):
+    def _get_residuals(self, get_residuals=True, min_gene_len=20, max_gene_len=None, position_bias=False):
         """
         Calculate residuals from Gibbs samples
         """
-        theta, obs_data = self._generate_data(position_bias=position_bias)
+        theta, obs_data = self._generate_data(min_gene_len=min_gene_len, max_gene_len=max_gene_len, position_bias=position_bias)
         self.feat_gen.add_base_features_for_list(obs_data)
         sampler_collection = SamplerCollection(
             obs_data,
@@ -107,11 +112,16 @@ class Residuals_TestCase(unittest.TestCase):
             self.burn_in,
             sampling_rate=self.sampling_rate,
         )
-        return np.array([res.residuals for res in sampler_results])
+        residual_list = [res.residuals for res in sampler_results]
+        if get_residuals:
+            residuals = np.array(list(itertools.izip_longest(*residual_list, fillvalue=np.nan))).T
+        else:
+            residuals = np.array(residual_list)
+        return residuals
 
     def test_residuals(self):
         # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
-        residuals = self._get_residuals(get_residuals=True)
+        residuals = self._get_residuals(min_gene_len=15, max_gene_len=25, get_residuals=True)
         seq_len = residuals.shape[1]
         xval = np.array(range(seq_len) * residuals.shape[0])
         ax = sns.regplot(xval, residuals.flatten(), dropna=True)
@@ -122,7 +132,10 @@ class Residuals_TestCase(unittest.TestCase):
         plt.clf()
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
+        # Positional bias
         residuals = self._get_residuals(get_residuals=True, position_bias=True)
+        seq_len = residuals.shape[1]
+        xval = np.array(range(seq_len) * residuals.shape[0])
         ax = sns.regplot(xval, residuals.flatten(), dropna=True)
         ax.set(xlabel='nucleotide position', ylabel='residual')
         ax.set_xticks(np.arange(0, seq_len, seq_len / 4))
