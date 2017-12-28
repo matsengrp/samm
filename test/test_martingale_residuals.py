@@ -14,7 +14,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineMetadata
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn, SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
-from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES
+from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES, process_degenerates_and_impute_nucleotides
 
 class Residuals_TestCase(unittest.TestCase):
     @classmethod
@@ -76,10 +76,24 @@ class Residuals_TestCase(unittest.TestCase):
                 start_seq=germline_sequence.lower(),
                 percent_mutated=np.random.uniform(low=.05, high=.20),
             )
+            # Make a quarter of sequences have interior degenerate nucleotides
+            raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
+            raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
+            if np.random.uniform() < .25:
+                raw_start_seq = raw_start_seq[:curr_gene_len/2] + 'n' * self.motif_len * 2 + raw_start_seq[curr_gene_len/2:]
+                raw_end_seq = raw_end_seq[:curr_gene_len/2] + 'n' * self.motif_len * 2 + raw_end_seq[curr_gene_len/2:]
+
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
+                raw_start_seq,
+                raw_end_seq,
+                self.motif_len,
+            )
+
             obs_seq_mutation = ObservedSequenceMutations(
-                start_seq=sample.left_flank + sample.start_seq + sample.right_flank,
-                end_seq=sample.left_flank + sample.end_seq + sample.right_flank,
+                start_seq=start_seq,
+                end_seq=end_seq,
                 motif_len=self.motif_len,
+                collapse_list=collapse_list,
             )
             if obs_seq_mutation.num_mutations > 0:
                 # don't consider pairs where mutations occur in flanking regions
