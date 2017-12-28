@@ -368,6 +368,7 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     # conform unknowns and collapse "n"s
     repl = 'n' * (motif_len/2)
     pattern = repl + '+' if motif_len > 1 else 'n'
+    collapse_list = []
     if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
         # if one sequence has an "n" but the other doesn't, make them both have "n"s
         start_list = list(processed_start_seq)
@@ -390,7 +391,6 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
             warnings.warn("Sequence of length {0} had {1} unknown bases".format(seq_len, num_ns))
 
         # now collapse interior "n"s
-        collapse_list = []
         for match in re.finditer(pattern, interior_end_seq):
             # num "n"s removed
             # starting position of "n"s removed
