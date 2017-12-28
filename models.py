@@ -1,8 +1,8 @@
-from common import mutate_string
+from common import mutate_string, DEGENERATE_NUCLEOTIDE
 import numpy as np
 
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=None, right_flank_len=None):
+    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=None, right_flank_len=None, collapse_list=[]):
         """
         @param start_seq: start sequence
         @param end_seq: ending sequence with mutations
@@ -37,18 +37,24 @@ class ObservedSequenceMutations:
         skipped_right= 0
 
         # Go through half the sequence forward to find beginning conserved nucleotides
+        # Also skip ns
         for flank_start_idx in range(len(start_seq)/2):
             if start_idx + left_flank_len == flank_start_idx:
                 break
-            elif start_seq[flank_start_idx] != end_seq[flank_start_idx]:
+            elif start_seq[flank_start_idx] != end_seq[flank_start_idx] or \
+                 start_seq[flank_start_idx] == DEGENERATE_NUCLEOTIDE or \
+                 end_seq[flank_start_idx] == DEGENERATE_NUCLEOTIDE:
                 start_idx = flank_start_idx + 1
                 skipped_left += 1
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides
+        # Also skip ns
         for flank_end_idx in reversed(range(len(start_seq)/2, len(start_seq))):
             if end_idx - right_flank_len - 1 == flank_end_idx:
                 break
-            elif start_seq[flank_end_idx] != end_seq[flank_end_idx]:
+            elif start_seq[flank_end_idx] != end_seq[flank_end_idx] or \
+                 start_seq[flank_end_idx] == DEGENERATE_NUCLEOTIDE or \
+                 end_seq[flank_end_idx] == DEGENERATE_NUCLEOTIDE:
                 end_idx = flank_end_idx + 1
                 skipped_right += 1
 
@@ -75,6 +81,7 @@ class ObservedSequenceMutations:
         self.end_seq = end_seq
         self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
+        self.collapse_list = collapse_list
         assert(self.seq_len > 0)
 
     def set_start_feats(self, feat_matrix):

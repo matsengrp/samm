@@ -444,11 +444,19 @@ class MutationOrderGibbsSampler(Sampler):
         """
 
         def _pad_vec_with_nan(vec):
-            return np.concatenate((
+            """
+            Pad vector with NaN values both for the flanking positions and for the interior "n" values that were collapsed during processing
+            """
+            padded_vec = np.concatenate((
                 [np.nan] * self.obs_seq_mutation.left_position_offset,
                 vec,
                 [np.nan] * self.obs_seq_mutation.right_position_offset
             ))
+            for collapse_tuple in sorted(self.obs_seq_mutation.collapse_list, key=lambda val: val[1]):
+                start_idx = collapse_tuple[0] + collapse_tuple[1]
+                to_insert = [np.nan] * (collapse_tuple[2] - collapse_tuple[0] - collapse_tuple[1])
+                padded_vec = np.insert(padded_vec, start_idx, to_insert)
+            return padded_vec
 
         # pad the indicator vector to take into account flanks and skipped bases
         padded_risks = _pad_vec_with_nan(acc_risks)

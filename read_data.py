@@ -459,7 +459,7 @@ def get_sequence_mutations_from_tree(tree, motif_len=5, left_flank_len=None, rig
     obs_data = []
     for _, descendant in enumerate(tree.traverse('preorder')):
         if not descendant.is_root():
-            start_seq, end_seq = process_degenerates_and_impute_nucleotides(
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
                 descendant.up.sequence.lower(),
                 descendant.sequence.lower(),
                 motif_len
@@ -471,6 +471,7 @@ def get_sequence_mutations_from_tree(tree, motif_len=5, left_flank_len=None, rig
                     motif_len=motif_len,
                     left_flank_len=left_flank_len,
                     right_flank_len=right_flank_len,
+                    collapse_list=collapse_list,
             )
 
             if obs_seq_mutation.num_mutations > 0:
@@ -513,7 +514,7 @@ def read_gene_seq_csv_data(
         for idx, elt in cluster.iterrows():
             n_mutes = 0
             current_obs_seq_mutation = None
-            start_seq, end_seq = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
 
             obs_seq_mutation = ObservedSequenceMutations(
                     start_seq=start_seq,
@@ -521,6 +522,7 @@ def read_gene_seq_csv_data(
                     motif_len=motif_len,
                     left_flank_len=left_flank_len,
                     right_flank_len=right_flank_len,
+                    collapse_list=collapse_list,
             )
 
             if obs_seq_mutation.num_mutations > 0:
