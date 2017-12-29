@@ -1,12 +1,5 @@
 import unittest
 import numpy as np
-import matplotlib
-import itertools
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set_style('white')
-sns.set_style('ticks')
 
 from sampler_collection import SamplerCollection
 from mutation_order_gibbs import MutationOrderGibbsSampler
@@ -15,6 +8,7 @@ from simulate_germline import GermlineMetadata
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn, SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
 from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES, process_degenerates_and_impute_nucleotides
+from plot_helpers import plot_martingale_residuals
 
 class Residuals_TestCase(unittest.TestCase):
     @classmethod
@@ -126,35 +120,17 @@ class Residuals_TestCase(unittest.TestCase):
             self.burn_in,
             sampling_rate=self.sampling_rate,
         )
-        residual_list = [res.residuals for res in sampler_results]
-        if get_residuals:
-            residuals = np.array(list(itertools.izip_longest(*residual_list, fillvalue=np.nan))).T
-        else:
-            residuals = np.array(residual_list)
-        return residuals
+        return sampler_results
 
     def test_residuals(self):
         # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
-        residuals = self._get_residuals(min_gene_len=15, max_gene_len=25, get_residuals=True)
-        seq_len = residuals.shape[1]
-        xval = np.array(range(seq_len) * residuals.shape[0])
-        ax = sns.regplot(xval, residuals.flatten(), dropna=True)
-        ax.set(xlabel='nucleotide position', ylabel='residual')
-        ax.set_xticks(np.arange(0, seq_len, seq_len / 4))
-        ax.set_xticklabels(np.arange(0, seq_len, seq_len / 4))
-        plt.savefig('test/_output/residuals.svg')
-        plt.clf()
+        sampler_results = self._get_residuals(min_gene_len=15, max_gene_len=25, get_residuals=True)
+        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals.svg', trim_proportion=.5)
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
         # Positional bias
-        residuals = self._get_residuals(get_residuals=True, position_bias=True)
-        seq_len = residuals.shape[1]
-        xval = np.array(range(seq_len) * residuals.shape[0])
-        ax = sns.regplot(xval, residuals.flatten(), dropna=True)
-        ax.set(xlabel='nucleotide position', ylabel='residual')
-        ax.set_xticks(np.arange(0, seq_len, seq_len / 4))
-        ax.set_xticklabels(np.arange(0, seq_len, seq_len / 4))
-        plt.savefig('test/_output/residuals_position_bias.svg')
+        sampler_results = self._get_residuals(get_residuals=True, position_bias=True)
+        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals_position_bias.svg')
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
         # Negative control: run gibbs sampling without getting residuals
