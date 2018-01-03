@@ -125,12 +125,12 @@ class Residuals_TestCase(unittest.TestCase):
     def test_residuals(self):
         # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
         sampler_results = self._get_residuals(min_gene_len=15, max_gene_len=25, get_residuals=True)
-        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals.svg', trim_proportion=.5)
+        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals.svg', trim_proportion=.5, plot_average=True)
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
         # Positional bias
         sampler_results = self._get_residuals(get_residuals=True, position_bias=True)
-        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals_position_bias.svg')
+        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals_position_bias.svg', plot_average=True)
         self.assertTrue(np.nanmax(residuals) <= 1.)
 
         # Negative control: run gibbs sampling without getting residuals
