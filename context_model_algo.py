@@ -8,6 +8,8 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from method_results import MethodResults
 from model_truncation import ModelTruncation
 from common import *
+from sampler_collection import SamplerCollection
+from mutation_order_gibbs import MutationOrderGibbsSampler
 
 class ContextModelAlgo:
     """
@@ -50,10 +52,13 @@ class ContextModelAlgo:
 
         self.true_theta = true_theta
         self.num_e_samples = args.num_e_samples
+        self.num_jobs = args.num_jobs
+        self.scratch_dir = args.scratch_dir
         self.intermediate_out_dir = args.intermediate_out_dir
         self.motif_lens = args.motif_lens
         self.positions_mutating = args.positions_mutating
         self.burn_in = args.burn_in
+        self.sampling_rate = args.sampling_rate
 
     def _get_theta_err(self, theta, theta_mask):
         """
@@ -176,3 +181,29 @@ class ContextModelAlgo:
             sample_obs_info,
             possible_theta_mask_refit,
         )
+
+    def calculate_residuals(self, model_result):
+        """
+        Calculate residuals
+        """
+        self.feat_generator.add_base_features_for_list(self.obs_data)
+        sampler_collection = SamplerCollection(
+            self.obs_data,
+            model_result.refit_theta,
+            MutationOrderGibbsSampler,
+            self.feat_generator,
+            self.num_jobs,
+            self.scratch_dir,
+            get_residuals=True,
+        )
+        init_orders = [
+            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
+            for obs_seq in obs_data
+        ]
+        sampler_results = sampler_collection.get_samples(
+            init_orders,
+            self.num_e_samples,
+            self.burn_in,
+            sampling_rate=self.sampling_rate,
+        )
+        model_result.set_sampler_result(sampler_results)
