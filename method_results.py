@@ -12,6 +12,7 @@ class MethodResults:
         self.motif_lens = motif_lens
         self.positions_mutating = positions_mutating
         self.has_refit_data = False
+        self.has_residuals = False
         self.num_not_crossing_zero = 0
         self.percent_not_crossing_zero = 1
         self.num_p = 0
@@ -47,6 +48,13 @@ class MethodResults:
         self.sample_obs_info = sample_obs_info
         self.refit_possible_theta_mask = possible_theta_mask
         self.num_p = np.sum(self.refit_possible_theta_mask & ~self.model_masks.zero_theta_mask_refit)
+
+    def set_sampler_results(self, sampler_results):
+        """
+        Store the residuals
+        """
+        self.has_residuals = True
+        self.sampler_results = sampler_results
 
     def __str__(self):
         pen_param_str = ",".join(map(str, self.penalty_params))
