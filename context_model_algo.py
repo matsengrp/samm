@@ -129,7 +129,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, model_result, max_em_iters, get_hessian=True):
+    def refit_unpenalized(self, model_result, max_em_iters, get_hessian=True, get_residuals=False):
         """
         Refit the model
         Modifies model_result
@@ -182,28 +182,24 @@ class ContextModelAlgo:
             possible_theta_mask_refit,
         )
 
-    def calculate_residuals(self, model_result):
-        """
-        Calculate residuals
-        """
-        self.feat_generator.add_base_features_for_list(self.obs_data)
-        sampler_collection = SamplerCollection(
-            self.obs_data,
-            model_result.refit_theta,
-            MutationOrderGibbsSampler,
-            self.feat_generator,
-            self.num_jobs,
-            self.scratch_dir,
-            get_residuals=True,
-        )
-        init_orders = [
-            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
-            for obs_seq in obs_data
-        ]
-        sampler_results = sampler_collection.get_samples(
-            init_orders,
-            self.num_e_samples,
-            self.burn_in,
-            sampling_rate=self.sampling_rate,
-        )
-        model_result.set_sampler_result(sampler_results)
+        if get_residuals:
+            sampler_collection = SamplerCollection(
+                obs_data_stage2,
+                refit_theta,
+                MutationOrderGibbsSampler,
+                feat_generator_stage2,
+                self.num_jobs,
+                self.scratch_dir,
+                get_residuals=True,
+            )
+            init_orders = [
+                np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
+                for obs_seq in obs_data_stage2
+            ]
+            sampler_results = sampler_collection.get_samples(
+                init_orders,
+                self.num_e_samples,
+                self.burn_in,
+                sampling_rate=self.sampling_rate,
+            )
+            model_result.set_sampler_results(sampler_results)

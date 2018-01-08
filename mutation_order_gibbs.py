@@ -80,7 +80,8 @@ class MutationOrderGibbsSampler(Sampler):
                         samples += [gibbs_orders[-1]]
                         residuals += curr_residuals
                 traces += trace
-        residuals = np.nanmean(residuals, axis=0)
+        if self.get_residuals:
+            residuals = np.nanmean(residuals, axis=0)
 
         return GibbsSamplerResult(
             [ImputedSequenceMutations(self.obs_seq_mutation, order) for order in samples],
