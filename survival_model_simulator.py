@@ -1,7 +1,7 @@
 import numpy as np
 from common import mutate_string
 from common import NUCLEOTIDES, NUM_NUCLEOTIDES
-from common import sample_multinomial
+from common import sample_multinomial, process_degenerates_and_impute_nucleotides
 from models import *
 
 class SurvivalModelSimulator:
@@ -9,7 +9,7 @@ class SurvivalModelSimulator:
     A simple model that will mutate sequences based on the survival model we've assumed.
     We will suppose that the hazard is constant over time.
     """
-    def simulate(self, start_seq, censoring_time=None, percent_mutated=None, with_replacement=False):
+    def simulate(self, start_seq=None, censoring_time=None, percent_mutated=None, with_replacement=False, obs_seq_mutation=None):
         """
         @param start_seq: string for the original sequence (includes flanks!)
         @param censoring_time: how long to mutate the sequence for
@@ -19,11 +19,20 @@ class SurvivalModelSimulator:
         """
         mutations = []
 
-        left_flank = start_seq[:self.feature_generator.motif_len/2]
-        right_flank = start_seq[len(start_seq) - self.feature_generator.motif_len/2:]
-        start_seq = start_seq[self.feature_generator.motif_len/2:len(start_seq) - self.feature_generator.motif_len/2]
+        if start_seq is None and obs_seq_mutation is None:
+            raise ValueError
+        elif obs_seq_mutation is None:
+            left_flank = start_seq[:self.feature_generator.motif_len/2]
+            right_flank = start_seq[len(start_seq) - self.feature_generator.motif_len/2:]
+            start_seq = start_seq[self.feature_generator.motif_len/2:len(start_seq) - self.feature_generator.motif_len/2]
+            pos_to_mutate = set(range(len(start_seq)))
+        else:
+            left_flank = obs_seq_mutation.left_flank
+            right_flank = obs_seq_mutation.right_flank
+            start_seq = obs_seq_mutation.start_seq
+            pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
+
         intermediate_seq = start_seq
-        pos_to_mutate = set(range(len(start_seq)))
         last_mutate_time = 0
         while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
@@ -60,6 +69,32 @@ class SurvivalModelSimulator:
             right_flank,
             mutations,
         )
+
+    def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5):
+        simulated_data = []
+        for idx, obs_seq_mutation in enumerate(obs_data):
+            pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
+            sample = self.simulate(obs_seq_mutation=obs_seq_mutation, with_replacement=with_replacement)
+            #sample = self.simulate(obs_seq_mutation=obs_seq_mutation)
+            raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
+            raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
+
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
+                raw_start_seq,
+                raw_end_seq,
+                motif_len,
+            )
+
+            sim_seq_mutation = ObservedSequenceMutations(
+                start_seq=start_seq,
+                end_seq=end_seq,
+                motif_len=motif_len,
+                collapse_list=collapse_list,
+            )
+            if sim_seq_mutation.num_mutations > 0:
+                # don't consider pairs where mutations occur in flanking regions
+                simulated_data.append(sim_seq_mutation)
+        return simulated_data
 
 class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
     """
