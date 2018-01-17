@@ -129,7 +129,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, model_result, max_em_iters, get_hessian=True, get_residuals=False):
+    def refit_unpenalized(self, model_result, max_em_iters, get_hessian=True):
         """
         Refit the model
         Modifies model_result
@@ -182,24 +182,43 @@ class ContextModelAlgo:
             possible_theta_mask_refit,
         )
 
-        if get_residuals:
-            sampler_collection = SamplerCollection(
-                obs_data_stage2,
-                refit_theta,
-                MutationOrderGibbsSampler,
-                feat_generator_stage2,
-                self.num_jobs,
-                self.scratch_dir,
-                get_residuals=True,
-            )
-            init_orders = [
-                np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
-                for obs_seq in obs_data_stage2
-            ]
-            sampler_results = sampler_collection.get_samples(
-                init_orders,
-                self.num_e_samples,
-                self.burn_in,
-                sampling_rate=self.sampling_rate,
-            )
-            model_result.set_sampler_results(sampler_results)
+    def calculate_residuals_from_refit(self, model_result):
+        """
+        Calculates residuals from refit theta
+        Modifies model_result
+        """
+        model_masks = model_result.model_masks
+
+        if not model_result.has_refit_data:
+            return
+
+        # Create a feature generator for this shrunken model
+        feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
+            motif_lens=self.motif_lens,
+            feats_to_remove=model_masks.feats_to_remove,
+            left_motif_flank_len_list=self.positions_mutating,
+        )
+        # Get the data ready - using ALL data
+        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
+        feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
+
+        sampler_collection = SamplerCollection(
+            obs_data_stage2,
+            model_result.refit_theta,
+            MutationOrderGibbsSampler,
+            feat_generator_stage2,
+            self.num_jobs,
+            self.scratch_dir,
+            get_residuals=True,
+        )
+        init_orders = [
+            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
+            for obs_seq in obs_data_stage2
+        ]
+        sampler_results = sampler_collection.get_samples(
+            init_orders,
+            self.num_e_samples,
+            self.burn_in,
+            sampling_rate=self.sampling_rate,
+        )
+        model_result.set_sampler_results(sampler_results)
