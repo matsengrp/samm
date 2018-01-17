@@ -269,10 +269,9 @@ def disambiguate(seq):
     """
     @param seq: sequence
 
-    @return sequence where only unknown nucleotides are "n"s and where flanking "n"s have been collapsed
+    @return sequence where only unknown nucleotides are "n"s
     """
-    proc_seq = re.sub('[^acgtn]', 'n', seq)
-    return re.sub('^n+|n+$', '', proc_seq)
+    return re.sub('[^acgtn]', 'n', seq)
 
 def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_file_name, sample_highest_mutated=False):
     """
