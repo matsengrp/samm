@@ -14,17 +14,18 @@ class SurvivalModelSimulator:
         @param start_seq: string for the original sequence (includes flanks!)
         @param censoring_time: how long to mutate the sequence for
         @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
+        @param obs_seq_mutation: an ObservedSequenceMutation to mimic in terms of germline sequence/mutation positions; if None then use start_seq
 
         @return FullSequenceMutations, ending sequence and entire history of mutations
         """
         mutations = []
 
         if start_seq is None and obs_seq_mutation is None:
-            raise ValueError
+            raise ValueError("Either start_seq or obs_seq_mutation must be specified")
         elif obs_seq_mutation is None:
-            left_flank = start_seq[:self.feature_generator.motif_len/2]
-            right_flank = start_seq[len(start_seq) - self.feature_generator.motif_len/2:]
-            start_seq = start_seq[self.feature_generator.motif_len/2:len(start_seq) - self.feature_generator.motif_len/2]
+            left_flank = start_seq[:self.feature_generator.max_left_motif_flank_len]
+            right_flank = start_seq[self.feature_generator.max_right_motif_flank_len:]
+            start_seq = start_seq[self.feature_generator.max_left_motif_flank_len:self.feature_generator.max_right_motif_flank_len]
             pos_to_mutate = set(range(len(start_seq)))
         else:
             left_flank = obs_seq_mutation.left_flank
@@ -71,11 +72,19 @@ class SurvivalModelSimulator:
         )
 
     def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5):
+        """
+        Simulates a dataset with similar germlines and mutation positions/rates as an observed dataset
+
+        @param obs_data: data to mimic in simulation
+        @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
+        @param motif_len: length of motif, for data processing
+
+        @return list of ObservedSequenceMutations
+        """
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
             sample = self.simulate(obs_seq_mutation=obs_seq_mutation, with_replacement=with_replacement)
-            #sample = self.simulate(obs_seq_mutation=obs_seq_mutation)
             raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
             raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
 
