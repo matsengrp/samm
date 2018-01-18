@@ -152,7 +152,7 @@ class MutationOrderGibbsSampler(Sampler):
         # Add the log probability of the position mutating last
         all_log_probs.append(full_ordering_log_prob)
 
-        # These lists store the history of the log numerators and the denominators
+        # These lists store the history of the log numerators, the denominators and the risk values
         # The numerators have a possibility of changing three times during order shuffling
         # The denominator have a possibility of changing two times during ordering shuffling
         # We can reconstruct the numerators and the denominators for a particular sampled mutation order
@@ -212,21 +212,26 @@ class MutationOrderGibbsSampler(Sampler):
             denominators[i + 1] = self._get_denom_update(denominators[i], first_mutation_feats, second_feat_mut_step)
             if self.get_residuals:
                 first_mutation_pos = [seq_mut_order.mutation_order[i]]
-                all_risks[i + 1] = self._get_risk_update(all_risks[i], first_mutation_pos, second_feat_mut_step, denominators[i] / denominators[i+1])
+                all_risks[i + 1] = self._get_risk_update(
+                    all_risks[i] * denominators[i] / denominators[i+1],
+                    first_mutation_pos,
+                    second_feat_mut_step,
+                    denominators[i+1],
+                )
 
             # correct the full ordering probability by adding back the new terms
             full_ordering_log_prob += log_numerators[i] + log_numerators[i + 1] - np.log(denominators[i + 1])
 
             all_log_probs.append(full_ordering_log_prob)
 
-            # Track the numerator and denominator history
+            # Track the numerator, denominator and risk history
             log_numerator_hist[i].append(log_numerators[i])
             log_numerator_hist[i + 1].append(log_numerators[i + 1])
             denominator_hist[i+1].append(denominators[i + 1])
             if self.get_residuals:
                 risk_hist[i+1].append(all_risks[i + 1])
 
-        # Now sample and reconstruct our decision from the numerator/denominator histories
+        # Now sample and reconstruct our decision from the numerator/denominator/risk histories
         gibbs_step_info, log_lik = self._sample_order(
             all_log_probs,
             partial_order,
@@ -249,7 +254,7 @@ class MutationOrderGibbsSampler(Sampler):
                                 calculations for the sampled mutation order
         @param log_numerator_hist: the history of all the (log) numerators for reconstructing the intermediate
                                 calculations for the sampled mutation order
-        @param risk_hist: the history of all the risks for reconstructing the fitted risk values
+        @param risk_hist: the history of all the risks for reconstructing the fitted risk values; defaults to None if we are not calculating residuals
 
         @return tuple of GibbsStepInfo and log likelihood of the sampled mutation order
         """
@@ -338,7 +343,12 @@ class MutationOrderGibbsSampler(Sampler):
         for i, feat_mut_step in enumerate(feat_mutation_steps[1:]):
             new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             if self.get_residuals:
-                new_risk_vec = self._get_risk_update(all_risk_vecs[i], prev_feat_mut_step.mutating_pos, feat_mut_step, denominators[i] / new_denom)
+                new_risk_vec = self._get_risk_update(
+                    all_risk_vecs[i] * denominators[i] / new_denom,
+                    prev_feat_mut_step.mutating_pos,
+                    feat_mut_step,
+                    new_denom,
+                )
                 all_risk_vecs.append(new_risk_vec)
             prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
@@ -378,7 +388,12 @@ class MutationOrderGibbsSampler(Sampler):
             feat_mut_step = feat_mutation_steps[i - update_step_start + 1]
             new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             if self.get_residuals:
-                new_risk_vec = self._get_risk_update(all_risk_vecs[i], prev_feat_mut_step.mutating_pos, feat_mut_step, denominators[i] / new_denom)
+                new_risk_vec = self._get_risk_update(
+                    all_risk_vecs[i] * denominators[i] / new_denom,
+                    prev_feat_mut_step.mutating_pos,
+                    feat_mut_step,
+                    new_denom,
+                )
                 all_risk_vecs.append(new_risk_vec)
             prev_feat_mut_step = feat_mut_step
             denominators.append(new_denom)
@@ -411,30 +426,28 @@ class MutationOrderGibbsSampler(Sampler):
             new_denom = old_denominator - prev_exp_theta_sum - np.sum(old_feat_exp_theta_sums) + np.sum(new_feat_exp_theta_sums)
         return float(new_denom)
 
-    def _get_risk_update(self, old_risk_vec, prev_mut_pos, feat_mut_step, denom_quotient):
+    def _get_risk_update(self, base_risk_vec, prev_mut_pos, feat_mut_step, new_denom):
         """
         Similar to _get_denom_update but calculate the updated risk vector to use as residuals
 
-        @param old_risk_vec: the vector of summands from denominator from the previous mutation step
+        @param base_risk_vec: the vector of summands from denominator from the previous mutation step weighted with the new denominator
         @param prev_mut_pos: previously mutated position that won't contribute to the updated risk group
         @param feat_mut_step: the features that differed for this next mutation step
-        @param denom_quotient: old denominator divided by new denominator
+        @param new_denom: new denominator
         """
-        # TODO: might be better to calculate log
-        new_risk_vec = old_risk_vec * denom_quotient
-        if len(prev_mut_pos):
-            # prev_mut_pos are now zero risk having mutated
-            new_risk_vec[prev_mut_pos] = 0.
         for feat_pos, feat_idxs in feat_mut_step.neighbors_feat_new.iteritems():
             # updated risk values for nearby positions
             if self.feature_generator.num_feat_gens > 1:
                 if not self.per_target_model:
-                    new_risk_vec[feat_pos] = np.exp(self.theta[feat_idxs].sum())
+                    base_risk_vec[feat_pos] = np.exp(self.theta[feat_idxs].sum()) / new_denom
                 else:
-                    new_risk_vec[feat_pos] = np.exp(self.theta[feat_idxs,0].sum() + self.theta[feat_idxs, 1:].sum(axis=0))
+                    base_risk_vec[feat_pos] = np.exp(self.theta[feat_idxs,0].sum() + self.theta[feat_idxs, 1:].sum(axis=0)) / new_denom
             elif feat_idxs.size:
-                new_risk_vec[feat_pos] = self.exp_theta_sum[feat_idxs]
-        return new_risk_vec
+                base_risk_vec[feat_pos] = self.exp_theta_sum[feat_idxs]/ new_denom
+        if len(prev_mut_pos):
+            # prev_mut_pos are now zero risk having mutated
+            base_risk_vec[prev_mut_pos] = 0.
+        return base_risk_vec
 
     def _calculate_unoffset_residuals(self, acc_risks):
         """
@@ -442,6 +455,10 @@ class MutationOrderGibbsSampler(Sampler):
 
         These are martingale residuals padded with nans where we ignored positions due to
         mutations in the flanks.
+
+        @param acc_risks: numpy array of accumulated risk values
+
+        @return: indicator of whether a position mutated minus its accumulated risk; NaNs added to flanks and ambiguous positions
         """
 
         def _pad_vec_with_nan(vec):
