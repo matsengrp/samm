@@ -9,6 +9,7 @@ class ObservedSequenceMutations:
         @param motif_len: needed to determine flanking ends/mutations to trim sequence
         @param left_flank_len: maximum left flank length for this motif length
         @param right_flank_len: maximum right flank length for this motif length
+        @param collapse_list: list of tuples of (index offset, start index of run of "n"s, end index of run of "n"s) for bookkeeping later
 
         This class goes through half the sequence forward and finds the position where
         there are motif_len/2 conserved nucleotides, and does the same in reverse.

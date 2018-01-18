@@ -184,12 +184,13 @@ class ContextModelAlgo:
 
     def calculate_residuals_from_refit(self, model_result):
         """
-        Calculates residuals from refit theta
+        Similar to refit_unpenalized, but calculates residuals from refit theta
         Modifies model_result
         """
         model_masks = model_result.model_masks
 
         if not model_result.has_refit_data:
+            # no refit data to get residuals from
             return
 
         # Create a feature generator for this shrunken model

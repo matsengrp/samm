@@ -470,6 +470,7 @@ class MutationOrderGibbsSampler(Sampler):
                 vec,
                 [np.nan] * self.obs_seq_mutation.right_position_offset
             ))
+            # insert NaNs where we had collapsed in processing the data before
             for collapse_tuple in sorted(self.obs_seq_mutation.collapse_list, key=lambda val: val[1]):
                 start_idx = collapse_tuple[0] + collapse_tuple[1]
                 to_insert = [np.nan] * (collapse_tuple[2] - collapse_tuple[0] - collapse_tuple[1])
