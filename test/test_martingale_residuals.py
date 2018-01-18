@@ -8,7 +8,9 @@ from simulate_germline import GermlineMetadata
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn, SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
 from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES, process_degenerates_and_impute_nucleotides
-from plot_helpers import plot_martingale_residuals
+from plot_helpers import plot_martingale_residuals_to_file
+
+POSITION_BIAS = 3
 
 class Residuals_TestCase(unittest.TestCase):
     @classmethod
@@ -26,13 +28,21 @@ class Residuals_TestCase(unittest.TestCase):
         cls.num_jobs = 1
         cls.scratch_dir = 'test/_output/'
         cls.num_e_samples = 4
-        cls.sampling_rate = 1
+        cls.sampling_rate = 2
         cls.burn_in = 1
         cls.nonzero_ratio = 0.5
 
-    def _generate_data(self, n_naive=100, min_gene_len=20, max_gene_len=None, position_bias=False):
+    def _generate_data(self, n_naive=1000, max_gene_len=20, min_gene_len=None, position_bias=False):
         """
         Generate both theta and data (randomly sample nucleotides)
+
+        @param n_naive: number of naive sequences to simulate
+        @param max_gene_len: maximum length of germline sequence to simulate
+        @param min_gene_len: minum length of germline sequence to simulate; if None then just simulate max_gene_len length sequences
+        @param position_bias: if True, simulate data where the first half of each sequence mutates less frequently than latter half
+
+        @return randomly generated theta numpy array
+        @return list of ObservedSequenceMutations of simulated data
         """
         theta_shape = (self.feat_gen.feature_vec_len, 1)
         theta = np.random.normal(size=theta_shape)
@@ -56,14 +66,14 @@ class Residuals_TestCase(unittest.TestCase):
 
         obs_data = []
         for _ in range(n_naive):
-            if max_gene_len is None:
-                curr_gene_len = min_gene_len
+            if min_gene_len is None:
+                curr_gene_len = max_gene_len
             else:
                 curr_gene_len = np.random.randint(min_gene_len, max_gene_len)
             germline_sequence = get_random_dna_seq(curr_gene_len)
             if position_bias:
                 # the first half of the gene mutates less, second half mutates more
-                pos_risk = [-3] * (curr_gene_len / 2) + [3] * (curr_gene_len / 2)
+                pos_risk = [-POSITION_BIAS] * (curr_gene_len / 2) + [POSITION_BIAS] * (curr_gene_len - curr_gene_len / 2)
                 simulator = SurvivalModelSimulatorPositionDependent(theta, probability_matrix, self.feat_gen,
                                                                     lambda0=0.1, pos_risk=pos_risk)
             sample = simulator.simulate(
@@ -95,9 +105,16 @@ class Residuals_TestCase(unittest.TestCase):
 
         return theta, obs_data
 
-    def _get_residuals(self, get_residuals=True, min_gene_len=20, max_gene_len=None, position_bias=False):
+    def _get_residuals(self, get_residuals=True, max_gene_len=20, min_gene_len=None, position_bias=False):
         """
         Calculate residuals from Gibbs samples
+
+        @param get_residuals: if True, calculate residuals; only included for negative control
+        @param max_gene_len: maximum length of germline sequence to simulate
+        @param min_gene_len: minum length of germline sequence to simulate; if None then just simulate max_gene_len length sequences
+        @param position_bias: if True, simulate data where the first half of each sequence mutates less frequently than latter half
+
+        @return list of GibbsSamplerResults
         """
         theta, obs_data = self._generate_data(min_gene_len=min_gene_len, max_gene_len=max_gene_len, position_bias=position_bias)
         self.feat_gen.add_base_features_for_list(obs_data)
@@ -123,15 +140,29 @@ class Residuals_TestCase(unittest.TestCase):
         return sampler_results
 
     def test_residuals(self):
-        # Residuals have mean zero over *subjects*, are between -\infty and 1, and are approximately uncorrelated
+        # Residuals have mean zero over subjects and are between -\infty and 1
+        # Correctly specified model
         sampler_results = self._get_residuals(min_gene_len=15, max_gene_len=25, get_residuals=True)
-        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals.svg', trim_proportion=.5, plot_average=True)
+        residuals = plot_martingale_residuals_to_file(
+            sampler_results,
+            'test/_output/residuals.svg',
+            trim_proportion=.5,
+            plot_average=True,
+            title='Residuals vs. Position (correctly specified model)'
+        )
         self.assertTrue(np.nanmax(residuals) <= 1.)
+        self.assertTrue(np.isclose(np.nanmean(residuals), 0.))
 
         # Positional bias
         sampler_results = self._get_residuals(get_residuals=True, position_bias=True)
-        residuals = plot_martingale_residuals(sampler_results, 'test/_output/residuals_position_bias.svg', plot_average=True)
+        residuals = plot_martingale_residuals_to_file(
+            sampler_results,
+            'test/_output/residuals_position_bias.svg',
+            plot_average=True,
+            title='Residuals vs. Position (position-biased model)'
+        )
         self.assertTrue(np.nanmax(residuals) <= 1.)
+        self.assertTrue(np.isclose(np.nanmean(residuals), 0.))
 
         # Negative control: run gibbs sampling without getting residuals
         residuals = self._get_residuals(get_residuals=False)
