@@ -26,13 +26,12 @@ class SurvivalModelSimulator:
             left_flank = start_seq[:self.feature_generator.max_left_motif_flank_len]
             right_flank = start_seq[self.feature_generator.max_right_motif_flank_len:]
             start_seq = start_seq[self.feature_generator.max_left_motif_flank_len:self.feature_generator.max_right_motif_flank_len]
-            pos_to_mutate = set(range(len(start_seq)))
         else:
             left_flank = obs_seq_mutation.left_flank
             right_flank = obs_seq_mutation.right_flank
             start_seq = obs_seq_mutation.start_seq
-            pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
 
+        pos_to_mutate = set(range(len(start_seq)))
         intermediate_seq = start_seq
         last_mutate_time = 0
         while len(pos_to_mutate) > 0:
@@ -51,7 +50,6 @@ class SurvivalModelSimulator:
                 break
 
             last_mutate_time = mutate_time
-
 
             if not with_replacement:
                 pos_to_mutate.remove(mutate_pos)
@@ -84,7 +82,7 @@ class SurvivalModelSimulator:
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
-            sample = self.simulate(obs_seq_mutation=obs_seq_mutation, with_replacement=with_replacement)
+            sample = self.simulate(obs_seq_mutation=obs_seq_mutation, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len)
             raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
             raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
 
