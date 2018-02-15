@@ -182,16 +182,8 @@ class ContextModelAlgo:
             possible_theta_mask_refit,
         )
 
-    def calculate_residuals_from_refit(self, model_result):
-        """
-        Similar to refit_unpenalized, but calculates residuals from refit theta
-        Modifies model_result
-        """
+    def _calculate_residuals_from_refit(self, model_result):
         model_masks = model_result.model_masks
-
-        if not model_result.has_refit_data:
-            # no refit data to get residuals from
-            return
 
         # Create a feature generator for this shrunken model
         feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
@@ -223,3 +215,46 @@ class ContextModelAlgo:
             sampling_rate=self.sampling_rate,
         )
         model_result.set_sampler_results(sampler_results)
+
+    def _calculate_residuals_from_penalized(self, model_result):
+        # Create a feature generator for this shrunken model
+        feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
+            motif_lens=self.motif_lens,
+            left_motif_flank_len_list=self.positions_mutating,
+        )
+        # Get the data ready - using ALL data
+        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
+        feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
+
+        sampler_collection = SamplerCollection(
+            obs_data_stage2,
+            model_result.penalized_theta,
+            MutationOrderGibbsSampler,
+            feat_generator_stage2,
+            self.num_jobs,
+            self.scratch_dir,
+            get_residuals=True,
+        )
+        init_orders = [
+            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
+            for obs_seq in obs_data_stage2
+        ]
+        sampler_results = sampler_collection.get_samples(
+            init_orders,
+            self.num_e_samples,
+            self.burn_in,
+            sampling_rate=self.sampling_rate,
+        )
+        model_result.set_sampler_results(sampler_results)
+
+    def calculate_residuals(self, model_result):
+        """
+        Similar to refit_unpenalized, but calculates residuals from refit theta
+        Modifies model_result
+        """
+
+        if not model_result.has_refit_data:
+            # no refit data to get residuals from
+            self._calculate_residuals_from_penalized(model_result)
+        else:
+            self._calculate_residuals_from_refit(model_result)
