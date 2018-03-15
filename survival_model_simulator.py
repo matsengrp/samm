@@ -9,7 +9,7 @@ class SurvivalModelSimulator:
     A simple model that will mutate sequences based on the survival model we've assumed.
     We will suppose that the hazard is constant over time.
     """
-    def simulate(self, start_seq=None, censoring_time=None, percent_mutated=None, with_replacement=False, obs_seq_mutation=None):
+    def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False):
         """
         @param start_seq: string for the original sequence (includes flanks!)
         @param censoring_time: how long to mutate the sequence for
@@ -20,16 +20,10 @@ class SurvivalModelSimulator:
         """
         mutations = []
 
-        if start_seq is None and obs_seq_mutation is None:
-            raise ValueError("Either start_seq or obs_seq_mutation must be specified")
-        elif obs_seq_mutation is None:
+        if left_flank is None and right_flank is None:
             left_flank = start_seq[:self.feature_generator.max_left_motif_flank_len]
-            right_flank = start_seq[self.feature_generator.max_right_motif_flank_len:]
-            start_seq = start_seq[self.feature_generator.max_left_motif_flank_len:self.feature_generator.max_right_motif_flank_len]
-        else:
-            left_flank = obs_seq_mutation.left_flank
-            right_flank = obs_seq_mutation.right_flank
-            start_seq = obs_seq_mutation.start_seq
+            right_flank = start_seq[len(start_seq) - self.feature_generator.max_right_motif_flank_len:]
+            start_seq = start_seq[self.feature_generator.max_left_motif_flank_len:len(start_seq) - self.feature_generator.max_right_motif_flank_len]
 
         pos_to_mutate = set(range(len(start_seq)))
         intermediate_seq = start_seq
@@ -82,7 +76,7 @@ class SurvivalModelSimulator:
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
-            sample = self.simulate(obs_seq_mutation=obs_seq_mutation, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len)
+            sample = self.simulate(start_seq=obs_seq_mutation.start_seq, left_flank=obs_seq_mutation.left_flank, right_flank=obs_seq_mutation.right_flank, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len)
             raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
             raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
 
