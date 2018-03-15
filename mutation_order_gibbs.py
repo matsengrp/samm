@@ -473,8 +473,10 @@ class MutationOrderGibbsSampler(Sampler):
             # insert NaNs where we had collapsed in processing the data before
             for collapse_tuple in sorted(self.obs_seq_mutation.collapse_list, key=lambda val: val[1]):
                 start_idx = collapse_tuple[0] + collapse_tuple[1]
-                to_insert = [np.nan] * (collapse_tuple[2] - collapse_tuple[0] - collapse_tuple[1])
-                padded_vec = np.insert(padded_vec, start_idx, to_insert)
+                if start_idx <= len(padded_vec):
+                    # if it's greater then we'll pad the end regardless
+                    to_insert = [np.nan] * (collapse_tuple[2] - collapse_tuple[0] - collapse_tuple[1])
+                    padded_vec = np.insert(padded_vec, start_idx, to_insert)
             return padded_vec
 
         # pad the indicator vector to take into account flanks and skipped bases
