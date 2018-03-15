@@ -11,10 +11,12 @@ class SurvivalModelSimulator:
     """
     def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False):
         """
-        @param start_seq: string for the original sequence (includes flanks!)
+        @param start_seq: string for the original sequence; includes flanks unless they are provided by left_flank/right_flank
+        @param left_flank: the left flank
+        @param right_flank: the right flank
         @param censoring_time: how long to mutate the sequence for
+        @param percent_mutated: percent of sequence to mutated
         @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
-        @param obs_seq_mutation: an ObservedSequenceMutation to mimic in terms of germline sequence/mutation positions; if None then use start_seq
 
         @return FullSequenceMutations, ending sequence and entire history of mutations
         """
