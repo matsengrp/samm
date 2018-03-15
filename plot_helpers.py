@@ -24,8 +24,7 @@ def _align(metadata, residual_list, gap_dict):
     """
     aligned_residuals = []
     for meta, residual in zip(metadata, residual_list):
-        #gene = '-'.join(meta['germline_name'].split('-')[2:]).split('+')[0]
-        gene = '-'.join(meta['germline_name'].split('-')[2:])
+        gene = meta['v_gene'].split('+')[0]
         if gene not in gap_dict.keys():
             print "%s not found, skipping" % gene
             continue
@@ -58,7 +57,7 @@ def _recenter(metadata, residual_list, center_col):
         recenter_residuals.append(np.concatenate((pad_begin, residual)))
     return recenter_residuals, offset
 
-def _get_flat_processed_residuals(sampler_results, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start'):
+def _get_flat_processed_residuals(residual_list, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start'):
     """
     Get flattened residuals from Gibbs sampler results
 
@@ -80,7 +79,6 @@ def _get_flat_processed_residuals(sampler_results, metadata=None, trim_proportio
     if (align or recenter) and metadata is None:
         raise ValueError()
 
-    residual_list = [res.residuals for res in sampler_results]
     offset = 0
 
     if align:
@@ -109,9 +107,9 @@ def _get_flat_processed_residuals(sampler_results, metadata=None, trim_proportio
         flat_residuals = residuals.flatten()
         flat_residuals[column_mask] = np.nan
 
-    return xval, residuals, flat_residuals
+    return xval, residuals, flat_residuals, offset
 
-def plot_martingale_residuals_on_axis(sampler_results, ax, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start', region_bounds=[], title='Residuals vs. Position', alpha=1., pointsize=5, linesize=1, fontsize=8):
+def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start', region_bounds=[], title='Residuals vs. Position', xlabel='residual', alpha=1., pointsize=5, linesize=1, fontsize=8):
     """
     Plot martingale residuals per nucleotide position
 
@@ -139,8 +137,8 @@ def plot_martingale_residuals_on_axis(sampler_results, ax, metadata=None, trim_p
     if align and gap_dict is None:
         raise ValueError()
 
-    xval, residuals, flat_residuals = _get_flat_processed_residuals(
-        sampler_results,
+    xval, residuals, flat_residuals, offset = _get_flat_processed_residuals(
+        residuals_list,
         metadata,
         trim_proportion,
         plot_average,
@@ -158,11 +156,13 @@ def plot_martingale_residuals_on_axis(sampler_results, ax, metadata=None, trim_p
         dropna=True,
         scatter_kws={'alpha': alpha, 's': pointsize, 'color': 'black'},
         line_kws={'color': 'black', 'lw': linesize},
-        lowess=True,
+        #lowess=True,
+        fit_reg=False,
         ax=ax
     )
+    ax.axhline(y=0, color='black', linestyle='--', linewidth=linesize)
     ax.set_xlabel('nucleotide position', fontsize=fontsize)
-    ax.set_ylabel('residual', fontsize=fontsize)
+    ax.set_ylabel(xlabel, fontsize=fontsize)
     ax.tick_params(labelsize=fontsize)
     ax.set_title(title, fontsize=fontsize)
     increment = int(AXIS_INCREMENT * round(float(seq_len)/(10*AXIS_INCREMENT)))
@@ -173,7 +173,7 @@ def plot_martingale_residuals_on_axis(sampler_results, ax, metadata=None, trim_p
     if align:
         for bound in region_bounds:
             if bound < seq_len:
-                ax.axvline(x=bound, color='black', linestyle=':', linewidth=1)
+                ax.axvline(x=bound-offset, color='black', linestyle=':', linewidth=1)
     return residuals
 
 def plot_model_scatter(all_df, fname, hue_var=None, df_labels=['1', '2'], alpha=.5, linesize=3, legend_labels=None, title=''):
