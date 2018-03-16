@@ -113,7 +113,7 @@ def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_pr
     """
     Plot martingale residuals per nucleotide position
 
-    @param sampler_results: list of GibbsSamplerResults
+    @param residuals_list: list of residuals; can also be any list of position-wise statistics
     @param ax: axis on which to plot current residuals; useful for plt.subplots calls
     @param metadata: contains information on aligning and recentering
     @param trim_proportion: don't plot positions with trim_proportion or more missing values;
@@ -125,13 +125,13 @@ def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_pr
     @param center_col: column in metadata that has the centering position
     @param region_bounds: list of positions showing where to plot FW/CDR region boundaries
     @param title: title of plot
+    @param xlabel: xlabel of plot
     @param alpha: alpha parameter for points
     @param pointsize: size of scatterplot points
     @param linesize: thickness of lowess line
     @param fontsize: size of font for axes/title
 
-    @return: numpy array of n_obs x seq_len martingale residuals
-    and plot
+    @return: numpy array of n_obs x seq_len martingale residuals and plot
     """
 
     if align and gap_dict is None:

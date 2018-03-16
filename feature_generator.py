@@ -64,6 +64,7 @@ class MultiFeatureMutationStep:
     def __init__(self, mutating_pos_feat=None, mutating_pos=None, neighbors_feat_old=None, neighbors_feat_new=None):
         """
         @param mutating_pos_feats: the feature index of the position that mutated
+        @param mutating_pos: the position that mutated; for calculating position-wise risks/residuals later
         @param neighbors_feat_old: the old feature indices of the positions next to the mutated position
         @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
         @param feat_mut_step: FeatureMutationStep
