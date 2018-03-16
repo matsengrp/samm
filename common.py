@@ -10,6 +10,7 @@ DEBUG = False
 
 NUM_NUCLEOTIDES = 4
 NUCLEOTIDES = "acgt"
+DEGENERATE_NUCLEOTIDE = "n"
 NUCLEOTIDE_SET = set(["a", "c", "g", "t"])
 NUCLEOTIDE_DICT = {
     "a": 0,
@@ -345,15 +346,18 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     """
     Process the degenerate characters in sequences:
     1. Replace unknown characters with "n"
-    2. Remove padding "n"s at beginning and end of sequence
-    3. Collapse runs of "n"s into one of motif_len/2
-    4. Replace all interior "n"s with nonmutating random nucleotide
+    2. Collapse runs of "n"s into one of motif_len/2
+    3. Replace all interior "n"s with nonmutating random nucleotide
 
     @param start_seq: starting sequence
     @param end_seq: ending sequence
     @param motif_len: motif length; needed to determine length of collapsed "n" run
     @param threshold: if proportion of "n"s in a sequence is larger than this then
         throw a warning
+
+    @return processed_start_seq: starting sequence with interior "n"s collapsed and imputed
+    @return processed_end_seq: ending sequence with same
+    @return collapse_list: list of tuples of (index offset, start index of run of "n"s, end index of run of "n"s) for bookkeeping later
     """
     assert(len(start_seq) == len(end_seq))
 
@@ -364,8 +368,9 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     # conform unknowns and collapse "n"s
     repl = 'n' * (motif_len/2)
     pattern = repl + '+' if motif_len > 1 else 'n'
+    collapse_list = []
     if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
-        # turn known bases in start_seq to "n"s and collapse degenerates
+        # if one sequence has an "n" but the other doesn't, make them both have "n"s
         start_list = list(processed_start_seq)
         end_list = list(processed_end_seq)
         for idx in re.finditer('n', processed_end_seq):
@@ -375,17 +380,22 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
             end_list[idx.start()] = 'n'
         processed_end_seq = ''.join(end_list)
 
-        # first remove beginning and trailing "n"s
-        processed_start_seq = re.sub('^n+|n+$', '', processed_start_seq)
-        processed_end_seq = re.sub('^n+|n+$', '', processed_end_seq)
-
         # ensure there are not too many internal "n"s
-        num_ns = processed_end_seq.count('n')
         seq_len = len(processed_end_seq)
+        start_idx = re.search('[^n]', processed_end_seq).start()
+        end_idx = seq_len - re.search('[^n]', processed_end_seq[::-1]).start()
+        interior_end_seq = processed_end_seq[start_idx:end_idx]
+        num_ns = interior_end_seq.count('n')
+        seq_len = len(interior_end_seq)
         if num_ns > threshold * seq_len:
             warnings.warn("Sequence of length {0} had {1} unknown bases".format(seq_len, num_ns))
 
         # now collapse interior "n"s
+        for match in re.finditer(pattern, interior_end_seq):
+            # num "n"s removed
+            # starting position of "n"s removed
+            collapse_list.append((start_idx + motif_len/2, match.regs[0][0], match.regs[0][1]))
+
         processed_start_seq = re.sub(pattern, repl, processed_start_seq)
         processed_end_seq = re.sub(pattern, repl, processed_end_seq)
 
@@ -395,7 +405,7 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
             processed_start_seq = mutate_string(processed_start_seq, match.start(), random_nuc)
             processed_end_seq = mutate_string(processed_end_seq, match.start(), random_nuc)
 
-    return processed_start_seq, processed_end_seq
+    return processed_start_seq, processed_end_seq, collapse_list
 
 def get_idx_differ_by_one_character(s1, s2):
     """

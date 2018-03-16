@@ -1,7 +1,7 @@
 import numpy as np
 from common import mutate_string
 from common import NUCLEOTIDES, NUM_NUCLEOTIDES
-from common import sample_multinomial
+from common import sample_multinomial, process_degenerates_and_impute_nucleotides
 from models import *
 
 class SurvivalModelSimulator:
@@ -9,21 +9,26 @@ class SurvivalModelSimulator:
     A simple model that will mutate sequences based on the survival model we've assumed.
     We will suppose that the hazard is constant over time.
     """
-    def simulate(self, start_seq, censoring_time=None, percent_mutated=None, with_replacement=False):
+    def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False):
         """
-        @param start_seq: string for the original sequence (includes flanks!)
+        @param start_seq: string for the original sequence; includes flanks unless they are provided by left_flank/right_flank
+        @param left_flank: the left flank
+        @param right_flank: the right flank
         @param censoring_time: how long to mutate the sequence for
+        @param percent_mutated: percent of sequence to mutated
         @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
 
         @return FullSequenceMutations, ending sequence and entire history of mutations
         """
         mutations = []
 
-        left_flank = start_seq[:self.feature_generator.motif_len/2]
-        right_flank = start_seq[len(start_seq) - self.feature_generator.motif_len/2:]
-        start_seq = start_seq[self.feature_generator.motif_len/2:len(start_seq) - self.feature_generator.motif_len/2]
-        intermediate_seq = start_seq
+        if left_flank is None and right_flank is None:
+            left_flank = start_seq[:self.feature_generator.max_left_motif_flank_len]
+            right_flank = start_seq[len(start_seq) - self.feature_generator.max_right_motif_flank_len:]
+            start_seq = start_seq[self.feature_generator.max_left_motif_flank_len:len(start_seq) - self.feature_generator.max_right_motif_flank_len]
+
         pos_to_mutate = set(range(len(start_seq)))
+        intermediate_seq = start_seq
         last_mutate_time = 0
         while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
@@ -42,7 +47,6 @@ class SurvivalModelSimulator:
 
             last_mutate_time = mutate_time
 
-
             if not with_replacement:
                 pos_to_mutate.remove(mutate_pos)
 
@@ -60,6 +64,40 @@ class SurvivalModelSimulator:
             right_flank,
             mutations,
         )
+
+    def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5):
+        """
+        Simulates a dataset with similar germlines and mutation positions/rates as an observed dataset
+
+        @param obs_data: data to mimic in simulation
+        @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
+        @param motif_len: length of motif, for data processing
+
+        @return list of ObservedSequenceMutations
+        """
+        simulated_data = []
+        for idx, obs_seq_mutation in enumerate(obs_data):
+            pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
+            sample = self.simulate(start_seq=obs_seq_mutation.start_seq, left_flank=obs_seq_mutation.left_flank, right_flank=obs_seq_mutation.right_flank, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len)
+            raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
+            raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
+
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
+                raw_start_seq,
+                raw_end_seq,
+                motif_len,
+            )
+
+            sim_seq_mutation = ObservedSequenceMutations(
+                start_seq=start_seq,
+                end_seq=end_seq,
+                motif_len=motif_len,
+                collapse_list=collapse_list,
+            )
+            if sim_seq_mutation.num_mutations > 0:
+                # don't consider pairs where mutations occur in flanking regions
+                simulated_data.append(sim_seq_mutation)
+        return simulated_data
 
 class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
     """
@@ -154,3 +192,47 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         mutate_pos = mutate_positions[sampled_idx]
         nucleotide_target = target_nucleotides[sampled_idx]
         return mutate_time_delta, mutate_pos, nucleotide_target
+
+class SurvivalModelSimulatorPositionDependent(SurvivalModelSimulator):
+    """
+    A model that will mutate sequences based on a survival model
+    incorporating motif and position dependence. We assume the hazard
+    is constant over time.
+    """
+    def __init__(self, thetas, probability_matrix, feature_generator, lambda0, pos_risk):
+        """
+        @param thetas: Numpy array(p,1) where p is the number of
+        motifs. Each element is the rate at which the motif mutates.
+        @param probability_matrix: The probability of a target
+        nucleotide given that the motif mutated.  @param
+        feature_generator: FeatureGenerator @param lambda0: A constant
+        hazard rate @param pos_risk: Numpy array(n, 1) where n is the
+        length of the sequence. Each element describes how much more
+        or less likely the position is to mutate.
+        """
+        self.thetas = thetas
+        self.probability_matrix = probability_matrix
+        self.feature_generator = feature_generator
+        self.motif_list = self.feature_generator.motif_list
+        self.lambda0 = lambda0
+        self.pos_risk = pos_risk
+
+    def _sample_mutation(self, feature_vec_dict, intermediate_seq, pos_to_mutate):
+        hazard_weights = []
+        mutate_positions = []
+        for p in pos_to_mutate:
+            motif_idx = feature_vec_dict[p]
+            hazard_weights.append(np.exp(self.thetas[motif_idx,0].sum(axis=0) + self.pos_risk[p]))
+            mutate_positions.append(p)
+
+        unif_sample = np.random.rand(1)
+        denom = np.sum(hazard_weights)
+        mutate_time_delta = - 1/self.lambda0 * np.log(1 - unif_sample) / denom
+
+        sampled_idx = sample_multinomial(hazard_weights)
+        mutate_pos = mutate_positions[sampled_idx]
+        mutate_feat_idx = feature_vec_dict[mutate_pos]
+        nucleotide_target_idx = sample_multinomial(
+            self.probability_matrix[mutate_feat_idx,:].sum(axis=0)
+        )
+        return mutate_time_delta, mutate_pos, NUCLEOTIDES[nucleotide_target_idx]

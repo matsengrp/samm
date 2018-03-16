@@ -14,7 +14,7 @@ class SamplerCollection:
     A class that will run samplers in parallel.
     A sampler is created for each element in observed_data.
     """
-    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs=None, scratch_dir=None, pool=None, num_tries=5):
+    def __init__(self, observed_data, theta, sampler_cls, feat_generator, num_jobs=None, scratch_dir=None, pool=None, num_tries=5, get_residuals=False):
         """
         There are two choices for running a sampler collection: Batch submission and multithreading.
         If num_jobs and scratch_dir are specified, then we perform batch submission.
@@ -38,6 +38,7 @@ class SamplerCollection:
         self.feat_generator = feat_generator
         self.observed_data = observed_data
         self.num_tries = num_tries
+        self.get_residuals = get_residuals
 
     def get_samples(self, init_orders_for_iter, num_samples, burn_in_sweeps=0, sampling_rate=1):
         """
@@ -52,7 +53,7 @@ class SamplerCollection:
         @returns List of samples from each sampler (ImputedSequenceMutations) and log probabilities for tracing
         """
         rand_seed = get_randint()
-        shared_obj = SamplerPoolWorkerShared(self.sampler_cls, self.theta, self.feat_generator, num_samples, burn_in_sweeps, sampling_rate, self.num_tries)
+        shared_obj = SamplerPoolWorkerShared(self.sampler_cls, self.theta, self.feat_generator, num_samples, burn_in_sweeps, sampling_rate, self.num_tries, self.get_residuals)
         worker_list = [
             SamplerPoolWorker(rand_seed + i, obs_data, init_order)
             for i, (obs_data, init_order) in enumerate(zip(self.observed_data, init_orders_for_iter))
@@ -69,7 +70,7 @@ class SamplerCollection:
         return sampled_orders_list
 
 class SamplerPoolWorkerShared:
-    def __init__(self, sampler_cls, theta, feat_generator, num_samples, burn_in_sweeps, sampling_rate, num_tries):
+    def __init__(self, sampler_cls, theta, feat_generator, num_samples, burn_in_sweeps, sampling_rate, num_tries, get_residuals):
         self.sampler_cls = sampler_cls
         self.theta = theta
         self.feat_generator = feat_generator
@@ -77,6 +78,7 @@ class SamplerPoolWorkerShared:
         self.burn_in_sweeps = burn_in_sweeps
         self.sampling_rate = sampling_rate
         self.num_tries = num_tries
+        self.get_residuals = get_residuals
 
 class SamplerPoolWorker(ParallelWorker):
     """
@@ -93,6 +95,7 @@ class SamplerPoolWorker(ParallelWorker):
             shared_obj.feat_generator,
             self.obs_seq,
             shared_obj.num_tries,
+            shared_obj.get_residuals,
         )
         sampler_res = sampler.run(self.init_order, shared_obj.burn_in_sweeps, shared_obj.num_samples, shared_obj.sampling_rate)
         return sampler_res
@@ -101,7 +104,7 @@ class SamplerPoolWorker(ParallelWorker):
         return "SamplerPoolWorker %s" % self.obs_seq
 
 class Sampler:
-    def __init__(self, theta, feature_generator, obs_seq_mutation, num_tries=5):
+    def __init__(self, theta, feature_generator, obs_seq_mutation, num_tries=5, get_residuals=False):
         """
         @param theta: numpy vector of model parameters
         @param feature_generator: FeatureGenerator
@@ -128,3 +131,4 @@ class Sampler:
         self.num_mutations = len(self.mutated_positions)
 
         self.num_tries = num_tries
+        self.get_residuals = get_residuals

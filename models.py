@@ -1,14 +1,15 @@
-from common import mutate_string
+from common import mutate_string, DEGENERATE_NUCLEOTIDE
 import numpy as np
 
 class ObservedSequenceMutations:
-    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=None, right_flank_len=None):
+    def __init__(self, start_seq, end_seq, motif_len=3, left_flank_len=None, right_flank_len=None, collapse_list=[]):
         """
         @param start_seq: start sequence
         @param end_seq: ending sequence with mutations
         @param motif_len: needed to determine flanking ends/mutations to trim sequence
         @param left_flank_len: maximum left flank length for this motif length
         @param right_flank_len: maximum right flank length for this motif length
+        @param collapse_list: list of tuples of (index offset, start index of run of "n"s, end index of run of "n"s) for bookkeeping later
 
         This class goes through half the sequence forward and finds the position where
         there are motif_len/2 conserved nucleotides, and does the same in reverse.
@@ -33,23 +34,30 @@ class ObservedSequenceMutations:
         start_idx = 0
         end_idx = len(start_seq)
 
-        skipped_mutations = 0
+        skipped_left = 0
+        skipped_right= 0
 
         # Go through half the sequence forward to find beginning conserved nucleotides
+        # Also skip ns
         for flank_start_idx in range(len(start_seq)/2):
             if start_idx + left_flank_len == flank_start_idx:
                 break
-            elif start_seq[flank_start_idx] != end_seq[flank_start_idx]:
+            elif start_seq[flank_start_idx] != end_seq[flank_start_idx] or \
+                 start_seq[flank_start_idx] == DEGENERATE_NUCLEOTIDE or \
+                 end_seq[flank_start_idx] == DEGENERATE_NUCLEOTIDE:
                 start_idx = flank_start_idx + 1
-                skipped_mutations += 1
+                skipped_left += 1
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides
+        # Also skip ns
         for flank_end_idx in reversed(range(len(start_seq)/2, len(start_seq))):
             if end_idx - right_flank_len - 1 == flank_end_idx:
                 break
-            elif start_seq[flank_end_idx] != end_seq[flank_end_idx]:
+            elif start_seq[flank_end_idx] != end_seq[flank_end_idx] or \
+                 start_seq[flank_end_idx] == DEGENERATE_NUCLEOTIDE or \
+                 end_seq[flank_end_idx] == DEGENERATE_NUCLEOTIDE:
                 end_idx = flank_end_idx + 1
-                skipped_mutations += 1
+                skipped_right += 1
 
         self.left_flank = start_seq[start_idx:start_idx + left_flank_len]
         self.right_flank = start_seq[end_idx - right_flank_len:end_idx]
@@ -58,18 +66,23 @@ class ObservedSequenceMutations:
         end_seq = end_seq[start_idx + left_flank_len:end_idx - right_flank_len]
 
         self.mutation_pos_dict = dict()
+        self.mutated_indicator = [0.] * len(start_seq)
         for i in range(len(start_seq)):
             if start_seq[i] != end_seq[i]:
                 self.mutation_pos_dict[i] = end_seq[i]
+                self.mutated_indicator[i] = 1.
 
         self.num_mutations = len(self.mutation_pos_dict.keys())
         self.left_flank_len = len(self.left_flank)
-        self.skipped_mutations = skipped_mutations
+        self.skipped_mutations = skipped_left + skipped_right
+        self.left_position_offset = left_flank_len + skipped_left
+        self.right_position_offset = right_flank_len + skipped_right
         self.start_seq = start_seq
         self.start_seq_with_flanks = self.left_flank + start_seq + self.right_flank
         self.end_seq = end_seq
         self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
+        self.collapse_list = collapse_list
         assert(self.seq_len > 0)
 
     def set_start_feats(self, feat_matrix):
