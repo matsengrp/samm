@@ -213,9 +213,10 @@ class MutationOrderGibbsSampler(Sampler):
             if self.get_residuals:
                 first_mutation_pos = [seq_mut_order.mutation_order[i]]
                 all_risks[i + 1] = self._get_risk_update(
-                    all_risks[i] * denominators[i] / denominators[i+1],
+                    all_risks[i],
                     first_mutation_pos,
                     second_feat_mut_step,
+                    denominators[i],
                     denominators[i+1],
                 )
 
@@ -344,9 +345,10 @@ class MutationOrderGibbsSampler(Sampler):
             new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             if self.get_residuals:
                 new_risk_vec = self._get_risk_update(
-                    all_risk_vecs[i] * denominators[i] / new_denom,
+                    all_risk_vecs[i],
                     prev_feat_mut_step.mutating_pos,
                     feat_mut_step,
+                    denominators[i],
                     new_denom,
                 )
                 all_risk_vecs.append(new_risk_vec)
@@ -389,9 +391,10 @@ class MutationOrderGibbsSampler(Sampler):
             new_denom = self._get_denom_update(denominators[i], prev_feat_mut_step.mutating_pos_feats, feat_mut_step)
             if self.get_residuals:
                 new_risk_vec = self._get_risk_update(
-                    all_risk_vecs[i] * denominators[i] / new_denom,
+                    all_risk_vecs[i],
                     prev_feat_mut_step.mutating_pos,
                     feat_mut_step,
+                    denominators[i],
                     new_denom,
                 )
                 all_risk_vecs.append(new_risk_vec)
@@ -426,17 +429,21 @@ class MutationOrderGibbsSampler(Sampler):
             new_denom = old_denominator - prev_exp_theta_sum - np.sum(old_feat_exp_theta_sums) + np.sum(new_feat_exp_theta_sums)
         return float(new_denom)
 
-    def _get_risk_update(self, base_risk_vec, prev_mut_pos, feat_mut_step, new_denom):
+    def _get_risk_update(self, old_risk_vec, prev_mut_pos, feat_mut_step, old_denom, new_denom):
         """
         Similar to _get_denom_update but calculate the updated risk vector to use as residuals
 
-        @param base_risk_vec: the vector of summands from denominator from the previous mutation step weighted with the new denominator
+        @param old_risk_vec: the vector of summands from denominator from the previous mutation step
         @param prev_mut_pos: previously mutated position that won't contribute to the updated risk group
         @param feat_mut_step: the features that differed for this next mutation step
+        @param old_denom: previous mutation step denominator
         @param new_denom: new denominator
         """
+        # reweight old risk vector with new denominator
+        base_risk_vec = old_risk_vec * old_denom / new_denom
+
+        # update risk values for nearby positions
         for feat_pos, feat_idxs in feat_mut_step.neighbors_feat_new.iteritems():
-            # updated risk values for nearby positions
             if self.feature_generator.num_feat_gens > 1:
                 if not self.per_target_model:
                     base_risk_vec[feat_pos] = np.exp(self.theta[feat_idxs].sum()) / new_denom
@@ -447,6 +454,10 @@ class MutationOrderGibbsSampler(Sampler):
         if len(prev_mut_pos):
             # prev_mut_pos are now zero risk having mutated
             base_risk_vec[prev_mut_pos] = 0.
+
+        # make sure there are no NaNs because we'll use that to pad later
+        assert(not any([np.isnan(risk) for risk in base_risk_vec]))
+
         return base_risk_vec
 
     def _calculate_unoffset_residuals(self, acc_risks):
