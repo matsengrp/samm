@@ -1,6 +1,11 @@
 import unittest
 import numpy as np
 
+import matplotlib
+import pandas as pd
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+
 from sampler_collection import SamplerCollection
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
@@ -8,7 +13,7 @@ from simulate_germline import GermlineMetadata
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn, SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
 from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES, process_degenerates_and_impute_nucleotides
-from plot_helpers import plot_martingale_residuals_to_file
+from plot_helpers import plot_martingale_residuals_on_axis
 
 POSITION_BIAS = 3
 
@@ -143,24 +148,32 @@ class Residuals_TestCase(unittest.TestCase):
         # Residuals have mean zero over subjects and are between -\infty and 1
         # Correctly specified model
         sampler_results = self._get_residuals(min_gene_len=15, max_gene_len=25, get_residuals=True)
-        residuals = plot_martingale_residuals_to_file(
-            sampler_results,
-            'test/_output/residuals.svg',
+        fig, axs = plt.subplots(ncols=1, nrows=1)
+        residuals = plot_martingale_residuals_on_axis(
+            [res.residuals for res in sampler_results],
+            axs,
             trim_proportion=.5,
             plot_average=True,
-            title='Residuals vs. Position (correctly specified model)'
+            title='Residuals vs. Position (correctly specified model)',
+            xlabel='residual',
         )
+        plt.savefig('test/_output/residuals.svg')
+        plt.clf()
         self.assertTrue(np.nanmax(residuals) <= 1.)
         self.assertTrue(np.isclose(np.nanmean(residuals), 0.))
 
         # Positional bias
         sampler_results = self._get_residuals(get_residuals=True, position_bias=True)
-        residuals = plot_martingale_residuals_to_file(
-            sampler_results,
-            'test/_output/residuals_position_bias.svg',
+        fig, axs = plt.subplots(ncols=1, nrows=1)
+        residuals = plot_martingale_residuals_on_axis(
+            [res.residuals for res in sampler_results],
+            axs,
             plot_average=True,
-            title='Residuals vs. Position (position-biased model)'
+            title='Residuals vs. Position (position-biased model)',
+            xlabel='residual',
         )
+        plt.savefig('test/_output/residuals_position_bias.svg')
+        plt.clf()
         self.assertTrue(np.nanmax(residuals) <= 1.)
         self.assertTrue(np.isclose(np.nanmean(residuals), 0.))
 
