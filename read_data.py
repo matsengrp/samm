@@ -641,7 +641,7 @@ def read_shmulate_val(shmulate_value):
     # shazam csv puts a zero if there are not enough observations for that motif
     return -np.inf if shmulate_value == "NA" or shmulate_value == "0" or shmulate_value == "0.0" else np.log(float(shmulate_value))
 
-def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
+def get_shazam_theta(mutability_file, substitution_file=None):
     """
     Take shazam csv files and turn them into our theta vector
 
@@ -651,7 +651,8 @@ def get_shazam_theta(motif_len, mutability_file, substitution_file=None):
     """
 
     # Read in the results from the shmulate model-fitter
-    feat_gen = SubmotifFeatureGenerator(motif_len=motif_len)
+    # Shazam is always a 5mer
+    feat_gen = SubmotifFeatureGenerator(motif_len=5)
     motif_list = feat_gen.motif_list
 
     # Read mutability matrix

@@ -139,7 +139,6 @@ for sim_method in SIM_METHODS:
         samm = samm[possible_agg_mask] - np.median(samm[possible_agg_mask])
         tmp_df['samm'] = samm
         shazam_raw = get_shazam_theta(
-            MOTIF_LEN,
             SHAZAM_MUT_STR % (sim_method, seed),
             SHAZAM_SUB_STR % (sim_method, seed),
         )
