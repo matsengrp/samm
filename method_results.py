@@ -2,15 +2,11 @@ import numpy as np
 from common import get_num_nonzero
 
 class MethodResults:
-    def __init__(self, penalty_params, motif_lens, positions_mutating):
+    def __init__(self, penalty_params):
         """
         @param penalized_theta: a theta from the penalized version
-        @param motif_lens: the motif lengths we fit for
-        @param positions_mutating: the mutation positions that we fit for
         """
         self.penalty_params = penalty_params
-        self.motif_lens = motif_lens
-        self.positions_mutating = positions_mutating
         self.has_refit_data = False
         self.has_residuals = False
         self.num_not_crossing_zero = 0
