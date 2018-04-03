@@ -37,7 +37,7 @@ def parse_args():
 
 class ShazamModel:
    def __init__(self, agg_motif_len, shazam_mut_csv, shazam_sub_csv):
-        refit_theta = get_shazam_theta(agg_motif_len, shazam_mut_csv, shazam_sub_csv)
+        refit_theta = get_shazam_theta(shazam_mut_csv, shazam_sub_csv)
         if refit_theta.shape[1] > 1:
             self.agg_refit_theta = refit_theta[:,0:1] + refit_theta[:,1:]
         else:
