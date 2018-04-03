@@ -1,20 +1,21 @@
-from feature_generator import *
+import itertools
+import numpy as np
+
+from common import NUCLEOTIDE_SET, get_max_mut_pos, get_zero_theta_mask, create_theta_idx_mask, ZSCORE_95
+from combined_feature_generator import CombinedFeatureGenerator
+from feature_generator import MultiFeatureMutationStep
 from submotif_feature_generator import SubmotifFeatureGenerator
 from scipy.sparse import hstack
-from itertools import product
 
-class HierarchicalMotifFeatureGenerator(FeatureGenerator):
-    def __init__(self, motif_lens=[3,5], feats_to_remove=None, left_motif_flank_len_list=None):
+class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
+    def __init__(self, motif_lens, model_masks=None, left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
-        @param feats_to_remove: dictionary whose keys are left_flank_len values and whose values are lists of motifs (strings) where the motif and left_flank_len have been zeroed out (completely - all targets are zeroed out)
+        @param model_masks: dictionary whose keys are left_flank_len values and whose values are lists of motifs (strings) where the motif and left_flank_len have been zeroed out (completely - all targets are zeroed out)
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
         """
 
         self.motif_lens = motif_lens
-
-        self.max_motif_len = max(motif_lens)
-        self.motif_len = self.max_motif_len
 
         if left_motif_flank_len_list is None:
             # default to central base mutating
@@ -22,10 +23,9 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
             for motif_len in motif_lens:
                 left_motif_flank_len_list.append([motif_len/2])
 
-        self.all_mut_pos = set(sum(left_motif_flank_len_list, []))
-        if feats_to_remove is None:
-            # default to not removing any features
-            feats_to_remove = {mut_pos: [] for mut_pos in self.all_mut_pos}
+        self.max_motif_len = max(motif_lens)
+        self.motif_len = self.max_motif_len
+        self.left_motif_flank_len = get_max_mut_pos(motif_lens, left_motif_flank_len_list)
 
         # Find the maximum left and right motif flank lengths to pass to SubmotifFeatureGenerator
         # in order to update all the relevant features
@@ -35,15 +35,21 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         self.max_left_motif_flank_len = max(sum(left_motif_flank_len_list, []))
         self.max_right_motif_flank_len = max(all_right_flanks)
 
+        if model_masks is None:
+            # default to not removing any features
+            feats_to_remove = []
+        else:
+            feats_to_remove = model_masks.feats_to_remove()
+
         # Create list of feature generators for different motif lengths and different flank lengths
         self.feat_gens = []
         for motif_len, left_motif_flank_lens in zip(motif_lens, left_motif_flank_len_list):
             for left_motif_flank_len in left_motif_flank_lens:
-                motifs_to_remove = feats_to_remove[left_motif_flank_len]
+                curr_feats_to_remove = [label for label in feats_to_remove if int(label.split(' ')[2]) == left_motif_flank_len]
                 self.feat_gens.append(
                         SubmotifFeatureGenerator(
                             motif_len=motif_len,
-                            motifs_to_remove=motifs_to_remove,
+                            feats_to_remove=curr_feats_to_remove,
                             left_motif_flank_len=left_motif_flank_len,
                             hier_offset=self.max_left_motif_flank_len - left_motif_flank_len,
                             left_update_region=self.max_left_motif_flank_len,
@@ -54,98 +60,134 @@ class HierarchicalMotifFeatureGenerator(FeatureGenerator):
         feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
         self.num_feat_gens = len(self.feat_gens)
+        self.feature_vec_len = np.sum(feat_offsets)
 
         # construct motif dictionary and lists of parameters
-        self.feature_vec_len = np.sum(feat_offsets)
         self.motif_list = []
         self.mutating_pos_list = []
-        self.motif_dict = dict()
+        self.feature_label_list = []
+        for f in self.feat_gens:
+            self.motif_list += f.motif_list
+            self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
+            self.feature_label_list += f.feature_label_list
+
+    def _update_feature_generator_after_removing(self, model_masks):
+        """
+        so we don't have to create a whole new feature vector
+        """
+        # Create list of feature generators for different motif lengths and different flank lengths
+        feats_to_remove = model_masks.set_feats_to_remove()
+        old_feat_gens = self.feat_gens
+        self.feat_gens = []
+        for feat_gen in old_feat_gens:
+            curr_feats_to_remove = [label for label in feats_to_remove if int(label.split(' ')[2]) == feat_gen.left_motif_flank_len]
+            feat_gen._update_motifs_after_removing(curr_feats_to_remove)
+            self.feat_gens.append(feat_gen)
+
+        feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
+        self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
+        self.feature_vec_len = np.sum(feat_offsets)
+
+        # construct motif dictionary and lists of parameters
+        self.motif_list = []
+        self.mutating_pos_list = []
+        self.feature_label_list = []
         for i, f in enumerate(self.feat_gens):
             self.motif_list += f.motif_list
             self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
-            for motif in f.motif_list:
-                raw_motif_idx = f.motif_dict[motif]
-                if motif not in self.motif_dict.keys():
-                    self.motif_dict[motif] = dict()
-                if raw_motif_idx is not None:
-                    self.motif_dict[motif][f.left_motif_flank_len] = raw_motif_idx + self.feat_offsets[i]
+            self.feature_label_list += f.feature_label_list
 
-    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
-        if do_feat_vec_pos is None:
-            do_feat_vec_pos = range(len(seq_str))
-        feat_vec_dict = {pos:[] for pos in do_feat_vec_pos}
-        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos)
-            for pos in do_feat_vec_pos:
-                feat = f_dict[pos]
-                if feat is not None:
-                    feat_vec_dict[pos].append(feat + offset)
-        return feat_vec_dict
-
-    def add_base_features_for_list(self, obs_data):
+    def get_possible_motifs_to_targets(self, mask_shape):
         """
-        Calls create_base_features over a list of obs_seq_mutation
-        Mutates the obs_data object -- adds starting features as an attribute
+        @return a boolean matrix with possible mutations as True, impossible mutations as False
         """
-        for obs in obs_data:
-            self.add_base_features(obs)
+        theta_mask = np.ones(mask_shape, dtype=bool)
+        if mask_shape[1] == NUM_NUCLEOTIDES + 1:
+            # Estimating a different theta vector for different target nucleotides
+            # We cannot have a motif mutate to the same center nucleotide
+            for i in range(len(self.motif_list)):
+                center_motif_idx = self.mutating_pos_list[i]
+                mutating_nucleotide = self.motif_list[i][center_motif_idx]
+                center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide] + 1
+                theta_mask[i, center_nucleotide_idx] = False
+        elif mask_shape[1] == NUM_NUCLEOTIDES:
+            for i in range(len(self.motif_list)):
+                center_motif_idx = self.mutating_pos_list[i]
+                mutating_nucleotide = self.motif_list[i][center_motif_idx]
+                center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
+                theta_mask[i, center_nucleotide_idx] = False
 
-    def add_base_features(self, obs_seq_mutation):
+        return theta_mask
+
+    # why keep this column specific?
+    def combine_thetas_and_get_conf_int(self, theta, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
         """
-        Mutates the `obs_seq_mutation` object -- adds starting features as an attribute
+        Combine hierarchical and offset theta values
         """
-        feat_mats = []
-        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            feat_mat = feat_gen._get_base_features(obs_seq_mutation)
-            feat_mats.append(feat_mat)
-        full_feat_mat = hstack(feat_mats, format="csr")
-        obs_seq_mutation.set_start_feats(full_feat_mat)
+        full_feat_generator = SubmotifFeatureGenerator(
+            motif_len=self.motif_len,
+            left_motif_flank_len=self.left_motif_flank_len,
+        )
+        full_theta_size = full_feat_generator.feature_vec_len
+        zero_theta_mask = get_zero_theta_mask(theta)
+        theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
+        # stores which hierarchical theta values were used to construct the full theta
+        # important for calculating covariance
+        theta_index_matches = {i:[] for i in range(full_theta_size)}
 
-    def count_mutated_motifs(self, seq_mut_order):
-        mutated_motifs = []
-        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            curr_mutated_motifs = feat_gen.count_mutated_motifs(seq_mut_order)
-            mutated_motifs.append(curr_mutated_motifs)
-        return mutated_motifs
+        full_theta = np.zeros(full_theta_size)
+        theta_lower = np.zeros(full_theta_size)
+        theta_upper = np.zeros(full_theta_size)
 
-    def create_for_mutation_steps(self, seq_mut_order):
-        feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations)]
-        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            mut_steps = feat_gen.create_for_mutation_steps(seq_mut_order)
-            for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
-                multi_f.update(single_f, offset)
-        return feat_mutation_steps
+        for i, feat_gen in enumerate(self.feat_gens):
+            for m_idx, m in enumerate(feat_gen.motif_list):
+                raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
 
-    def get_shuffled_mutation_steps_delta(
-        self,
-        seq_mut_order,
-        update_step,
-        flanked_seq,
-        already_mutated_pos,
-    ):
-        first_mut_feats = []
-        multi_feat_mut_step = MultiFeatureMutationStep()
-        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            mut_pos_feat, mut_step = feat_gen.get_shuffled_mutation_steps_delta(
-                seq_mut_order,
-                update_step,
-                flanked_seq[feat_gen.hier_offset:],
-                already_mutated_pos,
-            )
-            if mut_pos_feat is not None:
-                first_mut_feats.append(mut_pos_feat + offset)
-            multi_feat_mut_step.update(mut_step, offset)
-        return first_mut_feats, multi_feat_mut_step
+                if col_idx != 0 and add_targets:
+                    m_theta = theta[raw_theta_idx, 0] + theta[raw_theta_idx, col_idx]
+                else:
+                    m_theta = theta[raw_theta_idx, col_idx]
 
-    def create_remaining_mutation_steps(
-        self,
-        seq_mut_order,
-        update_step_start,
-    ):
-        feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations - update_step_start)]
-        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            mut_steps = feat_gen.create_remaining_mutation_steps(seq_mut_order, update_step_start)
-            assert(len(mut_steps) == len(feat_mutation_steps))
-            for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
-                multi_f.update(single_f, offset)
-        return feat_mutation_steps
+                if feat_gen.motif_len == full_feat_generator.motif_len:
+                    assert(full_feat_generator.left_motif_flank_len == feat_gen.left_motif_flank_len)
+                    # Already at maximum motif length, so nothing to combine
+                    full_m_idx = full_feat_generator.motif_dict[m]
+                    full_theta[full_m_idx] += m_theta
+
+                    if theta_idx_counter[raw_theta_idx, 0] != -1:
+                        theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+                    if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+                        theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
+                else:
+                    # Combine hierarchical feat_gens for given left_motif_len
+                    flanks = itertools.product(NUCLEOTIDE_SET, repeat=full_feat_generator.motif_len - feat_gen.motif_len)
+                    for f in flanks:
+                        full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
+                        full_m_idx = full_feat_generator.motif_dict[full_m]
+                        full_theta[full_m_idx] += m_theta
+
+                        if theta_idx_counter[raw_theta_idx, 0] != -1:
+                            theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, 0])
+                        if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
+                            theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
+
+        if sample_obs_info is not None:
+            # Make the aggregation matrix
+            agg_matrix = np.zeros((full_theta.size, np.max(theta_idx_counter) + 1))
+            for full_theta_idx, matches in theta_index_matches.iteritems():
+                agg_matrix[full_theta_idx, matches] = 1
+
+            # Try two estimates of the obsersed information matrix
+            tts = [0.5 * (sample_obs_info + sample_obs_info.T), sample_obs_info]
+            for tt in tts:
+                cov_mat_full = np.dot(np.dot(agg_matrix, np.linalg.pinv(tt)), agg_matrix.T)
+                if not np.any(np.diag(cov_mat_full) < 0):
+                    break
+            if np.any(np.diag(cov_mat_full) < 0):
+                raise ValueError("Some variance estimates were negative: %d neg var" % np.sum(np.diag(cov_mat_full) < 0))
+
+            full_std_err = np.sqrt(np.diag(cov_mat_full))
+            theta_lower = full_theta - zstat * full_std_err
+            theta_upper = full_theta + zstat * full_std_err
+
+        return full_theta, theta_lower, theta_upper
