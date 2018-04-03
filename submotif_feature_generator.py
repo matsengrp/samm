@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 import logging as log
 
-from common import mutate_string
+from common import mutate_string, NUCLEOTIDES
 from generic_feature_generator import GenericFeatureGenerator
 
 class SubmotifFeatureGenerator(GenericFeatureGenerator):
@@ -82,7 +82,7 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
         for pos in update_positions:
             if pos not in already_mutated_pos:
                 # Only update the positions that are in the risk group (the ones that haven't mutated yet)
-                feat_dict[pos] = _get_mutating_pos_feat_idx(pos, intermediate_seq)
+                feat_dict[pos] = self._get_mutating_pos_feat_idx(pos, intermediate_seq)
         return feat_dict
 
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
@@ -104,9 +104,9 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
         @return a dict with the positions next to the given position and their feature index
         """
         return mutate_string(
-            intermediate_seq[self.hier_offset:],
-            pos + self.left_motif_flank_len,
-            end_seq[pos],
+            intermediate_seq,
+            pos + self.left_motif_flank_len + self.hier_offset,
+            end_seq[pos + self.left_motif_flank_len + self.hier_offset],
         )
 
     def _get_motif_list(self, motifs_to_remove):
