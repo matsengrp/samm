@@ -81,14 +81,11 @@ class MultiFeatureMutationStep:
 
     def _merge_dicts(self, my_dict, new_dict, feature_offset):
         for k in new_dict.keys():
-            if new_dict[k] is not None:
-                new_feature = [val + feature_offset for val in new_dict[k]]
-                if k not in my_dict:
-                    my_dict[k] = np.array(new_feature, dtype=int)
-                else:
-                    my_dict[k] = np.append(my_dict[k], new_feature)
+            new_feature = [val + feature_offset for val in new_dict[k]]
+            if k not in my_dict:
+                my_dict[k] = np.array(new_feature, dtype=int)
             else:
-                my_dict[k] = np.array([], dtype=int)
+                my_dict[k] = np.append(my_dict[k], new_feature)
 
     def __str__(self):
         return "(%s, old: %s, new: %s)" % (self.mutating_pos_feats, self.neighbors_feat_old, self.neighbors_feat_new)
