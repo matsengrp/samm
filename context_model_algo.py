@@ -31,10 +31,8 @@ class ContextModelAlgo:
         self.train_set = train_set
 
         self.theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
-        self.possible_theta_mask = get_possible_motifs_to_targets(
-            feat_generator.motif_list,
+        self.possible_theta_mask = feat_generator.get_possible_motifs_to_targets(
             self.theta_shape,
-            feat_generator.mutating_pos_list
         )
         self.zero_theta_mask = np.zeros(self.theta_shape, dtype=bool)
 
@@ -55,8 +53,6 @@ class ContextModelAlgo:
         self.num_jobs = args.num_jobs
         self.scratch_dir = args.scratch_dir
         self.intermediate_out_dir = args.intermediate_out_dir
-        self.motif_lens = args.motif_lens
-        self.positions_mutating = args.positions_mutating
         self.burn_in = args.burn_in
         self.sampling_rate = args.sampling_rate
 
@@ -110,7 +106,7 @@ class ContextModelAlgo:
             max_e_samples=self.num_e_samples * 4,
             intermed_file_prefix="%s/e_samples_%s_" % (self.intermediate_out_dir, "-".join([str(p) for p in penalty_params])),
         )
-        curr_model_results = MethodResults(penalty_params, self.motif_lens, self.positions_mutating)
+        curr_model_results = MethodResults(penalty_params)
 
         #### Calculate validation log likelihood (EM surrogate), use to determine if model is any good.
         log_lik_ratio_lower_bound, log_lik_ratio = self._do_validation_set_checks(
@@ -141,19 +137,14 @@ class ContextModelAlgo:
             return
 
         # Create a feature generator for this shrunken model
-        feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
-            motif_lens=self.motif_lens,
-            feats_to_remove=model_masks.feats_to_remove,
-            left_motif_flank_len_list=self.positions_mutating,
-        )
+        feat_generator_stage2 = copy.deepcopy(self.feat_generator)
+        feat_generator_stage2._update_feature_generator_after_removing(model_masks)
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
         # Create the theta mask for the shrunken theta
-        possible_theta_mask_refit = get_possible_motifs_to_targets(
-            feat_generator_stage2.motif_list,
+        possible_theta_mask_refit = self.feat_generator.get_possible_motifs_to_targets(
             model_masks.zero_theta_mask_refit.shape,
-            feat_generator_stage2.mutating_pos_list,
         )
         # Refit over the support from the penalized problem
         init_theta = model_result.penalized_theta[~model_masks.feats_to_remove_mask,:]
@@ -182,79 +173,41 @@ class ContextModelAlgo:
             possible_theta_mask_refit,
         )
 
-    def _calculate_residuals_from_refit(self, model_result):
-        model_masks = model_result.model_masks
-
-        # Create a feature generator for this shrunken model
-        feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
-            motif_lens=self.motif_lens,
-            feats_to_remove=model_masks.feats_to_remove,
-            left_motif_flank_len_list=self.positions_mutating,
-        )
-        # Get the data ready - using ALL data
-        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
-        feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
-
-        sampler_collection = SamplerCollection(
-            obs_data_stage2,
-            model_result.refit_theta,
-            MutationOrderGibbsSampler,
-            feat_generator_stage2,
-            self.num_jobs,
-            self.scratch_dir,
-            get_residuals=True,
-        )
-        init_orders = [
-            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
-            for obs_seq in obs_data_stage2
-        ]
-        sampler_results = sampler_collection.get_samples(
-            init_orders,
-            self.num_e_samples,
-            self.burn_in,
-            sampling_rate=self.sampling_rate,
-        )
-        model_result.set_sampler_results(sampler_results)
-
-    def _calculate_residuals_from_penalized(self, model_result):
-        # Create a feature generator for this shrunken model
-        feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
-            motif_lens=self.motif_lens,
-            left_motif_flank_len_list=self.positions_mutating,
-        )
-        # Get the data ready - using ALL data
-        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
-        feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
-
-        sampler_collection = SamplerCollection(
-            obs_data_stage2,
-            model_result.penalized_theta,
-            MutationOrderGibbsSampler,
-            feat_generator_stage2,
-            self.num_jobs,
-            self.scratch_dir,
-            get_residuals=True,
-        )
-        init_orders = [
-            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
-            for obs_seq in obs_data_stage2
-        ]
-        sampler_results = sampler_collection.get_samples(
-            init_orders,
-            self.num_e_samples,
-            self.burn_in,
-            sampling_rate=self.sampling_rate,
-        )
-        model_result.set_sampler_results(sampler_results)
-
     def calculate_residuals(self, model_result):
         """
         Similar to refit_unpenalized, but calculates residuals from refit theta
         Modifies model_result
         """
-
+        # Create a feature generator for this shrunken model
+        feat_generator_stage2 = copy.deepcopy(self.feat_generator)
         if not model_result.has_refit_data:
             # no refit data to get residuals from
-            self._calculate_residuals_from_penalized(model_result)
+            theta = model_result.penalized_theta
         else:
-            self._calculate_residuals_from_refit(model_result)
+            theta = model_result.refit_theta
+            feat_generator_stage2._update_feature_generator_after_removing(model_result.model_masks)
+
+        # Get the data ready - using ALL data
+        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
+        feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
+
+        sampler_collection = SamplerCollection(
+            obs_data_stage2,
+            theta,
+            MutationOrderGibbsSampler,
+            feat_generator_stage2,
+            self.num_jobs,
+            self.scratch_dir,
+            get_residuals=True,
+        )
+        init_orders = [
+            np.random.permutation(obs_seq.mutation_pos_dict.keys()).tolist()
+            for obs_seq in obs_data_stage2
+        ]
+        sampler_results = sampler_collection.get_samples(
+            init_orders,
+            self.num_e_samples,
+            self.burn_in,
+            sampling_rate=self.sampling_rate,
+        )
+        model_result.set_sampler_results(sampler_results)

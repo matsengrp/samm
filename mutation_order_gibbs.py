@@ -166,10 +166,10 @@ class MutationOrderGibbsSampler(Sampler):
             risk_hist = None
 
         # Now unmutate the string by one mutation step so that we can figure out the features at the positions
-        flanked_seq = unmutate_string(
+        flanked_seq = mutate_string(
             self.obs_seq_mutation.end_seq_with_flanks,
-            unmutate_pos=self.obs_seq_mutation.left_flank_len + position,
-            orig_nuc=self.obs_seq_mutation.start_seq[position]
+            self.obs_seq_mutation.left_flank_len + position,
+            self.obs_seq_mutation.start_seq[position]
         )
         already_mutated_pos_set = set(partial_order)
         # iterate through the remaining possible full mutation orders consistent with this partial order
@@ -180,10 +180,10 @@ class MutationOrderGibbsSampler(Sampler):
             already_mutated_pos_set.remove(shuffled_position)
             # Now unmutate the string so that we can figure out the features at the positions
             # right before the i-th mutation step occured
-            flanked_seq = unmutate_string(
+            flanked_seq = mutate_string(
                 flanked_seq,
-                unmutate_pos=self.obs_seq_mutation.left_flank_len + shuffled_position,
-                orig_nuc=self.obs_seq_mutation.start_seq[shuffled_position]
+                self.obs_seq_mutation.left_flank_len + shuffled_position,
+                self.obs_seq_mutation.start_seq[shuffled_position]
             )
             # Now get the features - we only need the feature of the mutating position at the ith step
             # And the feature updates at the time of the `i+1`-th step
@@ -423,9 +423,9 @@ class MutationOrderGibbsSampler(Sampler):
                 prev_theta_sum = self.theta[prev_feat_idxs,0].sum() + self.theta[prev_feat_idxs,1:].sum(axis=0)
                 new_denom = old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
-            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_new.values()]
-            prev_exp_theta_sum = self.exp_theta_sum[prev_feat_idxs] if len(prev_feat_idxs) else self.exp_theta_num_cols
+            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx].sum() if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx].sum() if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_new.values()]
+            prev_exp_theta_sum = self.exp_theta_sum[prev_feat_idxs].sum() if len(prev_feat_idxs) else self.exp_theta_num_cols
             new_denom = old_denominator - prev_exp_theta_sum - np.sum(old_feat_exp_theta_sums) + np.sum(new_feat_exp_theta_sums)
         return float(new_denom)
 
