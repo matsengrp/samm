@@ -11,7 +11,7 @@ class GenericFeatureGenerator(FeatureGenerator):
     We call these "sparse feature vectors".
     """
 
-    def get_base_features(self, obs_seq_mutation, feature_vec_len):
+    def get_base_features(self, obs_seq_mutation):
         """
         Create the feature matrices and feature vector dictionary
         before any mutations have occurred
@@ -33,7 +33,7 @@ class GenericFeatureGenerator(FeatureGenerator):
         data = [True] * start_idx
         feat_matrix = scipy.sparse.csr_matrix(
             (data, indices, indptr),
-            shape=(obs_seq_mutation.seq_len, feature_vec_len),
+            shape=(obs_seq_mutation.seq_len, self.feature_vec_len),
             dtype=bool,
         )
         return feat_matrix
@@ -75,7 +75,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             intermediate_seq = self._get_mutated_seq(
                 intermediate_seq,
                 mutation_pos,
-                seq_mut_order.obs_seq_mutation.end_seq,
+                seq_mut_order.obs_seq_mutation.end_seq_with_flanks,
             )
             already_mutated_pos.add(mutation_pos)
             feat_dict_prev = feat_dict_future
@@ -129,7 +129,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             flanked_seq = self._get_mutated_seq(
                 flanked_seq,
                 mutation_pos,
-                seq_mut_order.obs_seq_mutation.end_seq,
+                seq_mut_order.obs_seq_mutation.end_seq_with_flanks,
             )
             already_mutated_pos.add(mutation_pos)
             feat_dict_prev = feat_dict_future
@@ -163,12 +163,13 @@ class GenericFeatureGenerator(FeatureGenerator):
             flanked_seq,
             already_mutated_pos,
         )
+        first_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(first_mutation_pos, flanked_seq)
 
         # Apply mutation
         flanked_seq = self._get_mutated_seq(
             flanked_seq,
             first_mutation_pos,
-            seq_mut_order.obs_seq_mutation.end_seq,
+            seq_mut_order.obs_seq_mutation.end_seq_with_flanks,
         )
 
         feat_dict_curr, _ = self.update_mutation_step(
@@ -180,9 +181,8 @@ class GenericFeatureGenerator(FeatureGenerator):
             already_mutated_pos,
             calc_future_dict=False,
         )
-
-        first_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(first_mutation_pos, flanked_seq)
         second_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(second_mutation_pos, flanked_seq)
+
         return first_mut_pos_feat_idx, MultiFeatureMutationStep(
             second_mut_pos_feat_idx,
             [second_mutation_pos],

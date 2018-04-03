@@ -36,7 +36,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
         """
         feat_mats = []
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            feat_mat = feat_gen.get_base_features(obs_seq_mutation, feat_gen.feature_vec_len)
+            feat_mat = feat_gen.get_base_features(obs_seq_mutation)
             feat_mats.append(feat_mat)
         full_feat_mat = hstack(feat_mats, format="csr")
         obs_seq_mutation.set_start_feats(full_feat_mat)

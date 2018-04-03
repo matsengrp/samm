@@ -1,7 +1,7 @@
 import itertools
 import numpy as np
 
-from common import NUCLEOTIDE_SET, get_max_mut_pos, get_zero_theta_mask, create_theta_idx_mask, ZSCORE_95
+from common import NUCLEOTIDE_SET, get_max_mut_pos, get_zero_theta_mask, create_theta_idx_mask, ZSCORE_95, NUM_NUCLEOTIDES
 from combined_feature_generator import CombinedFeatureGenerator
 from feature_generator import MultiFeatureMutationStep
 from submotif_feature_generator import SubmotifFeatureGenerator
