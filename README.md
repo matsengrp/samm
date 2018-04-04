@@ -96,7 +96,7 @@ python plot_samm.py --input-pkl _output/fitted.pkl --output-pdf _output/fitted.p
 ### Computing the log-likelihood on a tree
 
 To obtain the log-likelihood of a supplied tree under a 5mer model, use the module `likelihood_of_tree_from_shazam` from `samm_rank.py`.
-It requires and `ete` tree as input as well as a `SHazaM`-style mutability and substitution `*.csv` file.
+It requires an `ete` tree as input as well as a `SHazaM`-style mutability and substitution `*.csv` file.
 The likelihood computed is the marginal likelihood.
 Chib's method is used to integrate out mutation order along all the branches, though determining `num_samples` and `num_tries` will be dataset-dependent.
 The following code will rank a tree that was simulated via [bcr-phylo](https://github.com/matsengrp/bcr-phylo-benchmark#sequence-simulation):
