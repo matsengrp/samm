@@ -70,8 +70,8 @@ In addition, use the following arguments to modify characteristics of the sequen
 
 |  argument        |  description
 |------------------------|----------------------------------------------------------------------------
-|  --min-percent-mutated | the minimum amount to mutate a sequence
-|  --max-percent-mutated | the maximum amount to mutate a sequence
+|  `--min-percent-mutated` | the minimum amount to mutate a sequence
+|  `--max-percent-mutated` | the maximum amount to mutate a sequence
 
 ### Fitting a model
 
