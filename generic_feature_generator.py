@@ -1,5 +1,6 @@
 import scipy.sparse
 
+from common import mutate_string
 from feature_generator import FeatureGenerator, MultiFeatureMutationStep
 
 class GenericFeatureGenerator(FeatureGenerator):
@@ -21,13 +22,12 @@ class GenericFeatureGenerator(FeatureGenerator):
         indices = []
         start_idx = 0
         indptr = [start_idx]
-        num_entries = 0
 
         for pos in range(obs_seq_mutation.seq_len):
             feat_idx = self._get_mutating_pos_feat_idx(pos, obs_seq_mutation.start_seq_with_flanks)
-            if feat_idx:
-                start_idx += len(feat_idx)
-                indices += feat_idx
+            if feat_idx is not None:
+                start_idx += 1
+                indices.append(feat_idx)
             indptr.append(start_idx)
 
         data = [True] * start_idx
@@ -66,7 +66,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, intermediate_seq)
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat_idx,
-                [mutation_pos],
+                mutation_pos,
                 neighbors_feat_old=feat_dict_prev,
                 neighbors_feat_new=feat_dict_curr,
             ))
@@ -120,7 +120,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, flanked_seq)
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat_idx,
-                [mutation_pos],
+                mutation_pos,
                 neighbors_feat_old=feat_dict_prev,
                 neighbors_feat_new=feat_dict_curr,
             ))
@@ -185,7 +185,7 @@ class GenericFeatureGenerator(FeatureGenerator):
 
         return first_mut_pos_feat_idx, MultiFeatureMutationStep(
             second_mut_pos_feat_idx,
-            [second_mutation_pos],
+            second_mutation_pos,
             neighbors_feat_old=feat_dict_future,
             neighbors_feat_new=feat_dict_curr,
         )
@@ -237,6 +237,30 @@ class GenericFeatureGenerator(FeatureGenerator):
             )
         return feat_dict_curr, feat_dict_future
 
+    def _get_mutated_seq(self, intermediate_seq, pos, end_seq):
+        """
+        @param intermediate_seq: initial nucleotide sequence
+        @param pos: mutating position
+        @param end_seq: final nucleotide sequence
+
+        @return a dict with the positions next to the given position and their feature index
+        """
+        return mutate_string(
+            intermediate_seq,
+            pos,
+            end_seq[pos],
+        )
+
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
+        feat_vec_dict = dict()
+        seq_len = len(seq_str)
+        if do_feat_vec_pos is None:
+            do_feat_vec_pos = range(len(seq_str))
+        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        for pos in do_feat_vec_pos:
+            feat_vec_dict[pos] = self._get_mutating_pos_feat_idx(pos, left_flank + seq_str + right_flank)
+        return feat_vec_dict
+
     # feature generator--specific functions
 
     def _get_feature_dict_for_region(
@@ -257,11 +281,6 @@ class GenericFeatureGenerator(FeatureGenerator):
         raise NotImplementedError()
 
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
-        """
-        """
-        raise NotImplementedError()
-
-    def _get_mutated_seq(self, intermediate_seq, mutation_pos, end_seq):
         """
         """
         raise NotImplementedError()

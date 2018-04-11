@@ -9,6 +9,15 @@ class FeatureGenerator:
     first). We call these "sparse feature vectors".
     """
 
+    def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
+        """
+        @param sequence: current sequence (string)
+        @param do_feat_vec_pos: do generate feature vectors for these positions.
+                    By default, this will be set to all positions in the sequence.
+        @return: list of sparse feature vectors
+        """
+        raise NotImplementedError()
+
     def create_for_mutation_steps(self, seq_mut_order):
         """
         @param seq_mut_order: a ImputedSequenceMutations
@@ -52,7 +61,7 @@ class MultiFeatureMutationStep:
         indices for these positions. If we use the denominator from the previous step, we need to subtract
         out the old exp(psi * theta)) and add in new exp(psi * theta)
     """
-    def __init__(self, mutating_pos_feat=[], mutating_pos=[], neighbors_feat_old=None, neighbors_feat_new=None):
+    def __init__(self, mutating_pos_feat=None, mutating_pos=None, neighbors_feat_old=None, neighbors_feat_new=None):
         """
         @param mutating_pos_feats: the feature index of the position that mutated
         @param mutating_pos: the position that mutated; for calculating position-wise risks/residuals later
@@ -60,8 +69,12 @@ class MultiFeatureMutationStep:
         @param neighbors_feat_new: the new feature indices of the positions next to the mutated position
         @param feat_mut_step: FeatureMutationStep
         """
-        self.mutating_pos_feats = np.array(mutating_pos_feat, dtype=int)
-        self.mutating_pos = np.array(mutating_pos, dtype=int)
+        if mutating_pos_feat is not None:
+            self.mutating_pos_feats = np.array([mutating_pos_feat], dtype=int)
+            self.mutating_pos = np.array([mutating_pos], dtype=int)
+        else:
+            self.mutating_pos_feats = np.array([], dtype=int)
+            self.mutating_pos = np.array([], dtype=int)
         self.neighbors_feat_old = dict()
         self.neighbors_feat_new = dict()
         if neighbors_feat_old is not None:
@@ -73,7 +86,7 @@ class MultiFeatureMutationStep:
         """
         @param feat_mut_step: MultiFeatureMutationStep
         """
-        if feat_mut_step.mutating_pos_feats.size:
+        if feat_mut_step.mutating_pos_feats is not None:
             self.mutating_pos_feats = np.append(self.mutating_pos_feats, feat_mut_step.mutating_pos_feats + feature_offset)
             self.mutating_pos = np.append(self.mutating_pos, feat_mut_step.mutating_pos)
         self._merge_dicts(self.neighbors_feat_old, feat_mut_step.neighbors_feat_old, feature_offset)
@@ -81,11 +94,14 @@ class MultiFeatureMutationStep:
 
     def _merge_dicts(self, my_dict, new_dict, feature_offset):
         for k in new_dict.keys():
-            new_feature = [val + feature_offset for val in new_dict[k]]
-            if k not in my_dict:
-                my_dict[k] = np.array(new_feature, dtype=int)
+            if new_dict[k] is not None:
+                new_feature = new_dict[k] + feature_offset
+                if k not in my_dict:
+                    my_dict[k] = np.array([new_feature], dtype=int)
+                else:
+                    my_dict[k] = np.append(my_dict[k], new_feature)
             else:
-                my_dict[k] = np.append(my_dict[k], new_feature)
+                my_dict[k] = np.array([], dtype=int)
 
     def __str__(self):
         return "(%s, old: %s, new: %s)" % (self.mutating_pos_feats, self.neighbors_feat_old, self.neighbors_feat_new)

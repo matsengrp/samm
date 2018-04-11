@@ -44,7 +44,7 @@ class MutationOrderGibbsSampler(Sampler):
     A class that will do the heavy lifting of Gibbs sampling.
     Returns orders and log probability vector (for tracing)
     """
-    def run(self, init_order, burn_in, num_samples, sampling_rate, conditional_partial_order=[]):
+    def run(self, init_order, burn_in, num_samples, sampling_rate=0, conditional_partial_order=[]):
         """
         @param init_order: a mutation order to initialize the sampler (list of integers)
         @param burn_in: number of iterations for burn in
@@ -423,9 +423,9 @@ class MutationOrderGibbsSampler(Sampler):
                 prev_theta_sum = self.theta[prev_feat_idxs,0].sum() + self.theta[prev_feat_idxs,1:].sum(axis=0)
                 new_denom = old_denominator - np.exp(prev_theta_sum).sum() - np.exp(old_feat_theta_sums).sum() + np.exp(new_feat_theta_sums).sum()
         else:
-            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx].sum() if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_old.values()]
-            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx].sum() if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_new.values()]
-            prev_exp_theta_sum = self.exp_theta_sum[prev_feat_idxs].sum() if len(prev_feat_idxs) else self.exp_theta_num_cols
+            old_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_old.values()]
+            new_feat_exp_theta_sums = [self.exp_theta_sum[feat_idx] if feat_idx.size else self.exp_theta_num_cols for feat_idx in feat_mut_step.neighbors_feat_new.values()]
+            prev_exp_theta_sum = self.exp_theta_sum[prev_feat_idxs] if len(prev_feat_idxs) else self.exp_theta_num_cols
             new_denom = old_denominator - prev_exp_theta_sum - np.sum(old_feat_exp_theta_sums) + np.sum(new_feat_exp_theta_sums)
         return float(new_denom)
 
