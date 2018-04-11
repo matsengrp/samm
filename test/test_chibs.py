@@ -3,7 +3,7 @@ import numpy as np
 import scipy.misc
 
 from models import ObservedSequenceMutations
-from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from likelihood_evaluator import LogLikelihoodEvaluator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 
@@ -14,7 +14,7 @@ class Chibs_TestCase(unittest.TestCase):
         cls.motif_len = 3
         cls.burn_in = 10
 
-        cls.feat_gen = SubmotifFeatureGenerator(cls.motif_len)
+        cls.feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[cls.motif_len])
         cls.theta = np.random.rand(cls.feat_gen.feature_vec_len, 1) * 2
 
     def test_chibs(self):
@@ -35,7 +35,8 @@ class Chibs_TestCase(unittest.TestCase):
         )
 
     def _test_chibs_for_obs_seq_mut(self, obs_seq_mut):
-        obs_seq_m = self.feat_gen.create_base_features(obs_seq_mut)
+        obs_seq_m = obs_seq_mut
+        self.feat_gen.add_base_features(obs_seq_m)
 
         gibbs_sampler = MutationOrderGibbsSampler(self.theta, self.feat_gen, obs_seq_m)
         fake_chibs_ll = self.get_log_lik_obs_seq_fake_chibs(

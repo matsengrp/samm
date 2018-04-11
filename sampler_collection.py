@@ -115,20 +115,13 @@ class Sampler:
         self.exp_theta = np.exp(theta)
         self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES + 1
 
-        # !! why this if statement?
-        #if len(feature_generator.motif_lens) == 1:
-        #    self.exp_theta_num_cols = 1 if not self.per_target_model else NUM_NUCLEOTIDES
-        #    if not self.per_target_model:
-        #        self.exp_theta_sum = np.exp(theta).sum(axis=1)
-        #    else:
-        #        theta_summed = theta[:,0,None] + theta[:,1:]
-        #        self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
-        self.exp_theta_num_cols = 1 if not self.per_target_model else NUM_NUCLEOTIDES
-        if not self.per_target_model:
-            self.exp_theta_sum = np.exp(theta).sum(axis=1)
-        else:
-            theta_summed = theta[:,0,None] + theta[:,1:]
-            self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
+        if feature_generator.num_feat_gens == 1:
+            self.exp_theta_num_cols = 1 if not self.per_target_model else NUM_NUCLEOTIDES
+            if not self.per_target_model:
+                self.exp_theta_sum = np.exp(theta).sum(axis=1)
+            else:
+                theta_summed = theta[:,0,None] + theta[:,1:]
+                self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
 
         self.feature_generator = feature_generator
         self.obs_seq_mutation = obs_seq_mutation

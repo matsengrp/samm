@@ -12,7 +12,7 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineMetadata
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn, SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
-from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES, process_degenerates_and_impute_nucleotides
+from common import get_random_dna_seq, NUM_NUCLEOTIDES, process_degenerates_and_impute_nucleotides, NUCLEOTIDE_DICT
 from plot_helpers import plot_martingale_residuals_on_axis
 
 POSITION_BIAS = 3
@@ -63,7 +63,7 @@ class Residuals_TestCase(unittest.TestCase):
 
         target_shape = (self.feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
         probability_matrix = np.ones(target_shape) * 1.0/3
-        possible_motifs_mask = get_possible_motifs_to_targets(self.feat_gen.motif_list, target_shape, self.feat_gen.mutating_pos_list)
+        possible_motifs_mask = self.feat_gen.get_possible_motifs_to_targets(target_shape)
         probability_matrix[~possible_motifs_mask] = 0.
 
         # Default simulator

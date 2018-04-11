@@ -129,7 +129,7 @@ def run_survival(args, germline_seqs):
     elif agg_theta.shape[1] == 1:
         agg_theta_shape = (agg_theta.size, NUM_NUCLEOTIDES)
         probability_matrix = np.ones(agg_theta_shape) * 1.0/3
-        possible_motifs_mask = get_possible_motifs_to_targets(feat_generator.motif_list, agg_theta_shape, feat_generator.mutating_pos_list)
+        possible_motifs_mask = feat_generator.get_possible_motifs_to_targets(agg_theta_shape)
         probability_matrix[~possible_motifs_mask] = 0
         simulator = SurvivalModelSimulatorSingleColumn(agg_theta, probability_matrix, feat_generator, lambda0=args.lambda0)
     else:
