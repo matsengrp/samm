@@ -234,7 +234,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             flanked_seq=flanked_seq,
             already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 2]),
         )
-        self.assertEqual(first_mutation_feat, [14])
+        self.assertEqual(first_mutation_feat, 14)
         self.assertEqual(feat_mut_steps1[-2].mutating_pos_feats, 14)
         self.assertEqual(second_mut_step.mutating_pos_feats, 0)
         self.assertEqual(feat_mut_steps1[-1].mutating_pos_feats, 0)
@@ -261,7 +261,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             flanked_seq=flanked_seq,
             already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 3]),
         )
-        self.assertEqual(first_mutation_feat2, [14])
+        self.assertEqual(first_mutation_feat2, 14)
         self.assertEqual(second_mut_step2.mutating_pos_feats, 14)
         self.assertEqual(second_mut_step2.neighbors_feat_old, {9: 57, 7: 3})
         self.assertEqual(second_mut_step2.neighbors_feat_new, {9: 9, 7: 0})
