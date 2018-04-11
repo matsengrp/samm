@@ -163,7 +163,7 @@ def get_nonzero_theta_print_lines(theta, feat_gen):
                 thetas = theta[i,]
                 lines.append((
                     thetas[np.isfinite(thetas)].sum(),
-                    "%s (%s)" % (thetas, feat_gen.feature_label_list[i]),
+                    "%s (%s)" % (thetas, feat_gen.print_label_from_idx(i)),
                 ))
                 break
     sorted_lines = sorted(lines, key=lambda s: s[0])
@@ -173,6 +173,9 @@ def get_nonzero_theta_print_lines_with_hotspots(theta, feat_gen):
     """
     @return a string that summarizes the theta vector/matrix
     """
+    # only works for motif models
+    assert(hasattr(feat_gen, 'motif_list'))
+    assert(hasattr(feat_gen, 'mutating_pos_list'))
     motif_list = feat_gen.motif_list
     motif_len = feat_gen.motif_len
     mutating_pos_list = feat_gen.mutating_pos_list

@@ -6,7 +6,7 @@ from mutation_order_gibbs import MutationOrderGibbsSampler
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from survival_model_simulator import SurvivalModelSimulatorPositionDependent
 from models import ObservedSequenceMutations
-from common import get_possible_motifs_to_targets, get_random_dna_seq, NUM_NUCLEOTIDES
+from common import get_random_dna_seq, NUM_NUCLEOTIDES
 
 class Position_Simulation_TestCase(unittest.TestCase):
     @classmethod
@@ -49,8 +49,7 @@ class Position_Simulation_TestCase(unittest.TestCase):
 
         target_shape = (self.feat_gen.feature_vec_len, NUM_NUCLEOTIDES)
         probability_matrix = np.ones(target_shape) * 1.0/3
-        possible_motifs_mask = get_possible_motifs_to_targets(self.feat_gen.motif_list, target_shape, 
-                                                              self.feat_gen.mutating_pos_list)
+        possible_motifs_mask = self.feat_gen.get_possible_motifs_to_targets(target_shape)
         probability_matrix[~possible_motifs_mask] = 0.
         simulator = SurvivalModelSimulatorPositionDependent(theta, probability_matrix, self.feat_gen, 
                                                             lambda0=0.1, pos_risk=pos_risk)
