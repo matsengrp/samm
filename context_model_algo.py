@@ -138,7 +138,8 @@ class ContextModelAlgo:
 
         # Create a feature generator for this shrunken model
         feat_generator_stage2 = copy.deepcopy(self.feat_generator)
-        feat_generator_stage2._update_feature_generator_after_removing(model_masks)
+        all_feats_to_remove = model_masks.feats_to_remove + self.feat_generator.feats_to_remove
+        feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
@@ -185,7 +186,8 @@ class ContextModelAlgo:
             theta = model_result.penalized_theta
         else:
             theta = model_result.refit_theta
-            feat_generator_stage2._update_feature_generator_after_removing(model_result.model_masks)
+            all_feats_to_remove = model_result.model_masks.feats_to_remove + self.feat_generator.feats_to_remove
+            feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
 
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
