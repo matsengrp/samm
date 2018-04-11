@@ -14,14 +14,6 @@ class ModelTruncation:
         self.feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
         self.zero_theta_mask_refit = zeroed_thetas[~self.feats_to_remove_mask,:]
 
-        self.feats_to_remove = self.set_feats_to_remove()
-
-    def set_feats_to_remove(self):
-        """
-        use the generic feature_label_list to remove features
-        """
-        feats_to_remove = []
+        self.feats_to_remove = []
         for i in np.where(self.feats_to_remove_mask)[0].tolist():
-            feats_to_remove.append(self.feat_generator.feature_label_list[i])
-
-        return feats_to_remove
+            self.feats_to_remove.append(self.feat_generator.feature_info_list[i])

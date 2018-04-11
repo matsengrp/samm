@@ -8,19 +8,13 @@ class CombinedFeatureGenerator(FeatureGenerator):
     A generic way to combine feature generators.
     A hierarchical model is a type of this.
     """
-    def __init__(self, feat_gen_list):
+    def __init__(self, feat_gen_list, feats_to_remove=[]):
         """
         @param feat_gen_list: list of feature generators
         """
         self.feat_gens = feat_gen_list
-
-        feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
-        self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
-        self.num_feat_gens = len(self.feat_gens)
-        self.feature_vec_len = np.sum(feat_offsets)
-        self.feature_label_list = []
-        for f in self.feat_gens:
-            self.feature_label_list += f.feature_label_list
+        self.feats_to_remove = feats_to_remove
+        self.update_feats_after_removing(feats_to_remove)
 
     def add_base_features_for_list(self, obs_data):
         """
@@ -66,7 +60,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
                 already_mutated_pos,
             )
             if mut_pos_feat is not None:
-                first_mut_feats += [feat + offset for feat in mut_pos_feat]
+                first_mut_feats.append(mut_pos_feat + offset)
             multi_feat_mut_step.update(mut_step, offset)
         return first_mut_feats, multi_feat_mut_step
 
@@ -90,17 +84,40 @@ class CombinedFeatureGenerator(FeatureGenerator):
         # default to no per-target mask?
         return np.ones(mask_shape, dtype=bool)
 
-    def _update_feature_generator_after_removing(self, model_masks):
+    def update_feats_after_removing(self, feats_to_remove):
         """
         so we don't have to create a whole new feature vector
         """
         # Create list of feature generators for different motif lengths and different flank lengths
         old_feat_gens = self.feat_gens
         self.feat_gens = []
+        self.feature_info_list = []
         for feat_gen in old_feat_gens:
-            feat_gen._update_motifs_after_removing(model_masks.feats_to_remove)
+            feat_gen.update_feats_after_removing(feats_to_remove)
             self.feat_gens.append(feat_gen)
+            self.feature_info_list += feat_gen.feature_info_list
 
         feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
         self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
+        self.num_feat_gens = len(self.feat_gens)
         self.feature_vec_len = np.sum(feat_offsets)
+
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
+        if do_feat_vec_pos is None:
+            do_feat_vec_pos = range(len(seq_str))
+        feat_vec_dict = {pos:[] for pos in do_feat_vec_pos}
+        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
+            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos)
+            for pos in do_feat_vec_pos:
+                feat = f_dict[pos]
+                if feat is not None:
+                    feat_vec_dict[pos].append(feat + offset)
+        return feat_vec_dict
+
+    def print_label_from_idx(self, idx):
+        label = ""
+        for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
+            if idx < offset + feat_gen.feature_vec_len:
+                label = feat_gen.print_label_from_info(self.feature_info_list[idx])
+                break
+        return label

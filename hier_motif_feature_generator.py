@@ -1,21 +1,22 @@
 import itertools
 import numpy as np
 
-from common import NUCLEOTIDE_SET, get_max_mut_pos, get_zero_theta_mask, create_theta_idx_mask, ZSCORE_95, NUM_NUCLEOTIDES
+from common import NUCLEOTIDE_SET, get_max_mut_pos, get_zero_theta_mask, create_theta_idx_mask, ZSCORE_95, NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
 from combined_feature_generator import CombinedFeatureGenerator
 from feature_generator import MultiFeatureMutationStep
 from submotif_feature_generator import SubmotifFeatureGenerator
 from scipy.sparse import hstack
 
 class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
-    def __init__(self, motif_lens, model_masks=None, left_motif_flank_len_list=None):
+    def __init__(self, motif_lens, feats_to_remove=[], left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
-        @param model_masks: dictionary whose keys are left_flank_len values and whose values are lists of motifs (strings) where the motif and left_flank_len have been zeroed out (completely - all targets are zeroed out)
+        @param feats_to_remove: list of feature info tuples to remove
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
         """
 
         self.motif_lens = motif_lens
+        self.left_motif_flank_len_list = left_motif_flank_len_list
 
         if left_motif_flank_len_list is None:
             # default to central base mutating
@@ -35,21 +36,13 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         self.max_left_motif_flank_len = max(sum(left_motif_flank_len_list, []))
         self.max_right_motif_flank_len = max(all_right_flanks)
 
-        if model_masks is None:
-            # default to not removing any features
-            feats_to_remove = []
-        else:
-            feats_to_remove = model_masks.feats_to_remove()
-
         # Create list of feature generators for different motif lengths and different flank lengths
         self.feat_gens = []
         for motif_len, left_motif_flank_lens in zip(motif_lens, left_motif_flank_len_list):
             for left_motif_flank_len in left_motif_flank_lens:
-                curr_feats_to_remove = [label for label in feats_to_remove if int(label.split(' ')[2]) == left_motif_flank_len]
                 self.feat_gens.append(
                         SubmotifFeatureGenerator(
                             motif_len=motif_len,
-                            feats_to_remove=curr_feats_to_remove,
                             left_motif_flank_len=left_motif_flank_len,
                             hier_offset=self.max_left_motif_flank_len - left_motif_flank_len,
                             left_update_region=self.max_left_motif_flank_len,
@@ -57,45 +50,14 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                         )
                     )
 
-        feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
-        self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
-        self.num_feat_gens = len(self.feat_gens)
-        self.feature_vec_len = np.sum(feat_offsets)
+        self.update_feats_after_removing(feats_to_remove)
 
         # construct motif dictionary and lists of parameters
         self.motif_list = []
         self.mutating_pos_list = []
-        self.feature_label_list = []
         for f in self.feat_gens:
             self.motif_list += f.motif_list
             self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
-            self.feature_label_list += f.feature_label_list
-
-    def _update_feature_generator_after_removing(self, model_masks):
-        """
-        so we don't have to create a whole new feature vector
-        """
-        # Create list of feature generators for different motif lengths and different flank lengths
-        feats_to_remove = model_masks.set_feats_to_remove()
-        old_feat_gens = self.feat_gens
-        self.feat_gens = []
-        for feat_gen in old_feat_gens:
-            curr_feats_to_remove = [label for label in feats_to_remove if int(label.split(' ')[2]) == feat_gen.left_motif_flank_len]
-            feat_gen._update_motifs_after_removing(curr_feats_to_remove)
-            self.feat_gens.append(feat_gen)
-
-        feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
-        self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
-        self.feature_vec_len = np.sum(feat_offsets)
-
-        # construct motif dictionary and lists of parameters
-        self.motif_list = []
-        self.mutating_pos_list = []
-        self.feature_label_list = []
-        for i, f in enumerate(self.feat_gens):
-            self.motif_list += f.motif_list
-            self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
-            self.feature_label_list += f.feature_label_list
 
     def get_possible_motifs_to_targets(self, mask_shape):
         """
@@ -119,7 +81,6 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
 
         return theta_mask
 
-    # why keep this column specific?
     def combine_thetas_and_get_conf_int(self, theta, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
         """
         Combine hierarchical and offset theta values

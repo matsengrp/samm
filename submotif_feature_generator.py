@@ -41,24 +41,26 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
         self.right_update_region = right_update_region
 
         # add properties of feature generator
-        self._update_motifs_after_removing(feats_to_remove)
+        self.feats_to_remove = feats_to_remove
+        self.update_feats_after_removing(feats_to_remove)
 
         self.motifs_fused_lasso1 = []
         self.motifs_fused_lasso2 = []
 
-    def _update_motifs_after_removing(self, feats_to_remove=[]):
+    def update_feats_after_removing(self, feats_to_remove=[]):
         """
         take existing SubmotifGenerator and update it with features to remove
         """
-        motifs_to_remove = [m[:self.motif_len] for m in feats_to_remove]
-        self.motif_list = self._get_motif_list(motifs_to_remove)
+        all_feature_info_list = [("".join(motif), self.left_motif_flank_len) for motif in itertools.product(*([NUCLEOTIDES] * self.motif_len))]
+        self.feature_info_list = [feat_tuple for feat_tuple in all_feature_info_list if feat_tuple not in feats_to_remove]
+
+        self.motif_list = [motif for motif, _ in self.feature_info_list]
         self.motif_dict = {motif: i for i, motif in enumerate(self.motif_list)}
-        for m in motifs_to_remove:
-            self.motif_dict[m] = None
+        for motif, flank_len in all_feature_info_list:
+            if (motif, flank_len) in feats_to_remove:
+                self.motif_dict[motif] = None
 
-        self.feature_label_list = ['%s, position %d' % (motif, self.left_motif_flank_len) for motif in self.motif_list]
-
-        self.feature_vec_len = len(self.motif_list)
+        self.feature_vec_len = len(self.feature_info_list)
 
     def _get_feature_dict_for_region(
         self,
@@ -93,10 +95,12 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
         @return index of feature vector for this mutating position
         """
         submotif = seq_with_flanks[pos + self.hier_offset: pos + self.hier_offset + self.motif_len]
-        return [self.motif_dict[submotif]]
+        return self.motif_dict[submotif]
 
     def _get_mutated_seq(self, intermediate_seq, pos, end_seq):
         """
+        Our submotifs need hierarchical offsets and flank lengths, but general feature generators do not use this
+
         @param intermediate_seq: initial nucleotide sequence
         @param pos: mutating position
         @param end_seq: final nucleotide sequence
@@ -109,15 +113,8 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
             end_seq[pos + self.left_motif_flank_len + self.hier_offset],
         )
 
-    def _get_motif_list(self, motifs_to_remove):
-        motif_list = itertools.product(*([NUCLEOTIDES] * self.motif_len))
-        filtered_motif_list = []
-        for m in motif_list:
-            motif = "".join(m)
-            if motif not in motifs_to_remove:
-                filtered_motif_list.append(motif)
-
-        return filtered_motif_list
+    def print_label_from_info(self, info):
+        return "motif: %s, pos: %d" % (info[0], info[1])
 
     def count_mutated_motifs(self, seq_mut_order):
         """
