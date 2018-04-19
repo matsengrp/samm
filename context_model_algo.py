@@ -144,7 +144,7 @@ class ContextModelAlgo:
         obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
         # Create the theta mask for the shrunken theta
-        possible_theta_mask_refit = self.feat_generator.get_possible_motifs_to_targets(
+        possible_theta_mask_refit = feat_generator_stage2.get_possible_motifs_to_targets(
             model_masks.zero_theta_mask_refit.shape,
         )
         # Refit over the support from the penalized problem
