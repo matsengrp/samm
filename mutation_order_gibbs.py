@@ -456,7 +456,7 @@ class MutationOrderGibbsSampler(Sampler):
             base_risk_vec[prev_mut_pos] = 0.
 
         # make sure there are no NaNs because we'll use that to pad later
-        assert(not any([np.isnan(risk) for risk in base_risk_vec]))
+        assert(not any([np.isnan(risk_val) for risks in base_risk_vec for risk_val in risks]))
 
         return base_risk_vec
 

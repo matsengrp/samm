@@ -50,6 +50,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                         )
                     )
 
+        self.feats_to_remove = feats_to_remove
         self.update_feats_after_removing(feats_to_remove)
 
         # construct motif dictionary and lists of parameters
@@ -63,22 +64,16 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         """
         @return a boolean matrix with possible mutations as True, impossible mutations as False
         """
+        # Estimating a different theta vector for different target nucleotides
+        # We cannot have a motif mutate to the same center nucleotide
         theta_mask = np.ones(mask_shape, dtype=bool)
-        if mask_shape[1] == NUM_NUCLEOTIDES + 1:
-            # Estimating a different theta vector for different target nucleotides
-            # We cannot have a motif mutate to the same center nucleotide
-            for i in range(len(self.motif_list)):
-                center_motif_idx = self.mutating_pos_list[i]
-                mutating_nucleotide = self.motif_list[i][center_motif_idx]
-                center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide] + 1
-                theta_mask[i, center_nucleotide_idx] = False
-        elif mask_shape[1] == NUM_NUCLEOTIDES:
-            for i in range(len(self.motif_list)):
-                center_motif_idx = self.mutating_pos_list[i]
-                mutating_nucleotide = self.motif_list[i][center_motif_idx]
+        if mask_shape[1] > 1:
+            for i, (motif, mutating_pos) in enumerate(self.feature_info_list):
+                mutating_nucleotide = motif[mutating_pos]
                 center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
+                if mask_shape[1] == NUM_NUCLEOTIDES + 1:
+                    center_nucleotide_idx += 1
                 theta_mask[i, center_nucleotide_idx] = False
-
         return theta_mask
 
     def combine_thetas_and_get_conf_int(self, theta, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
