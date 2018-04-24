@@ -1,6 +1,3 @@
-[submodule "gctree"]
-	path = gctree
-	url = git@github.com:matsengrp/gctree.git
 [submodule "partis"]
 	path = partis
 	url = git@github.com:psathyrella/partis.git
