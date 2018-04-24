@@ -199,7 +199,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     @return genes_line: information needed to output imputed germline data
     @return seqs_line: information needed to output imputed sequence data
     """
-    from gctree.bin import phylip_parse
+    from gctree.bin.phylip_parse import parse_outfile
 
     assert(len(gl_name) < 10)
 
@@ -248,7 +248,7 @@ def impute_ancestors_dnapars(seqs, gl_seq, scratch_dir, gl_name='germline', verb
     res = subprocess.call([" ".join(cmd)], shell=True)
 
     # phew, finally got some trees
-    trees = phylip_parse.parse_outfile(outfile, countfile=None, naive=gl_name)
+    trees = parse_outfile(outfile, countfile=None, naive=gl_name)
 
     # take first parsimony tree
     genes_line = []

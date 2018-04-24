@@ -156,7 +156,7 @@ def run_gctree(args, germline_seq, mutation_model, n_taxa):
             motif, score = line.replace('"', '').split()[:2]
             mutability_sum += float(score)
 
-    lambda0 = args.lambda_mean * len(germline_seq) * len(germline_seq) / mutability_sum
+    lambda0 = [args.lambda_mean * len(germline_seq) * len(germline_seq) / mutability_sum]
 
     tree = mutation_model.simulate(germline_seq,
                                    lambda0=lambda0,
