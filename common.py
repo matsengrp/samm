@@ -169,46 +169,6 @@ def get_nonzero_theta_print_lines(theta, feat_gen):
     sorted_lines = sorted(lines, key=lambda s: s[0])
     return "\n".join([l[1] for l in sorted_lines])
 
-def get_nonzero_theta_print_lines_with_hotspots(theta, feat_gen):
-    """
-    @return a string that summarizes the theta vector/matrix
-    """
-    # only works for motif models
-    assert(hasattr(feat_gen, 'motif_list'))
-    assert(hasattr(feat_gen, 'mutating_pos_list'))
-    motif_list = feat_gen.motif_list
-    motif_len = feat_gen.motif_len
-    mutating_pos_list = feat_gen.mutating_pos_list
-
-    lines = []
-    mutating_pos_set = list(set(mutating_pos_list))
-    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]
-    for i in range(theta.shape[0]):
-        for j in range(theta.shape[1]):
-            if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
-                # print the whole line if any element in the theta is nonzero
-                motif = motif_list[i]
-                pos_idx = mutating_pos_set.index(mutating_pos_list[i])
-                hot_cold_matches = ""
-                for spot_name, spot_regex in known_hot_cold[pos_idx]:
-                    if is_re_match(spot_regex, motif):
-                        hot_cold_matches = " -- " + spot_name
-                        break
-                thetas = theta[i,]
-                lines.append((
-                    thetas[np.isfinite(thetas)].sum(),
-                    "%s (%s%s) pos %s" % (thetas, motif_list[i], hot_cold_matches, mutating_pos_list[i]),
-                ))
-                break
-    sorted_lines = sorted(lines, key=lambda s: s[0])
-    return "\n".join([l[1] for l in sorted_lines])
-
-def print_known_cold_hot_spot(motif, known_hot_cold_regexs):
-    for spot_name, spot_regex in known_hot_cold_regexs:
-        if is_re_match(spot_regex, motif):
-            return spot_name
-    return None
-
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
     Mutate a string
