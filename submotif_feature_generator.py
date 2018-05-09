@@ -2,7 +2,7 @@ import numpy as np
 import itertools
 import logging as log
 
-from common import mutate_string, NUCLEOTIDES
+from common import mutate_string, is_re_match, compute_known_hot_and_cold, NUCLEOTIDES, HOT_COLD_SPOT_REGS
 from generic_feature_generator import GenericFeatureGenerator
 
 class SubmotifFeatureGenerator(GenericFeatureGenerator):
@@ -114,7 +114,14 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
         )
 
     def print_label_from_info(self, info):
-        return "motif: %s, pos: %d" % (info[0], info[1])
+        motif, mut_pos = info
+        print_str = "motif: %s, pos: %d" % (motif, mut_pos)
+        known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, self.motif_len, self.left_motif_flank_len)
+        for spot_name, spot_regex in known_hot_cold:
+            if is_re_match(spot_regex, motif):
+                print_str += ", %s" % spot_name
+                break
+        return print_str
 
     def count_mutated_motifs(self, seq_mut_order):
         """
