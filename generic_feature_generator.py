@@ -17,7 +17,9 @@ class GenericFeatureGenerator(FeatureGenerator):
         Create the feature matrices and feature vector dictionary
         before any mutations have occurred
 
-        @return ObservedSequenceMutations augmented with a feature matrix and dictionary
+        @param obs_seq_mutation: ObservedSequenceMutations
+
+        @return sparse matrix with presence/absence of features per position for this sequence
         """
         indices = []
         start_idx = 0
@@ -149,7 +151,7 @@ class GenericFeatureGenerator(FeatureGenerator):
         @param flanked_seq: must be a FLANKED sequence
         @param already_mutated_pos: set of positions that already mutated - dont calculate feature vals for these
 
-        @return a tuple with the feature at this mutation step and the feature mutation step of the next mutation step
+        @return a tuple with the feature index at this mutation step and the feature mutation step of the next mutation step
         """
         feat_mutation_steps = []
         first_mutation_pos = seq_mut_order.mutation_order[update_step]
@@ -202,16 +204,18 @@ class GenericFeatureGenerator(FeatureGenerator):
         ):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
+
         @param mutation_step: mutation step index
         @param mutation_pos: the position that is mutating
         @param old_mutation_pos: the position that mutated previously - None if this is first mutation
         @param seq_mut_order: ImputedSequenceMutations
         @param intermediate_seq: nucleotide sequence INCLUDING flanks - before the mutation step occurs
+        @param already_mutated_pos: list of positions that have already mutated
+        @param calc_future_dict: calculate feat_dict_future (dict with positions next to current mutation)
 
         @return tuple with
-            1. the feature index of the position that mutated
-            2. a dict with the positions next to the previous mutation and their feature index
-            3. a dict with the positions next to the current mutation and their feature index
+            1. a dict with the positions next to the previous mutation and their feature index
+            2. a dict with the positions next to the current mutation and their feature index
         """
         feat_dict_curr = dict()
         feat_dict_future = dict()
@@ -243,7 +247,7 @@ class GenericFeatureGenerator(FeatureGenerator):
         @param pos: mutating position
         @param end_seq: final nucleotide sequence
 
-        @return a dict with the positions next to the given position and their feature index
+        @return the mutated sequence string
         """
         return mutate_string(
             intermediate_seq,
@@ -256,7 +260,7 @@ class GenericFeatureGenerator(FeatureGenerator):
         seq_len = len(seq_str)
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
-        # don't generate any feature vector for positions in no_feat_vec_pos since it is not in the risk group
+        # only generate feature vectors for positions in do_feat_vec_pos---others not in the risk group
         for pos in do_feat_vec_pos:
             feat_vec_dict[pos] = self._get_mutating_pos_feat_idx(pos, left_flank + seq_str + right_flank)
         return feat_vec_dict
@@ -282,5 +286,12 @@ class GenericFeatureGenerator(FeatureGenerator):
 
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
         """
+        Feature generator--specific function.
+        Take sequence and mutating position and return the index of the feature vector.
+
+        @param pos: mutating position
+        @param seq_with_flanks: nucleotide sequence with flanks
+
+        @return index of feature vector for this mutating position
         """
         raise NotImplementedError()

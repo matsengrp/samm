@@ -5,12 +5,13 @@ from scipy.sparse import hstack
 
 class CombinedFeatureGenerator(FeatureGenerator):
     """
-    A generic way to combine feature generators.
-    A hierarchical model is a type of this.
+    Class that combines GenericFeatureGenerators.
+    For example, a hierarchical model is a CombinedFeatureGenerator with each element a SubmotifFeatureGenerator.
     """
     def __init__(self, feat_gen_list, feats_to_remove=[]):
         """
-        @param feat_gen_list: list of feature generators
+        @param feat_gen_list: list of GenericFeatureGenerators
+        @param feats_to_remove: list of elements of feature_info_list for each GenericFeatureGenerator to remove
         """
         self.feat_gens = feat_gen_list
         self.feats_to_remove = feats_to_remove
@@ -79,14 +80,19 @@ class CombinedFeatureGenerator(FeatureGenerator):
 
     def get_possible_motifs_to_targets(self, mask_shape):
         """
+        For a per-target model, this is the matrix with elements corresponding to which nucleotides certain features can mutate to.
+        Default is any feature can mutate to any nucleotide
+
+        @param mask_shape: shape of theta mask; either p-by-1 or p-by-(NUM_NUCLEOTIDES+1)
         @return a boolean matrix with possible mutations as True, impossible mutations as False
         """
-        # default to no per-target mask?
         return np.ones(mask_shape, dtype=bool)
 
     def update_feats_after_removing(self, feats_to_remove):
         """
-        so we don't have to create a whole new feature vector
+        Updates feature generator properties after removing features
+
+        @param feats_to_remove: list of feature info elements to remove
         """
         # Create list of feature generators for different motif lengths and different flank lengths
         old_feat_gens = self.feat_gens

@@ -35,7 +35,7 @@ class AdjacentMotifFeatureGenerator(GenericFeatureGenerator):
 
     def update_feats_after_removing(self, feats_to_remove=[]):
         """
-        take existing SubmotifGenerator and update it with features to remove
+        take existing AdjacentMotifGenerator and update it with features to remove
         """
         all_feature_info_list = [("".join(motif), self.distance_to_right_flank_end) for motif in itertools.product(*([NUCLEOTIDES] * self.motif_len))]
         self.feature_info_list = [feat_tuple for feat_tuple in all_feature_info_list if feat_tuple not in feats_to_remove]
@@ -49,6 +49,11 @@ class AdjacentMotifFeatureGenerator(GenericFeatureGenerator):
         self.feature_vec_len = len(self.feature_info_list)
 
     def print_label_from_info(self, info):
+        """
+        Print what feature this corresponds to.
+
+        @param info: an element of feature_info_list
+        """
         return "adjacent motif: %s, distance: %d" % (info[0], info[1])
 
     def _get_feature_dict_for_region(

@@ -105,7 +105,7 @@ class SubmotifFeatureGenerator(GenericFeatureGenerator):
         @param pos: mutating position
         @param end_seq: final nucleotide sequence
 
-        @return a dict with the positions next to the given position and their feature index
+        @return the mutated sequence string
         """
         return mutate_string(
             intermediate_seq,
