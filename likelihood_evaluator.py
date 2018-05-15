@@ -1,5 +1,6 @@
 import time
 import numpy as np
+from combined_feature_generator import CombinedFeatureGenerator
 from sampler_collection import SamplerCollection
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from mutation_order_chibs import MutationOrderChibsSampler

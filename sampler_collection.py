@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import traceback
 import os.path
+from combined_feature_generator import CombinedFeatureGenerator
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker
 from parallel_worker import BatchSubmissionManager

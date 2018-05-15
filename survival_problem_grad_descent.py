@@ -4,6 +4,7 @@ import scipy as sp
 from scipy.sparse import csr_matrix, dok_matrix
 
 import logging as log
+from combined_feature_generator import CombinedFeatureGenerator
 from survival_problem import SurvivalProblem
 from parallel_worker import MultiprocessingManager, ParallelWorker
 from common import *

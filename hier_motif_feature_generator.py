@@ -67,7 +67,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         self.mutating_pos_list = []
         for f in self.feat_gens:
             self.motif_list += f.motif_list
-            self.mutating_pos_list += [f.left_motif_flank_len] * len(f.motif_list)
+            self.mutating_pos_list += [-f.distance_to_start_of_motif] * len(f.motif_list)
 
     def get_possible_motifs_to_targets(self, mask_shape):
         """
@@ -77,7 +77,8 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         # We cannot have a motif mutate to the same center nucleotide
         theta_mask = np.ones(mask_shape, dtype=bool)
         if mask_shape[1] > 1:
-            for i, (motif, mutating_pos) in enumerate(self.feature_info_list):
+            for i, (motif, distance_to_start_of_motif) in enumerate(self.feature_info_list):
+                mutating_pos = -distance_to_start_of_motif
                 mutating_nucleotide = motif[mutating_pos]
                 center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
                 if mask_shape[1] == NUM_NUCLEOTIDES + 1:
