@@ -6,7 +6,7 @@ import numpy as np
 from cvxpy import *
 from common import *
 
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 import solver_wrappers
 
 class Fused_LassoC_TestCase(unittest.TestCase):
@@ -14,7 +14,7 @@ class Fused_LassoC_TestCase(unittest.TestCase):
     def setUpClass(cls):
         np.random.seed(10)
         cls.motif_len = 5
-        feat_gen = SubmotifFeatureGenerator(cls.motif_len)
+        feat_gen = MotifFeatureGenerator(motif_len=cls.motif_len)
         cls.feature_vec_len = feat_gen.feature_vec_len
 
         cls.theta_g = np.random.rand(cls.feature_vec_len)

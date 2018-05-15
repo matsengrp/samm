@@ -5,23 +5,17 @@
 
 '''
 
-import subprocess
 import sys
 import argparse
 import numpy as np
 import os
 import os.path
 import csv
-import pickle
 import warnings
 
-from common import *
-from read_data import *
-from Bio import SeqIO
+from read_data import read_germline_file, get_partition_info
 from scipy.stats import poisson
 
-from submotif_feature_generator import SubmotifFeatureGenerator
-from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineSimulatorPartis
 
 from gctree.bin.mutation_model import MutationModel
@@ -234,6 +228,10 @@ def _get_clonal_family_stats(path_to_annotations, metadata, use_np=False, use_im
             continue
         if not locus or data_info['locus'] != locus:
             continue
+        PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
+        sys.path.insert(1, PARTIS_PATH + '/python')
+        from utils import add_implicit_info, process_input_line
+        import glutils
         glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
         with open(data_info['annotations_file'][0], "r") as csvfile:
             reader = csv.DictReader(csvfile)

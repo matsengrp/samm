@@ -1,7 +1,7 @@
 import unittest
 import time
 
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 from models import *
 from common import *
 
@@ -16,7 +16,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         seq_length = 400
         mut_per_length = 10
 
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
+        feat_generator = MotifFeatureGenerator(motif_len=motif_len)
 
         start_seq = get_random_dna_seq(seq_length)
         # Mutate a 10th of the sequence
@@ -46,7 +46,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
     def test_create(self):
         motif_len = 3
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
+        feat_generator = MotifFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
                 end_seq=  "atgcaagatagc",
@@ -75,10 +75,10 @@ class FeatureGeneratorTestCase(unittest.TestCase):
     def test_create_upstream(self):
         motif_len = 3
         left_motif_flank_len = 0
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len,
-                left_motif_flank_len=left_motif_flank_len,
-                left_update_region=0,
-                right_update_region=2)
+        feat_generator = MotifFeatureGenerator(
+            motif_len=motif_len,
+            distance_to_start_of_motif=-left_motif_flank_len,
+        )
         obs_seq_mut = ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
                 end_seq=  "atgcaagatagc",
@@ -109,10 +109,10 @@ class FeatureGeneratorTestCase(unittest.TestCase):
     def test_create_downstream(self):
         motif_len = 3
         left_motif_flank_len = 2
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len,
-                left_motif_flank_len=left_motif_flank_len,
-                left_update_region=2,
-                right_update_region=0)
+        feat_generator = MotifFeatureGenerator(
+            motif_len=motif_len,
+            distance_to_start_of_motif=-left_motif_flank_len,
+        )
         obs_seq_mut = ObservedSequenceMutations(
                 start_seq="aaattatgaatgc",
                 end_seq=  "aatgcaagatagc",
@@ -142,11 +142,11 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         motif_len = 3
         left_flank_lens = [1, 2]
         left_motif_flank_len = 1
-        feat_generator1 = SubmotifFeatureGenerator(motif_len=motif_len,
-                left_motif_flank_len=left_motif_flank_len,
-                hier_offset=max(left_flank_lens) - left_motif_flank_len,
-                left_update_region=max(left_flank_lens),
-                right_update_region=motif_len - 1 - min(left_flank_lens))
+        feat_generator1 = MotifFeatureGenerator(
+            motif_len=motif_len,
+            distance_to_start_of_motif=-left_motif_flank_len,
+            combined_offset=max(left_flank_lens) - left_motif_flank_len,
+        )
         obs_seq_mut1 = ObservedSequenceMutations(
                 start_seq="aaattatgaatgc",
                 end_seq=  "aatgcaagatagc",
@@ -162,11 +162,11 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         left_motif_flank_len = 2
-        feat_generator2 = SubmotifFeatureGenerator(motif_len=motif_len,
-                left_motif_flank_len=left_motif_flank_len,
-                hier_offset=max(left_flank_lens) - left_motif_flank_len,
-                left_update_region=max(left_flank_lens),
-                right_update_region=motif_len - 1 - min(left_flank_lens))
+        feat_generator2 = MotifFeatureGenerator(
+            motif_len=motif_len,
+            distance_to_start_of_motif=-left_motif_flank_len,
+            combined_offset=max(left_flank_lens) - left_motif_flank_len,
+        )
         obs_seq_mut2 = ObservedSequenceMutations(
                 start_seq="aaattatgaatgc",
                 end_seq=  "aatgcaagatagc",
@@ -191,7 +191,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
     def test_update(self):
         motif_len = 3
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
+        feat_generator = MotifFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
                 end_seq=  "atgcaagatagc",

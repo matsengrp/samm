@@ -8,7 +8,7 @@ import pandas as pd
 import glob
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 
 
 # needed to read partis files
@@ -652,7 +652,7 @@ def get_shazam_theta(mutability_file, substitution_file=None):
 
     # Read in the results from the shmulate model-fitter
     # Shazam is always a 5mer
-    feat_gen = SubmotifFeatureGenerator(motif_len=5)
+    feat_gen = MotifFeatureGenerator(motif_len=5)
     motif_list = feat_gen.motif_list
 
     # Read mutability matrix

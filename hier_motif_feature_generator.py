@@ -4,10 +4,18 @@ import numpy as np
 from common import NUCLEOTIDE_SET, get_max_mut_pos, get_zero_theta_mask, create_theta_idx_mask, ZSCORE_95, NUM_NUCLEOTIDES, NUCLEOTIDE_DICT
 from combined_feature_generator import CombinedFeatureGenerator
 from feature_generator import MultiFeatureMutationStep
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 from scipy.sparse import hstack
 
 class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
+    """
+    A hierarchical motif model is a special case of a CombinedFeatureGenerator.
+    Included in this class is everything that will be needed to combined MotifFeatureGenerators into a Hierarchical generator, and the
+    inputs are included as in the standard motif definitions, i.e., we pass in the left flank length instead of the distance to the motif
+    start (which is what MotifFeatureGenerator takes).
+
+    All code that previously uses HierarchicalMotifFeatureGenerator should still work as-is.
+    """
     def __init__(self, motif_lens, feats_to_remove=[], left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
@@ -28,7 +36,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         self.motif_len = self.max_motif_len
         self.left_motif_flank_len = get_max_mut_pos(motif_lens, left_motif_flank_len_list)
 
-        # Find the maximum left and right motif flank lengths to pass to SubmotifFeatureGenerator
+        # Find the maximum left and right motif flank lengths to pass to MotifFeatureGenerator
         # in order to update all the relevant features
         all_right_flanks = [m - flank_len - 1 \
                 for m, flank_len_list in zip(motif_lens, left_motif_flank_len_list) \
@@ -36,17 +44,18 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         self.max_left_motif_flank_len = max(sum(left_motif_flank_len_list, []))
         self.max_right_motif_flank_len = max(all_right_flanks)
 
+        self.left_update_region = self.max_left_motif_flank_len
+        self.right_update_region = self.max_right_motif_flank_len
+
         # Create list of feature generators for different motif lengths and different flank lengths
         self.feat_gens = []
         for motif_len, left_motif_flank_lens in zip(motif_lens, left_motif_flank_len_list):
             for left_motif_flank_len in left_motif_flank_lens:
                 self.feat_gens.append(
-                        SubmotifFeatureGenerator(
+                        MotifFeatureGenerator(
                             motif_len=motif_len,
-                            left_motif_flank_len=left_motif_flank_len,
-                            hier_offset=self.max_left_motif_flank_len - left_motif_flank_len,
-                            left_update_region=self.max_left_motif_flank_len,
-                            right_update_region=self.max_right_motif_flank_len,
+                            distance_to_start_of_motif=-left_motif_flank_len,
+                            combined_offset=self.max_left_motif_flank_len - left_motif_flank_len,
                         )
                     )
 
@@ -80,9 +89,9 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         """
         Combine hierarchical and offset theta values
         """
-        full_feat_generator = SubmotifFeatureGenerator(
+        full_feat_generator = MotifFeatureGenerator(
             motif_len=self.motif_len,
-            left_motif_flank_len=self.left_motif_flank_len,
+            distance_to_start_of_motif=-self.left_motif_flank_len,
         )
         full_theta_size = full_feat_generator.feature_vec_len
         zero_theta_mask = get_zero_theta_mask(theta)
@@ -118,7 +127,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                     # Combine hierarchical feat_gens for given left_motif_len
                     flanks = itertools.product(NUCLEOTIDE_SET, repeat=full_feat_generator.motif_len - feat_gen.motif_len)
                     for f in flanks:
-                        full_m = "".join(f[:feat_gen.hier_offset]) + m + "".join(f[feat_gen.hier_offset:])
+                        full_m = "".join(f[:feat_gen.combined_offset]) + m + "".join(f[feat_gen.combined_offset:])
                         full_m_idx = full_feat_generator.motif_dict[full_m]
                         full_theta[full_m_idx] += m_theta
 

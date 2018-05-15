@@ -9,7 +9,6 @@ from common import *
 from models import ObservedSequenceMutations
 from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
-from submotif_feature_generator import SubmotifFeatureGenerator
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler, GibbsStepInfo
 
