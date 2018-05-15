@@ -9,7 +9,7 @@ import random
 import numpy as np
 
 from read_data import write_partis_data_from_annotations, write_data_after_imputing, write_data_after_sampling
-from common import split_train_val
+from data_split import split_train_val
 from shutil import copyfile
 
 def parse_args():

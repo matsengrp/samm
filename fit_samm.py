@@ -18,6 +18,7 @@ from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
 from likelihood_evaluator import LikelihoodComparer
 from context_model_algo import ContextModelAlgo
+import data_split
 from common import *
 from read_data import *
 
@@ -72,15 +73,15 @@ def parse_args():
     parser.add_argument('--em-max-iters',
         type=int,
         help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
-        default=20)
+        default=1)
     parser.add_argument('--burn-in',
         type=int,
         help='Number of burn-in iterations used on the first E-step of each penalty parameter',
-        default=10)
+        default=1)
     parser.add_argument('--num-e-samples',
         type=int,
         help='Number of mutation order samples to draw per observation during E-step',
-        default=10)
+        default=3)
     parser.add_argument('--sampling-rate',
         type=int,
         help='Number of gibbs sweep to perform to get one sample',
@@ -104,6 +105,14 @@ def parse_args():
     parser.add_argument('--validation-col',
         type=str,
         default=None)
+    parser.add_argument('--k-folds',
+        type=int,
+        help="""
+        Number of folds for cross validation (for tuning the penalty parameter).
+        If <= 1, then do training-validation split.
+        Otherwise, then do k-fold CV.
+        """,
+        default=1)
     parser.add_argument('--num-val-burnin',
         type=int,
         help='Number of burn-in iterations when estimating likelihood of validation data',
@@ -158,9 +167,17 @@ def parse_args():
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
 
-    assert(args.tuning_sample_ratio > 0)
+    if len(args.penalty_params) > 1:
+        assert args.tuning_sample_ratio > 0 or args.k_folds > 1
 
     return args
+
+def _select_model_result(model_res_list):
+    """
+    Select the fitted penalized model with the least nonzero elements (most parsimonious)
+    """
+    nonzeros = [res.penalized_num_nonzero for res in model_res_list]
+    return model_res_list[np.argmin(nonzeros)]
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -186,16 +203,22 @@ def main(args=sys.argv[1:]):
         right_flank_len=args.max_right_flank,
     )
 
-    train_idx, val_idx = split_train_val(
+    feat_generator.add_base_features_for_list(obs_data)
+    fold_indices = data_split.split(
         len(obs_data),
         metadata,
         args.tuning_sample_ratio,
+        args.k_folds,
         validation_column=args.validation_col,
     )
-    train_set = [obs_data[i] for i in train_idx]
-    val_set = [obs_data[i] for i in val_idx]
-    feat_generator.add_base_features_for_list(train_set)
-    feat_generator.add_base_features_for_list(val_set)
+    cmodels = []
+    data_folds = []
+    for train_idx, val_idx in fold_indices:
+        train_set = [obs_data[i] for i in train_idx]
+        val_set = [obs_data[i] for i in val_idx]
+        data_folds.append((train_set, val_set))
+        cmodels.append(
+                ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool))
 
     st_time = time.time()
     log.info("Data statistics:")
@@ -203,66 +226,73 @@ def main(args=sys.argv[1:]):
     log.info(get_data_statistics_print_lines(obs_data, feat_generator))
     log.info("Settings %s" % args)
     log.info("Running EM")
-    cmodel_algo = ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool)
 
     # Run EM on the lasso parameters from largest to smallest
-    num_val_samples = args.num_val_samples
     results_list = []
-    val_set_evaluator = None
-    penalty_params_prev = None
+    val_set_evaluators = [None for _ in cmodels]
     prev_pen_theta = None
     best_model_idx = 0
     for param_i, penalty_param in enumerate(args.penalty_params):
+        param_results = []
+        penalty_params_prev = None if param_i == 0 else args.penalty_params[param_i - 1]
         target_penalty_param = penalty_param if args.per_target_model else 0
         penalty_params = (penalty_param, target_penalty_param)
         log.info("==== Penalty parameters %f, %f ====" % penalty_params)
-        curr_model_results = cmodel_algo.fit_penalized(
-            penalty_params,
-            max_em_iters=args.em_max_iters,
-            val_set_evaluator=val_set_evaluator,
-            init_theta=prev_pen_theta,
-            reference_pen_param=penalty_params_prev,
-        )
+        for fold_idx, (cmodel_algo, (_, val_set)) in enumerate(zip(cmodels, data_folds)):
+            log.info("========= Fold %d ==============" % fold_idx)
+            prev_pen_theta = results_list[param_i - 1][fold_idx].penalized_theta if param_i else None
+            val_set_evaluator = val_set_evaluators[fold_idx]
+            curr_model_results = cmodel_algo.fit_penalized(
+                penalty_params,
+                max_em_iters=args.em_max_iters,
+                val_set_evaluator=val_set_evaluator,
+                init_theta=prev_pen_theta,
+                reference_pen_param=penalty_params_prev,
+            )
 
-        # Create this val set evaluator for next time
-        val_set_evaluator = LikelihoodComparer(
-            val_set,
-            feat_generator,
-            theta_ref=curr_model_results.penalized_theta,
-            num_samples=num_val_samples,
-            burn_in=args.num_val_burnin,
-            num_jobs=args.num_jobs,
-            scratch_dir=args.scratch_dir,
-            pool=all_runs_pool,
-        )
-        # grab this many validation samples from now on
-        num_val_samples = val_set_evaluator.num_samples
+            # Create this val set evaluator for next time
+            prev_num_val_samples = val_set_evaluator.num_samples if val_set_evaluator is not None else args.num_val_samples
+            val_set_evaluator = LikelihoodComparer(
+                val_set,
+                feat_generator,
+                theta_ref=curr_model_results.penalized_theta,
+                # Try grabbing same number of samples as previous iter
+                num_samples=prev_num_val_samples,
+                burn_in=args.num_val_burnin,
+                num_jobs=args.num_jobs,
+                scratch_dir=args.scratch_dir,
+                pool=all_runs_pool,
+            )
+            val_set_evaluators[fold_idx] = val_set_evaluator
 
-        # Save model results
-        results_list.append(curr_model_results)
+            # Save model results
+            param_results.append(curr_model_results)
+
+        results_list.append(param_results)
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        ll_ratio = curr_model_results.log_lik_ratio_lower_bound
-        if curr_model_results.penalized_num_nonzero > 0 and ll_ratio is not None and ll_ratio < -ZERO_THRES:
+        ll_ratios = [res.log_lik_ratio_lower_bound for res in param_results if res.log_lik_ratio_lower_bound is not None]
+        nonzeros = [res.penalized_num_nonzero for res in param_results]
+        if any(nonzeros) and len(ll_ratios) and get_interval(ll_ratios, scale_std_err=1)[0] < -ZERO_THRES:
             # Make sure that the penalty isnt so big that theta is empty
+            # One std error below the mean for the log lik ratios surrogate is negative
+            # Time to stop shrinking penalty param
             # This model is not better than the previous model. Stop trying penalty parameters.
             # Time to refit the model
-            log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratio %f" % ll_ratio)
+            log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % ll_ratios)
             break
         else:
             best_model_idx = param_i
 
-        if curr_model_results.penalized_num_nonzero == feat_generator.feature_vec_len:
+        if np.mean(nonzeros) == feat_generator.feature_vec_len:
             # Model is saturated so stop fitting new parameters
-            log.info("Model is saturated with %d parameters. Stop fitting." % curr_model_results.penalized_num_nonzero)
+            log.info("Model is saturated with %d parameters. Stop fitting." % np.mean(nonzeros))
             break
 
-        penalty_params_prev = penalty_params
-        prev_pen_theta = curr_model_results.penalized_theta
-
+    method_res = _select_model_result(results_list[best_model_idx])
     cmodel_algo.refit_unpenalized(
-        model_result=results_list[best_model_idx],
+        model_result=method_res,
         max_em_iters=args.em_max_iters * 3,
         get_hessian=not args.omit_hessian,
     )
@@ -276,7 +306,6 @@ def main(args=sys.argv[1:]):
             motif_lens=[args.max_motif_len],
             left_motif_flank_len_list=args.max_mut_pos,
         )
-        method_res = results_list[best_model_idx]
         num_agg_cols = NUM_NUCLEOTIDES if args.per_target_model else 1
         agg_start_col = 1 if args.per_target_model else 0
 
@@ -304,8 +333,9 @@ def main(args=sys.argv[1:]):
                 log.info("No fits had positive variance estimates")
             else:
                 best_model_idx -= 1
+                method_res = _select_model_result(results_list[best_model_idx])
                 cmodel_algo.refit_unpenalized(
-                    model_result=results_list[best_model_idx],
+                    model_result=method_res,
                     max_em_iters=args.em_max_iters,
                     get_hessian=not args.omit_hessian,
                 )
