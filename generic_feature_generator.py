@@ -40,7 +40,12 @@ class GenericFeatureGenerator(FeatureGenerator):
         )
         return feat_matrix
 
-    def create_for_mutation_steps(self, seq_mut_order):
+    def create_for_mutation_steps(
+        self,
+        seq_mut_order,
+        left_update_region,
+        right_update_region,
+    ):
         """
         Calculate the feature values for the mutation steps
         Only returns the deltas at each mutation step
@@ -64,6 +69,8 @@ class GenericFeatureGenerator(FeatureGenerator):
                 seq_mut_order,
                 intermediate_seq,
                 already_mutated_pos,
+                left_update_region=left_update_region,
+                right_update_region=right_update_region,
             )
             mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, intermediate_seq)
             feat_mutation_steps.append(MultiFeatureMutationStep(
@@ -91,6 +98,8 @@ class GenericFeatureGenerator(FeatureGenerator):
         self,
         seq_mut_order,
         update_step_start,
+        left_update_region,
+        right_update_region,
     ):
         """
         Calculate the feature values for the mutation steps starting the the `update_step_start`-th step
@@ -118,6 +127,8 @@ class GenericFeatureGenerator(FeatureGenerator):
                 seq_mut_order,
                 flanked_seq,
                 already_mutated_pos,
+                left_update_region=left_update_region,
+                right_update_region=right_update_region,
             )
             mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, flanked_seq)
             feat_mutation_steps.append(MultiFeatureMutationStep(
@@ -144,6 +155,8 @@ class GenericFeatureGenerator(FeatureGenerator):
         update_step,
         flanked_seq,
         already_mutated_pos,
+        left_update_region,
+        right_update_region,
     ):
         """
         @param seq_mut_order: a list of the positions in the mutation order
@@ -164,6 +177,8 @@ class GenericFeatureGenerator(FeatureGenerator):
             seq_mut_order,
             flanked_seq,
             already_mutated_pos,
+            left_update_region=left_update_region,
+            right_update_region=right_update_region,
         )
         first_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(first_mutation_pos, flanked_seq)
 
@@ -182,6 +197,8 @@ class GenericFeatureGenerator(FeatureGenerator):
             flanked_seq,
             already_mutated_pos,
             calc_future_dict=False,
+            left_update_region=left_update_region,
+            right_update_region=right_update_region,
         )
         second_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(second_mutation_pos, flanked_seq)
 
@@ -201,6 +218,8 @@ class GenericFeatureGenerator(FeatureGenerator):
             intermediate_seq,
             already_mutated_pos,
             calc_future_dict=True,
+            left_update_region=0,
+            right_update_region=0,
         ):
         """
         Does the heavy lifting for calculating feature vectors at a given mutation step
@@ -212,6 +231,8 @@ class GenericFeatureGenerator(FeatureGenerator):
         @param intermediate_seq: nucleotide sequence INCLUDING flanks - before the mutation step occurs
         @param already_mutated_pos: list of positions that have already mutated
         @param calc_future_dict: calculate feat_dict_future (dict with positions next to current mutation)
+        @param left_update_region: from CombinedFeatureGenerator
+        @param right_update_region: from CombinedFeatureGenerator
 
         @return tuple with
             1. a dict with the positions next to the previous mutation and their feature index
@@ -228,6 +249,8 @@ class GenericFeatureGenerator(FeatureGenerator):
                 intermediate_seq,
                 seq_mut_order.obs_seq_mutation.seq_len,
                 already_mutated_pos,
+                left_update_region,
+                right_update_region,
             )
 
         # Calculate the features in these special positions for updating the next mutation step's risk group
@@ -238,6 +261,8 @@ class GenericFeatureGenerator(FeatureGenerator):
                 intermediate_seq,
                 seq_mut_order.obs_seq_mutation.seq_len,
                 already_mutated_pos,
+                left_update_region,
+                right_update_region,
             )
         return feat_dict_curr, feat_dict_future
 
@@ -265,14 +290,14 @@ class GenericFeatureGenerator(FeatureGenerator):
             feat_vec_dict[pos] = self._get_mutating_pos_feat_idx(pos, left_flank + seq_str + right_flank)
         return feat_vec_dict
 
-    # feature generator--specific functions
-
     def _get_feature_dict_for_region(
         self,
         position,
         intermediate_seq,
         seq_len,
         already_mutated_pos,
+        left_update_region,
+        right_update_region,
     ):
         """
         @param position: the position around which to calculate the feature indices for
@@ -282,7 +307,15 @@ class GenericFeatureGenerator(FeatureGenerator):
 
         @return a dict with the positions next to the given position and their feature index
         """
-        raise NotImplementedError()
+        feat_dict = dict()
+        start_region_idx = max(position - left_update_region, 0)
+        end_region_idx = min(position + right_update_region, seq_len - 1)
+        update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx)
+        for pos in update_positions:
+            if pos not in already_mutated_pos:
+                # Only update the positions that are in the risk group (the ones that haven't mutated yet)
+                feat_dict[pos] = self._get_mutating_pos_feat_idx(pos, intermediate_seq)
+        return feat_dict
 
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
         """

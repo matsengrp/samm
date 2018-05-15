@@ -6,15 +6,22 @@ from scipy.sparse import hstack
 class CombinedFeatureGenerator(FeatureGenerator):
     """
     Class that combines GenericFeatureGenerators.
-    For example, a hierarchical model is a CombinedFeatureGenerator with each element a SubmotifFeatureGenerator.
     """
-    def __init__(self, feat_gen_list, feats_to_remove=[]):
+    def __init__(self, feat_gen_list, feats_to_remove=[], left_update_region=0, right_update_region=0):
         """
         @param feat_gen_list: list of GenericFeatureGenerators
         @param feats_to_remove: list of elements of feature_info_list for each GenericFeatureGenerator to remove
+        @param left_update_region: number of positions to consider left of mutating position to update
+            features correctly
+        @param right_update_region: number of positions to consider right of mutating position to update
+            features correctly
         """
         self.feat_gens = feat_gen_list
         self.feats_to_remove = feats_to_remove
+
+        self.left_update_region = left_update_region
+        self.right_update_region = right_update_region
+
         self.update_feats_after_removing(feats_to_remove)
 
     def add_base_features_for_list(self, obs_data):
@@ -39,7 +46,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
     def create_for_mutation_steps(self, seq_mut_order):
         feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations)]
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            mut_steps = feat_gen.create_for_mutation_steps(seq_mut_order)
+            mut_steps = feat_gen.create_for_mutation_steps(seq_mut_order, self.left_update_region, self.right_update_region)
             for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
                 multi_f.update(single_f, offset)
         return feat_mutation_steps
@@ -59,6 +66,8 @@ class CombinedFeatureGenerator(FeatureGenerator):
                 update_step,
                 flanked_seq,
                 already_mutated_pos,
+                self.left_update_region,
+                self.right_update_region,
             )
             if mut_pos_feat is not None:
                 first_mut_feats.append(mut_pos_feat + offset)
@@ -72,7 +81,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
     ):
         feat_mutation_steps = [MultiFeatureMutationStep() for i in range(seq_mut_order.obs_seq_mutation.num_mutations - update_step_start)]
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            mut_steps = feat_gen.create_remaining_mutation_steps(seq_mut_order, update_step_start)
+            mut_steps = feat_gen.create_remaining_mutation_steps(seq_mut_order, update_step_start, self.left_update_region, self.right_update_region)
             assert(len(mut_steps) == len(feat_mutation_steps))
             for multi_f, single_f in zip(feat_mutation_steps, mut_steps):
                 multi_f.update(single_f, offset)
