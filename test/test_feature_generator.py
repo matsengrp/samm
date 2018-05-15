@@ -15,6 +15,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         motif_len = 3
         seq_length = 400
         mut_per_length = 10
+        left_update = 1
+        right_update = 1
 
         feat_generator = MotifFeatureGenerator(motif_len=motif_len)
 
@@ -41,11 +43,13 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             my_order,
         )
         st_time = time.time()
-        mutation_steps = feat_generator.create_for_mutation_steps(seq_mut_order)
+        mutation_steps = feat_generator.create_for_mutation_steps(seq_mut_order, left_update, right_update)
         print "create_for_mutation_steps time", time.time() - st_time
 
     def test_create(self):
         motif_len = 3
+        left_update = 1
+        right_update = 1
         feat_generator = MotifFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
@@ -60,7 +64,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
+        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut, left_update, right_update)
         self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 16 * 0 + 4 * 0 + 1 * 3)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
@@ -75,6 +79,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
     def test_create_upstream(self):
         motif_len = 3
         left_motif_flank_len = 0
+        left_update = 0
+        right_update = 2
         feat_generator = MotifFeatureGenerator(
             motif_len=motif_len,
             distance_to_start_of_motif=-left_motif_flank_len,
@@ -94,7 +100,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
+        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut, left_update, right_update)
         self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 16 * 0 + 4 * 3  + 1 * 3)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
@@ -109,6 +115,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
     def test_create_downstream(self):
         motif_len = 3
         left_motif_flank_len = 2
+        left_update = 2
+        right_update = 0
         feat_generator = MotifFeatureGenerator(
             motif_len=motif_len,
             distance_to_start_of_motif=-left_motif_flank_len,
@@ -128,7 +136,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut)
+        base_feat_mut_steps = feat_generator.create_for_mutation_steps(ordered_seq_mut, left_update, right_update)
         self.assertEqual(base_feat_mut_steps[0].mutating_pos_feats, 16 * 0 + 4 * 0  + 1 * 0)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_new), 0)
         self.assertEqual(len(base_feat_mut_steps[0].neighbors_feat_old), 0)
@@ -142,6 +150,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         motif_len = 3
         left_flank_lens = [1, 2]
         left_motif_flank_len = 1
+        left_update = max(left_flank_lens)
+        right_update = motif_len - 1 - min(left_flank_lens)
         feat_generator1 = MotifFeatureGenerator(
             motif_len=motif_len,
             distance_to_start_of_motif=-left_motif_flank_len,
@@ -182,8 +192,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # Create the base_feat_vec_dicts and base_intermediate_seqs
-        base_feat_mut_steps1 = feat_generator1.create_for_mutation_steps(ordered_seq_mut1)
-        base_feat_mut_steps2 = feat_generator2.create_for_mutation_steps(ordered_seq_mut2)
+        base_feat_mut_steps1 = feat_generator1.create_for_mutation_steps(ordered_seq_mut1, left_update, right_update)
+        base_feat_mut_steps2 = feat_generator2.create_for_mutation_steps(ordered_seq_mut2, left_update, right_update)
         self.assertEqual(base_feat_mut_steps1[0].mutating_pos_feats, 16 * 0 + 4 * 0  + 1 * 3)
         self.assertEqual(base_feat_mut_steps2[0].mutating_pos_feats, 16 * 0 + 4 * 0  + 1 * 0)
         self.assertEqual(base_feat_mut_steps1[1].neighbors_feat_old[1], 16 * 0 + 4 * 3  + 1 * 3)
@@ -191,6 +201,8 @@ class FeatureGeneratorTestCase(unittest.TestCase):
 
     def test_update(self):
         motif_len = 3
+        left_update = 1
+        right_update = 1
         feat_generator = MotifFeatureGenerator(motif_len=motif_len)
         obs_seq_mut = ObservedSequenceMutations(
                 start_seq="aattatgaatgc",
@@ -226,13 +238,15 @@ class FeatureGeneratorTestCase(unittest.TestCase):
             + obs_seq_mut.right_flank
         )
         # create features - the slow version
-        feat_mut_steps1 = feat_generator.create_for_mutation_steps(ordered_seq_mut1)
+        feat_mut_steps1 = feat_generator.create_for_mutation_steps(ordered_seq_mut1, left_update, right_update)
         # get the feature delta - the fast version
         first_mutation_feat, second_mut_step = feat_generator.get_shuffled_mutation_steps_delta(
             ordered_seq_mut1,
             update_step=obs_seq_mut.num_mutations - 2,
             flanked_seq=flanked_seq,
             already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 2]),
+            left_update_region=left_update,
+            right_update_region=right_update,
         )
         self.assertEqual(first_mutation_feat, 14)
         self.assertEqual(feat_mut_steps1[-2].mutating_pos_feats, 14)
@@ -253,13 +267,15 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         )
 
         # create features - the slow version
-        feat_mut_steps2 = feat_generator.create_for_mutation_steps(ordered_seq_mut2)
+        feat_mut_steps2 = feat_generator.create_for_mutation_steps(ordered_seq_mut2, left_update, right_update)
         # get the feature delta - the fast version
         first_mutation_feat2, second_mut_step2 = feat_generator.get_shuffled_mutation_steps_delta(
             ordered_seq_mut2,
             update_step=obs_seq_mut.num_mutations - 3,
             flanked_seq=flanked_seq,
             already_mutated_pos=set(new_order[:obs_seq_mut.num_mutations - 3]),
+            left_update_region=left_update,
+            right_update_region=right_update,
         )
         self.assertEqual(first_mutation_feat2, 14)
         self.assertEqual(second_mut_step2.mutating_pos_feats, 14)

@@ -310,7 +310,7 @@ class GenericFeatureGenerator(FeatureGenerator):
         feat_dict = dict()
         start_region_idx = max(position - left_update_region, 0)
         end_region_idx = min(position + right_update_region, seq_len - 1)
-        update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx)
+        update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx + 1)
         for pos in update_positions:
             if pos not in already_mutated_pos:
                 # Only update the positions that are in the risk group (the ones that haven't mutated yet)

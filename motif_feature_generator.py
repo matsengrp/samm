@@ -1,6 +1,6 @@
 import itertools
 
-from common import is_re_match, compute_known_hot_and_cold, NUCLEOTIDES, HOT_COLD_SPOT_REGS
+from common import is_re_match, compute_known_hot_and_cold, NUCLEOTIDES, HOT_COLD_SPOT_REGS, mutate_string
 from generic_feature_generator import GenericFeatureGenerator
 
 class MotifFeatureGenerator(GenericFeatureGenerator):
@@ -33,7 +33,7 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
         self.motif_len = motif_len
         if distance_to_start_of_motif is None:
             # default to central base mutating (for odd motif)
-            self.distance_to_start_of_motif = -motif_len/2
+            self.distance_to_start_of_motif = -(motif_len/2)
         else:
             self.distance_to_start_of_motif = distance_to_start_of_motif
         self.combined_offset = combined_offset
