@@ -15,7 +15,7 @@ class GreedyLikelihoodComparer:
     def do_greedy_search(val_set, feat_generator, models, sort_func, burn_in, num_samples, num_jobs, scratch_dir, pool=None):
         """
         @param val_set: list of ObservedSequenceMutations
-        @param feat_generator: FeatureGenerator
+        @param feat_generator: CombinedFeatureGenerator
         @param models: list of MethodResults
         @param sort_func: a function for sorting the list of models, some measure of model complexity
         @param burn_in, num_samples, num_jobs, scratch_dir
@@ -74,7 +74,7 @@ class LikelihoodComparer:
     def __init__(self, obs_data, feat_generator, theta_ref, num_samples=10, burn_in=0, num_jobs=1, scratch_dir="", pool=None):
         """
         @param obs_data: list of ObservedSequenceMutations
-        @param feat_generator: SubmotifFeatureGenerator
+        @param feat_generator: CombinedFeatureGenerator
         @param theta_ref: the model parameters (numpy vector) - we use this as the reference theta
         @param num_samples: number of samples to draw for the likelihood ratio estimation
         @param burn_in: number of burn in samples
@@ -84,6 +84,8 @@ class LikelihoodComparer:
         """
         self.theta_ref = theta_ref
         self.num_samples = num_samples
+
+        assert(isinstance(feat_generator, CombinedFeatureGenerator))
         self.feat_generator = feat_generator
         self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES + 1
         self.pool = pool
@@ -179,12 +181,14 @@ class LogLikelihoodEvaluator:
     def __init__(self, obs_data, feat_generator, num_jobs=1, scratch_dir=""):
         """
         @param obs_data: list of ObservedSequenceMutations
-        @param feat_generator: SubmotifFeatureGenerator
+        @param feat_generator: CombinedFeatureGenerator
         @param num_jobs: number of jobs to submit
         @param scratch_dir: tmp dir for batch submission manager
         """
         self.obs_data = obs_data
         self.init_orders = [obs_seq.mutation_pos_dict.keys() for obs_seq in obs_data]
+
+        assert(isinstance(feat_generator, CombinedFeatureGenerator))
         self.feat_generator = feat_generator
         self.num_jobs = num_jobs
         self.scratch_dir = scratch_dir

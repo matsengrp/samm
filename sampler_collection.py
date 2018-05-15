@@ -123,6 +123,7 @@ class Sampler:
                 theta_summed = theta[:,0,None] + theta[:,1:]
                 self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
 
+        assert(isinstance(feature_generator, CombinedFeatureGenerator))
         self.feature_generator = feature_generator
         self.obs_seq_mutation = obs_seq_mutation
         self.seq_len = obs_seq_mutation.seq_len
