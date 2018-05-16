@@ -73,15 +73,15 @@ def parse_args():
     parser.add_argument('--em-max-iters',
         type=int,
         help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
-        default=1)
+        default=20)
     parser.add_argument('--burn-in',
         type=int,
         help='Number of burn-in iterations used on the first E-step of each penalty parameter',
-        default=1)
+        default=10)
     parser.add_argument('--num-e-samples',
         type=int,
         help='Number of mutation order samples to draw per observation during E-step',
-        default=3)
+        default=10)
     parser.add_argument('--sampling-rate',
         type=int,
         help='Number of gibbs sweep to perform to get one sample',
@@ -176,7 +176,7 @@ def _select_model_result(model_res_list):
     """
     Select the fitted penalized model with the least nonzero elements (most parsimonious)
     """
-    nonzeros = [res.penalized_num_nonzero for res in model_res_list]
+    nonzeros = np.array([res.penalized_num_nonzero for res in model_res_list])
     return model_res_list[np.argmin(nonzeros)]
 
 def main(args=sys.argv[1:]):
@@ -272,8 +272,9 @@ def main(args=sys.argv[1:]):
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        ll_ratios = [res.log_lik_ratio_lower_bound for res in param_results if res.log_lik_ratio_lower_bound is not None]
-        nonzeros = [res.penalized_num_nonzero for res in param_results]
+        ll_ratios = np.array([res.log_lik_ratio_lower_bound for res in param_results if res.log_lik_ratio_lower_bound is not None])
+        nonzeros = np.array([res.penalized_num_nonzero for res in param_results])
+        log.info("LL ratios across folds %s" % ll_ratios)
         if any(nonzeros) and len(ll_ratios) and get_interval(ll_ratios, scale_std_err=1)[0] < -ZERO_THRES:
             # Make sure that the penalty isnt so big that theta is empty
             # One std error below the mean for the log lik ratios surrogate is negative
