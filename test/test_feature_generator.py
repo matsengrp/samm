@@ -155,7 +155,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         feat_generator1 = MotifFeatureGenerator(
             motif_len=motif_len,
             distance_to_start_of_motif=-left_motif_flank_len,
-            combined_offset=max(left_flank_lens) - left_motif_flank_len,
+            flank_len_offset=max(left_flank_lens) - left_motif_flank_len,
         )
         obs_seq_mut1 = ObservedSequenceMutations(
                 start_seq="aaattatgaatgc",
@@ -175,7 +175,7 @@ class FeatureGeneratorTestCase(unittest.TestCase):
         feat_generator2 = MotifFeatureGenerator(
             motif_len=motif_len,
             distance_to_start_of_motif=-left_motif_flank_len,
-            combined_offset=max(left_flank_lens) - left_motif_flank_len,
+            flank_len_offset=max(left_flank_lens) - left_motif_flank_len,
         )
         obs_seq_mut2 = ObservedSequenceMutations(
                 start_seq="aaattatgaatgc",

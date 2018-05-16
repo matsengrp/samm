@@ -23,7 +23,7 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
             motif_len=3,
             distance_to_start_of_motif=None,
             feats_to_remove=[],
-            combined_offset=0,
+            flank_len_offset=0,
         ):
         """
         @param motif_len: list of motifs to look for at a distance from mutating position
@@ -32,11 +32,12 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
         """
         self.motif_len = motif_len
         if distance_to_start_of_motif is None:
-            # default to central base mutating (for odd motif)
+            # default to central base mutating (for odd motif length)
             self.distance_to_start_of_motif = -(motif_len/2)
         else:
             self.distance_to_start_of_motif = distance_to_start_of_motif
-        self.combined_offset = combined_offset
+
+        self.flank_len_offset = flank_len_offset
 
         self.update_feats_after_removing(feats_to_remove)
 
@@ -61,7 +62,7 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
 
         @param info: an element of feature_info_list
         """
-        if -self.distance_to_start_of_motif <= self.motif_len - 1 and self.distance_to_start_of_motif <= 0:
+        if -self.distance_to_start_of_motif in range(self.motif_len):
             # this is a motif feature, so print accordingly
             motif, dist = info
             mut_pos = -self.distance_to_start_of_motif
@@ -78,29 +79,13 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
         """
         The fact that this module takes a flanked sequence means that some of the submotif length information is contained
-        in seq_with_flanks, and we need to use combined_offset to get the correct feature.
+        in seq_with_flanks, and we need to use flank_len_offset to get the correct feature.
 
         @param pos: mutating position
         @param seq_with_flanks: sequence to determine motif, flanks included
 
         @return index of feature vector for this mutating position
         """
-        motif = seq_with_flanks[pos + self.combined_offset: pos + self.combined_offset + self.motif_len]
+        motif = seq_with_flanks[pos + self.flank_len_offset: pos + self.flank_len_offset + self.motif_len]
         feat_idx = self.motif_dict[motif]
         return feat_idx
-
-    def _get_mutated_seq(self, intermediate_seq, pos, end_seq):
-        """
-        Our motifs need offsets, but general feature generators do not use this.
-
-        @param intermediate_seq: initial nucleotide sequence
-        @param pos: mutating position
-        @param end_seq: final nucleotide sequence
-
-        @return the mutated sequence string
-        """
-        return mutate_string(
-            intermediate_seq,
-            pos - self.distance_to_start_of_motif + self.combined_offset,
-            end_seq[pos - self.distance_to_start_of_motif + self.combined_offset],
-        )

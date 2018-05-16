@@ -24,13 +24,17 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         """
 
         self.motif_lens = motif_lens
-        self.left_motif_flank_len_list = left_motif_flank_len_list
 
         if left_motif_flank_len_list is None:
             # default to central base mutating
             left_motif_flank_len_list = []
             for motif_len in motif_lens:
                 left_motif_flank_len_list.append([motif_len/2])
+        else:
+            # make sure we're actually making a hierarchical model
+            for left_motif_lens, motif_len in zip(left_motif_flank_len_list, motif_lens):
+                for left_motif_len in left_motif_lens:
+                    assert(left_motif_len in range(motif_len))
 
         self.max_motif_len = max(motif_lens)
         self.motif_len = self.max_motif_len
@@ -55,7 +59,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                         MotifFeatureGenerator(
                             motif_len=motif_len,
                             distance_to_start_of_motif=-left_motif_flank_len,
-                            combined_offset=self.max_left_motif_flank_len - left_motif_flank_len,
+                            flank_len_offset=self.max_left_motif_flank_len - left_motif_flank_len,
                         )
                     )
 
@@ -77,9 +81,8 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         # We cannot have a motif mutate to the same center nucleotide
         theta_mask = np.ones(mask_shape, dtype=bool)
         if mask_shape[1] > 1:
-            for i, (motif, distance_to_start_of_motif) in enumerate(self.feature_info_list):
-                mutating_pos = -distance_to_start_of_motif
-                mutating_nucleotide = motif[mutating_pos]
+            for i, (motif, mut_pos) in enumerate(zip(self.motif_list, self.mutating_pos_list)):
+                mutating_nucleotide = motif[mut_pos]
                 center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
                 if mask_shape[1] == NUM_NUCLEOTIDES + 1:
                     center_nucleotide_idx += 1
@@ -128,7 +131,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                     # Combine hierarchical feat_gens for given left_motif_len
                     flanks = itertools.product(NUCLEOTIDE_SET, repeat=full_feat_generator.motif_len - feat_gen.motif_len)
                     for f in flanks:
-                        full_m = "".join(f[:feat_gen.combined_offset]) + m + "".join(f[feat_gen.combined_offset:])
+                        full_m = "".join(f[:feat_gen.flank_len_offset]) + m + "".join(f[feat_gen.flank_len_offset:])
                         full_m_idx = full_feat_generator.motif_dict[full_m]
                         full_theta[full_m_idx] += m_theta
 

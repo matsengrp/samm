@@ -81,10 +81,11 @@ class GenericFeatureGenerator(FeatureGenerator):
             ))
 
             # Apply mutation
-            intermediate_seq = self._get_mutated_seq(
+            curr_mutation_pos = mutation_pos + seq_mut_order.obs_seq_mutation.left_flank_len
+            intermediate_seq = mutate_string(
                 intermediate_seq,
-                mutation_pos,
-                seq_mut_order.obs_seq_mutation.end_seq_with_flanks,
+                curr_mutation_pos,
+                seq_mut_order.obs_seq_mutation.end_seq_with_flanks[curr_mutation_pos],
             )
             already_mutated_pos.add(mutation_pos)
             feat_dict_prev = feat_dict_future
@@ -139,10 +140,11 @@ class GenericFeatureGenerator(FeatureGenerator):
             ))
 
             # Apply mutation
-            flanked_seq = self._get_mutated_seq(
+            curr_mutation_pos = mutation_pos + seq_mut_order.obs_seq_mutation.left_flank_len
+            flanked_seq = mutate_string(
                 flanked_seq,
-                mutation_pos,
-                seq_mut_order.obs_seq_mutation.end_seq_with_flanks,
+                curr_mutation_pos,
+                seq_mut_order.obs_seq_mutation.end_seq_with_flanks[curr_mutation_pos],
             )
             already_mutated_pos.add(mutation_pos)
             feat_dict_prev = feat_dict_future
@@ -183,10 +185,11 @@ class GenericFeatureGenerator(FeatureGenerator):
         first_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(first_mutation_pos, flanked_seq)
 
         # Apply mutation
-        flanked_seq = self._get_mutated_seq(
+        curr_mutation_pos = first_mutation_pos + seq_mut_order.obs_seq_mutation.left_flank_len
+        flanked_seq = mutate_string(
             flanked_seq,
-            first_mutation_pos,
-            seq_mut_order.obs_seq_mutation.end_seq_with_flanks,
+            curr_mutation_pos,
+            seq_mut_order.obs_seq_mutation.end_seq_with_flanks[curr_mutation_pos],
         )
 
         feat_dict_curr, _ = self.update_mutation_step(
@@ -265,20 +268,6 @@ class GenericFeatureGenerator(FeatureGenerator):
                 right_update_region,
             )
         return feat_dict_curr, feat_dict_future
-
-    def _get_mutated_seq(self, intermediate_seq, pos, end_seq):
-        """
-        @param intermediate_seq: initial nucleotide sequence
-        @param pos: mutating position
-        @param end_seq: final nucleotide sequence
-
-        @return the mutated sequence string
-        """
-        return mutate_string(
-            intermediate_seq,
-            pos,
-            end_seq[pos],
-        )
 
     def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
         feat_vec_dict = dict()
