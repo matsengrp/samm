@@ -9,7 +9,7 @@ from profile_support import profile
 from confidence_interval_maker import ConfidenceIntervalMaker
 
 class MCMC_EM:
-    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=200, num_jobs=1, scratch_dir='_output', pool=None, per_target_model=False, sampling_rate=1):
+    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=200, num_jobs=1, scratch_dir='_output', per_target_model=False, sampling_rate=1):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param sampler_cls: a Sampler class

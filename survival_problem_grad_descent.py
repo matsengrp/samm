@@ -189,7 +189,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained expected scores %s" % (time.time() - st))
 
         # Calculate the score score (second summand)
-        num_batches = self.pool._processes * batch_factor * 2 if self.pool is not None else 1
+        num_batches = len(grad_log_lik) #self.pool._processes * batch_factor * 2 if self.pool is not None else 1
         batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
         score_scores = [None for _ in batched_idxs]
         score_score_worker_list = [
@@ -628,6 +628,7 @@ class ExpectedScoreScoreWorker(threading.Thread):
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify
         self.label_list = label_list
+        self.expected_scores = expected_scores
 
     def run(self):
         """
@@ -637,5 +638,5 @@ class ExpectedScoreScoreWorker(threading.Thread):
         np.random.seed(self.seed)
         ss = 0
         for label in self.label_list:
-            ss += expected_scores[label] * expected_scores[label].T
+            ss += self.expected_scores[label] * self.expected_scores[label].T
         self.list_to_modify[self.index_to_modify] = ss
