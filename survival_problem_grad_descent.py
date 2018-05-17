@@ -29,7 +29,7 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False):
+    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, max_threads=1):
         """
         @param sample_labels: only used for calculating the Hessian
         @param possible_theta_mask: these theta values are some finite number
@@ -52,6 +52,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
         self.fuse_center_only = fuse_center_only
+        self.max_threads = max_threads
 
         self.precalc_data = self._create_precalc_data_parallel(samples)
 
@@ -83,7 +84,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.per_target_model,
             ) for i, sample in enumerate(samples)
         ]
-        SurvivalProblemCustom._run_threads(worker_list)
+        self._run_threads(worker_list)
         return precalc_data
 
     def get_value(self, theta):
@@ -116,14 +117,16 @@ class SurvivalProblemCustom(SurvivalProblem):
         else:
             return ll_ratio_vec
 
-    @staticmethod
-    def _run_threads(worker_list):
+    def _run_threads(self, worker_list):
         """
         Run and join python Thread objects
         """
-        for w in worker_list:
+        # Batching so not to kill all mymemory
+        batched_worker_list = [
+                ThreadWorker(l) for l in get_batched_list(worker_list, self.max_threads)]
+        for w in batched_worker_list:
             w.start()
-        for w in worker_list:
+        for w in batched_worker_list:
             w.join()
 
     def _get_log_lik_parallel(self, theta):
@@ -143,19 +146,18 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.per_target_model,
                 theta) for i, sample_data in enumerate(self.precalc_data)
         ]
-        SurvivalProblemCustom._run_threads(worker_list)
+        self._run_threads(worker_list)
 
         return np.array(worker_results)
 
     def get_hessian(self, theta):
         """
         Uses Louis's method to calculate the information matrix of the observed data
-        IMPORTANT: all the parallel workers that produce square matrices pre-batch jobs! We do this because otherwise memory consumption will go crazy.
 
         @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
         """
         def _get_parallel_sum(worker_list, res_list):
-            SurvivalProblemCustom._run_threads(worker_list)
+            self._run_threads(worker_list)
             tot = 0
             for r in res_list:
                 tot += r
@@ -173,7 +175,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.per_target_model,
                 theta) for i, sample_data in enumerate(self.precalc_data)
         ]
-        SurvivalProblemCustom._run_threads(worker_list)
+        self._run_threads(worker_list)
 
         sorted_sample_labels = sorted(list(set(self.sample_labels)))
         log.info("Obtained gradients %s" % (time.time() - st))
@@ -259,7 +261,7 @@ class SurvivalProblemCustom(SurvivalProblem):
                 theta)
             for i, sample_data in enumerate(self.precalc_data)
         ]
-        SurvivalProblemCustom._run_threads(worker_list)
+        self._run_threads(worker_list)
 
         grad_ll_raw = np.array(grad_ll_raw)
         grad_ll_dtheta = np.sum(grad_ll_raw, axis=0)
@@ -475,7 +477,19 @@ class SurvivalProblemCustom(SurvivalProblem):
             risk_group_hessian += aug_prev_risk_group_grad * aug_prev_risk_group_grad.T * np.power(prev_denom, -2) - np.power(prev_denom, -1) * block_diag_dd
         return risk_group_hessian
 
-class PrecalcDataWorker(threading.Thread):
+class ThreadWorker(threading.Thread):
+    def __init__(self, workers):
+        threading.Thread.__init__(self)
+        self.workers = workers
+
+    def run(self):
+        """
+        Modifies the list in place and puts in a SamplePrecalcData
+        """
+        for w in self.workers:
+            w.run()
+
+class PrecalcDataWorker:
     """
     Stores the information for calculating gradient
     """
@@ -486,7 +500,6 @@ class PrecalcDataWorker(threading.Thread):
         @param feat_mut_steps: list of FeatureMutationStep
         @param num_features: total number of features that exist
         """
-        threading.Thread.__init__(self)
         self.seed = seed
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify
@@ -502,7 +515,7 @@ class PrecalcDataWorker(threading.Thread):
         np.random.seed(self.seed)
         self.list_to_modify[self.index_to_modify] = SurvivalProblemCustom.get_precalc_data(self.sample, self.feat_mut_steps, self.num_features, self.per_target_model)
 
-class GradientWorker(threading.Thread):
+class GradientWorker:
     """
     Stores the information for calculating gradient
     """
@@ -510,7 +523,6 @@ class GradientWorker(threading.Thread):
         """
         @param sample_data: class SamplePrecalcData
         """
-        threading.Thread.__init__(self)
         self.seed = seed
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify
@@ -531,7 +543,7 @@ class GradientWorker(threading.Thread):
     def __str__(self):
         return "GradientWorker %s" % self.sample_data.obs_seq_mutation
 
-class ObjectiveValueWorker(threading.Thread):
+class ObjectiveValueWorker:
     """
     Stores the information for calculating objective function value
     """
@@ -539,7 +551,6 @@ class ObjectiveValueWorker(threading.Thread):
         """
         @param sample: SamplePrecalcData
         """
-        threading.Thread.__init__(self)
         self.seed = seed
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify
@@ -561,7 +572,7 @@ class ObjectiveValueWorker(threading.Thread):
     def __str__(self):
         return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
 
-class HessianWorker(threading.Thread):
+class HessianWorker:
     """
     Stores the information for calculating gradient
     """
@@ -569,7 +580,6 @@ class HessianWorker(threading.Thread):
         """
         @param sample_data: class SamplePrecalcData
         """
-        threading.Thread.__init__(self)
         self.seed = seed
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify
@@ -589,7 +599,7 @@ class HessianWorker(threading.Thread):
             tot_hessian += h
         self.list_to_modify[self.index_to_modify] = tot_hessian
 
-class ScoreScoreWorker(threading.Thread):
+class ScoreScoreWorker:
     """
     Calculate the product of scores
     """
@@ -597,7 +607,6 @@ class ScoreScoreWorker(threading.Thread):
         """
         @param grad_log_liks: the grad_log_liks to calculate the product of scores
         """
-        threading.Thread.__init__(self)
         self.seed = seed
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify
@@ -614,7 +623,7 @@ class ScoreScoreWorker(threading.Thread):
             ss += g * g.T
         self.list_to_modify[self.index_to_modify] = ss
 
-class ExpectedScoreScoreWorker(threading.Thread):
+class ExpectedScoreScoreWorker:
     """
     Calculate the product of expected scores between itself (indexed by labels)
     """
@@ -622,7 +631,6 @@ class ExpectedScoreScoreWorker(threading.Thread):
         """
         @param label_list: a list of labels to process
         """
-        threading.Thread.__init__(self)
         self.seed = seed
         self.list_to_modify = list_to_modify
         self.index_to_modify = index_to_modify

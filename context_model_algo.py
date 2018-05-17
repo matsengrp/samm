@@ -43,6 +43,7 @@ class ContextModelAlgo:
             scratch_dir=args.scratch_dir,
             per_target_model=args.per_target_model,
             sampling_rate=args.sampling_rate,
+            max_threads=args.num_cpu_threads,
         )
         self.em_max_iters = args.em_max_iters
 
