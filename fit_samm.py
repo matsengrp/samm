@@ -188,6 +188,7 @@ def main(args=sys.argv[1:]):
         motif_lens=args.motif_lens,
         left_motif_flank_len_list=args.positions_mutating,
     )
+    cmodel_algo = ContextModelAlgo(feat_generator, args)
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
@@ -206,17 +207,11 @@ def main(args=sys.argv[1:]):
         args.k_folds,
         validation_column=args.validation_col,
     )
-    cmodels = []
     data_folds = []
     for train_idx, val_idx in fold_indices:
         train_set = [obs_data[i] for i in train_idx]
         val_set = [obs_data[i] for i in val_idx]
         data_folds.append((train_set, val_set))
-        cmodels.append(ContextModelAlgo(
-            feat_generator,
-            obs_data,
-            train_set,
-            args))
 
     st_time = time.time()
     log.info("Data statistics:")
@@ -227,7 +222,7 @@ def main(args=sys.argv[1:]):
 
     # Run EM on the lasso parameters from largest to smallest
     results_list = []
-    val_set_evaluators = [None for _ in cmodels]
+    val_set_evaluators = [None for _ in fold_indices]
     prev_pen_theta = None
     best_model_idx = 0
     for param_i, penalty_param in enumerate(args.penalty_params):
@@ -237,7 +232,7 @@ def main(args=sys.argv[1:]):
         penalty_params = (penalty_param, target_penalty_param)
         log.info("==== Penalty parameters %f, %f ====" % penalty_params)
         workers = []
-        for fold_idx, (cmodel_algo, (_, val_set)) in enumerate(zip(cmodels, data_folds)):
+        for fold_idx, (train_set, val_set) in enumerate(data_folds):
             log.info("========= Fold %d ==============" % fold_idx)
             prev_pen_theta = results_list[param_i - 1][fold_idx].penalized_theta if param_i else None
             val_set_evaluator = val_set_evaluators[fold_idx]
@@ -246,6 +241,7 @@ def main(args=sys.argv[1:]):
             samm_worker = SammWorker(
                 fold_idx,
                 cmodel_algo,
+                train_set,
                 penalty_params,
                 args.em_max_iters,
                 val_set_evaluator,
@@ -288,23 +284,32 @@ def main(args=sys.argv[1:]):
             log.info("Model is saturated with %d parameters. Stop fitting." % np.mean(nonzeros))
             break
 
+    # Make sure we have hte same support. Otherwise we need to refit
     support_all_same = True
     theta_support = results_list[best_model_idx][0].model_masks.zeroed_thetas
-    for method_res in results_list[best_model_idx][1:]:
-        if np.any(theta_support != method_res.model_masks.zeroed_thetas):
+    for res in results_list[best_model_idx][1:]:
+        if np.any(theta_support != res.model_masks.zeroed_thetas):
             support_all_same = False
             break
 
-    if not support_all_same:
-        curr_model_results = cmodel_algo.fit_penalized(
-            penalty_params,
+    if support_all_same:
+        # Just use the first fold as template for doing the refitting unpenalized
+        method_res = results_list[best_model_idx][0]
+    else:
+        # If support is not the same, refit penalized on all the data and get that support
+        # Just use the first fold as template for doing the refitting unpenalized
+        method_res_template = results_list[best_model_idx][0]
+        prev_pen_theta = results_list[best_model_idx - 1][0].penalized_theta if best_model_idx else None
+        method_res = cmodel_algo.fit_penalized(
+            obs_data,
+            method_res_template.penalty_params,
             max_em_iters=args.em_max_iters,
-            val_set_evaluator=val_set_evaluator,
             init_theta=prev_pen_theta,
-            reference_pen_param=penalty_params_prev,
         )
-    1/0
+
+    # Finally ready to refit as unpenalized model
     cmodel_algo.refit_unpenalized(
+        obs_data,
         model_result=method_res,
         max_em_iters=args.em_max_iters * 3,
         get_hessian=not args.omit_hessian,
@@ -348,6 +353,7 @@ def main(args=sys.argv[1:]):
                 best_model_idx -= 1
                 method_res = _select_model_result(results_list[best_model_idx])
                 cmodel_algo.refit_unpenalized(
+                    obs_data,
                     model_result=method_res,
                     max_em_iters=args.em_max_iters,
                     get_hessian=not args.omit_hessian,

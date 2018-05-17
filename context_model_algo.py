@@ -15,7 +15,7 @@ class ContextModelAlgo:
     """
     Performs fitting procedures
     """
-    def __init__(self, feat_generator, obs_data, train_set, args, true_theta=None):
+    def __init__(self, feat_generator, args, true_theta=None):
         """
         @param feat_generator: feature generator
         @param obs_data: full data set - used in training for the refitting stage
@@ -26,9 +26,6 @@ class ContextModelAlgo:
         """
         self.args = args
         self.feat_generator = feat_generator
-
-        self.obs_data = obs_data
-        self.train_set = train_set
 
         self.theta_shape = (feat_generator.feature_vec_len, args.theta_num_col)
         self.possible_theta_mask = get_possible_motifs_to_targets(
@@ -86,7 +83,7 @@ class ContextModelAlgo:
 
         return ll_ratio_lower_bound, log_lik_ratio
 
-    def fit_penalized(self, penalty_params, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
+    def fit_penalized(self, train_set, penalty_params, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
         """
         @param penalty_params: penalty parameter for fitting penalized model
         @param val_set_evaluator: LikelihoodComparer with a given reference model
@@ -98,7 +95,7 @@ class ContextModelAlgo:
             init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
 
         penalized_theta, _, _, _ = self.em_algo.run(
-            self.train_set,
+            train_set,
             self.feat_generator,
             theta=init_theta,
             possible_theta_mask=self.possible_theta_mask,
@@ -128,7 +125,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, model_result, max_em_iters, get_hessian=True):
+    def refit_unpenalized(self, obs_data, model_result, max_em_iters, get_hessian=True):
         """
         Refit the model
         Modifies model_result
@@ -146,7 +143,7 @@ class ContextModelAlgo:
             left_motif_flank_len_list=self.positions_mutating,
         )
         # Get the data ready - using ALL data
-        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
+        obs_data_stage2 = [copy.deepcopy(o) for o in obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
         # Create the theta mask for the shrunken theta
         possible_theta_mask_refit = get_possible_motifs_to_targets(
