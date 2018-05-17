@@ -15,7 +15,7 @@ class ContextModelAlgo:
     """
     Performs fitting procedures
     """
-    def __init__(self, feat_generator, obs_data, train_set, args, all_runs_pool, true_theta=None):
+    def __init__(self, feat_generator, obs_data, train_set, args, true_theta=None):
         """
         @param feat_generator: feature generator
         @param obs_data: full data set - used in training for the refitting stage
@@ -44,7 +44,6 @@ class ContextModelAlgo:
             base_num_e_samples=args.num_e_samples,
             num_jobs=args.num_jobs,
             scratch_dir=args.scratch_dir,
-            pool=all_runs_pool,
             per_target_model=args.per_target_model,
             sampling_rate=args.sampling_rate,
         )

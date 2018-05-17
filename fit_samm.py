@@ -17,6 +17,8 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
 from likelihood_evaluator import LikelihoodComparer
+from samm_worker import SammWorker
+from parallel_worker import MultiprocessingManager
 from context_model_algo import ContextModelAlgo
 import data_split
 from common import *
@@ -172,20 +174,13 @@ def parse_args():
 
     return args
 
-def _select_model_result(model_res_list):
-    """
-    Select the fitted penalized model with the least nonzero elements (most parsimonious)
-    """
-    nonzeros = np.array([res.penalized_num_nonzero for res in model_res_list])
-    return model_res_list[np.argmin(nonzeros)]
-
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    if args.num_cpu_threads > 1:
-        all_runs_pool = Pool(args.num_cpu_threads)
+    if args.k_folds > 1:
+        all_runs_pool = Pool(args.k_folds)
     else:
         all_runs_pool = None
 
@@ -217,8 +212,11 @@ def main(args=sys.argv[1:]):
         train_set = [obs_data[i] for i in train_idx]
         val_set = [obs_data[i] for i in val_idx]
         data_folds.append((train_set, val_set))
-        cmodels.append(
-                ContextModelAlgo(feat_generator, obs_data, train_set, args, all_runs_pool))
+        cmodels.append(ContextModelAlgo(
+            feat_generator,
+            obs_data,
+            train_set,
+            args))
 
     st_time = time.time()
     log.info("Data statistics:")
@@ -238,37 +236,36 @@ def main(args=sys.argv[1:]):
         target_penalty_param = penalty_param if args.per_target_model else 0
         penalty_params = (penalty_param, target_penalty_param)
         log.info("==== Penalty parameters %f, %f ====" % penalty_params)
+        workers = []
         for fold_idx, (cmodel_algo, (_, val_set)) in enumerate(zip(cmodels, data_folds)):
             log.info("========= Fold %d ==============" % fold_idx)
             prev_pen_theta = results_list[param_i - 1][fold_idx].penalized_theta if param_i else None
             val_set_evaluator = val_set_evaluators[fold_idx]
-            curr_model_results = cmodel_algo.fit_penalized(
-                penalty_params,
-                max_em_iters=args.em_max_iters,
-                val_set_evaluator=val_set_evaluator,
-                init_theta=prev_pen_theta,
-                reference_pen_param=penalty_params_prev,
-            )
-
             # Create this val set evaluator for next time
             prev_num_val_samples = val_set_evaluator.num_samples if val_set_evaluator is not None else args.num_val_samples
-            val_set_evaluator = LikelihoodComparer(
+            samm_worker = SammWorker(
+                fold_idx,
+                cmodel_algo,
+                penalty_params,
+                args.em_max_iters,
+                val_set_evaluator,
+                prev_pen_theta,
+                penalty_params_prev,
                 val_set,
-                feat_generator,
-                theta_ref=curr_model_results.penalized_theta,
-                # Try grabbing same number of samples as previous iter
-                num_samples=prev_num_val_samples,
-                burn_in=args.num_val_burnin,
-                num_jobs=args.num_jobs,
-                scratch_dir=args.scratch_dir,
-                pool=all_runs_pool,
-            )
-            val_set_evaluators[fold_idx] = val_set_evaluator
+                prev_num_val_samples,
+                args)
+            workers.append(samm_worker)
+        if all_runs_pool is not None:
+            manager = MultiprocessingManager(all_runs_pool, workers, num_approx_batches=len(workers))
+            results = manager.run()
+        else:
+            results = [w.run() for w in workers]
 
-            # Save model results
-            param_results.append(curr_model_results)
-
+        param_results = [r[0] for r in results]
         results_list.append(param_results)
+        val_set_evaluators = [r[1] for r in results]
+
+        #results_list.append(param_results)
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
@@ -291,7 +288,22 @@ def main(args=sys.argv[1:]):
             log.info("Model is saturated with %d parameters. Stop fitting." % np.mean(nonzeros))
             break
 
-    method_res = _select_model_result(results_list[best_model_idx])
+    support_all_same = True
+    theta_support = results_list[best_model_idx][0].model_masks.zeroed_thetas
+    for method_res in results_list[best_model_idx][1:]:
+        if np.any(theta_support != method_res.model_masks.zeroed_thetas):
+            support_all_same = False
+            break
+
+    if not support_all_same:
+        curr_model_results = cmodel_algo.fit_penalized(
+            penalty_params,
+            max_em_iters=args.em_max_iters,
+            val_set_evaluator=val_set_evaluator,
+            init_theta=prev_pen_theta,
+            reference_pen_param=penalty_params_prev,
+        )
+    1/0
     cmodel_algo.refit_unpenalized(
         model_result=method_res,
         max_em_iters=args.em_max_iters * 3,

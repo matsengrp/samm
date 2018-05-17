@@ -23,7 +23,6 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
         self.num_jobs = num_jobs
-        self.pool = pool
         self.scratch_dir = scratch_dir
         self.per_target_model = per_target_model
         self.sampling_rate = sampling_rate
@@ -98,7 +97,6 @@ class MCMC_EM:
                     self.per_target_model,
                     possible_theta_mask=possible_theta_mask,
                     zero_theta_mask=zero_theta_mask,
-                    pool=self.pool,
                 )
 
                 theta, pen_exp_log_lik, lower_bound = problem.solve(
