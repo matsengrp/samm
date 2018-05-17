@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from mcmc_em import MCMC_EM
-from submotif_feature_generator import SubmotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_cvxpy import SurvivalProblemFusedLassoCVXPY
@@ -18,11 +18,13 @@ class MCMC_EM_TestCase(unittest.TestCase):
         """
         MOTIF_LEN = 3
 
-        feat_generator = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
+        feat_generator = HierarchicalMotifFeatureGenerator(motif_lens=[MOTIF_LEN])
         obs_data_raw = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len=MOTIF_LEN)
         obs_data = []
         for obs_seq_mutation in obs_data_raw:
-            obs_data.append(feat_generator.create_base_features(obs_seq_mutation))
+            obs_seq_m = obs_seq_mutation
+            feat_generator.add_base_features(obs_seq_m)
+            obs_data.append(obs_seq_m)
 
         init_theta = np.random.rand(feat_generator.feature_vec_len, 1)
         theta_mask = np.ones((feat_generator.feature_vec_len, 1), dtype=bool)

@@ -130,6 +130,9 @@ class SurvivalProblemFusedLassoCVXPY(SurvivalProblemCVXPY):
         @param max_iters: ignored
         @param num_threads: ignored
         """
+        # only works for motif models
+        assert(hasattr(self.feature_generator, 'motif_list'))
+
         motif_list = self.feature_generator.motif_list
 
         theta = Variable(self.feature_generator.feature_vec_len)

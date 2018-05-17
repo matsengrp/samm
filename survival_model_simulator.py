@@ -115,7 +115,6 @@ class SurvivalModelSimulatorSingleColumn(SurvivalModelSimulator):
         self.thetas = thetas
         self.probability_matrix = probability_matrix
         self.feature_generator = feature_generator
-        self.motif_list = self.feature_generator.motif_list
         self.lambda0 = lambda0
 
     def _sample_mutation(self, feature_vec_dict, intermediate_seq, pos_to_mutate):
@@ -161,7 +160,6 @@ class SurvivalModelSimulatorMultiColumn(SurvivalModelSimulator):
         self.thetas = thetas
         assert(thetas.shape[1] == NUM_NUCLEOTIDES)
         self.feature_generator = feature_generator
-        self.motif_list = self.feature_generator.motif_list
         self.lambda0 = lambda0
 
     def _sample_mutation(self, feature_vec_dict, intermediate_seq, pos_to_mutate):
@@ -213,7 +211,6 @@ class SurvivalModelSimulatorPositionDependent(SurvivalModelSimulator):
         self.thetas = thetas
         self.probability_matrix = probability_matrix
         self.feature_generator = feature_generator
-        self.motif_list = self.feature_generator.motif_list
         self.lambda0 = lambda0
         self.pos_risk = pos_risk
 

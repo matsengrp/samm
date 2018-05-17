@@ -4,7 +4,6 @@ import numpy as np
 import scipy as sp
 
 from models import ImputedSequenceMutations, ObservedSequenceMutations
-from submotif_feature_generator import SubmotifFeatureGenerator
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_grad_descent import SurvivalProblemCustom
@@ -28,7 +27,7 @@ class Hessian_TestCase(unittest.TestCase):
             theta_num_col = 1
 
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        possible_theta_mask = get_possible_motifs_to_targets(feat_gen.motif_list, theta.shape, feat_gen.mutating_pos_list)
+        possible_theta_mask = self.feat_gen.get_possible_motifs_to_targets(theta.shape)
         theta[~possible_theta_mask] = -np.inf
         zero_theta_mask = np.zeros((feat_gen.feature_vec_len, theta_num_col), dtype=bool)
 

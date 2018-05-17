@@ -5,8 +5,7 @@ import logging as log
 from common import NUCLEOTIDES
 
 class ConfidenceIntervalMaker:
-    def __init__(self, motif_list, per_target_model, possible_theta_mask, zero_theta_mask):
-        self.motif_list = motif_list
+    def __init__(self, per_target_model, possible_theta_mask, zero_theta_mask):
         self.per_target_model = per_target_model
         self.possible_theta_mask = possible_theta_mask
         self.zero_theta_mask = zero_theta_mask
@@ -31,7 +30,7 @@ class ConfidenceIntervalMaker:
             return None
         return np.linalg.pinv(sample_obs_information), sample_obs_information
 
-    def _get_confidence_interval_print_lines(self, conf_ints):
+    def _get_confidence_interval_print_lines(self, conf_ints, feat_gen):
         """
         Get confidence intervals print lines (shows motif and target nucleotides)
         Sorted by theta values
@@ -43,7 +42,7 @@ class ConfidenceIntervalMaker:
             for i in range(self.zero_theta_mask.shape[0]):
                 if not self.theta_mask[i, j]:
                     continue
-                print_str = "%s (%s->%s)" % (conf_ints[idx,:], self.motif_list[i], target_nucleotide)
+                print_str = "%s (%s->%s)" % (conf_ints[idx,:], feat_gen.print_label_from_idx(i), target_nucleotide)
                 print_line_list.append((conf_ints[idx,1], print_str))
                 idx += 1
         sorted_lines = sorted(print_line_list, key=lambda s: s[0])

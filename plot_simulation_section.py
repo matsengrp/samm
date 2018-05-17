@@ -99,10 +99,8 @@ def _collect_statistics(fitted_models, args, agg_true_theta, stat_func):
         left_motif_flank_len_list=[[args.agg_pos_mutating]],
     )
 
-    possible_agg_mask = get_possible_motifs_to_targets(
-        dense_agg_feat_gen.motif_list,
-        mask_shape=agg_true_theta.shape,
-        mutating_pos_list=[args.agg_pos_mutating] * dense_agg_feat_gen.feature_vec_len,
+    possible_agg_mask = dense_agg_feat_gen.get_possible_motifs_to_targets(
+        agg_true_theta.shape,
     )
     statistics = []
     for fmodel in fitted_models:

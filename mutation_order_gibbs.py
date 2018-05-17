@@ -44,7 +44,7 @@ class MutationOrderGibbsSampler(Sampler):
     A class that will do the heavy lifting of Gibbs sampling.
     Returns orders and log probability vector (for tracing)
     """
-    def run(self, init_order, burn_in, num_samples, sampling_rate, conditional_partial_order=[]):
+    def run(self, init_order, burn_in, num_samples, sampling_rate=0, conditional_partial_order=[]):
         """
         @param init_order: a mutation order to initialize the sampler (list of integers)
         @param burn_in: number of iterations for burn in
@@ -166,10 +166,10 @@ class MutationOrderGibbsSampler(Sampler):
             risk_hist = None
 
         # Now unmutate the string by one mutation step so that we can figure out the features at the positions
-        flanked_seq = unmutate_string(
+        flanked_seq = mutate_string(
             self.obs_seq_mutation.end_seq_with_flanks,
-            unmutate_pos=self.obs_seq_mutation.left_flank_len + position,
-            orig_nuc=self.obs_seq_mutation.start_seq[position]
+            self.obs_seq_mutation.left_flank_len + position,
+            self.obs_seq_mutation.start_seq[position]
         )
         already_mutated_pos_set = set(partial_order)
         # iterate through the remaining possible full mutation orders consistent with this partial order
@@ -180,10 +180,10 @@ class MutationOrderGibbsSampler(Sampler):
             already_mutated_pos_set.remove(shuffled_position)
             # Now unmutate the string so that we can figure out the features at the positions
             # right before the i-th mutation step occured
-            flanked_seq = unmutate_string(
+            flanked_seq = mutate_string(
                 flanked_seq,
-                unmutate_pos=self.obs_seq_mutation.left_flank_len + shuffled_position,
-                orig_nuc=self.obs_seq_mutation.start_seq[shuffled_position]
+                self.obs_seq_mutation.left_flank_len + shuffled_position,
+                self.obs_seq_mutation.start_seq[shuffled_position]
             )
             # Now get the features - we only need the feature of the mutating position at the ith step
             # And the feature updates at the time of the `i+1`-th step
@@ -456,7 +456,7 @@ class MutationOrderGibbsSampler(Sampler):
             base_risk_vec[prev_mut_pos] = 0.
 
         # make sure there are no NaNs because we'll use that to pad later
-        assert(not any([np.isnan(risk) for risk in base_risk_vec]))
+        assert(not any([np.isnan(risk_val) for risks in base_risk_vec for risk_val in risks]))
 
         return base_risk_vec
 

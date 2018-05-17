@@ -18,7 +18,7 @@ import scipy.stats
 
 from models import ObservedSequenceMutations
 from mcmc_em import MCMC_EM
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from read_data import read_shmulate_val
 from common import *
@@ -75,7 +75,7 @@ def main(args=sys.argv[1:]):
     res = subprocess.call(cmd)
 
     # Read in the results from the shmulate model-fitter
-    feat_gen = SubmotifFeatureGenerator(motif_len=MOTIF_LEN)
+    feat_gen = MotifFeatureGenerator(motif_len=MOTIF_LEN)
     motif_list = feat_gen.motif_list
     # Read target matrix
     target_motif_dict = dict()

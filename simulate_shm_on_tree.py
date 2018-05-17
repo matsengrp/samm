@@ -6,12 +6,9 @@ import os.path
 import csv
 import warnings
 
-from read_data import *
+from read_data import get_partition_info, disambiguate
 from scipy.stats import poisson
 from ete3 import TreeNode
-
-from submotif_feature_generator import SubmotifFeatureGenerator
-from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 
 from gctree.bin.mutation_model import MutationModel
 

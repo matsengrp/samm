@@ -3,7 +3,7 @@ import unittest
 from read_data import *
 from matsen_grp_data import *
 from constants import *
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 
 class Input_Data_TestCase(unittest.TestCase):
     def test_data_input_fns(self):
@@ -32,7 +32,7 @@ class Input_Data_TestCase(unittest.TestCase):
 
         motif_len = 3
 
-        feat_generator = SubmotifFeatureGenerator(motif_len=motif_len)
+        feat_generator = MotifFeatureGenerator(motif_len=motif_len)
         seqs, metadata = read_gene_seq_csv_data(INPUT_GENES, INPUT_SEQS, motif_len)
         print get_data_statistics_print_lines(seqs, feat_generator)
 

@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import traceback
 import os.path
+from combined_feature_generator import CombinedFeatureGenerator
 from models import ImputedSequenceMutations
 from parallel_worker import ParallelWorker
 from parallel_worker import BatchSubmissionManager
@@ -115,7 +116,7 @@ class Sampler:
         self.exp_theta = np.exp(theta)
         self.per_target_model = self.theta.shape[1] == NUM_NUCLEOTIDES + 1
 
-        if len(feature_generator.motif_lens) == 1:
+        if feature_generator.num_feat_gens == 1:
             self.exp_theta_num_cols = 1 if not self.per_target_model else NUM_NUCLEOTIDES
             if not self.per_target_model:
                 self.exp_theta_sum = np.exp(theta).sum(axis=1)
@@ -123,8 +124,8 @@ class Sampler:
                 theta_summed = theta[:,0,None] + theta[:,1:]
                 self.exp_theta_sum = np.exp(theta_summed).sum(axis=1)
 
+        assert(isinstance(feature_generator, CombinedFeatureGenerator))
         self.feature_generator = feature_generator
-        self.motif_len = self.feature_generator.motif_len
         self.obs_seq_mutation = obs_seq_mutation
         self.seq_len = obs_seq_mutation.seq_len
         self.mutated_positions = obs_seq_mutation.mutation_pos_dict.keys()
