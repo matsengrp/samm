@@ -66,7 +66,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         raise NotImplementedError()
 
-    def _create_precalc_data_parallel(self, samples, batch_factor=4):
+    def _create_precalc_data_parallel(self, samples):
         """
         calculate the precalculated data for each sample in parallel
         """
@@ -118,17 +118,18 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     @staticmethod
     def _run_threads(worker_list):
+        """
+        Run and join python Thread objects
+        """
         for w in worker_list:
             w.start()
         for w in worker_list:
             w.join()
 
-    def _get_log_lik_parallel(self, theta, batch_factor=4):
+    def _get_log_lik_parallel(self, theta):
         """
         JUST KIDDING - parallel is not faster
         @param theta: the theta to calculate the likelihood for
-        @param batch_factor: When using multiprocessing, we batch the samples together for speed
-                            We make `num_threads` * `batch_factor` batches
         @return vector of log likelihood values
         """
         rand_seed = get_randint()
@@ -144,9 +145,9 @@ class SurvivalProblemCustom(SurvivalProblem):
         ]
         SurvivalProblemCustom._run_threads(worker_list)
 
-        return np.array(worker_results)#_get_parallel(worker_list, theta)
+        return np.array(worker_results)
 
-    def get_hessian(self, theta, batch_factor=4):
+    def get_hessian(self, theta):
         """
         Uses Louis's method to calculate the information matrix of the observed data
         IMPORTANT: all the parallel workers that produce square matrices pre-batch jobs! We do this because otherwise memory consumption will go crazy.
@@ -189,7 +190,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained expected scores %s" % (time.time() - st))
 
         # Calculate the score score (second summand)
-        num_batches = len(grad_log_lik) #self.pool._processes * batch_factor * 2 if self.pool is not None else 1
+        num_batches = len(grad_log_lik)
         batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
         score_scores = [None for _ in batched_idxs]
         score_score_worker_list = [
@@ -239,12 +240,10 @@ class SurvivalProblemCustom(SurvivalProblem):
         fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
         return fisher_info, -1.0/self.num_samples * hessian_sum
 
-    def _get_gradient_log_lik(self, theta, batch_factor=4):
+    def _get_gradient_log_lik(self, theta):
         """
         JUST KIDDING - parallel is not faster
         @param theta: the theta to calculate the likelihood for
-        @param batch_factor: When using multiprocessing, we batch the samples together for speed
-                            We make `num_threads` * `batch_factor` batches
 
         Calculate the gradient of the negative log likelihood - delegates to separate cpu threads if threads > 1
         """

@@ -597,7 +597,7 @@ def pick_best_model(fitted_models):
 
 def get_interval(xs, zscore):
     """
-    @return the interval around the mean of `xs` with width 2 * `scale_std_err`
+    @return the interval around the mean of `xs` with width std_err * `zscore`
     """
     mean = np.mean(xs)
     std_err = np.sqrt(np.var(xs)/xs.size)

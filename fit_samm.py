@@ -174,6 +174,16 @@ def parse_args():
 
     return args
 
+def _check_same_support(model_results):
+    """
+    List of MethodResults
+    """
+    theta_support = model_results[0].model_masks.zeroed_thetas
+    for res in model_results[1:]:
+        if np.any(theta_support != res.model_masks.zeroed_thetas):
+            return False
+    return True
+
 def main(args=sys.argv[1:]):
     args = parse_args()
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
@@ -236,7 +246,7 @@ def main(args=sys.argv[1:]):
             log.info("========= Fold %d ==============" % fold_idx)
             prev_pen_theta = results_list[param_i - 1][fold_idx].penalized_theta if param_i else None
             val_set_evaluator = val_set_evaluators[fold_idx]
-            # Create this val set evaluator for next time
+            # Use the same number of order samples as previous validation set if possible
             prev_num_val_samples = val_set_evaluator.num_samples if val_set_evaluator is not None else args.num_val_samples
             samm_worker = SammWorker(
                 fold_idx,
@@ -255,7 +265,7 @@ def main(args=sys.argv[1:]):
             manager = MultiprocessingManager(all_runs_pool, workers, num_approx_batches=len(workers))
             results = manager.run()
         else:
-            results = [w.run() for w in workers]
+            results = [w.run(None) for w in workers]
 
         param_results = [r[0] for r in results]
         results_list.append(param_results)
@@ -286,18 +296,13 @@ def main(args=sys.argv[1:]):
             log.info("Model is saturated with %d parameters. Stop fitting." % np.mean(nonzeros))
             break
 
+    # Pick out the best model
     # Make sure we have hte same support. Otherwise we need to refit
-    support_all_same = True
-    theta_support = results_list[best_model_idx][0].model_masks.zeroed_thetas
-    for res in results_list[best_model_idx][1:]:
-        if np.any(theta_support != res.model_masks.zeroed_thetas):
-            support_all_same = False
-            break
-
-    if support_all_same:
+    if _check_same_support(results_list[best_model_idx]):
         # Just use the first fold as template for doing the refitting unpenalized
         method_res = results_list[best_model_idx][0]
     else:
+        log.info("Need to refit to get the same support")
         # If support is not the same, refit penalized on all the data and get that support
         # Just use the first fold as template for doing the refitting unpenalized
         method_res_template = results_list[best_model_idx][0]
@@ -349,17 +354,7 @@ def main(args=sys.argv[1:]):
             print(e)
 
             log.info("Variance estimates negative; trying previous penalty parameter")
-            if best_model_idx == 0:
-                log.info("No fits had positive variance estimates")
-            else:
-                best_model_idx -= 1
-                method_res = _select_model_result(results_list[best_model_idx])
-                cmodel_algo.refit_unpenalized(
-                    obs_data,
-                    model_result=method_res,
-                    max_em_iters=args.em_max_iters,
-                    get_hessian=not args.omit_hessian,
-                )
+            log.info("No fits had positive variance estimates")
 
         # Pickle the refitted theta
         with open(args.out_file, "w") as f:

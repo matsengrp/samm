@@ -31,7 +31,10 @@ class SammWorker(ParallelWorker):
         self.num_val_samples = num_val_samples
         self.args = args
 
-    def run_worker(self, shared_obj):
+    def run_worker(self, shared_obj=None):
+        """
+        No shared_obj
+        """
         model_results = self.context_model_algo.fit_penalized(
                 self.train_set,
                 self.penalty_params,
