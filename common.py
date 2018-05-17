@@ -595,10 +595,10 @@ def pick_best_model(fitted_models):
     best_model = good_models[max_idx]
     return best_model
 
-def get_interval(xs, scale_std_err=1):
+def get_interval(xs, zscore):
     """
     @return the interval around the mean of `xs` with width 2 * `scale_std_err`
     """
-    mean_x = np.mean(xs)
-    std_err = np.sqrt(np.var(xs)/len(xs))
-    return (mean_x - scale_std_err * std_err, mean_x + scale_std_err * std_err)
+    mean = np.mean(xs)
+    std_err = np.sqrt(np.var(xs)/xs.size)
+    return (mean - zscore * std_err, mean + zscore * std_err)

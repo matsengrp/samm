@@ -261,23 +261,25 @@ def main(args=sys.argv[1:]):
         results_list.append(param_results)
         val_set_evaluators = [r[1] for r in results]
 
-        #results_list.append(param_results)
         with open(args.out_file, "w") as f:
             pickle.dump(results_list, f)
 
-        ll_ratios = np.array([res.log_lik_ratio_lower_bound for res in param_results if res.log_lik_ratio_lower_bound is not None])
         nonzeros = np.array([res.penalized_num_nonzero for res in param_results])
-        log.info("LL ratios across folds %s" % ll_ratios)
-        if any(nonzeros) and len(ll_ratios) and get_interval(ll_ratios, scale_std_err=1)[0] < -ZERO_THRES:
-            # Make sure that the penalty isnt so big that theta is empty
-            # One std error below the mean for the log lik ratios surrogate is negative
-            # Time to stop shrinking penalty param
-            # This model is not better than the previous model. Stop trying penalty parameters.
-            # Time to refit the model
-            log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % ll_ratios)
-            break
-        else:
-            best_model_idx = param_i
+        log_lik_ratios = np.array([r.log_lik_ratio for r in param_results])
+        log.info("Log lik ratios %s" % log_lik_ratios)
+        if any(nonzeros) and param_i > 0:
+            cv_interval = get_interval(log_lik_ratios, zscore=1)
+            log.info("log lik interval (%f, %f)" % cv_interval)
+            if cv_interval[0] < -ZERO_THRES:
+                # Make sure that the penalty isnt so big that theta is empty
+                # One std error below the mean for the log lik ratios surrogate is negative
+                # Time to stop shrinking penalty param
+                # This model is not better than the previous model. Stop trying penalty parameters.
+                # Time to refit the model
+                log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % ll_ratios)
+                break
+
+        best_model_idx = param_i
 
         if np.mean(nonzeros) == feat_generator.feature_vec_len:
             # Model is saturated so stop fitting new parameters
