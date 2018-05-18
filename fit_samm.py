@@ -262,6 +262,8 @@ def main(args=sys.argv[1:]):
                 args)
             workers.append(samm_worker)
         if all_runs_pool is not None:
+            # We will be using the MultiprocessingManager handle fitting theta for each fold (so python's multiprocessing lib)
+            # Within each process, we will use (python) threading to do the M-step
             manager = MultiprocessingManager(all_runs_pool, workers, num_approx_batches=len(workers))
             results = manager.run()
         else:
@@ -353,7 +355,6 @@ def main(args=sys.argv[1:]):
         except ValueError as e:
             print(e)
 
-            log.info("Variance estimates negative; trying previous penalty parameter")
             log.info("No fits had positive variance estimates")
 
         # Pickle the refitted theta

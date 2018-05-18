@@ -33,7 +33,10 @@ class SammWorker(ParallelWorker):
 
     def run_worker(self, shared_obj=None):
         """
-        No shared_obj
+        @param shared_obj: ignored obj
+        @return tuple with:
+            MethodResults summarizing our theta fit
+            the new LikelihoodComparer with this new theta vector
         """
         model_results = self.context_model_algo.fit_penalized(
                 self.train_set,

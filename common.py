@@ -89,7 +89,7 @@ def get_max_mut_pos(motif_len_vals, positions_mutating):
     return max_mut_pos
 
 def get_batched_list(my_list, num_batches):
-    batch_size = max(len(my_list)/num_batches, 1)
+    batch_size = max((int(len(my_list)/num_batches) + 1), 1)
     batched_list = []
     for i in range(num_batches + 1):
         additional_batch = my_list[i * batch_size: (i+1) * batch_size]
