@@ -34,11 +34,6 @@ def parse_args():
         type=str,
         help='Input CSV file with naive sequences',
         default='_output/mutated.csv')
-    parser.add_argument('--sample-regime',
-        type=int,
-        default=1,
-        choices=(1, 2, 3),
-        help='1: take all sequences; 2: sample random sequence from cluster; 3: choose most highly mutated sequence (default: 1)')
     parser.add_argument('--motif-lens',
         type=str,
         help='Comma-separated list of motif lengths for the motif model we are fitting',
@@ -53,6 +48,14 @@ def parse_args():
         and 5mer with first, second and third
         """,
         default="1")
+    parser.add_argument('--min-C',
+        type=float,
+        help='Minimum C (inverse of penalty param) for logistic regression in sckitlearn',
+        default=-1)
+    parser.add_argument('--max-C',
+        type=float,
+        help='Maximum C for logistic regression in sckitlearn',
+        default=1)
     parser.add_argument('--per-target-model',
         action='store_true',
         help='Fit a model that allows for different hazard rates for different target nucleotides')
@@ -104,17 +107,17 @@ def main(args=sys.argv[1:]):
     stacked_y = np.array(y)
 
     logistic_reg = LogisticRegressionCV(
-            Cs=np.power(10, np.arange(-4,2,0.5)),
+            Cs=np.power(10, np.arange(args.min_C, args.max_C,0.1)),
             cv=3,
             penalty='l1',
             solver='liblinear',
+            scoring="neg_log_loss",
             max_iter=10000,
-            class_weight='balanced',
             fit_intercept=False)
     logistic_reg.fit(stacked_X, stacked_y)
+    log.info(logistic_reg.coefs_paths_)
     log.info("Best scores %s", logistic_reg.scores_)
     log.info("Best C %s", logistic_reg.C_)
-    log.info(logistic_reg.coefs_paths_)
     lines = get_nonzero_theta_print_lines(logistic_reg.coef_.T, feat_generator)
     log.info(lines)
 
