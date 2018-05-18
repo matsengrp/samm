@@ -343,11 +343,8 @@ def main(args=sys.argv[1:]):
                 left_motif_flank_len_list=args.positions_mutating,
             )
             for col_idx in range(num_agg_cols):
-                full_theta, theta_lower, theta_upper = combine_thetas_and_get_conf_int(
-                    feat_generator_stage2,
-                    full_feat_generator,
+                full_theta, theta_lower, theta_upper = feat_generator_stage2.combine_thetas_and_get_conf_int(
                     method_res.refit_theta,
-                    method_res.model_masks.zero_theta_mask_refit,
                     method_res.refit_possible_theta_mask,
                     method_res.sample_obs_info,
                     col_idx + agg_start_col,

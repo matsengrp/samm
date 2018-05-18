@@ -89,13 +89,13 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                 theta_mask[i, center_nucleotide_idx] = False
         return theta_mask
 
-    def combine_thetas_and_get_conf_int(self, theta, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
+    def combine_thetas_and_get_conf_int(self, theta, possible_theta_mask, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
         """
         Combine hierarchical and offset theta values
         """
         full_feat_generator = MotifFeatureGenerator(
             motif_len=self.motif_len,
-            distance_to_start_of_motif=-self.left_motif_flank_len,
+            distance_to_start_of_motif= -self.left_motif_flank_len[0][0],
         )
         full_theta_size = full_feat_generator.feature_vec_len
         zero_theta_mask = get_zero_theta_mask(theta)
@@ -110,7 +110,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
 
         for i, feat_gen in enumerate(self.feat_gens):
             for m_idx, m in enumerate(feat_gen.motif_list):
-                raw_theta_idx = feat_generator.feat_offsets[i] + m_idx
+                raw_theta_idx = self.feat_offsets[i] + m_idx
 
                 if col_idx != 0 and add_targets:
                     m_theta = theta[raw_theta_idx, 0] + theta[raw_theta_idx, col_idx]
@@ -118,7 +118,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                     m_theta = theta[raw_theta_idx, col_idx]
 
                 if feat_gen.motif_len == full_feat_generator.motif_len:
-                    assert(full_feat_generator.left_motif_flank_len == feat_gen.left_motif_flank_len)
+                    assert(full_feat_generator.distance_to_start_of_motif == feat_gen.distance_to_start_of_motif)
                     # Already at maximum motif length, so nothing to combine
                     full_m_idx = full_feat_generator.motif_dict[m]
                     full_theta[full_m_idx] += m_theta

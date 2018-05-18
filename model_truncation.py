@@ -11,7 +11,7 @@ class ModelTruncation:
         zeroed_or_inf_thetas = self.zeroed_thetas | (~np.isfinite(theta))
         self.feat_generator = feat_generator
         self.feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
-        self.zero_theta_mask_refit = zeroed_thetas[~self.feats_to_remove_mask,:]
+        self.zero_theta_mask_refit = self.zeroed_thetas[~self.feats_to_remove_mask,:]
 
         self.feats_to_remove = []
         for i in np.where(self.feats_to_remove_mask)[0].tolist():
