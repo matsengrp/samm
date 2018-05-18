@@ -129,7 +129,7 @@ def main(args=sys.argv[1:]):
             col_idx=col_idx + agg_start_col,
         )
 
-    agg_possible_motif_mask = get_possible_motifs_to_targets(full_feat_generator.motif_list, full_theta.shape, full_feat_generator.mutating_pos_list)
+    agg_possible_motif_mask = full_feat_generator.get_possible_motifs_to_targets(full_theta.shape)
     full_theta[~agg_possible_motif_mask] = -np.inf
     theta_lower[~agg_possible_motif_mask] = -np.inf
     theta_upper[~agg_possible_motif_mask] = -np.inf

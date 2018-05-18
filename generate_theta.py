@@ -128,10 +128,8 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, th
     num_cols = NUM_NUCLEOTIDES + 1 if args.per_target_model else 1
     theta_shape = (hier_feat_generator.feature_vec_len, num_cols)
 
-    theta_mask = get_possible_motifs_to_targets(
-        hier_feat_generator.motif_list,
+    theta_mask = hier_feat_generator.get_possible_motifs_to_targets(
         theta_shape,
-        hier_feat_generator.mutating_pos_list,
     )
 
     theta_param = np.random.choice(

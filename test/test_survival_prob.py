@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from models import ImputedSequenceMutations, ObservedSequenceMutations
-from submotif_feature_generator import SubmotifFeatureGenerator
+from motif_feature_generator import MotifFeatureGenerator
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from common import *
@@ -16,7 +16,7 @@ class Survival_Problem_TestCase(unittest.TestCase):
         motif_len = 3
         penalty_param = 0.5
 
-        feat_gen = SubmotifFeatureGenerator(motif_len)
+        feat_gen = MotifFeatureGenerator(motif_len=motif_len)
         motif_list = feat_gen.motif_list
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
         theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape, [1] * len(motif_list))

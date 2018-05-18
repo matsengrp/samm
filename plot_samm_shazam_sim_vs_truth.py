@@ -121,10 +121,8 @@ for sim_method in SIM_METHODS:
         with open(TRUE_MODEL_STR % (sim_method, seed), 'r') as f:
             theta, _ = pickle.load(f)
         model_shape = theta.shape
-        possible_agg_mask = get_possible_motifs_to_targets(
-            dense_agg_feat_gen.motif_list,
-            mask_shape=model_shape,
-            mutating_pos_list=[MUT_POS] * dense_agg_feat_gen.feature_vec_len,
+        possible_agg_mask = dense_agg_feat_gen.get_possible_motifs_to_targets(
+            model_shape,
         )
         theta = theta[possible_agg_mask] - np.median(theta[possible_agg_mask])
         tmp_df = pd.DataFrame()
@@ -139,7 +137,6 @@ for sim_method in SIM_METHODS:
         samm = samm[possible_agg_mask] - np.median(samm[possible_agg_mask])
         tmp_df['samm'] = samm
         shazam_raw = get_shazam_theta(
-            MOTIF_LEN,
             SHAZAM_MUT_STR % (sim_method, seed),
             SHAZAM_SUB_STR % (sim_method, seed),
         )

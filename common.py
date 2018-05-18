@@ -2,9 +2,6 @@ import numpy as np
 import re
 import random
 import warnings
-import itertools
-
-from Bio import SeqIO
 
 DEBUG = False
 
@@ -131,20 +128,11 @@ def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2)
             ''.join([DEGENERATE_BASE_DICT[nuc] for nuc in kmer])])
     return hot_cold_regs
 
-def contains_degenerate_base(seq_str):
-    for nucleotide in seq_str:
-        if nucleotide not in NUCLEOTIDE_SET:
-            return True
-    return False
-
 def get_randint():
     """
     @return a random integer from a large range
     """
     return np.random.randint(low=0, high=2**31)
-
-def is_zero(num):
-    return np.abs(num) < ZERO_THRES
 
 def get_num_nonzero(theta):
     nonzero_idx = np.logical_and(np.isfinite(theta), np.abs(theta) > ZERO_THRES)
@@ -167,98 +155,25 @@ def get_nonzero_theta_print_lines(theta, feat_gen):
     """
     @return a string that summarizes the theta vector/matrix
     """
-    motif_list = feat_gen.motif_list
-    motif_len = feat_gen.motif_len
-    mutating_pos_list = feat_gen.mutating_pos_list
-
     lines = []
-    mutating_pos_set = list(set(mutating_pos_list))
-    known_hot_cold = [compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, half_motif_len) for half_motif_len in mutating_pos_set]
     for i in range(theta.shape[0]):
         for j in range(theta.shape[1]):
             if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
                 # print the whole line if any element in the theta is nonzero
-                motif = motif_list[i]
-                pos_idx = mutating_pos_set.index(mutating_pos_list[i])
-                hot_cold_matches = ""
-                for spot_name, spot_regex in known_hot_cold[pos_idx]:
-                    if is_re_match(spot_regex, motif):
-                        hot_cold_matches = " -- " + spot_name
-                        break
                 thetas = theta[i,]
                 lines.append((
                     thetas[np.isfinite(thetas)].sum(),
-                    "%s (%s%s) pos %s" % (thetas, motif_list[i], hot_cold_matches, mutating_pos_list[i]),
+                    "%s (%s)" % (thetas, feat_gen.print_label_from_idx(i)),
                 ))
                 break
     sorted_lines = sorted(lines, key=lambda s: s[0])
     return "\n".join([l[1] for l in sorted_lines])
-
-def print_known_cold_hot_spot(motif, known_hot_cold_regexs):
-    for spot_name, spot_regex in known_hot_cold_regexs:
-        if is_re_match(spot_regex, motif):
-            return spot_name
-    return None
-
-def get_zero_theta_mask(target_pairs_to_remove, feat_generator, theta_shape):
-    """
-    Combines `target_pairs_to_remove` from `read_zero_motif_csv` and with the feature generator
-
-    @return a boolean matrix with fixed zero theta values True, others as False
-    """
-    zero_theta_mask = np.zeros(theta_shape, dtype=bool)
-    if theta_shape[1] == 1:
-        return zero_theta_mask
-
-    for motif, target_dict in target_pairs_to_remove.iteritems():
-        for mut_pos, targets in target_dict:
-            if motif in feat_generator.motif_dict:
-                for nuc in targets:
-                    motif_idx = feat_generator.motif_dict[motif][mut_pos]
-                    if nuc == "n":
-                        zero_theta_mask[motif_idx, 0] = 1
-                    else:
-                        zero_theta_mask[motif_idx, NUCLEOTIDE_DICT[nuc] + 1] = 1
-    return zero_theta_mask
-
-def get_possible_motifs_to_targets(motif_list, mask_shape, mutating_pos_list):
-    """
-    @param motif_list: list of motifs - assumes that the first few theta rows correspond to these motifs
-    @param mask_shape: shape of the theta matrix
-    @param mutating_pos_list: list of mutating positions
-
-    @return a boolean matrix with possible mutations as True, impossible mutations as False
-    """
-    theta_mask = np.ones(mask_shape, dtype=bool)
-    if mask_shape[1] == NUM_NUCLEOTIDES + 1:
-        # Estimating a different theta vector for different target nucleotides
-        # We cannot have a motif mutate to the same center nucleotide
-        for i in range(len(motif_list)):
-            center_motif_idx = mutating_pos_list[i]
-            mutating_nucleotide = motif_list[i][center_motif_idx]
-            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide] + 1
-            theta_mask[i, center_nucleotide_idx] = False
-    elif mask_shape[1] == NUM_NUCLEOTIDES:
-        for i in range(len(motif_list)):
-            center_motif_idx = mutating_pos_list[i]
-            mutating_nucleotide = motif_list[i][center_motif_idx]
-            center_nucleotide_idx = NUCLEOTIDE_DICT[mutating_nucleotide]
-            theta_mask[i, center_nucleotide_idx] = False
-
-    return theta_mask
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
     Mutate a string
     """
     return "%s%s%s" % (begin_str[:mutate_pos], mutate_value, begin_str[mutate_pos + 1:])
-
-def unmutate_string(mutated_str, unmutate_pos, orig_nuc):
-    return (
-        mutated_str[:unmutate_pos]
-        + orig_nuc
-        + mutated_str[unmutate_pos + 1:]
-    )
 
 def sample_multinomial(pvals):
     """
@@ -278,9 +193,6 @@ def get_random_dna_seq(seq_length, nucleotide_probs=[0.25, 0.25, 0.25, 0.25]):
         NUCLEOTIDES[sample_multinomial(nucleotide_probs)] for i in range(seq_length)
     ]
     return "".join(random_nucleotides)
-
-def check_unordered_equal(L1, L2):
-    return len(L1) == len(L2) and sorted(L1) == sorted(L2)
 
 def get_standard_error_ci_corrected(values, zscore, pen_val_diff):
     """
@@ -422,44 +334,12 @@ def get_idx_differ_by_one_character(s1, s2):
             idx_differ = i
     return idx_differ
 
-def is_central_kmer_shared(s1, s2, k=5):
-    """
-    Return if central k-mer matches
-    @param k: must be odd
-    """
-    if k % 2 == 0:
-        return False
-
-    str_len = len(s1)
-    if str_len - k <= 0:
-        return False
-    else:
-        offset = (str_len - k)/2
-        central1 = s1[offset:-offset]
-        central2 = s2[offset:-offset]
-        return central1 == central2
-
 def get_target_col(sample, mutation_pos):
     """
     @param sample: ObservedSequenceMutations
     @returns the index of the column in the hazard rate matrix for the target nucleotide
     """
     return NUCLEOTIDE_DICT[sample.end_seq[mutation_pos]] + 1
-
-def make_zero_theta_refit_mask(theta, feat_generator):
-    """
-    @param theta: a fitted theta from which we determine the theta support
-    @param feat_generator: the feature generator
-
-    Figure out what the theta support is from the fitted theta
-    """
-    zeroed_thetas = np.array(np.abs(theta) < ZERO_THRES, dtype=bool)
-    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
-    motifs_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
-    motifs_to_remove = [feat_generator.motif_list[i] for i in np.where(motifs_to_remove_mask)[0].tolist()]
-
-    zero_theta_mask_refit = zeroed_thetas[~motifs_to_remove_mask,:]
-    return zero_theta_mask_refit, motifs_to_remove, motifs_to_remove_mask
 
 def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     """
@@ -602,3 +482,9 @@ def get_interval(xs, zscore):
     mean = np.mean(xs)
     std_err = np.sqrt(np.var(xs)/xs.size)
     return (mean - zscore * std_err, mean + zscore * std_err)
+
+def get_zero_theta_mask(theta):
+    zeroed_thetas = (np.abs(theta) < ZERO_THRES)
+    zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
+    feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
+    return zeroed_thetas[~feats_to_remove_mask,:]

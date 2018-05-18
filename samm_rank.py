@@ -28,7 +28,7 @@ def likelihood_of_tree_from_shazam(tree, mutability_file, substitution_file=None
         left_motif_flank_len_list=[[2]],
     )
 
-    theta_ref = get_shazam_theta(feat_generator.max_motif_len, mutability_file, substitution_file)
+    theta_ref = get_shazam_theta(mutability_file, substitution_file)
 
     per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES + 1
 
