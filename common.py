@@ -167,7 +167,10 @@ def get_nonzero_theta_print_lines(theta, feat_gen):
                 ))
                 break
     sorted_lines = sorted(lines, key=lambda s: s[0])
-    return "\n".join([l[1] for l in sorted_lines])
+    if len(sorted_lines):
+        return "\n".join([l[1] for l in sorted_lines])
+    else:
+        return "ALL ZEROES"
 
 def mutate_string(begin_str, mutate_pos, mutate_value):
     """
