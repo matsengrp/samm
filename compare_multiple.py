@@ -62,8 +62,8 @@ def main(args=sys.argv[1:]):
     stat_res = [{"one":[], "mult":[]} for i in stat_funcs]
     for true_m, samm_one, samm_mult in zip(true_models, samm_models_one, samm_models_mult):
         for stat_i, stat_f in enumerate(stat_funcs):
-           stat_samm_one = _collect_statistics([samm_one], args, None, true_m, stat_f)
-           stat_samm_mult = _collect_statistics([samm_mult], args, None, true_m, stat_f)
+           stat_samm_one = _collect_statistics([samm_one], args, true_m, stat_f)
+           stat_samm_mult = _collect_statistics([samm_mult], args, true_m, stat_f)
            stat_res[stat_i]["one"].append(stat_samm_one)
            stat_res[stat_i]["mult"].append(stat_samm_mult)
 

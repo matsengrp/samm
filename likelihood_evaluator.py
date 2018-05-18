@@ -13,7 +13,7 @@ class GreedyLikelihoodComparer:
     Given a list of models to compare, this will use a greedy method to compare them
     """
     @staticmethod
-    def do_greedy_search(val_set, feat_generator, models, sort_func, burn_in, num_samples, num_jobs, scratch_dir, pool=None):
+    def do_greedy_search(val_set, feat_generator, models, sort_func, burn_in, num_samples, num_jobs, scratch_dir):
         """
         @param val_set: list of ObservedSequenceMutations
         @param feat_generator: CombinedFeatureGenerator
@@ -35,7 +35,6 @@ class GreedyLikelihoodComparer:
             burn_in=burn_in,
             num_jobs=num_jobs,
             scratch_dir=scratch_dir,
-            pool=pool,
         )
         for model_idx, model in enumerate(sorted_models[1:]):
             log_lik_ratio, lower_bound, upper_bound = val_set_evaluator.get_log_likelihood_ratio(model.penalized_theta)
@@ -52,7 +51,6 @@ class GreedyLikelihoodComparer:
                         burn_in=burn_in,
                         num_jobs=num_jobs,
                         scratch_dir=scratch_dir,
-                        pool=pool,
                     )
             else:
                 break
@@ -72,7 +70,7 @@ class LikelihoodComparer:
     """
     MAX_TOT_SAMPLES = 50000
 
-    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=10, burn_in=0, num_jobs=1, scratch_dir="", pool=None):
+    def __init__(self, obs_data, feat_generator, theta_ref, num_samples=10, burn_in=0, num_jobs=1, scratch_dir=""):
         """
         @param obs_data: list of ObservedSequenceMutations
         @param feat_generator: CombinedFeatureGenerator
@@ -81,7 +79,6 @@ class LikelihoodComparer:
         @param burn_in: number of burn in samples
         @param num_jobs: number of jobs to submit
         @param scratch_dir: tmp dir for batch submission manager
-        @param pool: multiprocessing pool previously initialized before model fitting
         """
         self.theta_ref = theta_ref
         self.num_samples = num_samples
@@ -89,7 +86,6 @@ class LikelihoodComparer:
         assert(isinstance(feat_generator, CombinedFeatureGenerator))
         self.feat_generator = feat_generator
         self.per_target_model = theta_ref.shape[1] == NUM_NUCLEOTIDES + 1
-        self.pool = pool
 
         log.info("Creating likelihood comparer")
         st_time = time.time()
@@ -126,7 +122,6 @@ class LikelihoodComparer:
             sample_labels=self.sample_labels,
             penalty_params=[0],
             per_target_model=self.per_target_model,
-            pool=self.pool,
         )
         log.info("Finished calculating sample info, time %s" % (time.time() - st_time))
 
@@ -164,7 +159,6 @@ class LikelihoodComparer:
                 sample_labels=self.sample_labels,
                 penalty_params=[0],
                 per_target_model=self.per_target_model,
-                pool=self.pool,
             )
             ll_ratio_vec = self.prob.calculate_log_lik_ratio_vec(theta, self.theta_ref, group_by_sample=True)
             mean_ll_ratio = np.mean(ll_ratio_vec)

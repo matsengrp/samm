@@ -9,7 +9,7 @@ from profile_support import profile
 from confidence_interval_maker import ConfidenceIntervalMaker
 
 class MCMC_EM:
-    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=200, num_jobs=1, scratch_dir='_output', pool=None, per_target_model=False, sampling_rate=1):
+    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=200, num_jobs=1, scratch_dir='_output', per_target_model=False, sampling_rate=1, max_threads=1):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param sampler_cls: a Sampler class
@@ -23,10 +23,10 @@ class MCMC_EM:
         self.sampler_cls = sampler_cls
         self.problem_solver_cls = problem_solver_cls
         self.num_jobs = num_jobs
-        self.pool = pool
         self.scratch_dir = scratch_dir
         self.per_target_model = per_target_model
         self.sampling_rate = sampling_rate
+        self.max_threads = max_threads
 
     def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, intermed_file_prefix="", get_hessian=False):
         """
@@ -98,7 +98,7 @@ class MCMC_EM:
                     self.per_target_model,
                     possible_theta_mask=possible_theta_mask,
                     zero_theta_mask=zero_theta_mask,
-                    pool=self.pool,
+                    max_threads=self.max_threads,
                 )
 
                 theta, pen_exp_log_lik, lower_bound = problem.solve(

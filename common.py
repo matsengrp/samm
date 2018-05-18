@@ -86,7 +86,7 @@ def get_max_mut_pos(motif_len_vals, positions_mutating):
     return max_mut_pos
 
 def get_batched_list(my_list, num_batches):
-    batch_size = max(len(my_list)/num_batches, 1)
+    batch_size = max((int(len(my_list)/num_batches) + 1), 1)
     batched_list = []
     for i in range(num_batches + 1):
         additional_batch = my_list[i * batch_size: (i+1) * batch_size]
@@ -357,48 +357,41 @@ def initialize_theta(theta_shape, possible_theta_mask, zero_theta_mask):
     theta[zero_theta_mask] = 0
     return theta
 
-def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=None, val_column_idx=None):
+def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
     """
-    @param num_obs: number of observations
-    @param metadata: metadata to include variables to perform validation on
-    @param tuning_sample_ratio: ratio of data to place in validation set
-    @param validation_column: variable to perform validation on (if None then sample randomly)
-    @param val_column_idx: which index to pick for K-fold validation
+    From an aggregate theta, creates a matrix with the index of the hierarchical theta
+    """
+    theta_idx_counter = np.ones(possible_theta_mask.shape, dtype=int) * -1
+    theta_mask = ~zero_theta_mask_refit & possible_theta_mask
+    idx = 0
+    for col in range(theta_mask.shape[1]):
+        for row in range(theta_mask.shape[0]):
+            if theta_mask[row, col]:
+                theta_idx_counter[row, col] = idx
+                idx += 1
+    return theta_idx_counter
 
-    @return training and validation indices
-    """
-    if validation_column is None:
-        # For no validation column just sample data randomly
-        val_size = int(tuning_sample_ratio * num_obs)
-        if tuning_sample_ratio > 0:
-            val_size = max(val_size, 1)
-        permuted_idx = np.random.permutation(num_obs)
-        train_idx = permuted_idx[:num_obs - val_size]
-        val_idx = permuted_idx[num_obs - val_size:]
+def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True, add_targets=True):
+    def _combine_thetas(col_idx):
+        theta_col, _, _ = combine_thetas_and_get_conf_int(
+            hier_feat_generator,
+            agg_feat_generator,
+            theta,
+            zero_theta_mask,
+            possible_theta_mask,
+            sample_obs_info=None,
+            col_idx=col_idx,
+            add_targets=add_targets,
+        )
+        return theta_col.reshape((theta_col.size, 1))
+
+    if theta.shape[1] == 1:
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(1)]
     else:
-        # For a validation column, sample the categories randomly based on
-        # tuning_sample_ratio
-        categories = set([elt[validation_column] for elt in metadata])
-        num_categories = len(categories)
-        val_size = int(tuning_sample_ratio * num_categories) + 1
-        if tuning_sample_ratio > 0:
-            val_size = max(val_size, 1)
-
-        if val_column_idx is None:
-            # sample random categories from our validation variable
-            val_categories_idx = np.random.choice(len(categories), size=val_size, replace=False)
-            val_categories = set([list(categories)[j] for j in val_categories_idx])
-        else:
-            # choose val_column_idx as validation item
-            val_categories = set([list(categories)[val_column_idx]])
-
-        train_categories = categories - val_categories
-        print "val cate", val_categories
-        print "train cate", train_categories
-        train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
-        val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
-
-    return train_idx, val_idx
+        start_idx = 0 if keep_col0 else 1
+        theta_cols = [_combine_thetas(col_idx) for col_idx in range(start_idx, theta.shape[1])]
+    agg_theta = np.hstack(theta_cols)
+    return agg_theta
 
 def pick_best_model(fitted_models):
     """
@@ -417,22 +410,16 @@ def pick_best_model(fitted_models):
     best_model = good_models[max_idx]
     return best_model
 
+def get_interval(xs, zscore):
+    """
+    @return the interval around the mean of `xs` with width std_err * `zscore`
+    """
+    mean = np.mean(xs)
+    std_err = np.sqrt(np.var(xs)/xs.size)
+    return (mean - zscore * std_err, mean + zscore * std_err)
+
 def get_zero_theta_mask(theta):
     zeroed_thetas = (np.abs(theta) < ZERO_THRES)
     zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
     feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
     return zeroed_thetas[~feats_to_remove_mask,:]
-
-def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
-    """
-    From an aggregate theta, creates a matrix with the index of the hierarchical theta
-    """
-    theta_idx_counter = np.ones(possible_theta_mask.shape, dtype=int) * -1
-    theta_mask = ~zero_theta_mask_refit & possible_theta_mask
-    idx = 0
-    for col in range(theta_mask.shape[1]):
-        for row in range(theta_mask.shape[0]):
-            if theta_mask[row, col]:
-                theta_idx_counter[row, col] = idx
-                idx += 1
-    return theta_idx_counter
