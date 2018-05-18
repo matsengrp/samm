@@ -119,12 +119,8 @@ def main(args=sys.argv[1:]):
     theta_lower = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
     theta_upper = np.zeros((full_feat_generator.feature_vec_len, num_agg_cols))
     for col_idx in range(num_agg_cols):
-        full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = combine_thetas_and_get_conf_int(
-            feat_generator,
-            full_feat_generator,
+        full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = feat_generator.combine_thetas_and_get_conf_int(
             method_res.refit_theta,
-            method_res.model_masks.zero_theta_mask_refit,
-            method_res.refit_possible_theta_mask,
             sample_obs_info=method_res.sample_obs_info,
             col_idx=col_idx + agg_start_col,
         )

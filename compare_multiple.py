@@ -38,8 +38,6 @@ def main(args=sys.argv[1:]):
     samm_models_one = [
         load_fitted_model(
             samm_pkl,
-            args.agg_motif_len,
-            args.agg_pos_mutating,
             keep_col0=False,
             add_targets=True,
         ) for samm_pkl in args.samm_one
@@ -47,8 +45,6 @@ def main(args=sys.argv[1:]):
     samm_models_mult = [
         load_fitted_model(
             samm_pkl,
-            args.agg_motif_len,
-            args.agg_pos_mutating,
             keep_col0=False,
             add_targets=True,
         ) for samm_pkl in args.samm_mult

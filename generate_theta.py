@@ -195,10 +195,6 @@ def main(args=sys.argv[1:]):
         motif_lens=args.motif_lens,
         left_motif_flank_len_list=args.positions_mutating,
     )
-    agg_feat_generator = HierarchicalMotifFeatureGenerator(
-        motif_lens=[hier_feat_generator.max_motif_len],
-        left_motif_flank_len_list=args.max_mut_pos,
-    )
 
     if args.use_shmulate_as_truth:
         h5f_theta = _read_mutability_probability_params(args)
@@ -216,7 +212,10 @@ def main(args=sys.argv[1:]):
             theta_sampling_col_prob,
         )
 
-        agg_theta_raw = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta_raw, np.zeros(theta_raw.shape, dtype=bool), theta_mask, keep_col0=False)
+        agg_theta_raw = hier_feat_generator.create_aggregate_theta(
+            theta_raw,
+            keep_col0=False
+        )
 
         # Now rescale theta according to effect size
         mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude

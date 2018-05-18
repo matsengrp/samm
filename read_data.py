@@ -589,7 +589,7 @@ def load_true_model(file_name):
         true_model_agg, true_model = pickle.load(f)
     return np.array(true_model_agg)
 
-def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False, add_targets=True):
+def load_fitted_model(file_name, keep_col0=False, add_targets=True):
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
         best_model = pick_best_model(fitted_models)
@@ -603,16 +603,8 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         feats_to_remove=best_model.model_masks.feats_to_remove,
         left_motif_flank_len_list=best_model.positions_mutating,
     )
-    agg_feat_gen = HierarchicalMotifFeatureGenerator(
-        motif_lens=[agg_motif_len],
-        left_motif_flank_len_list=[[agg_pos_mutating]],
-    )
-    best_model.agg_refit_theta = create_aggregate_theta(
-        hier_feat_gen,
-        agg_feat_gen,
+    best_model.agg_refit_theta = hier_feat_gen.create_aggregate_theta(
         best_model.refit_theta,
-        best_model.model_masks.zero_theta_mask_refit,
-        best_model.refit_possible_theta_mask,
         keep_col0=keep_col0,
         add_targets=add_targets,
     )
