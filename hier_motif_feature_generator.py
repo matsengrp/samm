@@ -120,7 +120,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         )
         full_theta_size = full_feat_generator.feature_vec_len
         zero_theta_mask = get_zero_theta_mask(theta)
-        possible_theta_mask = self.get_possible_motifs_to_targets(theta.shape)
+        possible_theta_mask = self.get_possible_motifs_to_targets(zero_theta_mask.shape)
         theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
         # stores which hierarchical theta values were used to construct the full theta
         # important for calculating covariance

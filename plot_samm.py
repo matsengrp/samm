@@ -43,7 +43,7 @@ def parse_args():
 
     return args
 
-def convert_to_csv(output_csv, theta_vals, theta_lower, theta_upper, full_feat_generator):
+def convert_to_csv(output_csv, theta_vals, theta_lower, theta_upper, full_feat_generator, per_target_model):
     """
     Take pickle file and convert to csv for use in R
     """
@@ -59,22 +59,29 @@ def convert_to_csv(output_csv, theta_vals, theta_lower, theta_upper, full_feat_g
 
     header = ['motif', 'target', 'theta', 'theta_lower', 'theta_upper']
     data = []
+    agg_start_col = 1 if per_target_model else 0
     for col_idx in range(theta_vals.shape[1]):
         for motif, tval, tlow, tup in zip(padded_list, theta_vals[:, col_idx], theta_lower[:, col_idx], theta_upper[:, col_idx]):
-            data.append([motif.upper(), col_idx, tval, tlow, tup])
+            data.append([motif.upper(), col_idx+agg_start_col, tval, tlow, tup])
 
     with open(str(output_csv), 'wb') as f:
         writer = csv.writer(f)
         writer.writerow(header)
         writer.writerows(data)
 
-def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, targets, full_feat_generator, max_motif_len):
+def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per_target_model, full_feat_generator, max_motif_len):
+    if per_target_model:
+        targets = 'A,C,G,T'
+    else:
+        targets = 'N'
+
     convert_to_csv(
         output_csv,
         full_theta,
         theta_lower,
         theta_upper,
         full_feat_generator,
+        per_target_model,
     )
 
     # Call Rscript
@@ -94,23 +101,18 @@ def main(args=sys.argv[1:]):
         method_res = pick_best_model(method_results)
         per_target_model = method_res.refit_theta.shape[1] == NUM_NUCLEOTIDES + 1
 
-    max_motif_len = max(method_res.motif_lens)
-    max_mut_pos = get_max_mut_pos(method_res.motif_lens, method_res.positions_mutating)
+    feat_generator = method_res.model_masks.feat_generator
+    feat_generator.update_feats_after_removing(method_res.model_masks.feats_to_remove)
 
+    max_motif_len = feat_generator.motif_len
     full_feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=[max_motif_len],
-        left_motif_flank_len_list=max_mut_pos,
+        left_motif_flank_len_list=feat_generator.left_motif_flank_len,
     )
 
     theta = method_res.refit_theta
     if args.center_median:
         theta -= np.median(theta)
-
-    feat_generator = HierarchicalMotifFeatureGenerator(
-        motif_lens=method_res.motif_lens,
-        feats_to_remove=method_res.model_masks.feats_to_remove,
-        left_motif_flank_len_list=method_res.positions_mutating,
-    )
 
     num_agg_cols = NUM_NUCLEOTIDES if per_target_model else 1
     agg_start_col = 1 if per_target_model else 0
@@ -123,6 +125,7 @@ def main(args=sys.argv[1:]):
             method_res.refit_theta,
             sample_obs_info=method_res.sample_obs_info,
             col_idx=col_idx + agg_start_col,
+            add_targets=False,
         )
 
     agg_possible_motif_mask = full_feat_generator.get_possible_motifs_to_targets(full_theta.shape)
@@ -134,15 +137,7 @@ def main(args=sys.argv[1:]):
         theta_lower = full_theta
         theta_upper = full_theta
 
-    if per_target_model:
-        # if args.plot_separate:
-        #     for col_idx, target in enumerate(['A', 'C', 'G', 'T']):
-        #         output_pdf = args.output_pdf.replace(".pdf", "_col%d.pdf" % col_idx)
-        #         plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, output_pdf, target, full_feat_generator, args.max_motif_len)
-        # else:
-        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'A,C,G,T', full_feat_generator, args.max_motif_len)
-    else:
-        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N', full_feat_generator, max_motif_len)
+    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, max_motif_len)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

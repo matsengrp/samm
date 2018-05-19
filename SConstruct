@@ -69,3 +69,6 @@ SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'get_hedgehog'
 SConscript(flag + '/sconscript', exports=['flag'])
+
+flag = 'run_pipeline_tests'
+SConscript(flag + '/sconscript', exports=['flag'])

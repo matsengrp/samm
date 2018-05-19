@@ -276,7 +276,7 @@ def main(args=sys.argv[1:]):
                 # Time to stop shrinking penalty param
                 # This model is not better than the previous model. Stop trying penalty parameters.
                 # Time to refit the model
-                log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % ll_ratios)
+                log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % log_lik_ratios)
                 break
 
         best_model_idx = param_i

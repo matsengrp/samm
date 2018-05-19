@@ -13,6 +13,7 @@ import csv
 import re
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from model_truncation import ModelTruncation
 from common import *
 
 def parse_args():
@@ -211,6 +212,10 @@ def main(args=sys.argv[1:]):
             theta_sampling_col0,
             theta_sampling_col_prob,
         )
+
+        # Update feature generator with features to remove that we zeroed out for theta
+        model_mask = ModelTruncation(theta_raw, hier_feat_generator)
+        hier_feat_generator.update_feats_after_removing(model_mask.feats_to_remove)
 
         agg_theta_raw = hier_feat_generator.create_aggregate_theta(
             theta_raw,
