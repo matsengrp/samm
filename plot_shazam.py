@@ -76,7 +76,8 @@ def main(args=sys.argv[1:]):
     )
 
     # Load fitted theta file
-    shazam_model = ShazamModel(MOTIF_LEN, args.mut, args.sub)
+    # If it came from fit_shumlate_model.py, it's in wide format
+    shazam_model = ShazamModel(MOTIF_LEN, args.mut, args.sub, wide_format=True)
 
     full_theta = shazam_model.agg_refit_theta
     # center median
@@ -85,10 +86,8 @@ def main(args=sys.argv[1:]):
     theta_lower = full_theta
     theta_upper = full_theta
 
-    if full_theta.shape[1] > 1:
-        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'A,C,G,T', full_feat_generator, MOTIF_LEN)
-    else:
-        plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, 'N', full_feat_generator, MOTIF_LEN)
+    per_target_model = full_theta.shape[1] > 1
+    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, MOTIF_LEN)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

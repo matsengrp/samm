@@ -28,6 +28,10 @@ def parse_args():
     parser.add_argument('--agg-pos-mutating',
         type=int,
         default=2)
+    parser.add_argument('--wide-format',
+        action='store_true',
+        help='flag for different kinds of shazam output files',
+    )
     args = parser.parse_args()
     args.shazam_mut_files = args.in_shazam_mut.split(',')
     args.shazam_sub_files = args.in_shazam_sub.split(',')
@@ -36,8 +40,15 @@ def parse_args():
     return args
 
 class ShazamModel:
-   def __init__(self, agg_motif_len, shazam_mut_csv, shazam_sub_csv):
-        refit_theta = get_shazam_theta(shazam_mut_csv, shazam_sub_csv)
+   def __init__(self, agg_motif_len, shazam_mut_csv, shazam_sub_csv, wide_format=False):
+        """
+        @param agg_motif_len: motif length
+        @param shazam_mut_csv: csv of mutabilities
+        @param shazam_sub_csv: csv of substitution probabilities
+        @param wide_format: shazam can yield two types of files: wide format and tall format;
+            wide format comes directly from createMutabilityMatrix, etc.
+        """
+        refit_theta = get_shazam_theta(shazam_mut_csv, shazam_sub_csv, wide_format=wide_format)
         if refit_theta.shape[1] > 1:
             self.agg_refit_theta = refit_theta[:,0:1] + refit_theta[:,1:]
         else:
@@ -52,7 +63,8 @@ def main(args=sys.argv[1:]):
         ShazamModel(
             args.agg_motif_len,
             shazam_mut_csv,
-            shazam_sub_csv
+            shazam_sub_csv,
+            args.wide_format,
         ) for shazam_mut_csv, shazam_sub_csv in
         zip(args.shazam_mut_files, args.shazam_sub_files)
     ]
