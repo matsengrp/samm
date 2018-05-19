@@ -44,7 +44,7 @@ plot_list <- plotBarchart(raw_data,
                           rect_height=0.6)
 image <- do.call('grid.arrange', args = c(plot_list, ncol = max(1, length(center_nucs)/2)))
 if (length(center_nucs) > 1) {
-    ggsave(file=output_file, plot=image, width=15, height=8*length(target_nucs) * 2)
+    ggsave(file=output_file, plot=image, width=15, height=8*length(target_nucs) * 2, limitsize=FALSE)
 } else {
     ggsave(file=output_file, plot=image, width=8, height=8*length(target_nucs))
 }
