@@ -106,6 +106,7 @@ def main(args=sys.argv[1:]):
 
     feat_generator.add_base_features_for_list(obs_data)
     
+    # Process data
     X = []
     ys = []
     for i, obs in enumerate(obs_data):
@@ -125,12 +126,14 @@ def main(args=sys.argv[1:]):
         theta_shape = (stacked_X.shape[1], NUM_NUCLEOTIDES + 1)
     else:
         theta_shape = (stacked_X.shape[1], 1)
+    # Fit the model
     logistic_reg = LogisticRegressionMotif(
             theta_shape,
             stacked_X,
             stacked_y)
     theta, val = logistic_reg.solve(max_iters=2000)
 
+    # Aggregate theta
     full_feat_generator = MotifFeatureGenerator(
         motif_len=args.max_motif_len,
         distance_to_start_of_motif=-args.max_left_flank,
@@ -149,19 +152,16 @@ def main(args=sys.argv[1:]):
 
     feat_generator.add_base_features_for_list(motif_seq_mutations)
 
-    X = []
+    agg_X = []
     for motif_idx, motif_obs in enumerate(motif_seq_mutations):
-        print motif_obs.start_seq_with_flanks
-        print motif_obs.feat_matrix_start
-        X.append(motif_obs.feat_matrix_start)
-    X = scipy.sparse.vstack(X)
+        agg_X.append(motif_obs.feat_matrix_start)
+    agg_X = scipy.sparse.vstack(agg_X)
 
-    theta_agg = X * theta
-    print theta_agg.shape
+    theta_agg = agg_X * theta
 
+    # Convert theta to log probability of mutation
     if args.per_target_model:
         theta_est = -np.log(1.0 + np.exp(-theta_agg))
-        print theta_est.shape
         possible_mask = hier_full_feat_generator.get_possible_motifs_to_targets(theta_est.shape)
         theta_est[~possible_mask] = -np.inf
     else:
