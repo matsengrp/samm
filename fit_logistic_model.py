@@ -13,9 +13,14 @@ import scipy.sparse
 import numpy as np
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from logistic_problem_cvxpy import LogisticRegressionMotif
 from fit_model_common import process_motif_length_args
 from common import *
 from read_data import *
+
+class LogisticModel:
+    def __init__(self, theta):
+        self.agg_refit_theta = theta
 
 def parse_args():
     ''' parse command line arguments '''
@@ -47,15 +52,15 @@ def parse_args():
         e.g., --motif-lens 3,5 --left-flank-lens 0,1:0,1,2 will be a 3mer with first and second mutating position
         and 5mer with first, second and third
         """,
-        default="1")
+        default=None)
     parser.add_argument('--min-C',
         type=float,
         help='Minimum C (inverse of penalty param) for logistic regression in sckitlearn',
-        default=-1)
+        default=0)
     parser.add_argument('--max-C',
         type=float,
         help='Maximum C for logistic regression in sckitlearn',
-        default=1)
+        default=0.4)
     parser.add_argument('--per-target-model',
         action='store_true',
         help='Fit a model that allows for different hazard rates for different target nucleotides')
@@ -63,6 +68,10 @@ def parse_args():
         type=str,
         help='Log file',
         default='_output/logistic.log')
+    parser.add_argument('--model-pkl',
+        type=str,
+        help='pickled fitted model file',
+        default='_output/logistic.pkl')
     parser.set_defaults(per_target_model=False)
     args = parser.parse_args()
 
@@ -98,28 +107,70 @@ def main(args=sys.argv[1:]):
     feat_generator.add_base_features_for_list(obs_data)
     
     X = []
-    y = []
-    for obs in obs_data:
+    ys = []
+    for i, obs in enumerate(obs_data):
         X.append(obs.feat_matrix_start)
-        y += obs.mutated_indicator
+        if args.per_target_model:
+            y_vec = np.zeros(obs.seq_len)
+            for k, v in obs.mutation_pos_dict.iteritems():
+                y_vec[k] = NUCLEOTIDE_DICT[v] + 1
+            ys.append(y_vec)
+        else:
+            ys.append(np.array(obs.mutated_indicator))
 
-    stacked_X = scipy.sparse.vstack(X)
-    stacked_y = np.array(y)
+    stacked_X = scipy.sparse.vstack(X).todense()
+    stacked_y = np.concatenate(ys)
 
-    logistic_reg = LogisticRegressionCV(
-            Cs=np.power(10, np.arange(args.min_C, args.max_C,0.1)),
-            cv=3,
-            penalty='l1',
-            solver='liblinear',
-            scoring="neg_log_loss",
-            max_iter=10000,
-            fit_intercept=False)
-    logistic_reg.fit(stacked_X, stacked_y)
-    log.info(logistic_reg.coefs_paths_)
-    log.info("Best scores %s", logistic_reg.scores_)
-    log.info("Best C %s", logistic_reg.C_)
-    lines = get_nonzero_theta_print_lines(logistic_reg.coef_.T, feat_generator)
+    if args.per_target_model:
+        theta_shape = (stacked_X.shape[1], NUM_NUCLEOTIDES + 1)
+    else:
+        theta_shape = (stacked_X.shape[1], 1)
+    logistic_reg = LogisticRegressionMotif(
+            theta_shape,
+            stacked_X,
+            stacked_y)
+    theta, val = logistic_reg.solve(max_iters=2000)
+
+    full_feat_generator = MotifFeatureGenerator(
+        motif_len=args.max_motif_len,
+        distance_to_start_of_motif=-args.max_left_flank,
+    )
+    hier_full_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[args.max_motif_len],
+        left_motif_flank_len_list=[[args.max_left_flank]],
+    )
+    motif_seq_mutations = []
+    for motif in full_feat_generator.motif_list:
+        obs_seq_mut = ObservedSequenceMutations(
+            motif,
+            mutate_string(motif, args.max_left_flank, "b"),
+            motif_len=args.max_motif_len)
+        motif_seq_mutations.append(obs_seq_mut)
+
+    feat_generator.add_base_features_for_list(motif_seq_mutations)
+
+    X = []
+    for motif_idx, motif_obs in enumerate(motif_seq_mutations):
+        print motif_obs.start_seq_with_flanks
+        print motif_obs.feat_matrix_start
+        X.append(motif_obs.feat_matrix_start)
+    X = scipy.sparse.vstack(X)
+
+    theta_agg = X * theta
+    print theta_agg.shape
+
+    if args.per_target_model:
+        theta_est = -np.log(1.0 + np.exp(-theta_agg))
+        print theta_est.shape
+        possible_mask = hier_full_feat_generator.get_possible_motifs_to_targets(theta_est.shape)
+        theta_est[~possible_mask] = -np.inf
+    else:
+        theta_est = np.log(1.0/(1.0 + np.exp(-theta_agg)))
+    lines = get_nonzero_theta_print_lines(theta_est, feat_generator)
     log.info(lines)
+
+    with open(args.model_pkl, "w") as f:
+        pickle.dump(LogisticModel(theta_est), f)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
