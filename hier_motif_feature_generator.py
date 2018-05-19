@@ -6,6 +6,8 @@ from combined_feature_generator import CombinedFeatureGenerator
 from feature_generator import MultiFeatureMutationStep
 from motif_feature_generator import MotifFeatureGenerator
 from scipy.sparse import hstack
+from common import NUCLEOTIDES, mutate_string
+from models import ObservedSequenceMutations
 
 class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
     """
@@ -66,6 +68,8 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
         self.feats_to_remove = feats_to_remove
         self.update_feats_after_removing(feats_to_remove)
 
+    def update_feats_after_removing(self, feats_to_remove):
+        super(HierarchicalMotifFeatureGenerator, self).update_feats_after_removing(feats_to_remove)
         # construct motif dictionary and lists of parameters
         self.motif_list = []
         self.mutating_pos_list = []

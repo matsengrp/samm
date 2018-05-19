@@ -618,6 +618,11 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
     )
     return best_model
 
+def load_logistic_model(file_name):
+    with open(file_name, "r") as f:
+        model = pickle.load(f)
+    return model
+
 def read_germline_file(fasta):
     """
     Read fasta file containing germlines

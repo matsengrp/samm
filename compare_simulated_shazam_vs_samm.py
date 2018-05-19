@@ -15,6 +15,9 @@ def parse_args():
         type=str,
         help='comma separated shazam substitution csv files',
         default=None)
+    parser.add_argument('--in-logistic',
+        type=str,
+        help='comma separated logistic pkl files')
     parser.add_argument('--in-samm',
         type=str,
         help='comma separated samm pkl files')
@@ -31,6 +34,7 @@ def parse_args():
     args = parser.parse_args()
     args.shazam_mut_files = args.in_shazam_mut.split(',')
     args.shazam_sub_files = args.in_shazam_sub.split(',')
+    args.in_logistic = args.in_logistic.split(',')
     args.in_samm = args.in_samm.split(',')
     args.true_models = args.true_models.split(',')
     return args
@@ -66,14 +70,17 @@ def main(args=sys.argv[1:]):
             add_targets=True,
         ) for samm_pkl in args.in_samm
     ]
+
+    logistic_models = [load_logistic_model(logistic_pkl) for logistic_pkl in args.in_logistic]
+
     example_model = samm_models[0]
     true_models = [
         load_true_model(tmodel_file) for tmodel_file in args.true_models
     ]
 
     stat_funcs = [_get_agg_norm_diff, _get_agg_kendall, _get_agg_pearson]
-    stat_res = [{"shazam":[], "samm":[]} for i in stat_funcs]
-    for true_m, samm_m, shazam_m in zip(true_models, samm_models, shazam_models):
+    stat_res = [{"shazam":[], "samm":[], "logistic": []} for i in stat_funcs]
+    for true_m, samm_m, shazam_m, logistic_m in zip(true_models, samm_models, shazam_models, logistic_models):
         for stat_i, stat_f in enumerate(stat_funcs):
            try:
                stat_shazam = _collect_statistics([shazam_m], args, true_m, stat_f)
@@ -86,6 +93,8 @@ def main(args=sys.argv[1:]):
                continue
            stat_samm = _collect_statistics([samm_m], args, true_m, stat_f)
            stat_res[stat_i]["samm"].append(stat_samm)
+           stat_logistic = _collect_statistics([logistic_m], args, true_m, stat_f)
+           stat_res[stat_i]["logistic"].append(stat_samm)
 
     for stat_r, stat_func in zip(stat_res, stat_funcs):
         print stat_func.__name__, "mean (se)", len(stat_r["shazam"])
@@ -96,6 +105,8 @@ def main(args=sys.argv[1:]):
         print "samm", np.mean(stat_r["samm"]), "(%f)" % np.sqrt(np.var(stat_r["samm"])/len(stat_r["samm"]))
         if len(stat_r["shazam"]) != len(stat_r["samm"]):
             print "WARNING: Shazam had some bad estimates!"
+        print stat_func.__name__, "mean (se)", len(stat_r["logistic"])
+        print "logistic", np.mean(stat_r["logistic"]), "(%f)" % np.sqrt(np.var(stat_r["logistic"])/len(stat_r["logistic"]))
 
 if __name__ == "__main__":
     main(sys.argv[1:])

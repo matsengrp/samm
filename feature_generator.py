@@ -1,6 +1,6 @@
 import numpy as np
 
-class FeatureGenerator:
+class FeatureGenerator(object):
     """
     Subclass this to have various types of feature vector generators.
     We assume all feature vectors are composed of ones and zeros.
