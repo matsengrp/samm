@@ -25,7 +25,6 @@ class LogisticRegressionMotif:
         self.problem = cp.Problem(cp.Maximize(log_ll - self.lam * theta_norm))
 
     def solve(self, max_iters=2000):
-        print "solve?"
         self.problem.solve(max_iters=max_iters, verbose=True)
         assert(self.problem.status == cp.OPTIMAL)
         return self.theta.value, self.problem.value
