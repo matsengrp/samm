@@ -327,14 +327,14 @@ def main(args=sys.argv[1:]):
         try:
             feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
                 motif_lens=args.motif_lens,
-                feats_to_remove=method_res.model_masks.feats_to_remove,
+                feats_to_remove=method_res.model_masks,
                 left_motif_flank_len_list=args.positions_mutating,
             )
             for col_idx in range(num_agg_cols):
                 full_theta, theta_lower, theta_upper = feat_generator_stage2.combine_thetas_and_get_conf_int(
                     method_res.refit_theta,
-                    method_res.sample_obs_info,
-                    col_idx + agg_start_col,
+                    sample_obs_info=method_res.sample_obs_info,
+                    col_idx=col_idx + agg_start_col,
                 )
         except ValueError as e:
             print(e)

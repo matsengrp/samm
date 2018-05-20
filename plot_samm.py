@@ -102,7 +102,7 @@ def main(args=sys.argv[1:]):
         per_target_model = method_res.refit_theta.shape[1] == NUM_NUCLEOTIDES + 1
 
     feat_generator = method_res.model_masks.feat_generator
-    feat_generator.update_feats_after_removing(method_res.model_masks.feats_to_remove)
+    #feat_generator.update_feats_after_removing(method_res.model_masks)
 
     max_motif_len = feat_generator.motif_len
     full_feat_generator = HierarchicalMotifFeatureGenerator(

@@ -7,10 +7,10 @@ class CombinedFeatureGenerator(FeatureGenerator):
     """
     Class that combines GenericFeatureGenerators.
     """
-    def __init__(self, feat_gen_list, feats_to_remove=[], left_update_region=0, right_update_region=0):
+    def __init__(self, feat_gen_list, model_truncation=None, left_update_region=0, right_update_region=0):
         """
         @param feat_gen_list: list of GenericFeatureGenerators
-        @param feats_to_remove: list of elements of feature_info_list for each GenericFeatureGenerator to remove
+        @param model_truncation: ModelTruncation
         @param left_update_region: number of positions to consider left of mutating position to update
             features correctly
         @param right_update_region: number of positions to consider right of mutating position to update
@@ -22,7 +22,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
         self.left_update_region = left_update_region
         self.right_update_region = right_update_region
 
-        self.update_feats_after_removing(feats_to_remove)
+        self.update_feats_after_removing(model_truncation)
 
     def add_base_features_for_list(self, obs_data):
         """
@@ -97,18 +97,20 @@ class CombinedFeatureGenerator(FeatureGenerator):
         """
         return np.ones(mask_shape, dtype=bool)
 
-    def update_feats_after_removing(self, feats_to_remove):
+    def update_feats_after_removing(self, model_truncation):
         """
         Updates feature generator properties after removing features
 
-        @param feats_to_remove: list of feature info elements to remove
+        @param model_truncation: ModelTruncation
         """
+        self.model_truncation = model_truncation
+
         # Create list of feature generators for different motif lengths and different flank lengths
         old_feat_gens = self.feat_gens
         self.feat_gens = []
         self.feature_info_list = []
         for feat_gen in old_feat_gens:
-            feat_gen.update_feats_after_removing(feats_to_remove)
+            feat_gen.update_feats_after_removing(self.model_truncation)
             self.feat_gens.append(feat_gen)
             self.feature_info_list += feat_gen.feature_info_list
 

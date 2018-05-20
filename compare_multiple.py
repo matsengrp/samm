@@ -20,12 +20,6 @@ def parse_args():
     parser.add_argument('--true-models',
         type=str,
         help='true model pkl')
-    parser.add_argument('--agg-motif-len',
-        type=int,
-        default=3)
-    parser.add_argument('--agg-pos-mutating',
-        type=int,
-        default=1)
     args = parser.parse_args()
     args.samm_one = args.samm_one.split(',')
     args.samm_mult = args.samm_mult.split(',')

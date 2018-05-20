@@ -16,10 +16,10 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
 
     All code that previously uses HierarchicalMotifFeatureGenerator should still work as-is.
     """
-    def __init__(self, motif_lens, feats_to_remove=[], left_motif_flank_len_list=None):
+    def __init__(self, motif_lens, model_truncation=None, left_motif_flank_len_list=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
-        @param feats_to_remove: list of feature info tuples to remove
+        @param model_truncation: ModelTruncation object
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
         """
 
@@ -37,6 +37,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                     assert(left_motif_len in range(motif_len))
 
         self.max_motif_len = max(motif_lens)
+        # We must have motifs nested within each other for this hierarchical motif feature generator
         self.motif_len = self.max_motif_len
         self.left_motif_flank_len = get_max_mut_pos(motif_lens, left_motif_flank_len_list)
 
@@ -63,29 +64,14 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                         )
                     )
 
-        self.feats_to_remove = feats_to_remove
-        self.update_feats_after_removing(feats_to_remove)
+        self.update_feats_after_removing(model_truncation)
 
-    def update_feats_after_removing(self, feats_to_remove):
+    def update_feats_after_removing(self, model_truncation):
         """
         Updates feature generator properties after removing features.
         This feature generator also has motif_list and mutating_pos_list that must be updated.
-
-        @param feats_to_remove: list of feature info elements to remove
         """
-        # Create list of feature generators for different motif lengths and different flank lengths
-        old_feat_gens = self.feat_gens
-        self.feat_gens = []
-        self.feature_info_list = []
-        for feat_gen in old_feat_gens:
-            feat_gen.update_feats_after_removing(feats_to_remove)
-            self.feat_gens.append(feat_gen)
-            self.feature_info_list += feat_gen.feature_info_list
-
-        feat_offsets = [feat_gen.feature_vec_len for feat_gen in self.feat_gens]
-        self.feat_offsets = np.cumsum([0] + feat_offsets)[:-1]
-        self.num_feat_gens = len(self.feat_gens)
-        self.feature_vec_len = np.sum(feat_offsets)
+        super(HierarchicalMotifFeatureGenerator, self).update_feats_after_removing(model_truncation)
 
         # construct motif dictionary and lists of parameters
         self.motif_list = []
@@ -119,7 +105,8 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
             distance_to_start_of_motif=-self.max_left_motif_flank_len,
         )
         full_theta_size = full_feat_generator.feature_vec_len
-        zero_theta_mask = get_zero_theta_mask(theta)
+        zero_theta_mask = self.model_truncation.zero_theta_mask_refit if self.model_truncation is not None else np.ones(theta.shape, dtype=bool)
+        assert theta.shape[0] == self.feature_vec_len
         possible_theta_mask = self.get_possible_motifs_to_targets(zero_theta_mask.shape)
         theta_idx_counter = create_theta_idx_mask(zero_theta_mask, possible_theta_mask)
         # stores which hierarchical theta values were used to construct the full theta
@@ -140,6 +127,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                     m_theta = theta[raw_theta_idx, col_idx]
 
                 if feat_gen.motif_len == full_feat_generator.motif_len:
+                    assert(full_feat_generator.distance_to_start_of_motif == feat_gen.distance_to_start_of_motif)
                     assert(self.max_left_motif_flank_len == -feat_gen.distance_to_start_of_motif)
                     # Already at maximum motif length, so nothing to combine
                     full_m_idx = full_feat_generator.motif_dict[m]

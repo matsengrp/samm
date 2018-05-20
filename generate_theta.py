@@ -173,7 +173,7 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, th
         theta_col_probs = np.array(theta_col_probs)
         theta_param = np.hstack((theta_param, theta_col_probs))
 
-    return theta_param, theta_mask
+    return theta_param
 
 def dump_parameters(agg_theta, theta, args, feat_generator):
     # Dump a pickle file of simulation parameters
@@ -206,16 +206,12 @@ def main(args=sys.argv[1:]):
     else:
         theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
         avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
-        theta_raw, theta_mask = _generate_true_parameters(
+        theta_raw = _generate_true_parameters(
             hier_feat_generator,
             args,
             theta_sampling_col0,
             theta_sampling_col_prob,
         )
-
-        # Update feature generator with features to remove that we zeroed out for theta
-        model_mask = ModelTruncation(theta_raw, hier_feat_generator)
-        hier_feat_generator.update_feats_after_removing(model_mask.feats_to_remove)
 
         agg_theta_raw = hier_feat_generator.create_aggregate_theta(
             theta_raw,
