@@ -4,6 +4,7 @@ import argparse
 
 from common import *
 from read_data import *
+from fit_logistic_model import LogisticModel
 from plot_simulation_section import _collect_statistics, _get_agg_pearson, _get_agg_kendall, _get_agg_norm_diff
 
 def parse_args():
@@ -100,13 +101,13 @@ def main(args=sys.argv[1:]):
                    raise ValueError("infinite value for statistic")
            except Exception as e:
                print "WARNING: Shazam has a bad estimate!"
-               continue
            stat_samm = _collect_statistics([samm_m], args, true_m, stat_f)
            stat_res[stat_i]["samm"].append(stat_samm)
            stat_logistic = _collect_statistics([logistic_m], args, true_m, stat_f)
-           stat_res[stat_i]["logistic"].append(stat_samm)
+           stat_res[stat_i]["logistic"].append(stat_logistic)
 
     for stat_r, stat_func in zip(stat_res, stat_funcs):
+        print "==================="
         print stat_func.__name__, "mean (se)", len(stat_r["shazam"])
         if len(stat_r["shazam"]):
             print "shazam", np.mean(stat_r["shazam"]), "(%f)" % np.sqrt(np.var(stat_r["shazam"])/len(stat_r["shazam"]))

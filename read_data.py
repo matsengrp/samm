@@ -598,8 +598,7 @@ def load_fitted_model(file_name, keep_col0=False, add_targets=True):
         print "FAIL", file_name
         return None
 
-    hier_feat_gen = best_model.model_masks.feat_generator
-    #hier_feat_gen.update_feats_after_removing(best_model.model_masks.feats_to_remove)
+    hier_feat_gen = best_model.refit_feature_generator
     best_model.agg_refit_theta = hier_feat_gen.create_aggregate_theta(
         best_model.refit_theta,
         keep_col0=keep_col0,
