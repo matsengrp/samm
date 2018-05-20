@@ -27,7 +27,7 @@ class MCMC_EM:
         self.per_target_model = per_target_model
         self.sampling_rate = sampling_rate
 
-    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, max_threads=1, pool=None):
+    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, pool=None):
         """
         @param theta: initial value for theta in MCMC-EM
         @param feat_generator: an instance of a FeatureGenerator
@@ -97,6 +97,7 @@ class MCMC_EM:
                     self.per_target_model,
                     possible_theta_mask=possible_theta_mask,
                     zero_theta_mask=zero_theta_mask,
+                    pool=pool,
                 )
 
                 theta, pen_exp_log_lik, lower_bound = problem.solve(
@@ -127,9 +128,7 @@ class MCMC_EM:
             variance_est, sample_obs_info = ci_maker.run(
                     theta,
                     e_step_samples,
-                    problem,
-                    max_threads=max_threads,
-                    pool=pool)
+                    problem)
         else:
             sample_obs_info = None
             variance_est = None

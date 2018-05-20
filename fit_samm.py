@@ -185,8 +185,8 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     np.random.seed(args.seed)
 
-    if args.k_folds > 1:
-        all_runs_pool = Pool(args.k_folds)
+    if max(args.k_folds, args.num_cpu_threads) > 1:
+        all_runs_pool = Pool(max(args.k_folds, args.num_cpu_threads))
     else:
         all_runs_pool = None
 
@@ -257,13 +257,13 @@ def main(args=sys.argv[1:]):
                 prev_num_val_samples,
                 args)
             workers.append(samm_worker)
-        if all_runs_pool is not None:
+        if args.k_folds > 1:
             # We will be using the MultiprocessingManager handle fitting theta for each fold (so python's multiprocessing lib)
             # Within each process, we will use (python) threading to do the M-step
             manager = MultiprocessingManager(all_runs_pool, workers, num_approx_batches=len(workers))
             results = manager.run()
         else:
-            results = [w.run(None) for w in workers]
+            results = [w.run(all_runs_pool) for w in workers]
 
         param_results = [r[0] for r in results]
         results_list.append(param_results)
@@ -313,12 +313,13 @@ def main(args=sys.argv[1:]):
         )
 
     # Finally ready to refit as unpenalized model
+    if args.num_cpu_threads > 1 and all_runs_pool is not None:
+        all_runs_pool = Pool(args.num_cpu_threads)
     cmodel_algo.refit_unpenalized(
         obs_data,
         model_result=method_res,
         max_em_iters=args.unpenalized_em_max_iters,
         get_hessian=not args.omit_hessian,
-        max_threads=args.num_cpu_threads,
         pool=all_runs_pool,
     )
 

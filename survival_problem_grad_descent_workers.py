@@ -119,7 +119,7 @@ class GradientWorker(ParallelWorker):
     """
     def __init__(self, sample_data, per_target_model):
         """
-        @param sample_data: class SamplePrecalcData
+        @param sample_data: list of SamplePrecalcData
         """
         self.seed = 0
         self.sample_data = sample_data
@@ -133,16 +133,22 @@ class GradientWorker(ParallelWorker):
 
         @param theta: the theta to evaluate the gradient at
         """
+        grad = 0
+        for s in self.sample_data:
+            grad += self._get_gradient(s, theta)
+        return grad
+
+    def _get_gradient(self, sample_dat, theta):
         merged_thetas = theta[:,0, None]
         if self.per_target_model:
             merged_thetas = merged_thetas + theta[:,1:]
-        pos_exp_theta = np.exp(self.sample_data.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
+        pos_exp_theta = np.exp(sample_dat.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
         prev_denom = pos_exp_theta.sum()
 
-        prev_risk_group_grad = self.sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
+        prev_risk_group_grad = sample_dat.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
 
         risk_group_grad_tot = prev_risk_group_grad/prev_denom
-        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(self.sample_data.features_per_step_matrices, self.sample_data.features_per_step_matricesT, self.sample_data.features_sign_updates):
+        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_dat.features_per_step_matrices, sample_dat.features_per_step_matricesT, sample_dat.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(merged_thetas))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
 
@@ -154,19 +160,16 @@ class GradientWorker(ParallelWorker):
         if self.per_target_model:
             risk_group_grad_tot = np.hstack([np.sum(risk_group_grad_tot, axis=1, keepdims=True), risk_group_grad_tot])
         return np.array(
-                self.sample_data.init_grad_vector - risk_group_grad_tot,
+                sample_dat.init_grad_vector - risk_group_grad_tot,
                 dtype=float)
 
-    def __str__(self):
-        return "GradientWorker %s" % self.sample_data.obs_seq_mutation
-
-class ObjectiveValueWorker(ParallelWorker):
+class LogLikelihoodWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
     """
     def __init__(self, sample_data, per_target_model):
         """
-        @param sample: SamplePrecalcData
+        @param sample_data: list of SamplePrecalcData
         """
         self.seed = 0
         self.sample_data = sample_data
@@ -195,9 +198,6 @@ class ObjectiveValueWorker(ParallelWorker):
         log_lik = numerators.sum() - np.log(denominators).sum()
         return log_lik
 
-    def __str__(self):
-        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
-
 class HessianWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
@@ -216,7 +216,7 @@ class HessianWorker(ParallelWorker):
         """
         tot_hessian = 0
         for s in self.sample_datas:
-            h = self._get_hessian_per_sample(s)
+            h = self._get_hessian_per_sample(s, theta)
             tot_hessian += h
         return tot_hessian
 

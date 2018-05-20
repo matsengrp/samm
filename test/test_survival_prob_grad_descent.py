@@ -43,7 +43,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         old_grad = self.calculate_grad_slow(theta, feat_gen, sample)
 
         # Fast gradient calculation
-        fast_grad = GradientWorker(None, None, sample_data, per_target, theta).calculate()
+        fast_grad = GradientWorker([sample_data], per_target).run_worker(theta)
         self.assertTrue(np.allclose(fast_grad, old_grad))
 
     def test_grad_calculation(self):
@@ -71,7 +71,7 @@ class Survival_Problem_Gradient_Descent_TestCase(unittest.TestCase):
         # Basic gradient calculation
         old_ll = self.calculate_log_likelihood_slow(theta, feat_gen, sample)
         # Fast log likelihood calculation
-        fast_ll = ObjectiveValueWorker(None, None, sample_data, per_target, theta).calculate()
+        fast_ll = LogLikelihoodWorker(sample_data, per_target).run_worker(theta)
         self.assertTrue(np.allclose(fast_ll, old_ll))
 
     def test_log_likelihood_calculation(self):

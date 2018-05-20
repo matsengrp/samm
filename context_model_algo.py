@@ -79,7 +79,7 @@ class ContextModelAlgo:
 
         return ll_ratio_lower_bound, log_lik_ratio
 
-    def fit_penalized(self, train_set, penalty_params, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None):
+    def fit_penalized(self, train_set, penalty_params, max_em_iters, val_set_evaluator=None, init_theta=None, reference_pen_param=None, pool=None):
         """
         @param penalty_params: penalty parameter for fitting penalized model
         @param val_set_evaluator: LikelihoodComparer with a given reference model
@@ -100,6 +100,7 @@ class ContextModelAlgo:
             penalty_params=penalty_params,
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
+            pool=pool,
         )
         curr_model_results = MethodResults(penalty_params)
 
@@ -120,7 +121,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, obs_data, model_result, max_em_iters, get_hessian=True, max_threads=1, pool=None):
+    def refit_unpenalized(self, obs_data, model_result, max_em_iters, get_hessian=True, pool=None):
         """
         Refit the model
         Modifies model_result
@@ -155,7 +156,6 @@ class ContextModelAlgo:
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
             get_hessian=get_hessian,
-            max_threads=max_threads,
             pool=pool
         )
 

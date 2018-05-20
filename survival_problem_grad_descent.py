@@ -1,4 +1,3 @@
-import threading
 import time
 import numpy as np
 import scipy as sp
@@ -18,14 +17,13 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False):
+    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
         """
         @param feat_generator: CombinedFeatureGenerator
         @param samples: observations to compute gradient descent problem
         @param sample_labels: only used for calculating the Hessian
         @param possible_theta_mask: these theta values are some finite number
         @param zero_theta_mask: these theta values are forced to be zero
-        @param max_threads: this specifies number of threads to create via the python threading library
         """
         assert(isinstance(feat_generator, CombinedFeatureGenerator))
         self.feature_generator = feat_generator
@@ -45,6 +43,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
         self.fuse_center_only = fuse_center_only
+        self.pool = pool
 
         self.precalc_data = self._create_precalc_data_parallel(samples)
 
@@ -63,6 +62,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         calculate the precalculated data for each sample in parallel
         """
+        st = time.time()
         worker_list = [
             PrecalcDataWorker(
                 sample,
@@ -71,7 +71,8 @@ class SurvivalProblemCustom(SurvivalProblem):
                 self.per_target_model,
             ) for sample in samples
         ]
-        precalc_data = self._run_threads(worker_list)
+        precalc_data = self._run_processes(worker_list, shared_obj=None, pool=self.pool)
+        log.info("precalc time %f", time.time() - st)
         return precalc_data
 
     def get_value(self, theta):
@@ -104,18 +105,18 @@ class SurvivalProblemCustom(SurvivalProblem):
         else:
             return ll_ratio_vec
 
-    def _run_threads(self, worker_list, shared_obj=None, max_threads=1, pool=None):
+    def _run_processes(self, worker_list, shared_obj=None, pool=None):
         """
         Run and join python Thread objects
 
         @param worker_list: a list of Worker objects from down there
         """
-        if pool is not None and max_threads > 1:
+        if pool is not None:
             manager = MultiprocessingManager(
                     pool,
                     worker_list,
                     shared_obj=shared_obj,
-                    num_approx_batches=max_threads)
+                    num_approx_batches=pool._processes * 2)
             results = manager.run()
         else:
             results = [w.run(shared_obj) for w in worker_list]
@@ -123,26 +124,30 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     def _get_log_lik_parallel(self, theta):
         """
+        NOTE: parallel not faster if not a lot of a data
+
         @param theta: the theta to calculate the likelihood for
         @return vector of log likelihood values
         """
         worker_list = [
-            ObjectiveValueWorker(
-                sample_data,
-                self.per_target_model) for sample_data in self.precalc_data
+            LogLikelihoodWorker(s, self.per_target_model)
+            for s in self.precalc_data
         ]
-        log_liks = self._run_threads(worker_list, shared_obj=theta)
+        log_liks = self._run_processes(
+                worker_list,
+                shared_obj=theta,
+                pool=self.pool if len(worker_list) > 10000 else None)
 
         return np.array(log_liks)
 
-    def get_hessian(self, theta, max_threads=1, pool=None):
+    def get_hessian(self, theta):
         """
         Uses Louis's method to calculate the information matrix of the observed data
 
         @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
         """
         def _get_parallel_sum(worker_list, shared_obj=None):
-            res_list = self._run_threads(worker_list, shared_obj, max_threads=max_threads, pool=pool)
+            res_list = self._run_processes(worker_list, shared_obj, pool=self.pool)
             assert not any([r is None for r in res_list])
             tot = 0
             for r in res_list:
@@ -151,15 +156,10 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         st = time.time()
         grad_worker_list = [
-            GradientWorker(
-                sample_data,
-                self.per_target_model) for sample_data in self.precalc_data
+            GradientWorker([s], self.per_target_model) for s in sorted_sample_labels
         ]
-        grad_log_lik = self._run_threads(
-                grad_worker_list,
-                shared_obj=theta,
-                max_threads=max_threads,
-                pool=pool)
+        # Gradients are not faster in parallel. So this is running with a pool
+        grad_log_lik = self._run_processes(grad_worker_list, shared_obj=theta)
 
         sorted_sample_labels = sorted(list(set(self.sample_labels)))
         log.info("Obtained gradients %s" % (time.time() - st))
@@ -176,8 +176,10 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained expected scores %s" % (time.time() - st))
 
         # Calculate the score score (second summand)
-        num_batches = int(len(grad_log_lik)/max_threads) * 2
-        batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
+        if self.pool is not None:
+            batched_idxs = get_batched_list(range(len(grad_log_lik)), self.pool._processes * 2)
+        else:
+            batched_idxs = range(len(grad_log_lik))
         score_score_worker_list = [
             ScoreScoreWorker([grad_log_lik[j] for j in idxs])
             for idxs in batched_idxs
@@ -188,7 +190,10 @@ class SurvivalProblemCustom(SurvivalProblem):
         # Calculate the cross scores (third summand)
         # Instead of calculating \sum_{i \neq j} ES_i ES_j^T directly we calculate
         # (\sum_{i} ES_i) ( \sum_{i} ES_i)^T - \sum_{i} ES_i ES_i^T
-        batched_labels = get_batched_list(sorted_sample_labels, num_batches)
+        if self.pool is not None:
+            batched_labels = get_batched_list(sorted_sample_labels, self.pool._processes * 2)
+        else:
+            batched_labels = sorted_sample_labels
         expected_score_worker_list = [
                 ExpectedScoreScoreWorker([expected_scores[l] for l in labels])
                 for labels in batched_labels]
@@ -212,18 +217,24 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     def _get_gradient_log_lik(self, theta):
         """
-        JUST KIDDING - parallel is not faster
+        NOTE: parallel is not faster if not a lot of data
+
         @param theta: the theta to calculate the likelihood for
 
-        Calculate the gradient of the negative log likelihood - delegates to separate cpu threads if threads > 1
+        Calculate the gradient of the negative log likelihood
         """
+        if self.pool is not None:
+            batched_data = get_batched_list(self.precalc_data, self.pool._processes * 2)
+        else:
+            batched_data = [self.precalc_data]
         worker_list = [
-            GradientWorker(
-                sample_data,
-                self.per_target_model)
-            for i, sample_data in enumerate(self.precalc_data)
+            GradientWorker(batch, self.per_target_model)
+            for batch in batched_data
         ]
-        grad_ll_raw = self._run_threads(worker_list, theta)
+        grad_ll_raw = self._run_processes(
+                worker_list,
+                theta,
+                pool=self.pool if len(worker_list) > 10000 else None)
 
         grad_ll_raw = np.array(grad_ll_raw)
         grad_ll_dtheta = np.sum(grad_ll_raw, axis=0)
