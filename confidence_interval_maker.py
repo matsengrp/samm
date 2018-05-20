@@ -12,7 +12,7 @@ class ConfidenceIntervalMaker:
         self.theta_mask = possible_theta_mask & ~zero_theta_mask
         self.theta_mask_flat = self.theta_mask.reshape((self.theta_mask.size,), order="F")
 
-    def run(self, theta, e_step_samples, problem, z=1.96):
+    def run(self, theta, e_step_samples, problem, z=1.96, max_threads=1, pool=None):
         """
         The asymptotic covariance matrix of theta is the inverse of the fisher's information matrix
         since theta is an MLE.
@@ -22,7 +22,7 @@ class ConfidenceIntervalMaker:
         @return standard error estimates for the theta parameters
         """
         log.info("Obtaining Confidence Interval Estimates...")
-        sample_obs_information, _ = problem.get_hessian(theta)
+        sample_obs_information, _ = problem.get_hessian(theta, max_threads=max_threads, pool=pool)
         # Need to filter out all the theta values that are constant (negative infinity or zero constants)
         sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
 

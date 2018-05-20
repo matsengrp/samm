@@ -318,6 +318,8 @@ def main(args=sys.argv[1:]):
         model_result=method_res,
         max_em_iters=args.unpenalized_em_max_iters,
         get_hessian=not args.omit_hessian,
+        max_threads=args.num_cpu_threads,
+        pool=all_runs_pool,
     )
 
     # Pickle the refitted theta
