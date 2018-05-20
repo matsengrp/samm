@@ -119,12 +119,6 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-            # Save the e-step samples if we want to analyze later on
-            # e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
-            # log.info("Pickling E-step samples %s" % e_sample_file_name)
-            # with open(e_sample_file_name, "w") as f:
-            #     pickle.dump(e_step_samples, f)
-
             if lower_bound_is_negative or lower_bound < diff_thres or num_nonzero == 0:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break

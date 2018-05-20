@@ -73,6 +73,10 @@ def parse_args():
         and 5mer with first, second and third
         """,
         default="1")
+    parser.add_argument('--unpenalized-em-max-iters',
+        type=int,
+        help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
+        default=20)
     parser.add_argument('--em-max-iters',
         type=int,
         help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
@@ -312,7 +316,7 @@ def main(args=sys.argv[1:]):
     cmodel_algo.refit_unpenalized(
         obs_data,
         model_result=method_res,
-        max_em_iters=args.em_max_iters * 3,
+        max_em_iters=args.unpenalized_em_max_iters,
         get_hessian=not args.omit_hessian,
     )
 

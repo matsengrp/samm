@@ -18,7 +18,7 @@ nest = SConsWrap(Nest(), '_output', alias_environment=localenv)
 MOTIF_LENS = [2,3]
 MUT_POS = '0,1:1'
 SEED = 0
-PENALTY_PARAMS = np.power(10, np.arange(-1.0, -2.0, step=-0.5)).tolist()
+PENALTY_PARAMS = np.power(10, np.arange(-0.5, -1.0, step=-0.5)).tolist()
 
 nest.add(
     'per_target',
@@ -46,7 +46,7 @@ def generate(env, outdir, c):
            '--effect-size',
            1.0,
            '--nonzero-ratio',
-           .5,
+           .2,
            per_target_model_str,
            '--output-model ${TARGETS[0]}']
     return env.Command(
@@ -94,7 +94,7 @@ def star_simulate(env, outdir, c):
            '--n-subjects',
            1,
            '--tot-mutated',
-           250,
+           100,
            '--min-percent-mutated',
            0.01,
            '--max-percent-mutated',
@@ -118,7 +118,7 @@ def star_simulate_no_partis(env, outdir, c):
            '--n-subjects',
            1,
            '--tot-mutated',
-           250,
+           100,
            '--min-percent-mutated',
            0.01,
            '--max-percent-mutated',
@@ -143,7 +143,7 @@ def star_simulate_shmulate(env, outdir, c):
            '--n-subjects',
            1,
            '--tot-mutated',
-           250,
+           100,
            '--min-percent-mutated',
            0.01,
            '--max-percent-mutated',
@@ -211,6 +211,10 @@ def fit_samm(env, outdir, c):
            2,
            '--em-max-iters',
            1,
+           '--unpenalized-em-max-iters',
+           1,
+           '--max-m-iters',
+           100,
            '--num-val-burnin',
            1,
            '--num-val-samples',
