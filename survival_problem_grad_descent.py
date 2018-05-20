@@ -107,8 +107,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     def _run_processes(self, worker_list, shared_obj=None, pool=None):
         """
-        Run and join python Thread objects
-
+        Run parallel workers
         @param worker_list: a list of Worker objects from down there
         """
         if pool is not None:
@@ -130,8 +129,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         @return vector of log likelihood values
         """
         worker_list = [
-            LogLikelihoodWorker(s, self.per_target_model)
-            for s in self.precalc_data
+            LogLikelihoodWorker(s, self.per_target_model) for s in self.precalc_data
         ]
         log_liks = self._run_processes(
                 worker_list,

@@ -259,10 +259,10 @@ def main(args=sys.argv[1:]):
             workers.append(samm_worker)
         if args.k_folds > 1:
             # We will be using the MultiprocessingManager handle fitting theta for each fold (so python's multiprocessing lib)
-            # Within each process, we will use (python) threading to do the M-step
             manager = MultiprocessingManager(all_runs_pool, workers, num_approx_batches=len(workers))
             results = manager.run()
         else:
+            # We will be using the MultiprocessingManager parallelize computations within the M-step
             results = [w.run(all_runs_pool) for w in workers]
 
         param_results = [r[0] for r in results]
@@ -310,6 +310,7 @@ def main(args=sys.argv[1:]):
             method_res_template.penalty_params,
             max_em_iters=args.em_max_iters,
             init_theta=prev_pen_theta,
+            pool=all_runs_pool,
         )
 
     # Finally ready to refit as unpenalized model
