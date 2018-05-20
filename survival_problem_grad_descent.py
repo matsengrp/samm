@@ -156,7 +156,7 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         st = time.time()
         grad_worker_list = [
-            GradientWorker([s], self.per_target_model) for s in sorted_sample_labels
+            GradientWorker([s], self.per_target_model) for s in self.precalc_data
         ]
         # Gradients are not faster in parallel. So this is running with a pool
         grad_log_lik = self._run_processes(grad_worker_list, shared_obj=theta)
@@ -179,7 +179,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         if self.pool is not None:
             batched_idxs = get_batched_list(range(len(grad_log_lik)), self.pool._processes * 2)
         else:
-            batched_idxs = range(len(grad_log_lik))
+            batched_idxs = [range(len(grad_log_lik))]
         score_score_worker_list = [
             ScoreScoreWorker([grad_log_lik[j] for j in idxs])
             for idxs in batched_idxs
@@ -193,7 +193,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         if self.pool is not None:
             batched_labels = get_batched_list(sorted_sample_labels, self.pool._processes * 2)
         else:
-            batched_labels = sorted_sample_labels
+            batched_labels = [sorted_sample_labels]
         expected_score_worker_list = [
                 ExpectedScoreScoreWorker([expected_scores[l] for l in labels])
                 for labels in batched_labels]

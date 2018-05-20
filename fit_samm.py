@@ -313,7 +313,7 @@ def main(args=sys.argv[1:]):
         )
 
     # Finally ready to refit as unpenalized model
-    if args.num_cpu_threads > 1 and all_runs_pool is not None:
+    if args.num_cpu_threads > 1 and all_runs_pool is None:
         all_runs_pool = Pool(args.num_cpu_threads)
     cmodel_algo.refit_unpenalized(
         obs_data,
