@@ -589,7 +589,7 @@ def load_true_model(file_name):
         true_model_agg, true_model = pickle.load(f)
     return np.array(true_model_agg)
 
-def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=False, add_targets=True):
+def load_fitted_model(file_name, keep_col0=False, add_targets=True):
     with open(file_name, "r") as f:
         fitted_models = pickle.load(f)
         best_model = pick_best_model(fitted_models)
@@ -598,21 +598,10 @@ def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating, keep_col0=Fals
         print "FAIL", file_name
         return None
 
-    hier_feat_gen = HierarchicalMotifFeatureGenerator(
-        motif_lens=best_model.motif_lens,
-        feats_to_remove=best_model.model_masks.feats_to_remove,
-        left_motif_flank_len_list=best_model.positions_mutating,
-    )
-    agg_feat_gen = HierarchicalMotifFeatureGenerator(
-        motif_lens=[agg_motif_len],
-        left_motif_flank_len_list=[[agg_pos_mutating]],
-    )
-    best_model.agg_refit_theta = create_aggregate_theta(
-        hier_feat_gen,
-        agg_feat_gen,
+    hier_feat_gen = best_model.model_masks.feat_generator
+    #hier_feat_gen.update_feats_after_removing(best_model.model_masks.feats_to_remove)
+    best_model.agg_refit_theta = hier_feat_gen.create_aggregate_theta(
         best_model.refit_theta,
-        best_model.model_masks.zero_theta_mask_refit,
-        best_model.refit_possible_theta_mask,
         keep_col0=keep_col0,
         add_targets=add_targets,
     )
@@ -646,7 +635,7 @@ def read_shmulate_val(shmulate_value):
     # shazam csv puts a zero if there are not enough observations for that motif
     return -np.inf if shmulate_value == "NA" or shmulate_value == "0" or shmulate_value == "0.0" else np.log(float(shmulate_value))
 
-def get_shazam_theta(mutability_file, substitution_file=None):
+def get_shazam_theta(mutability_file, substitution_file=None, wide_format=False):
     """
     Take shazam csv files and turn them into our theta vector
 
@@ -656,19 +645,22 @@ def get_shazam_theta(mutability_file, substitution_file=None):
     """
 
     # Read in the results from the shmulate model-fitter
-    # Shazam is always a 5mer
-    feat_gen = MotifFeatureGenerator(motif_len=5)
-    motif_list = feat_gen.motif_list
-
     # Read mutability matrix
     mut_motif_dict = dict()
     with open(mutability_file, "r") as model_file:
-        csv_reader = csv.reader(model_file, delimiter=' ')
-        header = csv_reader.next()
-        for line in csv_reader:
-            motif = line[0].lower()
-            motif_val = line[1]
-            mut_motif_dict[motif.lower()] = motif_val
+        if wide_format:
+            csv_reader = csv.reader(model_file, delimiter=',')
+            shazam_motif_list = csv_reader.next()[1:]
+            shazam_mutabilities = csv_reader.next()[1:]
+            for motif, motif_val in zip(shazam_motif_list, shazam_mutabilities):
+                mut_motif_dict[motif.lower()] = motif_val
+        else:
+            csv_reader = csv.reader(model_file, delimiter=' ')
+            header = csv_reader.next()
+            for line in csv_reader:
+                motif = line[0].lower()
+                motif_val = line[1]
+                mut_motif_dict[motif.lower()] = motif_val
 
     num_theta_cols = 1
     if substitution_file is not None:
@@ -676,7 +668,10 @@ def get_shazam_theta(mutability_file, substitution_file=None):
         # Read substitution matrix
         sub_motif_dict = dict()
         with open(substitution_file, "r") as model_file:
-            csv_reader = csv.reader(model_file, delimiter=' ')
+            if wide_format:
+                csv_reader = csv.reader(model_file, delimiter=',')
+            else:
+                csv_reader = csv.reader(model_file, delimiter=' ')
             # Assume header is ACGT
             header = csv_reader.next()
             for i in range(NUM_NUCLEOTIDES):
@@ -689,6 +684,9 @@ def get_shazam_theta(mutability_file, substitution_file=None):
                     mutate_to_prop[header[i + 1]] = line[i + 1]
                 sub_motif_dict[motif] = mutate_to_prop
 
+
+    # Shazam is always a 5mer
+    feat_gen = MotifFeatureGenerator(motif_len=5)
     motif_list = feat_gen.motif_list
     # Reconstruct theta in the right order
     theta = np.zeros((feat_gen.feature_vec_len, num_theta_cols))

@@ -73,10 +73,18 @@ def parse_args():
         and 5mer with first, second and third
         """,
         default="1")
+    parser.add_argument('--unpenalized-em-max-iters',
+        type=int,
+        help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
+        default=20)
     parser.add_argument('--em-max-iters',
         type=int,
         help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
         default=20)
+    parser.add_argument('--max-m-iters',
+        type=int,
+        help='Maximum number of iterations for M step in EM',
+        default=200)
     parser.add_argument('--burn-in',
         type=int,
         help='Number of burn-in iterations used on the first E-step of each penalty parameter',
@@ -276,7 +284,7 @@ def main(args=sys.argv[1:]):
                 # Time to stop shrinking penalty param
                 # This model is not better than the previous model. Stop trying penalty parameters.
                 # Time to refit the model
-                log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % ll_ratios)
+                log.info("EM surrogate function is decreasing. Stop trying penalty parameters. ll_ratios %s" % log_lik_ratios)
                 break
 
         best_model_idx = param_i
@@ -308,7 +316,7 @@ def main(args=sys.argv[1:]):
     cmodel_algo.refit_unpenalized(
         obs_data,
         model_result=method_res,
-        max_em_iters=args.em_max_iters * 3,
+        max_em_iters=args.unpenalized_em_max_iters,
         get_hessian=not args.omit_hessian,
     )
 
@@ -327,24 +335,19 @@ def main(args=sys.argv[1:]):
         try:
             feat_generator_stage2 = HierarchicalMotifFeatureGenerator(
                 motif_lens=args.motif_lens,
-                feats_to_remove=method_res.model_masks.feats_to_remove,
+                model_truncation=method_res.model_masks,
                 left_motif_flank_len_list=args.positions_mutating,
             )
             for col_idx in range(num_agg_cols):
                 full_theta, theta_lower, theta_upper = feat_generator_stage2.combine_thetas_and_get_conf_int(
                     method_res.refit_theta,
-                    method_res.refit_possible_theta_mask,
-                    method_res.sample_obs_info,
-                    col_idx + agg_start_col,
+                    sample_obs_info=method_res.sample_obs_info,
+                    col_idx=col_idx + agg_start_col,
                 )
         except ValueError as e:
             print(e)
 
             log.info("No fits had positive variance estimates")
-
-        # Pickle the refitted theta
-        with open(args.out_file, "w") as f:
-            pickle.dump(results_list, f)
 
     if all_runs_pool is not None:
         all_runs_pool.close()

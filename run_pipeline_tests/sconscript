@@ -1,0 +1,307 @@
+# Run all of our scripts on small, example data as a suite of tests to make sure changes didn't break anything
+
+import os
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+import numpy as np
+
+from data_paths import SCRATCH_DIR, CUI_DATA_PATH
+
+Import('env')
+localenv = env.Clone()
+
+nest = SConsWrap(Nest(), '_output', alias_environment=localenv)
+
+MOTIF_LENS = [2,3]
+MUT_POS = '0,1:1'
+SEED = 0
+PENALTY_PARAMS = np.power(10, np.arange(-0.5, -1.0, step=-0.5)).tolist()
+
+nest.add(
+    'per_target',
+    [
+        True,
+        False,
+    ],
+    label_func=lambda c: "per-target%s" % str(c),
+)
+
+@nest.add_target_with_env(localenv)
+def generate(env, outdir, c):
+    per_target_model_str = ""
+    if c["per_target"]:
+        per_target_model_str = "--per-target-model"
+
+    cmd = ['python',
+           'generate_theta.py',
+           '--seed',
+           SEED,
+           '--motif-lens',
+           ",".join([str(m) for m in MOTIF_LENS]),
+           '--positions-mutating',
+           MUT_POS,
+           '--effect-size',
+           1.0,
+           '--nonzero-ratio',
+           .2,
+           per_target_model_str,
+           '--output-model ${TARGETS[0]}']
+    return env.Command(
+        [join(outdir, 'true_model.pkl')],
+        [],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def generate_shmulate(env, outdir, c):
+    per_target_model_str = ""
+    if c["per_target"]:
+        per_target_model_str = "--per-target-model"
+
+    cmd = ['python',
+           'generate_theta.py',
+           '--seed',
+           SEED,
+           '--motif-lens',
+           ",".join([str(m) for m in MOTIF_LENS]),
+           '--positions-mutating',
+           MUT_POS,
+           '--effect-size',
+           1.0,
+           '--nonzero-ratio',
+           .5,
+           per_target_model_str,
+           '--use-shmulate-as-truth',
+           '--output-model ${TARGETS[0]}']
+    return env.Command(
+        [join(outdir, 'true_model_shmulate.pkl')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# simulation methods
+@nest.add_target_with_env(localenv)
+def star_simulate(env, outdir, c):
+    cmd = ['python',
+           'simulate_shm_star_tree.py',
+           '--seed',
+           SEED,
+           '--agg-motif-len',
+           max(MOTIF_LENS),
+           '--input-model ${SOURCES[0]}',
+           '--use-partis',
+           '--n-subjects',
+           1,
+           '--tot-mutated',
+           100,
+           '--min-percent-mutated',
+           0.01,
+           '--max-percent-mutated',
+           0.05,
+           '--output-mutated ${TARGETS[0]}',
+           '--output-naive ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'star_seqs.csv'), join(outdir, 'star_genes.csv')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def star_simulate_no_partis(env, outdir, c):
+    cmd = ['python',
+           'simulate_shm_star_tree.py',
+           '--seed',
+           SEED,
+           '--agg-motif-len',
+           max(MOTIF_LENS),
+           '--input-model ${SOURCES[0]}',
+           '--n-subjects',
+           1,
+           '--tot-mutated',
+           100,
+           '--min-percent-mutated',
+           0.01,
+           '--max-percent-mutated',
+           0.05,
+           '--output-mutated ${TARGETS[0]}',
+           '--output-naive ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'star_seqs_no_partis.csv'), join(outdir, 'star_genes_no_partis.csv')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def star_simulate_shmulate(env, outdir, c):
+    cmd = ['python',
+           'simulate_shm_star_tree.py',
+           '--seed',
+           SEED,
+           '--agg-motif-len',
+           max(MOTIF_LENS),
+           '--input-model ${SOURCES[0]}',
+           '--use-shmulate',
+           '--n-subjects',
+           1,
+           '--tot-mutated',
+           100,
+           '--min-percent-mutated',
+           0.01,
+           '--max-percent-mutated',
+           0.05,
+           '--output-mutated ${TARGETS[0]}',
+           '--output-naive ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'star_seqs_shmulate.csv'), join(outdir, 'star_genes_shmulate.csv')],
+        c['generate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def tree_simulate(env, outdir, c):
+    cmd = ['python',
+           'simulate_shm_on_tree.py',
+           '--seed',
+           SEED,
+           '--use-v',
+           '--use-immunized',
+           '--locus',
+           'igk',
+           '--pct-mutated',
+           .025,
+           '--path-to-annotations',
+           CUI_DATA_PATH,
+            '--path-to-metadata',
+           CUI_DATA_PATH + '/meta.csv',
+           '--motif-lens',
+           ",".join([str(m) for m in MOTIF_LENS]),
+           '--n-clonal-families',
+           250,
+           '--output-germline-seqs ${TARGETS[0]}',
+           '--output-seqs ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'tree_seqs.csv'), join(outdir, 'tree_genes.csv')],
+        [],
+        ' '.join(map(str, cmd)))
+
+# Nest for model fitting
+@nest.add_target_with_env(localenv)
+def fit_samm(env, outdir, c):
+    per_target_model_str = ""
+    if c["per_target"]:
+        per_target_model_str = "--per-target-model"
+
+    cmd = ['python',
+           'fit_samm.py',
+           '--seed',
+           SEED,
+           '--motif-lens',
+           ",".join([str(m) for m in MOTIF_LENS]),
+           '--positions-mutating',
+           MUT_POS,
+           '--penalty-params',
+           ",".join(map(str, PENALTY_PARAMS)),
+           '--num-cpu-threads',
+           5,
+           '--num-jobs',
+           5,
+           '--burn-in',
+           1,
+           '--num-e-samples',
+           2,
+           '--sampling-rate',
+           2,
+           '--em-max-iters',
+           1,
+           '--unpenalized-em-max-iters',
+           1,
+           '--max-m-iters',
+           100,
+           '--num-val-burnin',
+           1,
+           '--num-val-samples',
+           2,
+           per_target_model_str,
+           '--scratch-directory',
+           SCRATCH_DIR,
+           '--tuning-sample-ratio',
+           0.2,
+           '--validation-col germline_family',
+           '--input-mutated ${SOURCES[0]}',
+           '--input-naive ${SOURCES[1]}',
+           '--out-file ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+        c['star_simulate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def plot_samm(env, outdir, c):
+    cmd = ['python',
+           'plot_samm.py',
+           '--input-pkl',
+           '${SOURCES[0]}',
+           '--output-csv',
+           '${TARGETS[0]}',
+           '--output-pdf',
+           '${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted.csv'), join(outdir, 'fitted.pdf')],
+        c['fit_samm'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def fit_shmulate(env, outdir, c):
+    cmd = ['python fit_shmulate_model.py',
+           '--input-file',
+           '${SOURCES[1]}',
+           '--input-genes',
+           '${SOURCES[0]}',
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt'), join(outdir, 'fitted_shazam_mut.csv'), join(outdir, 'fitted_shazam_sub.csv')],
+        c['star_simulate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def plot_shazam(env, outdir, c):
+    per_target_model_str = ""
+    if c["per_target"]:
+        per_target_model_str = "--sub ${SOURCES[3]}"
+
+    cmd = ['python plot_shazam.py',
+           '--mut',
+           '${SOURCES[2]}',
+           per_target_model_str,
+           '--output-csv',
+           '${TARGETS[0]}',
+           '--output-pdf',
+           '${TARGETS[1]}']
+    return env.Command(
+        [join(outdir, 'fitted_shazam.csv'), join(outdir, 'fitted_shazam.pdf')],
+        c['fit_shmulate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def fit_logistic(env, outdir, c):
+    per_target_model_str = ""
+    if c["per_target"]:
+        per_target_model_str = "--per-target-model"
+
+    cmd = ['python',
+           'fit_logistic_model.py',
+           '--seed',
+           SEED,
+           '--motif-lens',
+           ",".join([str(m) for m in MOTIF_LENS]),
+           '--positions-mutating',
+           MUT_POS,
+           per_target_model_str,
+           '--input-mutated ${SOURCES[0]}',
+           '--input-naive ${SOURCES[1]}',
+           '--log-file ${TARGETS[0]}']
+    return env.Command(
+        [join(outdir, 'log_logistic.txt')],
+        c['star_simulate'],
+        ' '.join(map(str, cmd)))
+

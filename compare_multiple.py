@@ -20,12 +20,6 @@ def parse_args():
     parser.add_argument('--true-models',
         type=str,
         help='true model pkl')
-    parser.add_argument('--agg-motif-len',
-        type=int,
-        default=3)
-    parser.add_argument('--agg-pos-mutating',
-        type=int,
-        default=1)
     args = parser.parse_args()
     args.samm_one = args.samm_one.split(',')
     args.samm_mult = args.samm_mult.split(',')
@@ -38,8 +32,6 @@ def main(args=sys.argv[1:]):
     samm_models_one = [
         load_fitted_model(
             samm_pkl,
-            args.agg_motif_len,
-            args.agg_pos_mutating,
             keep_col0=False,
             add_targets=True,
         ) for samm_pkl in args.samm_one
@@ -47,8 +39,6 @@ def main(args=sys.argv[1:]):
     samm_models_mult = [
         load_fitted_model(
             samm_pkl,
-            args.agg_motif_len,
-            args.agg_pos_mutating,
             keep_col0=False,
             add_targets=True,
         ) for samm_pkl in args.samm_mult

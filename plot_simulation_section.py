@@ -13,6 +13,7 @@ import seaborn as sns
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from confidence_interval_maker import ConfidenceIntervalMaker
 from common import *
+from read_data import load_fitted_model
 
 def parse_args():
     ''' parse command line arguments '''
@@ -64,34 +65,6 @@ def parse_args():
     args.effect_sizes = args.effect_sizes.split(",")
     args.sparsities = args.sparsities.split(",")
     return args
-
-def load_fitted_model(file_name, agg_motif_len, agg_pos_mutating):
-    with open(file_name, "r") as f:
-        fitted_models = pickle.load(f)
-        best_model = pick_best_model(fitted_models)
-
-    if best_model is None:
-        print "FAIL", file_name
-        return None
-
-    hier_feat_gen = HierarchicalMotifFeatureGenerator(
-        motif_lens=best_model.motif_lens,
-        feats_to_remove=best_model.model_masks.feats_to_remove,
-        left_motif_flank_len_list=best_model.positions_mutating,
-    )
-    agg_feat_gen = HierarchicalMotifFeatureGenerator(
-        motif_lens=[agg_motif_len],
-        left_motif_flank_len_list=[[agg_pos_mutating]],
-    )
-    best_model.agg_refit_theta = create_aggregate_theta(
-        hier_feat_gen,
-        agg_feat_gen,
-        best_model.refit_theta,
-        best_model.model_masks.zero_theta_mask_refit,
-        best_model.refit_possible_theta_mask,
-        keep_col0=False,
-    )
-    return best_model
 
 def _collect_statistics(fitted_models, args, agg_true_theta, stat_func):
     dense_agg_feat_gen = HierarchicalMotifFeatureGenerator(
@@ -161,12 +134,8 @@ def _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_
     tot_considered = 0
     agg_fitted_thetas = []
     for col_idx in range(agg_true_theta.shape[1]):
-        agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = combine_thetas_and_get_conf_int(
-            hier_feat_gen,
-            full_feat_generator,
+        agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = hier_feat_gen.combine_thetas_and_get_conf_int(
             fmodel.refit_theta,
-            fmodel.model_masks.zero_theta_mask_refit,
-            fmodel.refit_possible_theta_mask,
             np.linalg.pinv(fmodel.variance_est),
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=1.96,
@@ -263,7 +232,7 @@ def main(args=sys.argv[1:]):
                     if eff_same + sparse_same + samples_same >= 2:
                         for seed in range(args.reps):
                             fitted_filename = args.fitted_models % (model_type, sparsity, eff_size, nsamples, seed)
-                            fitted_model = load_fitted_model(fitted_filename, args.agg_motif_len, args.agg_pos_mutating)
+                            fitted_model = load_fitted_model(fitted_filename, keep_col0=False)
                             tmodel_file = args.true_models % (model_type, sparsity, eff_size)
                             true_model = _load_true_model(
                                 tmodel_file,

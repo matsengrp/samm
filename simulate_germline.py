@@ -26,7 +26,7 @@ class GermlineSimulatorPartis:
         self.allele_freq_file = self.output_dir + "/allele_freq.csv"
         self.ig_file = self.output_dir + "/igk/igkv.fasta"
 
-    def generate_germline_sets(self, num_sets=1, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1,2:1:1", min_sim_allele_prevalence_freq=0.1):
+    def generate_germline_sets(self, num_sets=1, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1.5:1:1", min_sim_allele_prevalence_freq=0.1):
         """
         @param num_sets: number of germline sets to create
         @param n_genes_per_region: number of genes to choose for each of the V, D, and J regions (colon separated list ordered like v:d:j)
@@ -49,7 +49,7 @@ class GermlineSimulatorPartis:
 
         return germline_seqs_dict
 
-    def _generate_germline_set(self, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1,2:1:1", min_sim_allele_prevalence_freq=0.1):
+    def _generate_germline_set(self, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1.5:1:1", min_sim_allele_prevalence_freq=0.1):
         PARTIS_PATH = './partis'
         sys.path.insert(1, PARTIS_PATH + '/python')
         import glutils

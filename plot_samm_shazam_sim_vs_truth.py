@@ -130,8 +130,6 @@ for sim_method in SIM_METHODS:
         print SAMM_MODEL_STR % (sim_method, seed)
         samm = load_fitted_model(
             SAMM_MODEL_STR % (sim_method, seed),
-            MOTIF_LEN,
-            MUT_POS,
             add_targets=True
         ).agg_refit_theta
         samm = samm[possible_agg_mask] - np.median(samm[possible_agg_mask])

@@ -13,6 +13,7 @@ import csv
 import re
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from model_truncation import ModelTruncation
 from common import *
 
 def parse_args():
@@ -172,7 +173,7 @@ def _generate_true_parameters(hier_feat_generator, args, theta_sampling_col0, th
         theta_col_probs = np.array(theta_col_probs)
         theta_param = np.hstack((theta_param, theta_col_probs))
 
-    return theta_param, theta_mask
+    return theta_param
 
 def dump_parameters(agg_theta, theta, args, feat_generator):
     # Dump a pickle file of simulation parameters
@@ -195,10 +196,6 @@ def main(args=sys.argv[1:]):
         motif_lens=args.motif_lens,
         left_motif_flank_len_list=args.positions_mutating,
     )
-    agg_feat_generator = HierarchicalMotifFeatureGenerator(
-        motif_lens=[hier_feat_generator.max_motif_len],
-        left_motif_flank_len_list=args.max_mut_pos,
-    )
 
     if args.use_shmulate_as_truth:
         h5f_theta = _read_mutability_probability_params(args)
@@ -209,14 +206,17 @@ def main(args=sys.argv[1:]):
     else:
         theta_sampling_col0, theta_sampling_col_prob = _make_theta_sampling_distribution(args)
         avg_sampled_magnitude = np.sqrt(np.var(theta_sampling_col0))
-        theta_raw, theta_mask = _generate_true_parameters(
+        theta_raw = _generate_true_parameters(
             hier_feat_generator,
             args,
             theta_sampling_col0,
             theta_sampling_col_prob,
         )
 
-        agg_theta_raw = create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta_raw, np.zeros(theta_raw.shape, dtype=bool), theta_mask, keep_col0=False)
+        agg_theta_raw = hier_feat_generator.create_aggregate_theta(
+            theta_raw,
+            keep_col0=False
+        )
 
         # Now rescale theta according to effect size
         mult_factor = 1.0/np.sqrt(np.var(agg_theta_raw[agg_theta_raw != -np.inf])) * args.effect_size * avg_sampled_magnitude

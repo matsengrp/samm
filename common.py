@@ -371,28 +371,6 @@ def create_theta_idx_mask(zero_theta_mask_refit, possible_theta_mask):
                 idx += 1
     return theta_idx_counter
 
-def create_aggregate_theta(hier_feat_generator, agg_feat_generator, theta, zero_theta_mask, possible_theta_mask, keep_col0=True, add_targets=True):
-    def _combine_thetas(col_idx):
-        theta_col, _, _ = combine_thetas_and_get_conf_int(
-            hier_feat_generator,
-            agg_feat_generator,
-            theta,
-            zero_theta_mask,
-            possible_theta_mask,
-            sample_obs_info=None,
-            col_idx=col_idx,
-            add_targets=add_targets,
-        )
-        return theta_col.reshape((theta_col.size, 1))
-
-    if theta.shape[1] == 1:
-        theta_cols = [_combine_thetas(col_idx) for col_idx in range(1)]
-    else:
-        start_idx = 0 if keep_col0 else 1
-        theta_cols = [_combine_thetas(col_idx) for col_idx in range(start_idx, theta.shape[1])]
-    agg_theta = np.hstack(theta_cols)
-    return agg_theta
-
 def pick_best_model(fitted_models):
     """
     Select the one with largest (pseudo) log lik ratio

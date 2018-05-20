@@ -307,7 +307,7 @@ def main(args=sys.argv[1:]):
                 mutation_model,
                 germline_dict['n_taxa'],
             )
-            random_leaf = random.choice([t.sequence for t in tree.traverse() if t.is_leaf()])
+            random_leaf = np.random.choice([t.sequence for t in tree.traverse() if t.is_leaf()])
             avg_mutations.append(np.mean([c1 != c2 for c1, c2 in \
                 zip(random_leaf.lower(), germline_dict['germline_sequence'].lower())]))
 

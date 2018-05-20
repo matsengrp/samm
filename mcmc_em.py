@@ -28,7 +28,7 @@ class MCMC_EM:
         self.sampling_rate = sampling_rate
         self.max_threads = max_threads
 
-    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, intermed_file_prefix="", get_hessian=False):
+    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False):
         """
         @param theta: initial value for theta in MCMC-EM
         @param feat_generator: an instance of a FeatureGenerator
@@ -118,12 +118,6 @@ class MCMC_EM:
                 if num_nonzero == 0:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
-
-            # Save the e-step samples if we want to analyze later on
-            # e_sample_file_name = "%s%d.pkl" % (intermed_file_prefix, run)
-            # log.info("Pickling E-step samples %s" % e_sample_file_name)
-            # with open(e_sample_file_name, "w") as f:
-            #     pickle.dump(e_step_samples, f)
 
             if lower_bound_is_negative or lower_bound < diff_thres or num_nonzero == 0:
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case

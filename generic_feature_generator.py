@@ -306,6 +306,14 @@ class GenericFeatureGenerator(FeatureGenerator):
                 feat_dict[pos] = self._get_mutating_pos_feat_idx(pos, intermediate_seq)
         return feat_dict
 
+    def update_feats_after_removing(self, model_truncation=None):
+        """
+        Update the feature generator given that we need to strip away certain features
+
+        @param model_truncation: ModelTruncation
+        """
+        raise NotImplementedError()
+
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
         """
         Feature generator--specific function.
