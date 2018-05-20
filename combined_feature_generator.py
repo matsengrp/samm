@@ -104,6 +104,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
         @param model_truncation: ModelTruncation
         """
         self.model_truncation = model_truncation
+        self.feats_to_remove = model_truncation.feats_to_remove if model_truncation is not None else []
 
         # Create list of feature generators for different motif lengths and different flank lengths
         old_feat_gens = self.feat_gens

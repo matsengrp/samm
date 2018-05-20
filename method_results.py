@@ -29,7 +29,7 @@ class MethodResults:
         self.penalized_num_nonzero = get_num_nonzero(self.penalized_theta)
         self.model_masks = model_masks
 
-    def set_refit_theta(self, refit_theta, variance_est, sample_obs_info, possible_theta_mask):
+    def set_refit_theta(self, refit_feature_generator, refit_theta, variance_est, sample_obs_info, possible_theta_mask):
         """
         @param refit_theta: the theta value after the second refitting stage
         @param variance_est: a variance estimate if we were able to obtain one
@@ -39,6 +39,7 @@ class MethodResults:
         Store the model from the refit stage
         """
         self.has_refit_data = True
+        self.refit_feature_generator = refit_feature_generator
         self.refit_theta = refit_theta
         self.variance_est = variance_est
         self.sample_obs_info = sample_obs_info

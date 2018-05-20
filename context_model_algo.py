@@ -37,6 +37,7 @@ class ContextModelAlgo:
             args.sampler_cls,
             args.problem_solver_cls,
             base_num_e_samples=args.num_e_samples,
+            max_m_iters=args.max_m_iters,
             num_jobs=args.num_jobs,
             scratch_dir=args.scratch_dir,
             per_target_model=args.per_target_model,
@@ -101,7 +102,6 @@ class ContextModelAlgo:
             penalty_params=penalty_params,
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
-            intermed_file_prefix="%s/e_samples_%s_" % (self.intermediate_out_dir, "-".join([str(p) for p in penalty_params])),
         )
         curr_model_results = MethodResults(penalty_params)
 
@@ -135,8 +135,7 @@ class ContextModelAlgo:
 
         # Create a feature generator for this shrunken model
         feat_generator_stage2 = copy.deepcopy(self.feat_generator)
-        all_feats_to_remove = model_masks.feats_to_remove + self.feat_generator.feats_to_remove
-        feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
+        feat_generator_stage2.update_feats_after_removing(model_masks)
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
@@ -157,7 +156,6 @@ class ContextModelAlgo:
             penalty_params=(0,0), # now fit with no penalty
             max_em_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
-            intermed_file_prefix="%s/e_samples_%f_full_" % (self.intermediate_out_dir, 0),
             get_hessian=get_hessian,
         )
 
@@ -165,6 +163,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(refit_theta, feat_generator_stage2))
 
         model_result.set_refit_theta(
+            feat_generator_stage2,
             refit_theta,
             variance_est,
             sample_obs_info,
@@ -183,8 +182,7 @@ class ContextModelAlgo:
             theta = model_result.penalized_theta
         else:
             theta = model_result.refit_theta
-            all_feats_to_remove = model_result.model_masks.feats_to_remove + self.feat_generator.feats_to_remove
-            feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
+            feat_generator_stage2.update_feats_after_removing(model_result.model_masks)
 
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
