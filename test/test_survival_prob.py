@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 
 from models import ImputedSequenceMutations, ObservedSequenceMutations
-from motif_feature_generator import MotifFeatureGenerator
+from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from survival_problem_cvxpy import SurvivalProblemLassoCVXPY
 from survival_problem_lasso import SurvivalProblemLasso
 from common import *
@@ -16,13 +16,14 @@ class Survival_Problem_TestCase(unittest.TestCase):
         motif_len = 3
         penalty_param = 0.5
 
-        feat_gen = MotifFeatureGenerator(motif_len=motif_len)
+        feat_gen = HierarchicalMotifFeatureGenerator(motif_lens=[motif_len])
         motif_list = feat_gen.motif_list
         theta = np.random.rand(feat_gen.feature_vec_len, theta_num_col)
-        theta_mask = get_possible_motifs_to_targets(motif_list, theta.shape, [1] * len(motif_list))
+        theta_mask = feat_gen.get_possible_motifs_to_targets(theta.shape)
         theta[~theta_mask] = -np.inf
 
-        obs = feat_gen.create_base_features(ObservedSequenceMutations("aggtgggttac", "aggagagttac", motif_len))
+        obs = ObservedSequenceMutations("aggtgggttac", "aggagagttac", motif_len)
+        feat_gen.add_base_features(obs)
         sample = ImputedSequenceMutations(obs, obs.mutation_pos_dict.keys())
         problem_cvx = SurvivalProblemLassoCVXPY(feat_gen, [sample], penalty_param, theta_mask)
         ll_cvx = problem_cvx.calculate_per_sample_log_lik(theta, sample)

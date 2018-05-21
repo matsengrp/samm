@@ -31,9 +31,11 @@ class SammWorker(ParallelWorker):
         self.num_val_samples = num_val_samples
         self.args = args
 
-    def run_worker(self, shared_obj=None):
+    def run_worker(self, pool=None):
         """
-        @param shared_obj: ignored obj
+        @param pool: if not None, pass this multiprocessing pool to the children
+                    this should only be not None if we are not using multiprocessing
+                    to process the SammWorker itself
         @return tuple with:
             MethodResults summarizing our theta fit
             the new LikelihoodComparer with this new theta vector
@@ -44,7 +46,8 @@ class SammWorker(ParallelWorker):
                 max_em_iters=self.max_em_iters,
                 val_set_evaluator=self.val_set_evaluator,
                 init_theta=self.init_theta,
-                reference_pen_param=self.reference_pen_param)
+                reference_pen_param=self.reference_pen_param,
+                pool=pool)
 
         val_set_evaluator = LikelihoodComparer(
             self.val_set,

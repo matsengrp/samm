@@ -1,4 +1,3 @@
-import threading
 import time
 import numpy as np
 import scipy as sp
@@ -9,6 +8,7 @@ from combined_feature_generator import CombinedFeatureGenerator
 from survival_problem import SurvivalProblem
 from survival_problem_grad_descent_workers import *
 from common import *
+from parallel_worker import MultiprocessingManager
 from profile_support import profile
 
 class SurvivalProblemCustom(SurvivalProblem):
@@ -17,14 +17,13 @@ class SurvivalProblemCustom(SurvivalProblem):
     """
     print_iter = 10 # print status every `print_iter` iterations
 
-    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, max_threads=1):
+    def __init__(self, feat_generator, samples, sample_labels=None, penalty_params=[0], per_target_model=False, possible_theta_mask=None, zero_theta_mask=None, fuse_windows=[], fuse_center_only=False, pool=None):
         """
         @param feat_generator: CombinedFeatureGenerator
         @param samples: observations to compute gradient descent problem
         @param sample_labels: only used for calculating the Hessian
         @param possible_theta_mask: these theta values are some finite number
         @param zero_theta_mask: these theta values are forced to be zero
-        @param max_threads: this specifies number of threads to create via the python threading library
         """
         assert(isinstance(feat_generator, CombinedFeatureGenerator))
         self.feature_generator = feat_generator
@@ -44,7 +43,7 @@ class SurvivalProblemCustom(SurvivalProblem):
         self.penalty_params = penalty_params
         self.fuse_windows = fuse_windows
         self.fuse_center_only = fuse_center_only
-        self.max_threads = max_threads
+        self.pool = pool
 
         self.precalc_data = self._create_precalc_data_parallel(samples)
 
@@ -63,18 +62,17 @@ class SurvivalProblemCustom(SurvivalProblem):
         """
         calculate the precalculated data for each sample in parallel
         """
-        precalc_data = [None for _ in samples]
+        st = time.time()
         worker_list = [
             PrecalcDataWorker(
-                precalc_data,
-                i,
                 sample,
                 self.feature_generator.create_for_mutation_steps(sample),
                 self.feature_generator.feature_vec_len,
                 self.per_target_model,
-            ) for i, sample in enumerate(samples)
+            ) for sample in samples
         ]
-        self._run_threads(worker_list)
+        precalc_data = self._run_processes(worker_list, shared_obj=None, pool=self.pool)
+        log.info("precalc time %f", time.time() - st)
         return precalc_data
 
     def get_value(self, theta):
@@ -107,38 +105,38 @@ class SurvivalProblemCustom(SurvivalProblem):
         else:
             return ll_ratio_vec
 
-    def _run_threads(self, worker_list):
+    def _run_processes(self, worker_list, shared_obj=None, pool=None):
         """
-        Run and join python Thread objects
-
+        Run parallel workers
         @param worker_list: a list of Worker objects from down there
         """
-        # Batching so not to kill all mymemory
-        batched_worker_list = [
-                ThreadWorker(l) for l in get_batched_list(worker_list, self.max_threads)]
-        for w in batched_worker_list:
-            w.start()
-        for w in batched_worker_list:
-            w.join()
+        if pool is not None:
+            manager = MultiprocessingManager(
+                    pool,
+                    worker_list,
+                    shared_obj=shared_obj,
+                    num_approx_batches=pool._processes * 2)
+            results = manager.run()
+        else:
+            results = [w.run(shared_obj) for w in worker_list]
+        return results
 
     def _get_log_lik_parallel(self, theta):
         """
-        JUST KIDDING - parallel is not faster
+        NOTE: parallel not faster if not a lot of a data
+
         @param theta: the theta to calculate the likelihood for
         @return vector of log likelihood values
         """
-        worker_results = [None for _ in self.precalc_data]
         worker_list = [
-            ObjectiveValueWorker(
-                worker_results,
-                i,
-                sample_data,
-                self.per_target_model,
-                theta) for i, sample_data in enumerate(self.precalc_data)
+            LogLikelihoodWorker(s, self.per_target_model) for s in self.precalc_data
         ]
-        self._run_threads(worker_list)
+        log_liks = self._run_processes(
+                worker_list,
+                shared_obj=theta,
+                pool=self.pool if len(worker_list) > 10000 else None)
 
-        return np.array(worker_results)
+        return np.array(log_liks)
 
     def get_hessian(self, theta):
         """
@@ -146,8 +144,8 @@ class SurvivalProblemCustom(SurvivalProblem):
 
         @return fishers information matrix of the observed data, hessian of the log likelihood of the complete data
         """
-        def _get_parallel_sum(worker_list, res_list):
-            self._run_threads(worker_list)
+        def _get_parallel_sum(worker_list, shared_obj=None):
+            res_list = self._run_processes(worker_list, shared_obj, pool=self.pool)
             assert not any([r is None for r in res_list])
             tot = 0
             for r in res_list:
@@ -155,16 +153,11 @@ class SurvivalProblemCustom(SurvivalProblem):
             return tot
 
         st = time.time()
-        grad_log_lik = [None for _ in self.precalc_data]
         grad_worker_list = [
-            GradientWorker(
-                grad_log_lik,
-                i,
-                sample_data,
-                self.per_target_model,
-                theta) for i, sample_data in enumerate(self.precalc_data)
+            GradientWorker([s], self.per_target_model) for s in self.precalc_data
         ]
-        self._run_threads(grad_worker_list)
+        # Gradients are not faster in parallel. So this is running with a pool
+        grad_log_lik = self._run_processes(grad_worker_list, shared_obj=theta)
 
         sorted_sample_labels = sorted(list(set(self.sample_labels)))
         log.info("Obtained gradients %s" % (time.time() - st))
@@ -181,50 +174,40 @@ class SurvivalProblemCustom(SurvivalProblem):
         log.info("Obtained expected scores %s" % (time.time() - st))
 
         # Calculate the score score (second summand)
-        num_batches = int(len(grad_log_lik)/self.max_threads) * 2
-        batched_idxs = get_batched_list(range(len(grad_log_lik)), num_batches)
-        score_scores = [None for _ in batched_idxs]
+        if self.pool is not None:
+            batched_idxs = get_batched_list(range(len(grad_log_lik)), self.pool._processes * 2)
+        else:
+            batched_idxs = [range(len(grad_log_lik))]
         score_score_worker_list = [
-            ScoreScoreWorker(
-                score_scores,
-                i,
-                [grad_log_lik[j] for j in idxs])
-            for i, idxs in enumerate(batched_idxs)
+            ScoreScoreWorker([grad_log_lik[j] for j in idxs])
+            for idxs in batched_idxs
         ]
-        tot_score_score = _get_parallel_sum(score_score_worker_list, score_scores)
+        tot_score_score = _get_parallel_sum(score_score_worker_list)
         log.info("Obtained score scores %s" % (time.time() - st))
 
         # Calculate the cross scores (third summand)
         # Instead of calculating \sum_{i \neq j} ES_i ES_j^T directly we calculate
         # (\sum_{i} ES_i) ( \sum_{i} ES_i)^T - \sum_{i} ES_i ES_i^T
-        batched_labels = get_batched_list(sorted_sample_labels, num_batches)
-        exp_score_scores = [None for _ in batched_labels]
+        if self.pool is not None:
+            batched_labels = get_batched_list(sorted_sample_labels, self.pool._processes * 2)
+        else:
+            batched_labels = [sorted_sample_labels]
         expected_score_worker_list = [
-                ExpectedScoreScoreWorker(
-                    exp_score_scores,
-                    i,
-                    labels,
-                    expected_scores)
-                for i, labels in enumerate(batched_labels)]
-        tot_expected_score_score = _get_parallel_sum(
-                expected_score_worker_list,
-                exp_score_scores)
+                ExpectedScoreScoreWorker([expected_scores[l] for l in labels])
+                for labels in batched_labels]
+        tot_expected_score_score = _get_parallel_sum(expected_score_worker_list)
         tot_cross_expected_scores = expected_scores_sum * expected_scores_sum.T - tot_expected_score_score
         log.info("Obtained cross scores %s" % (time.time() - st))
 
         # Calculate the hessian (first summand)
         assert(len(self.precalc_data) == len(grad_log_lik))
-        hessian_res = [None for _ in batched_idxs]
         hessian_worker_list = [
             HessianWorker(
-                hessian_res,
-                i,
                 [self.precalc_data[j] for j in idxs],
-                self.per_target_model,
-                theta)
-            for i, idxs in enumerate(batched_idxs)
+                self.per_target_model)
+            for idxs in batched_idxs
         ]
-        hessian_sum = _get_parallel_sum(hessian_worker_list, hessian_res)
+        hessian_sum = _get_parallel_sum(hessian_worker_list, theta)
         log.info("Obtained Hessian %s" % (time.time() - st))
 
         fisher_info = 1.0/self.num_reps_per_obs * (- hessian_sum - tot_score_score) - np.power(self.num_reps_per_obs, -2.0) * tot_cross_expected_scores
@@ -232,23 +215,24 @@ class SurvivalProblemCustom(SurvivalProblem):
 
     def _get_gradient_log_lik(self, theta):
         """
-        JUST KIDDING - parallel is not faster
+        NOTE: parallel is not faster if not a lot of data
+
         @param theta: the theta to calculate the likelihood for
 
-        Calculate the gradient of the negative log likelihood - delegates to separate cpu threads if threads > 1
+        Calculate the gradient of the negative log likelihood
         """
-        rand_seed = get_randint()
-        grad_ll_raw = [None for _ in self.precalc_data]
+        if self.pool is not None:
+            batched_data = get_batched_list(self.precalc_data, self.pool._processes * 2)
+        else:
+            batched_data = [self.precalc_data]
         worker_list = [
-            GradientWorker(
-                grad_ll_raw,
-                i,
-                sample_data,
-                self.per_target_model,
-                theta)
-            for i, sample_data in enumerate(self.precalc_data)
+            GradientWorker(batch, self.per_target_model)
+            for batch in batched_data
         ]
-        self._run_threads(worker_list)
+        grad_ll_raw = self._run_processes(
+                worker_list,
+                theta,
+                pool=self.pool if len(worker_list) > 10000 else None)
 
         grad_ll_raw = np.array(grad_ll_raw)
         grad_ll_dtheta = np.sum(grad_ll_raw, axis=0)

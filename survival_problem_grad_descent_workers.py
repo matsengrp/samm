@@ -1,47 +1,10 @@
-import threading
+import time
 import numpy as np
 import scipy as sp
 from scipy.sparse import csr_matrix, dok_matrix
 
+from parallel_worker import ParallelWorker
 from common import get_target_col, NUM_NUCLEOTIDES
-
-class ThreadWorker(threading.Thread):
-    """
-    Stores many CalculatorWorkers and batches running them in this same Thread object
-    """
-    def __init__(self, workers):
-        """
-        @param workers: List[CalculatorWorker]
-        """
-        threading.Thread.__init__(self)
-        self.workers = workers
-
-    def run(self):
-        for w in self.workers:
-            w.run()
-
-class CalculatorWorker:
-    """
-    The actual objects that calculate things in the Thread object.
-    Each of these workers are assigned an index in a list that it is allowed to modify.
-    That's how we get the output from these Thread objects (cause Thread objects dont return things)
-    """
-    def __init__(self, list_to_modify, index_to_modify):
-        """
-        @param list_to_modify: the list object that this worker object will get to modify
-        @param index_to_modify: the index of the list that this worker object gets to modify
-        """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify
-
-    def run(self):
-        """
-        Modifies the list in place
-        """
-        self.list_to_modify[self.index_to_modify] = self.calculate()
-
-    def calculate(self):
-        raise NotImplementedError()
 
 class SamplePrecalcData:
     """
@@ -58,11 +21,11 @@ class SamplePrecalcData:
         self.obs_seq_mutation = obs_seq_mutation
         self.feat_mut_steps = feat_mut_steps
 
-class PrecalcDataWorker(CalculatorWorker):
+class PrecalcDataWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, list_to_modify, index_to_modify, sample, feat_mut_steps, num_features, per_target_model):
+    def __init__(self, sample, feat_mut_steps, num_features, per_target_model):
         """
         @param exp_theta: theta is where to take the gradient of the total log likelihood, exp_theta is exp(theta)
         @param sample: ImputedSequenceMutations
@@ -70,14 +33,14 @@ class PrecalcDataWorker(CalculatorWorker):
         @param num_features: total number of features
         @param per_target_model: True if estimating different hazards for different target nucleotides
         """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify = index_to_modify
+        #seed object required for parallel worker, but this worker has no randomness
+        self.seed = 0
         self.sample = sample
         self.feat_mut_steps = feat_mut_steps
         self.num_features = num_features
         self.per_target_model = per_target_model
 
-    def calculate(self):
+    def run_worker(self, shared_obj):
         """
         Calculate the components in the gradient at the beginning of gradient descent
         Then the gradient can be calculated using element-wise matrix multiplication
@@ -88,6 +51,8 @@ class PrecalcDataWorker(CalculatorWorker):
             2. `base_grad`: the gradient of the sum of the exp * psi terms
             3. `mutating_pos_feat_vals_rows`: the feature row idxs for which a mutation occured
             4. `mutating_pos_feat_vals_cols`: the feature column idxs for which a mutation occured
+
+        @param shared_obj: ignored
         """
         mutating_pos_feat_vals_rows = np.array([])
         mutating_pos_feat_vals_cols = np.array([])
@@ -148,39 +113,42 @@ class PrecalcDataWorker(CalculatorWorker):
             self.feat_mut_steps,
         )
 
-class GradientWorker(CalculatorWorker):
+class GradientWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, list_to_modify, index_to_modify, sample_data, per_target_model, theta):
+    def __init__(self, sample_data, per_target_model):
         """
-        @param sample_data: class SamplePrecalcData
+        @param sample_data: list of SamplePrecalcData
         """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify = index_to_modify
+        self.seed = 0
         self.sample_data = sample_data
         self.per_target_model = per_target_model
-        self.theta = theta
 
-    def calculate(self):
+    def run_worker(self, theta):
         """
         Calculate the gradient of the log likelihood of this sample
         All the gradients for each step are the gradient of psi * theta - log(sum(exp(theta * psi)))
         Calculate the gradient from each step one at a time
 
         @param theta: the theta to evaluate the gradient at
-        @param sample_data: SamplePrecalcData
         """
-        merged_thetas = self.theta[:,0, None]
+        grad = 0
+        for s in self.sample_data:
+            grad += self._get_gradient(s, theta)
+        return grad
+
+    def _get_gradient(self, sample_dat, theta):
+        merged_thetas = theta[:,0, None]
         if self.per_target_model:
-            merged_thetas = merged_thetas + self.theta[:,1:]
-        pos_exp_theta = np.exp(self.sample_data.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
+            merged_thetas = merged_thetas + theta[:,1:]
+        pos_exp_theta = np.exp(sample_dat.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))
         prev_denom = pos_exp_theta.sum()
 
-        prev_risk_group_grad = self.sample_data.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
+        prev_risk_group_grad = sample_dat.obs_seq_mutation.feat_matrix_start.transpose().dot(pos_exp_theta)
 
         risk_group_grad_tot = prev_risk_group_grad/prev_denom
-        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(self.sample_data.features_per_step_matrices, self.sample_data.features_per_step_matricesT, self.sample_data.features_sign_updates):
+        for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_dat.features_per_step_matrices, sample_dat.features_per_step_matricesT, sample_dat.features_sign_updates):
             exp_thetas = np.exp(pos_feat_matrix.dot(merged_thetas))
             signed_exp_thetas = np.multiply(exp_thetas, features_sign_update)
 
@@ -192,33 +160,28 @@ class GradientWorker(CalculatorWorker):
         if self.per_target_model:
             risk_group_grad_tot = np.hstack([np.sum(risk_group_grad_tot, axis=1, keepdims=True), risk_group_grad_tot])
         return np.array(
-                self.sample_data.init_grad_vector - risk_group_grad_tot,
+                sample_dat.init_grad_vector - risk_group_grad_tot,
                 dtype=float)
 
-    def __str__(self):
-        return "GradientWorker %s" % self.sample_data.obs_seq_mutation
-
-class ObjectiveValueWorker(CalculatorWorker):
+class LogLikelihoodWorker(ParallelWorker):
     """
     Stores the information for calculating objective function value
     """
-    def __init__(self, list_to_modify, index_to_modify, sample_data, per_target_model, theta):
+    def __init__(self, sample_data, per_target_model):
         """
-        @param sample: SamplePrecalcData
+        @param sample_data: list of SamplePrecalcData
         """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify = index_to_modify
+        self.seed = 0
         self.sample_data = sample_data
         self.per_target_model = per_target_model
-        self.theta = theta
 
-    def calculate(self):
+    def run_worker(self, theta):
         """
         Calculate the log likelihood of this sample
         """
-        merged_thetas = self.theta[:,0, None]
+        merged_thetas = theta[:,0, None]
         if self.per_target_model:
-            merged_thetas = merged_thetas + self.theta[:,1:]
+            merged_thetas = merged_thetas + theta[:,1:]
         prev_denom = (np.exp(self.sample_data.obs_seq_mutation.feat_matrix_start.dot(merged_thetas))).sum()
         denominators = [prev_denom]
         for pos_feat_matrix, features_sign_update in zip(self.sample_data.features_per_step_matrices, self.sample_data.features_sign_updates):
@@ -228,50 +191,45 @@ class ObjectiveValueWorker(CalculatorWorker):
             denominators.append(new_denom)
             prev_denom = new_denom
 
-        numerators = self.theta[self.sample_data.mutating_pos_feat_vals_rows, 0]
+        numerators = theta[self.sample_data.mutating_pos_feat_vals_rows, 0]
         if self.per_target_model:
-            numerators = numerators + self.theta[self.sample_data.mutating_pos_feat_vals_rows, self.sample_data.mutating_pos_feat_vals_cols]
+            numerators = numerators + theta[self.sample_data.mutating_pos_feat_vals_rows, self.sample_data.mutating_pos_feat_vals_cols]
 
         log_lik = numerators.sum() - np.log(denominators).sum()
         return log_lik
 
-    def __str__(self):
-        return "ObjectiveValueWorker %s" % self.sample_data.obs_seq_mutation
-
-class HessianWorker(CalculatorWorker):
+class HessianWorker(ParallelWorker):
     """
     Stores the information for calculating gradient
     """
-    def __init__(self, list_to_modify, index_to_modify, sample_datas, per_target_model, theta):
+    def __init__(self, sample_datas, per_target_model):
         """
         @param sample_data: class SamplePrecalcData
         """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify = index_to_modify
+        self.seed = 0
         self.sample_datas = sample_datas
         self.per_target_model = per_target_model
-        self.theta = theta
 
-    def calculate(self):
+    def run_worker(self, theta):
         """
         @return the sum of the second derivatives of the log likelihood for the complete data
         """
         tot_hessian = 0
         for s in self.sample_datas:
-            h = self._get_hessian_per_sample(s)
+            h = self._get_hessian_per_sample(s, theta)
             tot_hessian += h
         return tot_hessian
 
-    def _get_hessian_per_sample(self, sample_data):
+    def _get_hessian_per_sample(self, sample_data, theta):
         """
         Calculates the second derivative of the log likelihood for the complete data
         """
-        merged_thetas = self.theta[:,0, None]
+        merged_thetas = theta[:,0, None]
         if self.per_target_model:
-            merged_thetas = merged_thetas + self.theta[:,1:]
+            merged_thetas = merged_thetas + theta[:,1:]
 
         # Create base dd matrix.
-        dd_matrices = [np.zeros((self.theta.shape[0], self.theta.shape[0])) for i in range(self.theta.shape[1])]
+        dd_matrices = [np.zeros((theta.shape[0], theta.shape[0])) for i in range(theta.shape[1])]
         for pos in range(sample_data.obs_seq_mutation.seq_len):
             exp_theta_psi = np.exp(np.array(sample_data.obs_seq_mutation.feat_matrix_start[pos,:] * merged_thetas).flatten())
             features = sample_data.obs_seq_mutation.feat_matrix_start[pos,:].nonzero()[1]
@@ -279,7 +237,7 @@ class HessianWorker(CalculatorWorker):
                 for f2 in features:
                     # The first column in a per-target model appears in all other columns. Hence we need a sum of all the exp_thetas
                     dd_matrices[0][f1, f2] += exp_theta_psi.sum()
-                    for j in range(1, self.theta.shape[1]):
+                    for j in range(1, theta.shape[1]):
                         # The rest of the theta values for the per-target model only appear once in the exp_theta vector
                         dd_matrices[j][f1, f2] += exp_theta_psi[j - 1]
 
@@ -295,11 +253,11 @@ class HessianWorker(CalculatorWorker):
             aug_prev_risk_group_grad = prev_risk_group_grad.reshape((prev_risk_group_grad.size, 1), order="F")
 
         block_diag_dd = sp.linalg.block_diag(*dd_matrices)
-        for i in range(self.theta.shape[1] - 1):
+        for i in range(theta.shape[1] - 1):
             # Recall that the first column in a per-target model appears in all the exp_theta expressions. So we need to add in these values
             # to the off-diagonal blocks of the second-derivative matrix
-            block_diag_dd[(i + 1) * self.theta.shape[0]:(i + 2) * self.theta.shape[0], 0:self.theta.shape[0]] = dd_matrices[i + 1]
-            block_diag_dd[0:self.theta.shape[0], (i + 1) * self.theta.shape[0]:(i + 2) * self.theta.shape[0]] = dd_matrices[i + 1]
+            block_diag_dd[(i + 1) * theta.shape[0]:(i + 2) * theta.shape[0], 0:theta.shape[0]] = dd_matrices[i + 1]
+            block_diag_dd[0:theta.shape[0], (i + 1) * theta.shape[0]:(i + 2) * theta.shape[0]] = dd_matrices[i + 1]
 
         risk_group_hessian = aug_prev_risk_group_grad * aug_prev_risk_group_grad.T * np.power(prev_denom, -2) - np.power(prev_denom, -1) * block_diag_dd
         for pos_feat_matrix, pos_feat_matrixT, features_sign_update in zip(sample_data.features_per_step_matrices, sample_data.features_per_step_matricesT, sample_data.features_sign_updates):
@@ -316,7 +274,7 @@ class HessianWorker(CalculatorWorker):
                 for f1 in feature_vals:
                     for f2 in feature_vals:
                         dd_matrices[0][f1, f2] += signed_exp_thetas[i,:].sum()
-                        for j in range(1, self.theta.shape[1]):
+                        for j in range(1, theta.shape[1]):
                             dd_matrices[j][f1, f2] += signed_exp_thetas[i,j - 1]
 
             if self.per_target_model:
@@ -326,27 +284,27 @@ class HessianWorker(CalculatorWorker):
                 aug_prev_risk_group_grad = prev_risk_group_grad.reshape((prev_risk_group_grad.size, 1), order="F")
 
             block_diag_dd = sp.linalg.block_diag(*dd_matrices)
-            for i in range(self.theta.shape[1] - 1):
-                block_diag_dd[(i + 1) * self.theta.shape[0]:(i + 2) * self.theta.shape[0], 0:self.theta.shape[0]] = dd_matrices[i + 1]
-                block_diag_dd[0:self.theta.shape[0], (i + 1) * self.theta.shape[0]:(i + 2) * self.theta.shape[0]] = dd_matrices[i + 1]
+            for i in range(theta.shape[1] - 1):
+                block_diag_dd[(i + 1) * theta.shape[0]:(i + 2) * theta.shape[0], 0:theta.shape[0]] = dd_matrices[i + 1]
+                block_diag_dd[0:theta.shape[0], (i + 1) * theta.shape[0]:(i + 2) * theta.shape[0]] = dd_matrices[i + 1]
 
             risk_group_hessian += aug_prev_risk_group_grad * aug_prev_risk_group_grad.T * np.power(prev_denom, -2) - np.power(prev_denom, -1) * block_diag_dd
         return risk_group_hessian
 
-class ScoreScoreWorker(CalculatorWorker):
+class ScoreScoreWorker(ParallelWorker):
     """
     Calculate the product of scores
     """
-    def __init__(self, list_to_modify, index_to_modify, grad_log_liks):
+    def __init__(self, grad_log_liks):
         """
         @param grad_log_liks: the grad_log_liks to calculate the product of scores
         """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify = index_to_modify
+        self.seed = 0
         self.grad_log_liks = grad_log_liks
 
-    def calculate(self):
+    def run_worker(self, shared_obj):
         """
+        @param shared_obj: ignored
         @return the sum of the product of scores
         """
         ss = 0
@@ -355,25 +313,23 @@ class ScoreScoreWorker(CalculatorWorker):
             ss += g * g.T
         return ss
 
-class ExpectedScoreScoreWorker(CalculatorWorker):
+class ExpectedScoreScoreWorker(ParallelWorker):
     """
     Calculate the product of expected scores between itself (indexed by labels)
     """
-    def __init__(self, list_to_modify, index_to_modify, label_list, expected_scores):
+    def __init__(self, expected_scores):
         """
-        @param label_list: a list of labels to process
+        @param expected_scores: list of expected scores
         """
-        self.list_to_modify = list_to_modify
-        self.index_to_modify = index_to_modify
-        self.label_list = label_list
+        self.seed = 0
         self.expected_scores = expected_scores
 
-    def calculate(self):
+    def run_worker(self, shared_obj):
         """
-        @param expected_scores: the expected scores
+        @param shared_obj: ignored
         @return the sum of the product of expected scores for the given label_list
         """
         ss = 0
-        for label in self.label_list:
-            ss += self.expected_scores[label] * self.expected_scores[label].T
+        for exp_score in self.expected_scores:
+            ss += exp_score * exp_score.T
         return ss

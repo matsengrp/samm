@@ -9,7 +9,7 @@ from profile_support import profile
 from confidence_interval_maker import ConfidenceIntervalMaker
 
 class MCMC_EM:
-    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=200, num_jobs=1, scratch_dir='_output', per_target_model=False, sampling_rate=1, max_threads=1):
+    def __init__(self, sampler_cls, problem_solver_cls, base_num_e_samples=10, max_m_iters=200, num_jobs=1, scratch_dir='_output', per_target_model=False, sampling_rate=1):
         """
         @param train_data, val_data: lists of ObservedSequenceMutationsFeatures (start and end sequences, plus base feature info)
         @param sampler_cls: a Sampler class
@@ -26,9 +26,8 @@ class MCMC_EM:
         self.scratch_dir = scratch_dir
         self.per_target_model = per_target_model
         self.sampling_rate = sampling_rate
-        self.max_threads = max_threads
 
-    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False):
+    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, pool=None):
         """
         @param theta: initial value for theta in MCMC-EM
         @param feat_generator: an instance of a FeatureGenerator
@@ -98,7 +97,7 @@ class MCMC_EM:
                     self.per_target_model,
                     possible_theta_mask=possible_theta_mask,
                     zero_theta_mask=zero_theta_mask,
-                    max_threads=self.max_threads,
+                    pool=pool,
                 )
 
                 theta, pen_exp_log_lik, lower_bound = problem.solve(
@@ -126,7 +125,10 @@ class MCMC_EM:
 
         if get_hessian:
             ci_maker = ConfidenceIntervalMaker(self.per_target_model, possible_theta_mask, zero_theta_mask)
-            variance_est, sample_obs_info = ci_maker.run(theta, e_step_samples, problem)
+            variance_est, sample_obs_info = ci_maker.run(
+                    theta,
+                    e_step_samples,
+                    problem)
         else:
             sample_obs_info = None
             variance_est = None
