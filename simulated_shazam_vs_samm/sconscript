@@ -98,6 +98,35 @@ def simulate(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 @nest.add_target_with_env(localenv)
+def fit_logistic(env, outdir, c):
+    motif_lens = c['model']['motif_lens']
+    left_flanks = c['model']['positions_mutating']
+    per_target_flag = "--per-target-model" if c["target"] else ""
+    penalty_params = ",".join(map(str, np.power(10, np.arange(2, -1.0, step=-.5)).tolist()))
+
+    cmd = ['python fit_logistic_model.py',
+           '--input-mutated',
+           '${SOURCES[0]}',
+           '--input-naive',
+           '${SOURCES[1]}',
+           '--motif-lens',
+           ",".join([str(m) for m in motif_lens]),
+           '--positions-mutating',
+           left_flanks,
+           '--penalty-params',
+           penalty_params,
+           per_target_flag,
+           '--tuning-sample-ratio',
+           0.2,
+           '--model-pkl ${TARGETS[0]}',
+           '--log-file ${TARGETS[1]}']
+
+    return env.Command(
+        [join(outdir, 'logistic_model.pkl'), join(outdir, 'logistic_log.txt')],
+        c['simulate'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
 def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
@@ -164,5 +193,4 @@ def fit_shazam(env, outdir, c):
         [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt')],
         c['simulate'],
         ' '.join(map(str, cmd)))
-
 # Compare models using compare_simulated_shazam_vs_samm.py

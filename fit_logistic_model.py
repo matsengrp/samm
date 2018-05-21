@@ -119,9 +119,12 @@ def get_best_penalty_param(penalty_params, data_folds):
     for penalty_param in penalty_params:
         tot_validation_value = 0
         for fold_idx, (val_X, val_y, logistic_reg) in enumerate(data_folds):
-            theta, train_value = logistic_reg.solve(lam_val=penalty_param, max_iters=9000)
+            theta_raw, theta_part_agg, train_value = logistic_reg.solve(
+                    lam_val=penalty_param,
+                    max_iters=2000,
+                    verbose=True)
             tot_validation_value += logistic_reg.score(val_X, val_y)
-            log.info("theta support %d", np.sum(np.abs(theta) > 1e-5))
+            log.info("theta support %d", np.sum(np.abs(theta_raw) > 1e-5))
         tot_validation_values.append([penalty_param, tot_validation_value])
         log.info("penalty_param %f, tot_val %f", penalty_param, tot_validation_value)
 
@@ -136,7 +139,9 @@ def fit_to_data(obs_data, pen_param, theta_shape, per_target_model):
             obs_X,
             obs_y,
             per_target_model=per_target_model)
-    theta, _ = logistic_reg.solve(pen_param)
+    _, theta, _ = logistic_reg.solve(pen_param,
+                    max_iters=5000,
+                    verbose=True)
     return theta
 
 def main(args=sys.argv[1:]):
