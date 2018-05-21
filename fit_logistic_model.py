@@ -166,7 +166,7 @@ def main(args=sys.argv[1:]):
     log.info("num observations %d", len(obs_data))
 
     feat_generator.add_base_features_for_list(obs_data)
-    
+
     # Process data
     fold_indices = data_split.split(
         len(obs_data),
@@ -184,7 +184,8 @@ def main(args=sys.argv[1:]):
         logistic_reg = LogisticRegressionMotif(
                 theta_shape,
                 train_X,
-                train_y)
+                train_y,
+                per_target_model=args.per_target_model)
         data_folds.append((val_X, val_y, logistic_reg))
 
     # Fit the models for each penalty parameter
