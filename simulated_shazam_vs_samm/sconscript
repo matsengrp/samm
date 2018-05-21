@@ -19,8 +19,8 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 SPARSITY_RATIO = 1.0
 
 models = [
-    # {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2"},
-    {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 4000, "subjects": 8},
+    {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 2000, "subjects": 4},
+    #{'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 4000, "subjects": 8},
 ]
 
 nest.add(
@@ -31,7 +31,7 @@ nest.add(
 
 nest.add(
     'replicate',
-    range(3,4),
+    range(1),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
