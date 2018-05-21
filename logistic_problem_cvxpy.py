@@ -32,7 +32,7 @@ class LogisticRegressionMotif:
         self.lam.value = lam_val
         self.problem.solve(max_iters=max_iters, verbose=verbose)
         assert(self.problem.status == cp.OPTIMAL)
-        return self.theta.value + self.theta_intercept.value, self.problem.value
+        return self.theta.value, self.theta.value + self.theta_intercept.value, self.problem.value
 
     def score(self, new_X, new_y):
         log_ll = - np.sum(_logistic(-new_X.dot(self.theta.value[:,0:1] + self.theta_intercept.value)))
