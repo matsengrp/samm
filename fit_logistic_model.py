@@ -113,7 +113,7 @@ def get_X_y_matrices(obs_data, per_target_model):
     stacked_y = np.concatenate(ys)
     return stacked_X, stacked_y
 
-def get_best_penalty_param(penalty_params, data_folds):
+def get_best_penalty_param(penalty_params, data_folds, max_iters=2000):
     # Fit the models for each penalty parameter
     tot_validation_values = []
     for penalty_param in penalty_params:
@@ -121,7 +121,7 @@ def get_best_penalty_param(penalty_params, data_folds):
         for fold_idx, (val_X, val_y, logistic_reg) in enumerate(data_folds):
             theta_raw, theta_part_agg, train_value = logistic_reg.solve(
                     lam_val=penalty_param,
-                    max_iters=2000,
+                    max_iters=max_iters,
                     verbose=True)
             tot_validation_value += logistic_reg.score(val_X, val_y)
             log.info("theta support %d", np.sum(np.abs(theta_raw) > 1e-5))
@@ -132,7 +132,7 @@ def get_best_penalty_param(penalty_params, data_folds):
     best_pen_param = tot_validation_values[np.argmax(tot_validation_values[:,1]),0]
     return best_pen_param
 
-def fit_to_data(obs_data, pen_param, theta_shape, per_target_model):
+def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=5000):
     obs_X, obs_y = get_X_y_matrices(obs_data, per_target_model)
     logistic_reg = LogisticRegressionMotif(
             theta_shape,
@@ -140,7 +140,7 @@ def fit_to_data(obs_data, pen_param, theta_shape, per_target_model):
             obs_y,
             per_target_model=per_target_model)
     _, theta, _ = logistic_reg.solve(pen_param,
-                    max_iters=5000,
+                    max_iters=max_iters,
                     verbose=True)
     return theta
 
