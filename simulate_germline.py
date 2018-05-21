@@ -19,18 +19,21 @@ class GermlineSimulatorPartis:
 
     GERMLINE_FOLDER = "./partis/data/germlines"
 
-    def __init__(self, organism="mouse", output_dir="_output"):
+    def __init__(self, organism="mouse", output_dir="_output", debug=False):
         assert(organism in ["human", "mouse"])
         self.organism = organism
         self.output_dir = output_dir
         self.allele_freq_file = self.output_dir + "/allele_freq.csv"
         self.ig_file = self.output_dir + "/igk/igkv.fasta"
+        self.debug = debug
 
     def generate_germline_sets(self, num_sets=1, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1.5:1:1", min_sim_allele_prevalence_freq=0.1):
         """
         @param num_sets: number of germline sets to create
         @param n_genes_per_region: number of genes to choose for each of the V, D, and J regions (colon separated list ordered like v:d:j)
-        @param n_sim_alleles_per_gene: number of alleles to choose for each of these genes (colon-separated list of comma separated lists)
+        @param n_sim_alleles_per_gene: number of alleles to choose for each of these genes (colon-separated list ordered like v:d:j)
+            Each value must be between 1 and 2 inclusive, e.g., 1.5 means select with equal probability genes with 1 or 2 alleles.
+            Warning: if you choose 2 the code might never finish...
         @param min_sim_allele_prevalence_freq: minimum prevalence ratio between any two alleles in the germline set
         """
         germline_seqs_dict = dict()
@@ -50,11 +53,21 @@ class GermlineSimulatorPartis:
         return germline_seqs_dict
 
     def _generate_germline_set(self, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1.5:1:1", min_sim_allele_prevalence_freq=0.1):
+        """
+        Call partis's germline set simulation function and write to files
+        """
         PARTIS_PATH = './partis'
         sys.path.insert(1, PARTIS_PATH + '/python')
         import glutils
         glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + self.organism, "igk")
-        glutils.generate_germline_set(glfo, n_genes_per_region, n_sim_alleles_per_gene, min_sim_allele_prevalence_freq, self.allele_freq_file)
+        glutils.generate_germline_set(
+            glfo,
+            n_genes_per_region,
+            n_sim_alleles_per_gene,
+            min_sim_allele_prevalence_freq,
+            self.allele_freq_file,
+            debug=self.debug,
+        )
         glutils.write_glfo(self.output_dir, glfo)
 
         # Read allele prevalences
