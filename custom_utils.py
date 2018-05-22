@@ -153,7 +153,7 @@ def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_option
                 print '        %s tail:' % strtype
                 logstr = check_output(['tail', cmdfo.logdir + '/' + strtype])
                 log_str_list = ['            ' + l for l in logstr.split('\n')]
-                last_line_split = log_str_list[-1].split(" ")
+                last_line_split = log_str_list[-2].strip().split(" ")
                 if last_line_split[2].startswith("gizmo"):
                     bad_machine = last_line_split[2].replace(":", "")
                     print 'culprit gizmo machine %s' % bad_machine
