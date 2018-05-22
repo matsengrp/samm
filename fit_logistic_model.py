@@ -243,14 +243,5 @@ def main(args=sys.argv[1:]):
     with open(args.model_pkl, "w") as f:
         pickle.dump(LogisticModel(theta_est), f)
 
-    true_model = load_true_model("_output/true_model.pkl")
-    args.agg_motif_len = 3
-    args.agg_pos_mutating = 1
-    print _collect_statistics(
-            [LogisticModel(theta_est)],
-            args,
-            true_model,
-            _get_agg_norm_diff)
-
 if __name__ == "__main__":
     main(sys.argv[1:])
