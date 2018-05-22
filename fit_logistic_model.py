@@ -7,7 +7,6 @@ import argparse
 import os
 import os.path
 import logging as log
-from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 import scipy.sparse
 import numpy as np
 
@@ -18,9 +17,8 @@ from fit_model_common import process_motif_length_args
 from model_truncation import ModelTruncation
 from common import *
 from read_data import *
-from plot_simulation_section import _collect_statistics, _get_agg_pearson, _get_agg_kendall, _get_agg_norm_diff
 
-MAX_ITERS = 1000
+MAX_CVXPY_ITERS = 1000
 
 class LogisticModel:
     def __init__(self, theta):
@@ -99,7 +97,11 @@ def parse_args():
     return args
 
 def get_X_y_matrices(obs_data, per_target_model):
-    # Process data
+    """
+    @return X matrix for each position of each sequence
+            y matrix with the indicator of mutation or the target nucleotide (depends on if per-target specified)
+            y matrix of the original nucleotide
+    """
     X = []
     ys = []
     y_origs = []
@@ -121,7 +123,11 @@ def get_X_y_matrices(obs_data, per_target_model):
     stacked_y_origs = np.concatenate(y_origs)
     return stacked_X, stacked_y, stacked_y_origs
 
-def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
+def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_CVXPY_ITERS):
+    """
+    Use Cross validation/training validation split to get the best penalty parameter
+    @return best penalty parameter
+    """
     if len(penalty_params) == 1:
         return penalty_params[0]
 
@@ -143,7 +149,10 @@ def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
     best_pen_param = tot_validation_values[np.argmax(tot_validation_values[:,1]),0]
     return best_pen_param
 
-def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=MAX_ITERS):
+def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=MAX_CVXPY_ITERS):
+    """
+    @return the fitted theta (includes the intercept) for this dataset
+    """
     obs_X, obs_y, obs_y_orig = get_X_y_matrices(obs_data, per_target_model)
     logistic_reg = LogisticRegressionMotif(
             theta_shape,

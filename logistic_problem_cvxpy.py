@@ -25,13 +25,17 @@ class LogisticRegressionMotif:
         theta_norm = cp.norm(self.theta, 1)
         self.lam = cp.Parameter(sign="positive", value=init_lam)
 
+        # This is the log denominator of the probability of mutating (-log(1 + exp(-theta)))
         log_ll = -cp.sum_entries(cp.logistic(-(X * (self.theta[:,0:1] + self.theta_intercept))))
 
+        # If no mutation happened, then we also need the log numerator of probability of not mutating
+        # since exp(-theta)/(1 + exp(-theta)) is prob not mutate
         no_mutate_X = X[y == 0, :]
         no_mutate_numerator = - (no_mutate_X * (self.theta[:,0:1] + self.theta_intercept))
 
         log_ll = log_ll + cp.sum_entries(no_mutate_numerator)
         if per_target_model:
+            # If per target, need the substitution probabilities too
             for orig_i in range(NUM_NUCLEOTIDES):
                 for i in range(NUM_NUCLEOTIDES):
                     if orig_i == i:
@@ -65,6 +69,7 @@ class LogisticRegressionMotif:
         """
         @return log likelihood on this new dataset
         """
+        # This code is the numpy version of the stuff in __init__
         log_ll = - np.sum(_logistic(-new_X.dot(self.theta.value[:,0:1] + self.theta_intercept.value)))
 
         no_mutate_X = new_X[new_y == 0, :]
