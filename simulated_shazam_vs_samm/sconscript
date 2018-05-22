@@ -103,7 +103,7 @@ def fit_logistic(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
     per_target_flag = "--per-target-model" if c["target"] else ""
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-0.5, -1, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(0.5, -1, step=-.5)).tolist()))
 
     cmd = ['python fit_logistic_model.py',
            '--input-mutated',
