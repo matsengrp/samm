@@ -114,6 +114,9 @@ def get_X_y_matrices(obs_data, per_target_model):
     return stacked_X, stacked_y
 
 def get_best_penalty_param(penalty_params, data_folds, max_iters=2000):
+    if len(penalty_params) == 1:
+        return penalty_params[0]
+
     # Fit the models for each penalty parameter
     tot_validation_values = []
     for penalty_param in penalty_params:
