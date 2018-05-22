@@ -102,21 +102,24 @@ def get_X_y_matrices(obs_data, per_target_model):
     # Process data
     X = []
     ys = []
+    y_origs = []
     for i, obs in enumerate(obs_data):
         X.append(obs.feat_matrix_start)
-        if per_target_model:
-            y_vec = np.zeros(obs.seq_len)
-            for k, v in obs.mutation_pos_dict.iteritems():
-                print obs.start_seq[k]
-                print obs.end_seq[k]
+        y_vec = np.zeros(obs.seq_len)
+        y_orig = np.zeros(obs.seq_len)
+        for k, v in obs.mutation_pos_dict.iteritems():
+            y_orig[k] = NUCLEOTIDE_DICT[obs.start_seq[k]] + 1
+            if per_target_model:
                 y_vec[k] = NUCLEOTIDE_DICT[v] + 1
-            ys.append(y_vec)
-        else:
-            ys.append(np.array(obs.mutated_indicator))
+            else:
+                y_vec[k] = 1
+        ys.append(y_vec)
+        y_origs.append(y_orig)
 
     stacked_X = scipy.sparse.vstack(X).todense()
     stacked_y = np.concatenate(ys)
-    return stacked_X, stacked_y
+    stacked_y_origs = np.concatenate(y_origs)
+    return stacked_X, stacked_y, stacked_y_origs
 
 def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
     if len(penalty_params) == 1:
@@ -125,12 +128,12 @@ def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
     tot_validation_values = []
     for penalty_param in penalty_params:
         tot_validation_value = 0
-        for fold_idx, (val_X, val_y, logistic_reg) in enumerate(data_folds):
+        for fold_idx, (val_X, val_y, val_y_orig, logistic_reg) in enumerate(data_folds):
             theta_raw, theta_part_agg, train_value = logistic_reg.solve(
                     lam_val=penalty_param,
                     max_iters=max_iters,
                     verbose=False)
-            tot_validation_value += logistic_reg.score(val_X, val_y)
+            tot_validation_value += logistic_reg.score(val_X, val_y, val_y_orig)
             log.info("theta support %d", np.sum(np.abs(theta_raw) > 1e-5))
         tot_validation_values.append([penalty_param, tot_validation_value])
         log.info("penalty_param %f, tot_val %f", penalty_param, tot_validation_value)
@@ -140,11 +143,12 @@ def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
     return best_pen_param
 
 def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=MAX_ITERS):
-    obs_X, obs_y = get_X_y_matrices(obs_data, per_target_model)
+    obs_X, obs_y, obs_y_orig = get_X_y_matrices(obs_data, per_target_model)
     logistic_reg = LogisticRegressionMotif(
             theta_shape,
             obs_X,
             obs_y,
+            obs_y_orig,
             per_target_model=per_target_model)
     _, theta, _ = logistic_reg.solve(pen_param,
                     max_iters=max_iters,
@@ -186,33 +190,19 @@ def main(args=sys.argv[1:]):
     for train_idx, val_idx in fold_indices:
         train_set = [obs_data[i] for i in train_idx]
         val_set = [obs_data[i] for i in val_idx]
-        train_X, train_y = get_X_y_matrices(train_set, args.per_target_model)
-        val_X, val_y = get_X_y_matrices(val_set, args.per_target_model)
+        train_X, train_y, train_y_orig = get_X_y_matrices(train_set, args.per_target_model)
+        val_X, val_y, val_y_orig = get_X_y_matrices(val_set, args.per_target_model)
         logistic_reg = LogisticRegressionMotif(
                 theta_shape,
                 train_X,
                 train_y,
+                train_y_orig,
                 per_target_model=args.per_target_model)
-        data_folds.append((val_X, val_y, logistic_reg))
+        data_folds.append((val_X, val_y, val_y_orig, logistic_reg))
 
     # Fit the models for each penalty parameter
     best_pen_param = get_best_penalty_param(args.penalty_params, data_folds)
     log.info("best penalty param %f", best_pen_param)
-
-    #obs_X, obs_y = get_X_y_matrices(obs_data, args.per_target_model)
-    #logistic_reg = LogisticRegression(
-    #    C=100000000,
-    #    #cv=3,
-    #    penalty='l1',
-    #    solver='liblinear',
-    #    #scoring="neg_log_loss",
-    #    max_iter=10000,
-    #    fit_intercept=False)
-    #logistic_reg.fit(obs_X, obs_y)
-    #lines = get_nonzero_theta_print_lines(logistic_reg.coef_.T, feat_generator)
-    #print("asdfkalsdfkla;skdf;asdkf;a=========")
-    #print(lines)
-    #print("asdfkalsdfkla;skdf;asdkf;a=========")
 
     # Refit penalized with all the data
     penalized_theta = fit_to_data(
@@ -225,9 +215,16 @@ def main(args=sys.argv[1:]):
     log.info(lines)
 
     # Convert theta to log probability of mutation
-    print 1.0/(1.0 + np.exp(-penalized_theta))
-    1/0
-    theta_log_prob = -np.log(1.0 + np.exp(-penalized_theta))
+    if args.per_target_model:
+        possible_mask = feat_generator.get_possible_motifs_to_targets(penalized_theta.shape)
+        penalized_theta[~possible_mask] = np.inf
+    penalized_theta_exp_sum = np.sum(
+            np.exp(-penalized_theta[:,1:]),
+            axis=1).reshape((penalized_theta.shape[0], 1))
+    theta_prob = np.hstack([
+        1.0/(1.0 + np.exp(-penalized_theta[:,0:1])),
+        np.exp(-penalized_theta[:,1:])/penalized_theta_exp_sum])
+    theta_log_prob = np.log(theta_prob)
     theta_est = feat_generator.create_aggregate_theta(theta_log_prob, keep_col0=False)
 
     hier_full_feat_generator = HierarchicalMotifFeatureGenerator(
@@ -245,14 +242,14 @@ def main(args=sys.argv[1:]):
     with open(args.model_pkl, "w") as f:
         pickle.dump(LogisticModel(theta_est), f)
 
-    #true_model = load_true_model("_output/true_model.pkl")
-    #args.agg_motif_len = 3
-    #args.agg_pos_mutating = 1
-    #print _collect_statistics(
-    #        [LogisticModel(theta_est)],
-    #        args,
-    #        true_model,
-    #        _get_agg_norm_diff)
+    true_model = load_true_model("_output/true_model.pkl")
+    args.agg_motif_len = 3
+    args.agg_pos_mutating = 1
+    print _collect_statistics(
+            [LogisticModel(theta_est)],
+            args,
+            true_model,
+            _get_agg_norm_diff)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
