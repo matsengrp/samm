@@ -148,9 +148,9 @@ def fit_survival(env, outdir, c):
         '--sample-regime',
         1, # use all the sequences since we generate from star tree (and we dont rename germlines)
         '--num-cpu-threads',
-        5, # int(6 * (c["model"]["seqs"]/3000)),
+        5,
         '--num-jobs',
-        30, #int(10 * (c["model"]["seqs"]/3000)),
+        30,
         '--burn-in',
         16,
         '--num-e-samples',
