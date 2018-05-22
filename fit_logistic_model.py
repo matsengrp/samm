@@ -102,7 +102,6 @@ def get_X_y_matrices(obs_data, per_target_model):
     # Process data
     X = []
     ys = []
-<<<<<<< HEAD
     y_origs = []
     for i, obs in enumerate(obs_data):
         X.append(obs.feat_matrix_start)
@@ -125,22 +124,7 @@ def get_X_y_matrices(obs_data, per_target_model):
 def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
     if len(penalty_params) == 1:
         return penalty_params[0]
-=======
-    for i, obs in enumerate(obs_data):
-        X.append(obs.feat_matrix_start)
-        if per_target_model:
-            y_vec = np.zeros(obs.seq_len)
-            for k, v in obs.mutation_pos_dict.iteritems():
-                y_vec[k] = NUCLEOTIDE_DICT[v] + 1
-            ys.append(y_vec)
-        else:
-            ys.append(np.array(obs.mutated_indicator))
 
-    stacked_X = scipy.sparse.vstack(X).todense()
-    stacked_y = np.concatenate(ys)
-    return stacked_X, stacked_y
-
-def get_best_penalty_param(penalty_params, data_folds, max_iters=2000):
     # Fit the models for each penalty parameter
     tot_validation_values = []
     for penalty_param in penalty_params:
