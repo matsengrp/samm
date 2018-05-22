@@ -55,7 +55,7 @@ def run_cmd(cmdfo, batch_system=None, batch_options=None):
     prefix = None
     if batch_system is not None:
         if batch_system == 'slurm':
-            prefix = 'srun -p restart,matsen_e,campus'  # --exclude=data/gizmod.txt'
+            prefix = 'srun -p restart,matsen_e,campus --exclude=data/gizmod.txt'
             if cmdfo.threads is not None:
                 prefix += ' --cpus-per-task %d' % cmdfo.threads
         elif batch_system == 'sge':
@@ -152,7 +152,14 @@ def finish_process(iproc, procs, n_tries, cmdfo, batch_system=None, batch_option
             if os.path.exists(cmdfo.logdir + '/' + strtype) and os.stat(cmdfo.logdir + '/' + strtype).st_size > 0:
                 print '        %s tail:' % strtype
                 logstr = check_output(['tail', cmdfo.logdir + '/' + strtype])
-                print '\n'.join(['            ' + l for l in logstr.split('\n')])
+                log_str_list = ['            ' + l for l in logstr.split('\n')]
+                last_line_split = log_str_list[-1].split(" ")
+                if last_line_split[2].startswith("gizmo"):
+                    bad_machine = last_line_split[2].replace(":", "")
+                    print 'culprit gizmo machine %s' % bad_machine
+                    with open("data/gizmod.txt", "a") as f:
+                        f.write("%s\n" % bad_machine)
+                print '\n'.join(log_str_list)
         if batch_system is not None and os.path.exists(cmdfo.logdir + '/err.txt'):  # cmdfo.cmd_str.split()[0] == 'srun' and
             jobid = ''
             try:
