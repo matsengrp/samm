@@ -31,11 +31,7 @@ nest.add(
 
 nest.add(
     'replicate',
-<<<<<<< HEAD
     range(10),
-=======
-    range(1),
->>>>>>> a7dbd383f3593c7431efe50bb777c89e111f1bdf
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
