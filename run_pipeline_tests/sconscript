@@ -15,16 +15,16 @@ localenv = env.Clone()
 
 nest = SConsWrap(Nest(), '_output', alias_environment=localenv)
 
-MOTIF_LENS = [2,3]
-MUT_POS = '0,1:1'
+MOTIF_LENS = [3,5]
+MUT_POS = '1:2'
 SEED = 0
-PENALTY_PARAMS = np.power(10, np.arange(-0.5, -1.0, step=-0.5)).tolist()
+PENALTY_PARAMS = np.power(10, np.arange(-4.0, -5.0, step=-0.5)).tolist()
 
 nest.add(
     'per_target',
     [
         True,
-        False,
+        #False,
     ],
     label_func=lambda c: "per-target%s" % str(c),
 )
@@ -92,9 +92,9 @@ def star_simulate(env, outdir, c):
            '--input-model ${SOURCES[0]}',
            '--use-partis',
            '--n-subjects',
-           1,
+           4,
            '--tot-mutated',
-           100,
+           2000,
            '--min-percent-mutated',
            0.01,
            '--max-percent-mutated',
@@ -200,25 +200,25 @@ def fit_samm(env, outdir, c):
            '--penalty-params',
            ",".join(map(str, PENALTY_PARAMS)),
            '--num-cpu-threads',
-           5,
+           4,
            '--num-jobs',
-           5,
+           80,
            '--burn-in',
-           1,
+           16,
            '--num-e-samples',
-           2,
+           4,
            '--sampling-rate',
-           2,
+           4,
            '--em-max-iters',
-           1,
+           10,
            '--unpenalized-em-max-iters',
-           1,
+           20,
            '--max-m-iters',
-           100,
+           200,
            '--num-val-burnin',
-           1,
+           16,
            '--num-val-samples',
-           2,
+           16,
            per_target_model_str,
            '--scratch-directory',
            SCRATCH_DIR,
@@ -228,7 +228,8 @@ def fit_samm(env, outdir, c):
            '--input-mutated ${SOURCES[0]}',
            '--input-naive ${SOURCES[1]}',
            '--out-file ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
+           '--log-file ${TARGETS[1]}',
+           '--omit-hessian']
     return env.Command(
         [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
         c['star_simulate'],

@@ -64,48 +64,54 @@ class ShazamModel:
 def main(args=sys.argv[1:]):
     args = parse_args()
 
-    shazam_models = [
-        ShazamModel(
-            args.agg_motif_len,
-            shazam_mut_csv,
-            shazam_sub_csv,
-            args.wide_format,
-        ) for shazam_mut_csv, shazam_sub_csv in
-        zip(args.shazam_mut_files, args.shazam_sub_files)
-    ]
+    shazam_models = []
+    #shazam_models = [
+    #    ShazamModel(
+    #        args.agg_motif_len,
+    #        shazam_mut_csv,
+    #        shazam_sub_csv,
+    #        args.wide_format,
+    #    ) for shazam_mut_csv, shazam_sub_csv in
+    #    zip(args.shazam_mut_files, args.shazam_sub_files)
+    #]
 
-    samm_models = [
-        load_fitted_model(
-            samm_pkl,
-            keep_col0=False,
-            add_targets=True,
-        ) for samm_pkl in args.in_samm
-    ]
+    samm_models = []
+    #samm_models = [
+    #    load_fitted_model(
+    #        samm_pkl,
+    #        keep_col0=False,
+    #        add_targets=True,
+    #    ) for samm_pkl in args.in_samm
+    #]
 
     logistic_models = [load_logistic_model(logistic_pkl) for logistic_pkl in args.in_logistic]
 
-    example_model = samm_models[0]
     true_models = [
         load_true_model(tmodel_file) for tmodel_file in args.true_models
     ]
 
     stat_funcs = [_get_agg_norm_diff, _get_agg_kendall, _get_agg_pearson]
     stat_res = [{"shazam":[], "samm":[], "logistic": []} for i in stat_funcs]
-    for true_m, samm_m, shazam_m, logistic_m in zip(true_models, samm_models, shazam_models, logistic_models):
-        for stat_i, stat_f in enumerate(stat_funcs):
-           try:
-               stat_shazam = _collect_statistics([shazam_m], args, true_m, stat_f)
-               if np.isfinite(stat_shazam):
-                   stat_res[stat_i]["shazam"].append(stat_shazam)
-               else:
-                   raise ValueError("infinite value for statistic")
-           except Exception as e:
-               print "WARNING: Shazam has a bad estimate!"
-           stat_samm = _collect_statistics([samm_m], args, true_m, stat_f)
-           stat_res[stat_i]["samm"].append(stat_samm)
-           stat_logistic = _collect_statistics([logistic_m], args, true_m, stat_f)
-           stat_res[stat_i]["logistic"].append(stat_logistic)
+    #for true_m, samm_m, shazam_m, logistic_m in zip(true_models, samm_models, shazam_models, logistic_models):
+    #    for stat_i, stat_f in enumerate(stat_funcs):
+    #       try:
+    #           stat_shazam = _collect_statistics([shazam_m], args, true_m, stat_f)
+    #           if np.isfinite(stat_shazam):
+    #               stat_res[stat_i]["shazam"].append(stat_shazam)
+    #           else:
+    #               raise ValueError("infinite value for statistic")
+    #       except Exception as e:
+    #           print "WARNING: Shazam has a bad estimate!"
+    #       stat_samm = _collect_statistics([samm_m], args, true_m, stat_f)
+    #       stat_res[stat_i]["samm"].append(stat_samm)
+    #       stat_logistic = _collect_statistics([logistic_m], args, true_m, stat_f)
+    #       stat_res[stat_i]["logistic"].append(stat_logistic)
 
+    for true_m, logistic_m in zip(true_models, logistic_models):
+        #logistic_m.agg_refit_theta = logistic_m.agg_refit_theta[:, 1:]
+        for stat_i, stat_f in enumerate(stat_funcs):
+            stat_logistic = _collect_statistics([logistic_m], args, true_m, stat_f)
+            stat_res[stat_i]["logistic"].append(stat_logistic)
     for stat_r, stat_func in zip(stat_res, stat_funcs):
         print "==================="
         print stat_func.__name__, "mean (se)", len(stat_r["shazam"])

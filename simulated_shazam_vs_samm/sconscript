@@ -26,12 +26,12 @@ models = [
 nest.add(
     'model',
     models,
-    label_func=lambda c: "final_%s_m%s_s%d" % (c["simulation"], "-".join(map(str, c["motif_lens"])), c["seqs"]),
+    label_func=lambda c: "revisions_%s_m%s_s%d" % (c["simulation"], "-".join(map(str, c["motif_lens"])), c["seqs"]),
 )
 
 nest.add(
     'replicate',
-    range(1),
+    range(10),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -97,34 +97,34 @@ def simulate(env, outdir, c):
         c['generate'],
         ' '.join(map(str, cmd)))
 
-@nest.add_target_with_env(localenv)
-def fit_logistic(env, outdir, c):
-    motif_lens = c['model']['motif_lens']
-    left_flanks = c['model']['positions_mutating']
-    per_target_flag = "--per-target-model" if c["target"] else ""
-    penalty_params = ",".join(map(str, np.power(10, np.arange(0.5, -1.5, step=-.5)).tolist()))
-
-    cmd = ['python fit_logistic_model.py',
-           '--input-mutated',
-           '${SOURCES[0]}',
-           '--input-naive',
-           '${SOURCES[1]}',
-           '--motif-lens',
-           ",".join([str(m) for m in motif_lens]),
-           '--positions-mutating',
-           left_flanks,
-           '--penalty-params',
-           penalty_params,
-           per_target_flag,
-           '--tuning-sample-ratio',
-           0.2,
-           '--model-pkl ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
-
-    return env.Command(
-        [join(outdir, 'logistic_model.pkl'), join(outdir, 'logistic_log.txt')],
-        c['simulate'],
-        ' '.join(map(str, cmd)))
+#@nest.add_target_with_env(localenv)
+#def fit_logistic(env, outdir, c):
+#    motif_lens = c['model']['motif_lens']
+#    left_flanks = c['model']['positions_mutating']
+#    per_target_flag = "--per-target-model" if c["target"] else ""
+#    penalty_params = ",".join(map(str, np.power(10, np.arange(0, -0.25, step=-.5)).tolist()))
+#
+#    cmd = ['python fit_logistic_model.py',
+#           '--input-mutated',
+#           '${SOURCES[0]}',
+#           '--input-naive',
+#           '${SOURCES[1]}',
+#           '--motif-lens',
+#           ",".join([str(m) for m in motif_lens]),
+#           '--positions-mutating',
+#           left_flanks,
+#           '--penalty-params',
+#           penalty_params,
+#           per_target_flag,
+#           '--tuning-sample-ratio',
+#           0.1,
+#           '--model-pkl ${TARGETS[0]}',
+#           '--log-file ${TARGETS[1]}']
+#
+#    return env.Command(
+#        [join(outdir, 'logistic_model.pkl'), join(outdir, 'logistic_log.txt')],
+#        c['simulate'],
+#        ' '.join(map(str, cmd)))
 
 @nest.add_target_with_env(localenv)
 def fit_survival(env, outdir, c):
@@ -147,9 +147,9 @@ def fit_survival(env, outdir, c):
         '--sample-regime',
         1, # use all the sequences since we generate from star tree (and we dont rename germlines)
         '--num-cpu-threads',
-        int(6 * (c["model"]["seqs"]/3000)),
+        5, # int(6 * (c["model"]["seqs"]/3000)),
         '--num-jobs',
-        int(10 * (c["model"]["seqs"]/3000)),
+        30, #int(10 * (c["model"]["seqs"]/3000)),
         '--burn-in',
         16,
         '--num-e-samples',

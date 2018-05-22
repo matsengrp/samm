@@ -7,7 +7,7 @@ import argparse
 import os
 import os.path
 import logging as log
-from sklearn.linear_model import LogisticRegressionCV
+from sklearn.linear_model import LogisticRegressionCV, LogisticRegression
 import scipy.sparse
 import numpy as np
 
@@ -18,6 +18,9 @@ from fit_model_common import process_motif_length_args
 from model_truncation import ModelTruncation
 from common import *
 from read_data import *
+from plot_simulation_section import _collect_statistics, _get_agg_pearson, _get_agg_kendall, _get_agg_norm_diff
+
+MAX_ITERS = 1000
 
 class LogisticModel:
     def __init__(self, theta):
@@ -57,7 +60,7 @@ def parse_args():
     parser.add_argument('--penalty-params',
         type=str,
         help="Comma-separated list of penalty parameters",
-        default="8.0, 4.0, 2.0, 1.0, 0.5, 0.25")
+        default="1")
     parser.add_argument('--tuning-sample-ratio',
         type=float,
         help="Proportion of data to reserve for tuning the penalty parameter",
@@ -104,6 +107,8 @@ def get_X_y_matrices(obs_data, per_target_model):
         if per_target_model:
             y_vec = np.zeros(obs.seq_len)
             for k, v in obs.mutation_pos_dict.iteritems():
+                print obs.start_seq[k]
+                print obs.end_seq[k]
                 y_vec[k] = NUCLEOTIDE_DICT[v] + 1
             ys.append(y_vec)
         else:
@@ -113,7 +118,9 @@ def get_X_y_matrices(obs_data, per_target_model):
     stacked_y = np.concatenate(ys)
     return stacked_X, stacked_y
 
-def get_best_penalty_param(penalty_params, data_folds, max_iters=2000):
+def get_best_penalty_param(penalty_params, data_folds, max_iters=MAX_ITERS):
+    if len(penalty_params) == 1:
+        return penalty_params[0]
     # Fit the models for each penalty parameter
     tot_validation_values = []
     for penalty_param in penalty_params:
@@ -122,7 +129,7 @@ def get_best_penalty_param(penalty_params, data_folds, max_iters=2000):
             theta_raw, theta_part_agg, train_value = logistic_reg.solve(
                     lam_val=penalty_param,
                     max_iters=max_iters,
-                    verbose=True)
+                    verbose=False)
             tot_validation_value += logistic_reg.score(val_X, val_y)
             log.info("theta support %d", np.sum(np.abs(theta_raw) > 1e-5))
         tot_validation_values.append([penalty_param, tot_validation_value])
@@ -132,7 +139,7 @@ def get_best_penalty_param(penalty_params, data_folds, max_iters=2000):
     best_pen_param = tot_validation_values[np.argmax(tot_validation_values[:,1]),0]
     return best_pen_param
 
-def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=5000):
+def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=MAX_ITERS):
     obs_X, obs_y = get_X_y_matrices(obs_data, per_target_model)
     logistic_reg = LogisticRegressionMotif(
             theta_shape,
@@ -141,7 +148,7 @@ def fit_to_data(obs_data, pen_param, theta_shape, per_target_model, max_iters=50
             per_target_model=per_target_model)
     _, theta, _ = logistic_reg.solve(pen_param,
                     max_iters=max_iters,
-                    verbose=True)
+                    verbose=False)
     return theta
 
 def main(args=sys.argv[1:]):
@@ -192,42 +199,60 @@ def main(args=sys.argv[1:]):
     best_pen_param = get_best_penalty_param(args.penalty_params, data_folds)
     log.info("best penalty param %f", best_pen_param)
 
+    #obs_X, obs_y = get_X_y_matrices(obs_data, args.per_target_model)
+    #logistic_reg = LogisticRegression(
+    #    C=100000000,
+    #    #cv=3,
+    #    penalty='l1',
+    #    solver='liblinear',
+    #    #scoring="neg_log_loss",
+    #    max_iter=10000,
+    #    fit_intercept=False)
+    #logistic_reg.fit(obs_X, obs_y)
+    #lines = get_nonzero_theta_print_lines(logistic_reg.coef_.T, feat_generator)
+    #print("asdfkalsdfkla;skdf;asdkf;a=========")
+    #print(lines)
+    #print("asdfkalsdfkla;skdf;asdkf;a=========")
+
     # Refit penalized with all the data
     penalized_theta = fit_to_data(
             obs_data,
             best_pen_param,
             theta_shape,
             args.per_target_model)
-    model_masks = ModelTruncation(penalized_theta, feat_generator)
-
-    # Create obs data with new pruned feature generator
-    feat_generator_stage2 = copy.deepcopy(feat_generator)
-    feat_generator_stage2.update_feats_after_removing(model_masks)
-    # Refit with all the data -- no penalty!
-    obs_data_stage2 = [copy.deepcopy(o) for o in obs_data]
-    feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
-    refit_theta_shape = (feat_generator_stage2.feature_vec_len, NUM_NUCLEOTIDES + 1 if args.per_target_model else 1)
-    refit_theta = fit_to_data(
-            obs_data_stage2,
-            0,
-            refit_theta_shape,
-            args.per_target_model)
-
-    # Aggregate theta
-    theta_agg = feat_generator_stage2.create_aggregate_theta(refit_theta)
+    lines = get_nonzero_theta_print_lines(penalized_theta, feat_generator)
+    log.info("========penalized==========")
+    log.info(lines)
 
     # Convert theta to log probability of mutation
+    print 1.0/(1.0 + np.exp(-penalized_theta))
+    1/0
+    theta_log_prob = -np.log(1.0 + np.exp(-penalized_theta))
+    theta_est = feat_generator.create_aggregate_theta(theta_log_prob, keep_col0=False)
+
+    hier_full_feat_generator = HierarchicalMotifFeatureGenerator(
+        motif_lens=[args.max_motif_len],
+        left_motif_flank_len_list=[[args.max_left_flank]],
+    )
     if args.per_target_model:
-        theta_est = -np.log(1.0 + np.exp(-theta_agg))
         possible_mask = hier_full_feat_generator.get_possible_motifs_to_targets(theta_est.shape)
         theta_est[~possible_mask] = -np.inf
-    else:
-        theta_est = np.log(1.0/(1.0 + np.exp(-theta_agg)))
-    lines = get_nonzero_theta_print_lines(theta_est, feat_generator)
-    log.info(lines)
+
+    agg_lines = get_nonzero_theta_print_lines(theta_est, hier_full_feat_generator)
+    log.info("===========aggregate=======")
+    log.info(agg_lines)
 
     with open(args.model_pkl, "w") as f:
         pickle.dump(LogisticModel(theta_est), f)
+
+    #true_model = load_true_model("_output/true_model.pkl")
+    #args.agg_motif_len = 3
+    #args.agg_pos_mutating = 1
+    #print _collect_statistics(
+    #        [LogisticModel(theta_est)],
+    #        args,
+    #        true_model,
+    #        _get_agg_norm_diff)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
