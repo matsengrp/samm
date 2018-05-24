@@ -59,7 +59,6 @@ class ShazamModel:
         else:
             self.agg_refit_theta = refit_theta[:,0:1]
         print "SHAZAM contains nan in the estimates", np.any(np.isnan(self.agg_refit_theta))
-        #self.agg_refit_theta[np.isnan(self.agg_refit_theta)] = 0
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -84,7 +83,6 @@ def main(args=sys.argv[1:]):
 
     logistic_models = [load_logistic_model(logistic_pkl) for logistic_pkl in args.in_logistic]
 
-    example_model = samm_models[0]
     true_models = [
         load_true_model(tmodel_file) for tmodel_file in args.true_models
     ]
