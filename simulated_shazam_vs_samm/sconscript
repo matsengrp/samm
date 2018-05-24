@@ -19,20 +19,20 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 SPARSITY_RATIO = 1.0
 
 models = [
-    {'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 2000, "subjects": 4},
-    #{'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 2000, "subjects": 4},
+    #{'simulation': 'survival', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 2000, "subjects": 4},
+    {'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 2000, "subjects": 4},
     #{'simulation': 'shmulate', 'motif_lens': [3,5], 'positions_mutating': "1:2", "seqs": 4000, "subjects": 8},
 ]
 
 nest.add(
     'model',
     models,
-    label_func=lambda c: "revisions_%s_m%s_s%d" % (c["simulation"], "-".join(map(str, c["motif_lens"])), c["seqs"]),
+    label_func=lambda c: "final_revisions_%s_m%s_s%d" % (c["simulation"], "-".join(map(str, c["motif_lens"])), c["seqs"]),
 )
 
 nest.add(
     'replicate',
-    range(10),
+    range(27,50),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -132,7 +132,7 @@ def fit_survival(env, outdir, c):
     motif_lens = c['model']['motif_lens']
     left_flanks = c['model']['positions_mutating']
     per_target_flag = "--per-target-model" if c["target"] else ""
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-4.0, -8.0, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-3, -3.51, step=-.25)).tolist()))
 
     cmd = ['python fit_samm.py',
         '--input-naive ${SOURCES[1]}',
