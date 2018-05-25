@@ -3,6 +3,7 @@ import matplotlib
 matplotlib.use('pdf')
 import seaborn as sns
 import matplotlib.pyplot as plt
+import itertools
 import numpy as np
 import scipy.stats
 import matplotlib.lines as mlines
@@ -12,18 +13,19 @@ sns.set(style="white")
 from common import *
 from read_data import *
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
+from fit_logistic_model import LogisticModel
 
 # some constants---pass these through as variables?
-NSEEDS = [0,1,2,4,5]
-NSEEDS = range(10)
+NSEEDS = range(30)
 MOTIF_LEN = 5
 MUT_POS = 2
-SIM_METHODS = ['final_shmulate_m3-5_s4000']
-SIM_METHODS = ['final_shmulate_m3-5']
-TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/true_model.pkl"
-SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted.pkl"
-SHAZAM_MUT_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_mut.csv"
-SHAZAM_SUB_STR = "simulated_shazam_vs_samm/_output/%s/0%d/True/fitted_shazam_sub.csv"
+SIM_METHODS = ['final_revisions_shmulate_m3-5_s2000']
+SIM_METHODS = ['final_revisions_survival_m3-5_s2000']
+TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/true_model.pkl"
+SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/fitted.pkl"
+LOGISTIC_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/logistic_model.pkl"
+SHAZAM_MUT_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/fitted_shazam_mut.csv"
+SHAZAM_SUB_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/fitted_shazam_sub.csv"
 THETA_MIN = -5
 THETA_MAX = 5
 # what step size to use to divide true theta by effect size
@@ -33,7 +35,7 @@ def raw_diff(agg_fit_theta, agg_true_theta):
     possible_agg_true_theta = agg_true_theta - np.median(agg_true_theta)
     possible_agg_refit_theta = agg_fit_theta - np.median(agg_fit_theta)
 
-    return np.abs(possible_agg_refit_theta - possible_agg_true_theta)
+    return (possible_agg_refit_theta - possible_agg_true_theta)
 
 def mean_raw_diff(agg_fit_theta, agg_true_theta):
     possible_agg_true_theta = agg_true_theta - np.median(agg_true_theta)
@@ -54,9 +56,18 @@ def norm_diff(agg_fit_theta, agg_true_theta):
     return np.linalg.norm(possible_agg_refit_theta - possible_agg_true_theta)/np.linalg.norm(possible_agg_true_theta)
 
 def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
-    all_df = all_df[['samm_raw_diff', 'shazam_raw_diff', 'true theta size']]
-    all_df.rename(index=str, columns={'samm_raw_diff': 'samm', 'shazam_raw_diff': 'SHazaM', 'true theta size': 'true theta size'}, inplace=True)
+    all_df = all_df[['samm_raw_diff', 'shazam_raw_diff', 'logistic_raw_diff', 'true theta size']]
+    all_df.rename(index=str,
+            columns={
+                'samm_raw_diff': 'samm',
+                'shazam_raw_diff': 'SHazaM',
+                'logistic_raw_diff': 'Logistic',
+                'true theta size': 'true theta size'},
+            inplace=True)
     melt_df = pd.melt(all_df, id_vars=['true theta size'])
+
+    matplotlib.rc('xtick', labelsize=14) 
+    matplotlib.rc('ytick', labelsize=14) 
 
     sns_plot = sns.factorplot(
         x='true theta size',
@@ -67,46 +78,21 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
         palette="Set2",
         order=true_categories.categories,
         legend=False,
+        size=7
     )
-    sns_plot.set(ylabel='Absolute diff. from true theta')
-    sns_plot.set(xlabel="True theta size")
-    sns_plot.set(ylim=(0, 4.5))
+    hatches = ['//', '+', 'x', '\\', '*', 'o', 'O', '.']
+    for i, bar in enumerate(sns_plot.axes[0,0].artists):
+        hatch = hatches[i % 3]
+        bar.set_hatch(hatch)
+    for i, bar in enumerate(sns_plot.axes[0,0].patches):
+        hatch = hatches[i % 3]
+        bar.set_hatch(hatch)
+    plt.ylabel('Absolute diff. from true theta', fontsize=17)
+    plt.xlabel("True theta size", fontsize=17)
+    sns_plot.set(ylim=(-5, 5))
     x = sns_plot.axes[0,0].get_xlim()
     sns_plot.axes[0,0].plot(x, len(x) * [0], 'k--', alpha=.4)
-    plt.legend(loc='upper right')
-
-    sns_plot.savefig(fname)
-
-def _plot_scatter(all_df, fname=''):
-    all_df = all_df[['samm', 'shazam', 'theta']]
-    all_df.rename(index=str, columns={'samm': 'samm', 'shazam': 'SHazaM', 'theta': 'theta'}, inplace=True)
-    melt_df = pd.melt(all_df, id_vars=['theta'])
-
-    sns.set_context(context="paper", font_scale=1.6)
-    sns_plot = sns.lmplot(
-        x="theta",
-        y="value",
-        hue="variable",
-        lowess=True,
-        scatter=False,
-        data=melt_df,
-        line_kws={'lw':3},
-        legend=False,
-        palette="Set2",
-    )
-    sns_plot.axes[0][0].plot([THETA_MIN, THETA_MAX],[THETA_MIN,THETA_MAX], color="black", ls="--", label="y=x")
-    model_legend = plt.legend(loc='lower right')
-
-    col_palette = sns.color_palette("Set2", 2)
-    melt_df = melt_df.sample(frac=1).reset_index(drop=True)
-    for i in range(melt_df.shape[0]/20):
-        vari = melt_df.loc[i]['variable']
-        col = col_palette[0] if vari == 'samm' else col_palette[1]
-        plt.scatter(melt_df.loc[i]['theta'], melt_df.loc[i]['value'], color=col, alpha=0.1, s=15)
-    sns_plot.set(ylabel='Fitted theta')
-    sns_plot.set(xlabel="True theta")
-    sns_plot.set(ylim=(THETA_MIN, THETA_MAX))
-    sns_plot.set(xlim=(THETA_MIN, THETA_MAX))
+    plt.legend(loc='upper right', fontsize='large')
 
     sns_plot.savefig(fname)
 
@@ -127,6 +113,8 @@ for sim_method in SIM_METHODS:
         theta = theta[possible_agg_mask] - np.median(theta[possible_agg_mask])
         tmp_df = pd.DataFrame()
         tmp_df['theta'] = theta
+
+        # Load samm
         print SAMM_MODEL_STR % (sim_method, seed)
         samm = load_fitted_model(
             SAMM_MODEL_STR % (sim_method, seed),
@@ -134,14 +122,27 @@ for sim_method in SIM_METHODS:
         ).agg_refit_theta
         samm = samm[possible_agg_mask] - np.median(samm[possible_agg_mask])
         tmp_df['samm'] = samm
+
+        # Load logistic
+        logistic_model = load_logistic_model(
+            LOGISTIC_MODEL_STR % (sim_method, seed)
+        ).agg_refit_theta
+        logistic_model = logistic_model[possible_agg_mask] - np.median(logistic_model[possible_agg_mask])
+        tmp_df['logistic'] = logistic_model
+
+        # Load shazam
         shazam_raw = get_shazam_theta(
             SHAZAM_MUT_STR % (sim_method, seed),
             SHAZAM_SUB_STR % (sim_method, seed),
+            wide_format=True
         )
         shazam = shazam_raw[:,0:1] + shazam_raw[:,1:]
         shazam = shazam[possible_agg_mask] - np.median(shazam[possible_agg_mask])
         tmp_df['shazam'] = shazam
+
+        # Final processing
         tmp_df['samm_raw_diff'] = raw_diff(samm, theta)
+        tmp_df['logistic_raw_diff'] = raw_diff(logistic_model, theta)
         tmp_df['shazam_raw_diff'] = raw_diff(shazam, theta)
         true_categories = pd.cut(theta.ravel(), np.arange(THETA_MIN, THETA_MAX + .1*STEP, STEP))
         tmp_df['sim_method'] = sim_method
@@ -155,6 +156,7 @@ for idx, sim_method in enumerate(SIM_METHODS):
     print np.max(sub_df['samm']), np.min(sub_df['samm'])
     print np.max(sub_df['shazam']), np.min(sub_df['shazam'])
     print np.max(sub_df['theta']), np.min(sub_df['theta'])
-    _plot_single_effect_size_overall(sub_df, true_categories=true_categories, fname='_output/box_%s.pdf' % sim_method)
-    _plot_scatter(all_df, fname='_output/scatter_%s.pdf' % sim_method)
-
+    _plot_single_effect_size_overall(
+            sub_df,
+            true_categories=true_categories,
+            fname='_output/revision_box_%s.pdf' % sim_method)
