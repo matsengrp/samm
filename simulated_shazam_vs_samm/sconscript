@@ -195,3 +195,4 @@ def fit_shazam(env, outdir, c):
         c['simulate'],
         ' '.join(map(str, cmd)))
 # Compare models using compare_simulated_shazam_vs_samm.py
+# Plot model results using plot_samm_shazam_sim_vs_truth.py

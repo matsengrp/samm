@@ -16,11 +16,11 @@ from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from fit_logistic_model import LogisticModel
 
 # some constants---pass these through as variables?
-NSEEDS = range(30)
+NSEEDS = range(50)
 MOTIF_LEN = 5
 MUT_POS = 2
 SIM_METHODS = ['final_revisions_shmulate_m3-5_s2000']
-SIM_METHODS = ['final_revisions_survival_m3-5_s2000']
+#SIM_METHODS = ['final_revisions_survival_m3-5_s2000']
 TRUE_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/true_model.pkl"
 SAMM_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/fitted.pkl"
 LOGISTIC_MODEL_STR = "simulated_shazam_vs_samm/_output/%s/%02d/True/logistic_model.pkl"
@@ -87,7 +87,7 @@ def _plot_single_effect_size_overall(all_df, true_categories, fname=''):
     for i, bar in enumerate(sns_plot.axes[0,0].patches):
         hatch = hatches[i % 3]
         bar.set_hatch(hatch)
-    plt.ylabel('Absolute diff. from true theta', fontsize=17)
+    plt.ylabel('Diff. from true theta', fontsize=17)
     plt.xlabel("True theta size", fontsize=17)
     sns_plot.set(ylim=(-5, 5))
     x = sns_plot.axes[0,0].get_xlim()

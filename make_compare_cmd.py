@@ -1,5 +1,5 @@
-sim_type = "final_revisions_survival_m3-5_s2000"
-seedrange =  ["%02d" % s for s in range(27)]
+sim_type = "final_revisions_shmulate_m3-5_s2000"
+seedrange =  ["%02d" % s for s in range(50)]
 
 true_model = "simulated_shazam_vs_samm/_output/%s/%%s/True/true_model.pkl" % (sim_type,)
 samm_m = "simulated_shazam_vs_samm/_output/%s/%%s/True/fitted.pkl" % (sim_type,)
