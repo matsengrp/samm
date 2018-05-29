@@ -1,5 +1,3 @@
-## Test model fits against one another
-
 import os
 import pickle
 import csv

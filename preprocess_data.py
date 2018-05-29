@@ -138,9 +138,7 @@ def main(args=sys.argv[1:]):
             args.metadata_path,
             use_v=args.use_v,
             use_np=args.use_np,
-            use_immunized=args.use_immunized,
-            locus=args.locus,
-            species=args.species
+            filters = {'group': ['immunized'], 'locus': ['igk'], 'species': ['mouse']},
         )
         args.input_genes = args.output_genes
         args.input_seqs = args.output_seqs
