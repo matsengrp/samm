@@ -87,13 +87,13 @@ def get_partition_info(path_to_annotations, metadata):
     with open(metadata, 'r') as metafile:
         reader = csv.DictReader(metafile)
         for line in reader:
-            annotations = glob.glob(os.path.join(
+            annotations = os.path.join(
                 path_to_annotations,
                 'partitions',
-                line['dataset']+'*-cluster-annotations.csv',
-            ))
+                '-'.join([line['dataset'], 'cluster-annotations.csv']),
+            )
             if not annotations:
-                # no annotations for this dataset (yet?)
+                # no annotations for this dataset
                 continue
             line['germline_file'] = os.path.join(
                 path_to_annotations,
@@ -105,18 +105,49 @@ def get_partition_info(path_to_annotations, metadata):
 
     return partition_info
 
-def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annotations, metadata, use_v=False, use_np=False, filters={'group': ['immunized'], 'locus': ['igk'], 'species': ['mouse']}):
+def write_partis_data_from_annotations(
+    output_genes,
+    output_seqs,
+    path_to_annotations,
+    metadata,
+    filters={},
+    seq_filters={},
+    min_clonal_family_size=0,
+    min_seq_len=0,
+    max_mut_pct=1.,
+    min_mut_pct=0.,
+    clone_str='',
+    region='v',
+    germline_family='v',
+):
     """
     Function to read partis annotations csv
 
     @param path_to_annotations: path to annotations files
     @param metadata: csv file of metadata; if None defaults will be used for chain/species
-    @param use_v: use just the V gene or use the whole sequence?
-    @param use_np: use nonproductive sequences only
-    @param filters: dictionary of lists with keys as column name and items as those values of the column variable to retain
+    @param filters: dictionary of lists with keys as column name and items as those values of the column variable to retain;
+        filters out families, e.g., {'locus': ['igk']}, etc.
+    @param seq_filters: same as filters, but for sequences, e.g., {indel_reversed_seqs': [''], 'in_frames': [False]} will
+        only retain sequences that are out of frame and did not have an indel
+    @param min_clonal_family_size: minimum clonal family size
+    @param min_seq_len: minimum sequence length
+    @param max_mut_pct: maximum mutation percentage
+    @param min_mut_pct: minimum mutation percentage
+    @param clone_str: string for identifying clones (useful if merging annotations from multiple datasets)
+    @param region: B-cell receptor region ('v', 'd', 'j', or 'vdj')
+    @param germline_family: for performing cross validation ('v', 'd', or 'j')
 
     @write genes to output_genes and seqs to output_seqs
     """
+
+    families = ['v', 'd', 'j']
+    if germline_family not in families:
+        raise ValueError("Invalid germline_family: %s. Must be one of %s" % (germline_family, families))
+
+    regions = ['v', 'd', 'j', 'vdj']
+    if region not in regions:
+        raise ValueError("Invalid region: %s. Must be one of %s" % (region, regions))
+
     PARTIS_PATH = os.path.dirname(os.path.realpath(__file__)) + '/partis'
     sys.path.insert(1, PARTIS_PATH + '/python')
     from utils import add_implicit_info, process_input_line
@@ -127,18 +158,6 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
         metadata,
     )
 
-    seqs_col = 'v_qr_seqs' if use_v else 'seqs'
-    gene_col = 'v_gl_seq' if use_v else 'naive_seq'
-
-    if use_np:
-        # return only nonproductive sequences
-        # here "nonproductive" is defined as having a stop codon or being
-        # out of frame or having a mutated conserved cysteine
-        good_seq = lambda seqs: seqs['stops'] or not seqs['in_frames'] or seqs['mutated_invariants']
-    else:
-        # return all sequences
-        good_seq = lambda seqs: [True for seq in seqs[seqs_col]]
-
     with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
         gene_writer = csv.DictWriter(genes_file, ['germline_name', 'germline_sequence'])
         gene_writer.writeheader()
@@ -147,41 +166,71 @@ def write_partis_data_from_annotations(output_genes, output_seqs, path_to_annota
             'germline_name',
             'sequence_name',
             'sequence',
+            'germline_family',
+            'v_gene',
+            'region',
         ]
+
         for key, _ in filters.iteritems():
             seq_header += [key]
 
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
-            for key, values in filters.iteritems():
-                if data_info[key] not in values:
-                    continue
+            if any([data_info[key] not in values for key, values in filters.iteritems()]):
+                continue
             glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
-            with open(data_info['annotations_file'][0], "r") as csvfile:
+            with open(data_info['annotations_file'], "r") as csvfile:
                 reader = csv.DictReader(csvfile)
                 for idx, line in enumerate(reader):
-                    # add goodies from partis
-                    if len(line['input_seqs']) == 0:
-                        # sometimes data will have empty clusters
-                        continue
-                    process_input_line(line)
-                    add_implicit_info(glfo, line)
-                    good_seq_idx = [i for i, is_good in enumerate(good_seq(line)) if is_good]
-                    if not good_seq_idx:
-                        # no nonproductive sequences... skip
+                    if line['v_gene'] == '':
+                        # failed annotations
                         continue
 
-                    gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, line['v_gene']])
-                    gene_writer.writerow({'germline_name': gl_name,
-                        'germline_sequence': line[gene_col].lower()})
+                    # add goodies from partis
+                    process_input_line(line)
+                    add_implicit_info(glfo, line)
+                    n_seqs = len(line['input_seqs'])
+                    if n_seqs < min_clonal_family_size:
+                        # don't take small clonal families---for data quality purposes
+                        continue
+
+                    if region == 'vdj':
+                        gl_seq = line['naive_seq'].lower()
+                        all_seqs = [seq.lower() for seq in line['seqs']]
+                    else:
+                        gl_seq = line['v_gl_seq'].lower()
+                        all_seqs = [seq.lower() for seq in line['v_qr_seqs']]
+
+                    idx_list = []
+                    # frequency filter
+                    idx_list.append(set([i for i, val in enumerate(line['mut_freqs']) if val < max_mut_pct and val >= min_mut_pct]))
+                    # sequence length filter
+                    idx_list.append(set([i for i, val in enumerate(all_seqs) if len(val.translate(None, 'n')) > min_seq_len]))
+                    for key, values in seq_filters.iteritems():
+                        idx_list.append(set([i for i, val in enumerate(line[key]) if val in values]))
+
+                    good_seq_idx = set.intersection(*idx_list)
+                    if not good_seq_idx:
+                        # no sequences after filtering... skip
+                        continue
+
+                    gl_name = 'clone{}-{}-{}'.format(*[data_idx, idx, clone_str])
+                    gene_writer.writerow({
+                        'germline_name': gl_name,
+                        'germline_sequence': gl_seq,
+                    })
 
                     for good_idx in good_seq_idx:
                         base_dict = {
                             'germline_name': gl_name,
                             'sequence_name': '-'.join([gl_name, line['unique_ids'][good_idx]]),
-                            'sequence': line[seqs_col][good_idx].lower()
+                            'sequence': all_seqs[good_idx].lower(),
+                            'germline_family': line['{}_gene'.format(germline_family)][:5],
+                            'v_gene': line['v_gene'],
+                            'region': region,
                         }
+
                         for key, _ in filters.iteritems():
                             base_dict[key] = data_info[key]
 
@@ -330,7 +379,6 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
             genes_line.append({
                 'germline_name': gl_name,
                 'germline_sequence': proc_gl_seq,
-                'germline_family': gl_name.split("-")[2],
             })
             current_seq['germline_name'] = gl_name
             current_seq['sequence_name'] = elt['sequence_name']
@@ -344,7 +392,7 @@ def write_data_after_sampling(output_genes, output_seqs, gene_file_name, seq_fil
         out_seqs += seqs_line
 
     with open(output_genes, 'w') as genes_file, open(output_seqs, 'w') as seqs_file:
-        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values) + ["germline_family"])
+        gene_writer = csv.DictWriter(genes_file, list(genes.columns.values))
         gene_writer.writeheader()
         gene_writer.writerows(out_genes)
         seq_writer = csv.DictWriter(seqs_file, list(seqs.columns.values))
