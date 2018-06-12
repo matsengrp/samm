@@ -71,6 +71,20 @@ def parse_args():
         choices=('','mouse','human'),
         help="species for use in partis annotations (mouse or human; default selects all species in data)",
         default='')
+    parser.add_argument('--group',
+        type=str,
+        help="a group that's in the metadata file to filter by (defaults to no filter)",
+        default='')
+    parser.add_argument('--region',
+        type=str,
+        choices=('v','d','j','vdj'),
+        help="region of BCR to return",
+        default='v')
+    parser.add_argument('--germline-family',
+        type=str,
+        choices=('v','d','j'),
+        help="germline family to use for validation splits",
+        default='v')
     parser.add_argument('--scratch-directory',
         type=str,
         help='where to write dnapars files, if necessary',
@@ -79,15 +93,12 @@ def parse_args():
         type=str,
         help='metadata with subject/species/locus information',
         default=None)
-    parser.add_argument('--use-v',
+    parser.add_argument('--use-out-of-frame-seqs',
         action='store_true',
-        help='use V genes?')
-    parser.add_argument('--use-np',
+        help='use out-of-frame seqs?')
+    parser.add_argument('--filter-indels',
         action='store_true',
-        help='use nonproductive seqs?')
-    parser.add_argument('--use-immunized',
-        action='store_true',
-        help='use immunized mouse?')
+        help='ignore sequences that had indels?')
     parser.add_argument('--test-column',
         type=str,
         help='column in the dataset to split training/testing on (e.g., subject, clonal_family, etc.)',
@@ -123,7 +134,6 @@ def write_train_test(output_seqs, sampled_set):
 
 def main(args=sys.argv[1:]):
     args = parse_args()
-    print args
     random.seed(args.seed)
     np.random.seed(args.seed)
     scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
@@ -131,16 +141,24 @@ def main(args=sys.argv[1:]):
         os.makedirs(scratch_dir)
 
     if args.path_to_annotations is not None:
+        seq_filters = {}
+        if args.filter_indels:
+            seq_filters['indel_reversed_seqs'] = ['']
+        if args.use_out_of_frame_seqs:
+            seq_filters['in_frames'] = [False]
         write_partis_data_from_annotations(
             args.output_genes,
             args.output_seqs,
             args.path_to_annotations,
             args.metadata_path,
-            use_v=args.use_v,
-            use_np=args.use_np,
-            use_immunized=args.use_immunized,
-            locus=args.locus,
-            species=args.species
+            filters={
+                'group': [args.group],
+                'locus': [args.locus],
+                'species': [args.species],
+            },
+            seq_filters=seq_filters,
+            region=args.region,
+            germline_family=args.germline_family,
         )
         args.input_genes = args.output_genes
         args.input_seqs = args.output_seqs
