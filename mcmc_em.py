@@ -27,7 +27,7 @@ class MCMC_EM:
         self.per_target_model = per_target_model
         self.sampling_rate = sampling_rate
 
-    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, pool=None):
+    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, pool=None, max_hessian_iters=10):
         """
         @param theta: initial value for theta in MCMC-EM
         @param feat_generator: an instance of a FeatureGenerator
@@ -46,6 +46,8 @@ class MCMC_EM:
             for obs_seq in observed_data
         ]
         all_traces = []
+        sample_obs_info = None
+        variance_est = None
         # burn in only at the very beginning
         for run in range(max_em_iters):
             prev_theta = theta
@@ -118,18 +120,27 @@ class MCMC_EM:
                     # The whole theta is zero - just stop and consider a different penalty parameter
                     break
 
-            if lower_bound_is_negative or lower_bound < diff_thres or num_nonzero == 0:
+            if not get_hessian and (lower_bound_is_negative or lower_bound < diff_thres or num_nonzero == 0):
                 # if penalized log likelihood is decreasing - gradient descent totally failed in this case
                 break
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
-        if get_hessian:
-            ci_maker = ConfidenceIntervalMaker(self.per_target_model, possible_theta_mask, zero_theta_mask)
-            variance_est, sample_obs_info = ci_maker.run(
-                    theta,
-                    e_step_samples,
-                    problem)
-        else:
-            sample_obs_info = None
-            variance_est = None
+            if run >= max_hessian_iters - 1 and get_hessian:
+                ci_maker = ConfidenceIntervalMaker(self.per_target_model, possible_theta_mask, zero_theta_mask)
+                variance_est, sample_obs_info = ci_maker.run(
+                        theta,
+                        e_step_samples,
+                        problem)
+                try:
+                    num_agg_cols = NUM_NUCLEOTIDES if self.per_target_model else 1
+                    agg_start_col = 1 if self.per_target_model else 0
+                    for col_idx in range(num_agg_cols):
+                        feat_generator.combine_thetas_and_get_conf_int(
+                                theta,
+                                variance_est,
+                                col_idx=col_idx + agg_start_col,
+                                add_targets=self.per_target_model)
+                    break
+                except ValueError as e:
+                    log.info("found negative variance estimates.. mcmc iteration %d, ERROR: %s", run, e)
         return theta, variance_est, sample_obs_info, all_traces

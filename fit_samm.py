@@ -345,8 +345,9 @@ def main(args=sys.argv[1:]):
             for col_idx in range(num_agg_cols):
                 full_theta, theta_lower, theta_upper = feat_generator_stage2.combine_thetas_and_get_conf_int(
                     method_res.refit_theta,
-                    sample_obs_info=method_res.sample_obs_info,
+                    variance_est=method_res.variance_est,
                     col_idx=col_idx + agg_start_col,
+                    add_targets=args.per_target_model,
                 )
         except ValueError as e:
             print(e)

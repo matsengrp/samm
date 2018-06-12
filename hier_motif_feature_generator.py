@@ -100,7 +100,7 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                 theta_mask[i, center_nucleotide_idx] = False
         return theta_mask
 
-    def combine_thetas_and_get_conf_int(self, theta, sample_obs_info=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
+    def combine_thetas_and_get_conf_int(self, theta, variance_est=None, col_idx=0, zstat=ZSCORE_95, add_targets=True):
         """
         Combine hierarchical and offset theta values
         """
@@ -154,20 +154,19 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                         if col_idx != 0 and theta_idx_counter[raw_theta_idx, col_idx] != -1:
                             theta_index_matches[full_m_idx].append(theta_idx_counter[raw_theta_idx, col_idx])
 
-        if sample_obs_info is not None:
+        if variance_est is not None:
             # Make the aggregation matrix
             agg_matrix = np.zeros((full_theta.size, np.max(theta_idx_counter) + 1))
             for full_theta_idx, matches in theta_index_matches.iteritems():
                 agg_matrix[full_theta_idx, matches] = 1
 
             # Try two estimates of the obsersed information matrix
-            tts = [0.5 * (sample_obs_info + sample_obs_info.T), sample_obs_info]
-            for tt in tts:
-                cov_mat_full = np.dot(np.dot(agg_matrix, np.linalg.pinv(tt)), agg_matrix.T)
-                if not np.any(np.diag(cov_mat_full) < 0):
-                    break
+            cov_mat_full = np.dot(np.dot(agg_matrix, variance_est), agg_matrix.T)
             if np.any(np.diag(cov_mat_full) < 0):
-                raise ValueError("Some variance estimates were negative: %d neg var" % np.sum(np.diag(cov_mat_full) < 0))
+                raise ValueError(
+                        "Some variance estimates were negative: %d neg var, %s" % (
+                            np.sum(np.diag(cov_mat_full) < 0),
+                            np.diag(cov_mat_full)))
 
             full_std_err = np.sqrt(np.diag(cov_mat_full))
             theta_lower = full_theta - zstat * full_std_err
