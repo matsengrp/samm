@@ -11,21 +11,24 @@ def parse_args():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--in-shazam-mut',
         type=str,
-        help='comma separated shazam mutability csv files')
+        help='shazam mutability csv files prefix')
     parser.add_argument('--in-shazam-sub',
         type=str,
-        help='comma separated shazam substitution csv files',
+        help='shazam substitution csv files prefix',
         default=None)
     parser.add_argument('--in-logistic',
         type=str,
-        help='comma separated logistic pkl files')
+        help='logistic pkl files prefix')
     parser.add_argument('--in-samm',
         type=str,
-        help='comma separated samm pkl files')
+        help='samm pkl files  prefix')
     parser.add_argument('--true-models',
         type=str,
-        help='true model pkl',
+        help='true model pkl  prefix',
         default=None)
+    parser.add_argument('--seeds',
+        type=str,
+        help="comma separated seed strings")
     parser.add_argument('--agg-motif-len',
         type=int,
         default=5)
@@ -37,11 +40,12 @@ def parse_args():
         help='flag for different kinds of shazam output files',
     )
     args = parser.parse_args()
-    args.shazam_mut_files = args.in_shazam_mut.split(',')
-    args.shazam_sub_files = args.in_shazam_sub.split(',')
-    args.in_logistic = args.in_logistic.split(',')
-    args.in_samm = args.in_samm.split(',')
-    args.true_models = args.true_models.split(',')
+    args.seeds = args.seeds.split(",")
+    args.shazam_mut_files = [args.in_shazam_mut % s for s in args.seeds]
+    args.shazam_sub_files = [args.in_shazam_sub % s for s in args.seeds]
+    args.in_logistic = [args.in_logistic % s for s in args.seeds]
+    args.in_samm = [args.in_samm % s for s in args.seeds]
+    args.true_models = [args.true_models % s for s in args.seeds]
     return args
 
 class ShazamModel:
@@ -59,7 +63,6 @@ class ShazamModel:
         else:
             self.agg_refit_theta = refit_theta[:,0:1]
         print "SHAZAM contains nan in the estimates", np.any(np.isnan(self.agg_refit_theta))
-        #self.agg_refit_theta[np.isnan(self.agg_refit_theta)] = 0
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -84,7 +87,6 @@ def main(args=sys.argv[1:]):
 
     logistic_models = [load_logistic_model(logistic_pkl) for logistic_pkl in args.in_logistic]
 
-    example_model = samm_models[0]
     true_models = [
         load_true_model(tmodel_file) for tmodel_file in args.true_models
     ]
