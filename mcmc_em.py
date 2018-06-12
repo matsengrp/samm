@@ -142,5 +142,5 @@ class MCMC_EM:
                                 add_targets=self.per_target_model)
                     break
                 except ValueError as e:
-                    log.info("found negative variance estimates.. mcmc iteration %d, ERROR: %s", run, e)
+                    log.info("found negative variance estimates.. EM iteration %d, ERROR: %s", run, e)
         return theta, variance_est, sample_obs_info, all_traces
