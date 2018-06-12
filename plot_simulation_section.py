@@ -233,7 +233,7 @@ def _get_agg_coverage(fmodel, full_feat_generator, agg_true_theta, possible_agg_
     for col_idx in range(agg_true_theta.shape[1]):
         agg_fitted_theta, agg_fitted_lower, agg_fitted_upper = hier_feat_gen.combine_thetas_and_get_conf_int(
             fmodel.refit_theta,
-            fmodel.sample_obs_info,
+            fmodel.variance_est,
             col_idx=col_idx + 1 if agg_true_theta.shape[1] == NUM_NUCLEOTIDES else 0,
             zstat=ZSCORE_95,
         )
@@ -384,13 +384,13 @@ def main(args=sys.argv[1:]):
     print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[var for stat in args.stats if stat in ['coverage', 'discovered'] for var in STAT_LABEL[stat]]].agg(lambda x: '%.1f (%.1f)' % (np.mean(x), np.std(x)))
     print_df.reset_index(level='model_type', inplace=True)
     out_str += print_df.pivot(columns='model_type').to_latex()
-    with open(args.outtable, 'w') as f:
-        f.write(out_str)
 
-    #print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[STAT_LABEL['discovered'][0]]].agg(lambda x: '%d, %d' % (np.sum(np.isnan(x)), len(x)))
     print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[STAT_LABEL['coverage'][0]]].agg(lambda x: '%d, %d' % (np.sum(np.isnan(x)), len(x)))
     print_df.reset_index(level='model_type', inplace=True)
-    print print_df.pivot(columns='model_type').to_latex()
+    out_str += print_df.pivot(columns='model_type').to_latex()
+
+    with open(args.outtable, 'w') as f:
+        f.write(out_str)
 
     sns_plot.map(sns.pointplot, linestyles=["-","--",":"], markers=".", scale=1, errwidth=1, dodge=True, capsize=0.2)
     # majro hack cause seaborn is broken i think
