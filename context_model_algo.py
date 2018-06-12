@@ -153,7 +153,8 @@ class ContextModelAlgo:
             zero_theta_mask=model_masks.zero_theta_mask_refit,
             burn_in=self.burn_in,
             penalty_params=(0,0), # now fit with no penalty
-            max_em_iters=max_em_iters,
+            max_em_iters=2 * max_em_iters if get_hessian else max_em_iters,
+            max_hessian_iters=max_em_iters,
             max_e_samples=self.num_e_samples * 4,
             get_hessian=get_hessian,
             pool=pool
