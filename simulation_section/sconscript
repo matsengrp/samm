@@ -13,9 +13,21 @@ from data_paths import SCRATCH_DIR
 Import('env')
 localenv = env.Clone()
 
-SPARSITIES = [0.25, 0.5, 1.0]
-EFFECT_SIZES = [0.5, 1.0, 2.0]
-SIMULATION_SIZES = [100, 200, 400]
+SPARSITIES = [
+    0.25,
+    0.5,
+    1.0,
+]
+EFFECT_SIZES = [
+    0.5,
+    1.0,
+    2.0,
+]
+SIMULATION_SIZES = [
+    100,
+    200,
+    400,
+]
 
 # Set up state
 base = {'nreps': localenv['NREPS'],
@@ -25,9 +37,9 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 
 # Nest for simulation methods
 models = [
-    #{'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
+    {'motif_lens': [3], 'positions_mutating': "1", 'per_target': False},
     {'motif_lens': [3], 'positions_mutating': "1", 'per_target': True},
-    #{'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': False},
+    {'motif_lens': [2,3], 'positions_mutating': "0,1:1", 'per_target': False},
 ]
 
 nest.add(
@@ -51,9 +63,6 @@ nest.add(
 
 @nest.add_target_with_env(localenv)
 def generate(env, outdir, c):
-    if c['effect_size'] != EFFECT_SIZES[int(len(EFFECT_SIZES)/2)] and c['nonzero_ratio'] != SPARSITIES[int(len(SPARSITIES)/2)]:
-        return
-
     per_target_model_str = ""
     if c["model"]["per_target"]:
         per_target_model_str = "--per-target-model"
@@ -85,7 +94,7 @@ nest.add(
 # Nest for replicates
 nest.add(
     'replicate',
-    range(2, 5),
+    range(100),
     label_func='{:02d}'.format)
 
 # Set the seed to be the replicate number.
@@ -97,11 +106,6 @@ nest.add(
 # Targets for simulating fake data
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
-    c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
-    c2 = c['nonzero_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
-    c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
-    if np.sum([c1, c2, c3]) < 2:
-        return
     cmd = ['python simulate_shm_star_tree.py',
            '--seed',
            c['seed'],
@@ -136,10 +140,16 @@ def fit_context_model(env, outdir, c):
     c1 = c['simulation_size'] == SIMULATION_SIZES[int(len(SIMULATION_SIZES)/2)]
     c2 = c['nonzero_ratio'] == SPARSITIES[int(len(SPARSITIES)/2)]
     c3 = c['effect_size'] == EFFECT_SIZES[int(len(EFFECT_SIZES)/2)]
-    if np.sum([c1, c2, c3]) < 2:
+    if np.sum([c1, c2, c3]) < 2 and c['replicate'] > 9:
         return
-    cmd = []
+
+    # pre-tuned penalty params
     penalty_params = np.power(10, np.arange(-1.0, -6, step=-0.5)).tolist()
+    if c['effect_size'] == EFFECT_SIZES[-1] or c['simulation_size'] == SIMULATION_SIZES[-1]:
+        penalty_params = penalty_params[2:]
+    elif not c['effect_size'] == EFFECT_SIZES[0] and not c['simulation_size'] == SIMULATION_SIZES[0]:
+        penalty_params = penalty_params[1:]
+
     per_target_model_str = ""
     if c["model"]["per_target"]:
         per_target_model_str = "--per-target-model"
