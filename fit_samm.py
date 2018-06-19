@@ -76,6 +76,10 @@ def parse_args():
     parser.add_argument('--unpenalized-em-max-iters',
         type=int,
         help='Maximum number of EM iterations during the fitting procedure for each penalty parameter',
+        default=80)
+    parser.add_argument('--hessian-check-iter',
+        type=int,
+        help='Number of EM iterations to check if hessian is positive semidefinite',
         default=20)
     parser.add_argument('--em-max-iters',
         type=int,
@@ -167,6 +171,8 @@ def parse_args():
 
     if len(args.penalty_params) > 1:
         assert args.tuning_sample_ratio > 0 or args.k_folds > 1
+
+    assert(args.hessian_check_iter is not None and not args.omit_hessian)
 
     return args
 
@@ -320,6 +326,7 @@ def main(args=sys.argv[1:]):
         obs_data,
         model_result=method_res,
         max_em_iters=args.unpenalized_em_max_iters,
+        hessian_check_iter=args.hessian_check_iter,
         get_hessian=not args.omit_hessian,
         pool=all_runs_pool,
     )

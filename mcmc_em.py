@@ -27,7 +27,7 @@ class MCMC_EM:
         self.per_target_model = per_target_model
         self.sampling_rate = sampling_rate
 
-    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, pool=None, max_hessian_iters=10):
+    def run(self, observed_data, feat_generator, theta, penalty_params=[1], possible_theta_mask=None, zero_theta_mask=None, max_em_iters=10, burn_in=1, diff_thres=1e-6, max_e_samples=10, get_hessian=False, pool=None, hessian_check_iter=None):
         """
         @param theta: initial value for theta in MCMC-EM
         @param feat_generator: an instance of a FeatureGenerator
@@ -125,7 +125,7 @@ class MCMC_EM:
                 break
             log.info("step final pen_exp_log_lik %f" % pen_exp_log_lik)
 
-            if run >= max_hessian_iters - 1 and get_hessian:
+            if get_hessian and run >= hessian_check_iter - 1:
                 ci_maker = ConfidenceIntervalMaker(self.per_target_model, possible_theta_mask, zero_theta_mask)
                 variance_est, sample_obs_info = ci_maker.run(
                         theta,
