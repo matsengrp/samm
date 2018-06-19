@@ -385,7 +385,7 @@ def main(args=sys.argv[1:]):
     print_df.reset_index(level='model_type', inplace=True)
     out_str += print_df.pivot(columns='model_type').to_latex()
 
-    print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[STAT_LABEL['coverage'][0]]].agg(lambda x: '%d, %d' % (np.sum(np.isnan(x)), len(x)))
+    print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[STAT_LABEL['coverage'][0]]].agg(lambda x: '%d, %d' % (np.sum(pd.isnull(x)), len(x)))
     print_df.reset_index(level='model_type', inplace=True)
     out_str += print_df.pivot(columns='model_type').to_latex()
 
