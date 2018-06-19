@@ -137,16 +137,9 @@ def _get_discovered_corrected(fmodel, full_feat_generator, true_theta, possible_
 
     # calculate which nonzeros do not have CIs overlapping zero
     theta = fmodel.refit_theta
-    sample_obs_info = fmodel.sample_obs_info
 
-    # Try two estimates of the obsersed information matrix
-    tts = [0.5 * (sample_obs_info + sample_obs_info.T), sample_obs_info]
-    for tt in tts:
-        cov_mat = np.linalg.pinv(tt)
-        if not np.any(np.diag(cov_mat) < 0):
-            break
+    cov_mat = fmodel.variance_est
     if np.any(np.diag(cov_mat) < 0):
-        #raise ValueError("Some variance estimates were negative: %d neg var" % np.sum(np.diag(cov_mat) < 0))
         return np.nan, np.nan
 
     standard_errors = np.sqrt(np.diag(cov_mat))
