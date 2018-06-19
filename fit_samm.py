@@ -16,7 +16,6 @@ import numpy as np
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from mutation_order_gibbs import MutationOrderGibbsSampler
 from survival_problem_lasso import SurvivalProblemLasso
-from likelihood_evaluator import LikelihoodComparer
 from samm_worker import SammWorker
 from parallel_worker import MultiprocessingManager
 from context_model_algo import ContextModelAlgo
