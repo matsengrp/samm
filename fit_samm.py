@@ -157,10 +157,6 @@ def parse_args():
 
     args.intermediate_out_dir = os.path.dirname(args.out_file)
 
-    args.scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
-    if not os.path.exists(args.scratch_dir):
-        os.makedirs(args.scratch_dir)
-
     # sort penalty params from largest to smallest
     args.penalty_params = [float(p) for p in args.penalty_params.split(",")]
     args.penalty_params = sorted(args.penalty_params, reverse=True)
@@ -194,7 +190,6 @@ def main(args=sys.argv[1:]):
         motif_lens=args.motif_lens,
         left_motif_flank_len_list=args.positions_mutating,
     )
-    cmodel_algo = ContextModelAlgo(feat_generator, args)
 
     log.info("Reading data")
     obs_data, metadata = read_gene_seq_csv_data(
@@ -229,6 +224,7 @@ def main(args=sys.argv[1:]):
     # Run EM on the lasso parameters from largest to smallest
     results_list = []
     val_set_evaluators = [None for _ in fold_indices]
+    cmodel_algos = [ContextModelAlgo(feat_generator, args) for _ in fold_indices]
     prev_pen_theta = None
     best_model_idx = 0
     for param_i, penalty_param in enumerate(args.penalty_params):
@@ -246,7 +242,7 @@ def main(args=sys.argv[1:]):
             prev_num_val_samples = val_set_evaluator.num_samples if val_set_evaluator is not None else args.num_val_samples
             samm_worker = SammWorker(
                 fold_idx,
-                cmodel_algo,
+                cmodel_algos[fold_idx],
                 train_set,
                 penalty_params,
                 args.em_max_iters,
@@ -305,7 +301,7 @@ def main(args=sys.argv[1:]):
         # Just use the first fold as template for doing the refitting unpenalized
         method_res_template = results_list[best_model_idx][0]
         prev_pen_theta = results_list[best_model_idx - 1][0].penalized_theta if best_model_idx else None
-        method_res = cmodel_algo.fit_penalized(
+        method_res = cmodel_algos[0].fit_penalized(
             obs_data,
             method_res_template.penalty_params,
             max_em_iters=args.em_max_iters,
@@ -316,7 +312,7 @@ def main(args=sys.argv[1:]):
     # Finally ready to refit as unpenalized model
     if args.num_cpu_threads > 1 and all_runs_pool is None:
         all_runs_pool = Pool(args.num_cpu_threads)
-    cmodel_algo.refit_unpenalized(
+    cmodel_algos[0].refit_unpenalized(
         obs_data,
         model_result=method_res,
         max_em_iters=args.unpenalized_em_max_iters,
