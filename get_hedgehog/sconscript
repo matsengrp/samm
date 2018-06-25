@@ -248,7 +248,7 @@ def plot_hedgehog_shazam(env, outdir, c):
            '--center-nucs C']
 
     return env.Command(
-        [join(outdir, 'fitted_shazam.csv'), join(outdir, 'fitted_shazam.pdf')],
+        [join(outdir, 'fitted_shazam_C_only.csv'), join(outdir, 'fitted_shazam_C_only.pdf')],
         c['fit_shazam'],
         ' '.join(map(str, cmd)))
 
@@ -268,7 +268,7 @@ def plot_hedgehog_sammcomp(env, outdir, c):
            '--no-conf-int']
 
     return env.Command(
-        [join(outdir, 'fitted_samm_comp.csv'), join(outdir, 'fitted_samm_comp.pdf')],
+        [join(outdir, 'fitted_samm_C_only.csv'), join(outdir, 'fitted_samm_C_only.pdf')],
         c['fit_survival'],
         ' '.join(map(str, cmd)))
 
@@ -287,6 +287,6 @@ def plot_hedgehog_logistic(env, outdir, c):
            '--center-nucs C']
 
     return env.Command(
-        [join(outdir, 'fitted_logistic.csv'), join(outdir, 'fitted_logistic.pdf')],
+        [join(outdir, 'fitted_logistic_C_only.csv'), join(outdir, 'fitted_logistic_C_only.pdf')],
         c['fit_logistic'],
         ' '.join(map(str, cmd)))

@@ -139,12 +139,10 @@ def get_num_nonzero(theta):
     return np.sum(nonzero_idx)
 
 def get_num_unique_theta(theta):
-    zero_theta_mask = np.abs(theta) < ZERO_THRES
-    nonzero_idx = np.logical_and(np.isfinite(theta), ~zero_theta_mask)
-    unique_theta = set(theta[nonzero_idx].flatten().tolist())
-    num_unique = len(unique_theta)
-    if np.any(zero_theta_mask):
-        num_unique += 1
+    theta_flat = theta.flatten()
+    sorted_idx = np.argsort(theta_flat)
+    diffs = np.diff(theta_flat[sorted_idx])
+    num_unique = 1 + np.sum(diffs > ZERO_THRES)
     return num_unique
 
 def is_re_match(regex, submotif):
