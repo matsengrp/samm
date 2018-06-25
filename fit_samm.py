@@ -306,13 +306,14 @@ def main(args=sys.argv[1:]):
         # Just use the first fold as template for doing the refitting unpenalized
         method_res_template = results_list[best_model_idx][0]
         prev_pen_theta = results_list[best_model_idx - 1][0].penalized_theta if best_model_idx else None
-        method_res = cmodel_algos[0].fit_penalized(
+        results_list[best_model_idx][0] = cmodel_algos[0].fit_penalized(
             obs_data,
             method_res_template.penalty_params,
             max_em_iters=args.em_max_iters,
             init_theta=prev_pen_theta,
             pool=all_runs_pool,
         )
+        method_res = results_list[best_model_idx][0]
 
     # Finally ready to refit as unpenalized model
     if args.num_cpu_threads > 1 and all_runs_pool is None:
