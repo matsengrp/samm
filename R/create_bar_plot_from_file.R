@@ -17,6 +17,7 @@ data_path <- arg[1]
 motif_str <- arg[2]
 output_file <- arg[3]
 target_nucs <- unlist(strsplit(arg[4], ','))
+center_nucs <- unlist(strsplit(arg[5], ','))
 
 motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 
@@ -26,9 +27,6 @@ raw_data <- do.call(data.frame, lapply(raw_data, function(x) replace(x, is.infin
 
 #replace target "N" with "Z" so that the plots are properly ordered
 raw_data['motif'] <- apply(raw_data['motif'], 2, function(motif) gsub('N', 'Z', motif))
-
-# Plot for multiple nucleotides
-center_nucs <- c('A', 'T', 'G', 'C')
 
 # Change the following to adjust y-limits in the plot
 y_lim <- c(
