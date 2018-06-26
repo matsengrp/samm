@@ -56,6 +56,6 @@ class SammWorker(ParallelWorker):
             num_samples=self.num_val_samples,
             burn_in=self.args.num_val_burnin,
             num_jobs=self.args.num_jobs,
-            scratch_dir=self.args.scratch_dir,
+            scratch_dir=self.context_model_algo.scratch_dir,
         )
         return model_results, val_set_evaluator

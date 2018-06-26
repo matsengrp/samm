@@ -1,3 +1,5 @@
+import os
+import time
 import copy
 import logging as log
 import numpy as np
@@ -32,13 +34,18 @@ class ContextModelAlgo:
         )
         self.zero_theta_mask = np.zeros(self.theta_shape, dtype=bool)
 
+        scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
+        if not os.path.exists(scratch_dir):
+            os.makedirs(scratch_dir)
+        print(scratch_dir)
+
         self.em_algo = MCMC_EM(
             args.sampler_cls,
             args.problem_solver_cls,
             base_num_e_samples=args.num_e_samples,
             max_m_iters=args.max_m_iters,
             num_jobs=args.num_jobs,
-            scratch_dir=args.scratch_dir,
+            scratch_dir=scratch_dir,
             per_target_model=args.per_target_model,
             sampling_rate=args.sampling_rate,
         )
@@ -47,7 +54,7 @@ class ContextModelAlgo:
         self.true_theta = true_theta
         self.num_e_samples = args.num_e_samples
         self.num_jobs = args.num_jobs
-        self.scratch_dir = args.scratch_dir
+        self.scratch_dir = scratch_dir
         self.intermediate_out_dir = args.intermediate_out_dir
         self.burn_in = args.burn_in
         self.sampling_rate = args.sampling_rate
