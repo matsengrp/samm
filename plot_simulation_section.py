@@ -87,7 +87,7 @@ STAT_LABEL = {
     "pearson": ["Pearson"],
     "kendall": ["Kendall's Tau"],
     "norm": ["Relative theta error"],
-    "discovered": ["Num False Positive", "Num Discovered"],
+    "discovered": ["Num False Positive; Num Discovered"],
 }
 FIT_TYPES = [
     'refit',
@@ -118,7 +118,7 @@ def _collect_statistics(fitted_models, args, true_thetas, stat, fit_type):
                 )
             try:
                 s = stat_func(fmodel, feat_gen, true_theta, possible_mask, fit_type)
-                if s is not None and stat == 'discovered':
+                if s is not None:
                     statistics.append(s)
                 elif s is not None:
                     statistics.append([s])
@@ -327,8 +327,8 @@ def _build_dataframe(args):
                                         fit_type,
                                     )
                                     if len(samm_statistics):
-                                        for var, stat_value in zip(STAT_LABEL[stat], samm_statistics[0]):
-                                            tmp_dat[var] = stat_value
+                                        for var in STAT_LABEL[stat]:
+                                            tmp_dat[var] = samm_statistics[0]
                                 tmp_df = tmp_df.append(tmp_dat, ignore_index=True)
                                 all_df = pd.concat((all_df, tmp_df))
 
@@ -336,6 +336,13 @@ def _build_dataframe(args):
             all_df.to_csv(f)
 
     return all_df
+
+def print_fcn(x):
+    outx = x.apply(pd.Series)
+    if outx.shape[1] > 1:
+        return '%.1f; %.1f (%.1f; %.1f)' % (np.mean(outx[0]), np.mean(outx[1]), np.std(outx[0]), np.std(outx[1]))
+    else:
+        return '%.1f (%.1f)' % (np.mean(outx), np.std(outx))
 
 def main(args=sys.argv[1:]):
     args = parse_args()
@@ -374,7 +381,7 @@ def main(args=sys.argv[1:]):
         print_df.reset_index(level='model_type', inplace=True)
         out_str += print_df.pivot(columns='model_type').to_latex()
 
-    print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[var for stat in args.stats if stat in ['coverage', 'discovered'] for var in STAT_LABEL[stat]]].agg(lambda x: '%.1f (%.1f)' % (np.mean(x), np.std(x)))
+    print_df = all_df[all_df['fit_type']=='refit'].groupby(group_cols)[[var for stat in args.stats if stat in ['coverage', 'discovered'] for var in STAT_LABEL[stat]]].agg(lambda x: print_fcn(x))
     print_df.reset_index(level='model_type', inplace=True)
     out_str += print_df.pivot(columns='model_type').to_latex()
 
