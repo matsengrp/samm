@@ -6,6 +6,7 @@ import os.path
 import pickle
 import pandas as pd
 import glob
+import copy
 
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from motif_feature_generator import MotifFeatureGenerator
@@ -649,6 +650,15 @@ def load_fitted_model(file_name, keep_col0=False, add_targets=True):
     hier_feat_gen = best_model.refit_feature_generator
     best_model.agg_refit_theta = hier_feat_gen.create_aggregate_theta(
         best_model.refit_theta,
+        keep_col0=keep_col0,
+        add_targets=add_targets,
+    )
+
+    # for penalized theta create full feature generator with no features removed
+    full_feat_gen = copy.deepcopy(hier_feat_gen)
+    full_feat_gen.update_feats_after_removing(None)
+    best_model.agg_penalized_theta = full_feat_gen.create_aggregate_theta(
+        best_model.penalized_theta,
         keep_col0=keep_col0,
         add_targets=add_targets,
     )

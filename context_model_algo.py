@@ -128,7 +128,7 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, obs_data, model_result, max_em_iters, get_hessian=True, pool=None):
+    def refit_unpenalized(self, obs_data, model_result, max_em_iters, hessian_check_iter=None, get_hessian=True, pool=None):
         """
         Refit the model
         Modifies model_result
@@ -160,8 +160,8 @@ class ContextModelAlgo:
             zero_theta_mask=model_masks.zero_theta_mask_refit,
             burn_in=self.burn_in,
             penalty_params=(0,0), # now fit with no penalty
-            max_em_iters=2 * max_em_iters if get_hessian else max_em_iters,
-            max_hessian_iters=max_em_iters,
+            max_em_iters=max_em_iters,
+            hessian_check_iter=hessian_check_iter,
             max_e_samples=self.num_e_samples * 4,
             get_hessian=get_hessian,
             pool=pool
