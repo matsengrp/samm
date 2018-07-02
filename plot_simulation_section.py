@@ -120,8 +120,6 @@ def _collect_statistics(fitted_models, args, true_thetas, stat, fit_type):
                 s = stat_func(fmodel, feat_gen, true_theta, possible_mask, fit_type)
                 if s is not None:
                     statistics.append(s)
-                elif s is not None:
-                    statistics.append([s])
             except ValueError as e:
                 print(e)
     return statistics
