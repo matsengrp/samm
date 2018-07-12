@@ -24,11 +24,13 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
             distance_to_start_of_motif=None,
             model_truncation=None,
             flank_len_offset=0,
+            feats_to_remove=None
         ):
         """
         @param motif_len: list of motifs to look for at a distance from mutating position
         @param distance_to_start_of_motif: distance from mutating position to look for nearby motif
         @param model_truncation: ModelTruncation object
+        @param feats_to_remove: list of features to remove if a model has not been fit yet
         """
         self.motif_len = motif_len
         if distance_to_start_of_motif is None:
@@ -39,16 +41,16 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
 
         self.flank_len_offset = flank_len_offset
 
-        self.update_feats_after_removing(model_truncation)
+        self.feats_to_remove = model_truncation.feats_to_remove if model_truncation is not None else []
+        if feats_to_remove is not None:
+            self.feats_to_remove += feats_to_remove
 
-    def update_feats_after_removing(self, model_truncation=None): 
+        self.update_feats_after_removing(self.feats_to_remove)
+
+    def update_feats_after_removing(self, feats_to_remove=[]):
         """
         take existing MotifGenerator and update it with features to remove
         """
-        if model_truncation is None:
-            feats_to_remove = []
-        else:
-            feats_to_remove = model_truncation.feats_to_remove
 
         all_feature_info_list = [("".join(motif), self.distance_to_start_of_motif) for motif in itertools.product(*([NUCLEOTIDES] * self.motif_len))]
         self.feature_info_list = [feat_tuple for feat_tuple in all_feature_info_list if feat_tuple not in feats_to_remove]

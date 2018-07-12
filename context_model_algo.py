@@ -37,7 +37,6 @@ class ContextModelAlgo:
         scratch_dir = os.path.join(args.scratch_directory, str(time.time() + np.random.randint(10000)))
         if not os.path.exists(scratch_dir):
             os.makedirs(scratch_dir)
-        print(scratch_dir)
 
         self.em_algo = MCMC_EM(
             args.sampler_cls,
@@ -141,7 +140,9 @@ class ContextModelAlgo:
 
         # Create a feature generator for this shrunken model
         feat_generator_stage2 = copy.deepcopy(self.feat_generator)
-        feat_generator_stage2.update_feats_after_removing(model_masks)
+        # needed for when passing in user-supplied feats_to_remove
+        all_feats_to_remove = model_masks.feats_to_remove + self.feat_generator.feats_to_remove
+        feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
@@ -190,7 +191,9 @@ class ContextModelAlgo:
             theta = model_result.penalized_theta
         else:
             theta = model_result.refit_theta
-            feat_generator_stage2.update_feats_after_removing(model_result.model_masks)
+            # needed for when passing in user-supplied feats_to_remove
+            all_feats_to_remove = model_result.model_masks.feats_to_remove + self.feat_generator.feats_to_remove
+            feat_generator_stage2.update_feats_after_removing(model_result.model_masks.feats_to_remove)
 
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
@@ -216,3 +219,36 @@ class ContextModelAlgo:
             sampling_rate=self.sampling_rate,
         )
         model_result.set_sampler_results(sampler_results)
+
+    def calculate_confidence_intervals(self, model_result, z=1.96):
+        """
+        Similar to refit_unpenalized, but calculates CIs from refit theta
+        Modifies model_result
+        """
+        cov_mat_full = model_result.variance_est
+        if np.any(np.diag(cov_mat_full) < 0):
+            warnings.warn("No confidence intervals computed; some variance estimates were negative: %d neg var" % np.sum(np.diag(cov_mat_full) < 0))
+            standard_errors = np.zeros(np.diag(cov_mat_full).shape)
+        else:
+            standard_errors = np.sqrt(np.diag(cov_mat_full))
+
+        if not model_result.has_refit_data:
+            # no refit data to get CIs from
+            warnings.warn("No refit data; confidence intervals may not behave as expected.")
+            theta_mask = self.possible_theta_mask & ~self.zero_theta_mask
+            theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
+            theta_flat = model_result.penalized_theta.reshape((model_result.penalized_theta.size,), order="F")
+        else:
+            theta_mask = model_result.refit_possible_theta_mask & ~model_result.model_masks.zero_theta_mask_refit
+            theta_mask_flat = theta_mask.reshape((theta_mask.size,), order="F")
+            theta_flat = model_result.refit_theta.reshape((model_result.refit_theta.size,), order="F")
+
+        conf_int_low = theta_flat - z * standard_errors
+        conf_int_upper = theta_flat + z * standard_errors
+        conf_ints = np.hstack((
+            conf_int_low.reshape((conf_int_low.size, 1)),
+            theta_flat.reshape((theta_flat.size, 1)),
+            conf_int_upper.reshape((conf_int_upper.size, 1)),
+        ))
+
+        model_result.set_confidence_intervals(conf_ints)

@@ -306,11 +306,11 @@ class GenericFeatureGenerator(FeatureGenerator):
                 feat_dict[pos] = self._get_mutating_pos_feat_idx(pos, intermediate_seq)
         return feat_dict
 
-    def update_feats_after_removing(self, model_truncation=None):
+    def update_feats_after_removing(self, feats_to_remove=[]):
         """
         Update the feature generator given that we need to strip away certain features
 
-        @param model_truncation: ModelTruncation
+        @param feats_to_remove: list of features to remove
         """
         raise NotImplementedError()
 

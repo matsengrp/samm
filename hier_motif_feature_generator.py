@@ -18,12 +18,18 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
 
     All code that previously uses HierarchicalMotifFeatureGenerator should still work as-is.
     """
-    def __init__(self, motif_lens, model_truncation=None, left_motif_flank_len_list=None):
+    def __init__(self, motif_lens, model_truncation=None, left_motif_flank_len_list=None, feats_to_remove=None):
         """
         @param motif_lens: list of odd-numbered motif lengths
         @param model_truncation: ModelTruncation object
         @param left_motif_flank_len_list: list of lengths of left motif flank; 0 will mutate the leftmost position, 1 the next to left, etc.
+        @param feats_to_remove: list of features to remove if a model has not been fit yet
         """
+
+        self.model_truncation = model_truncation
+        self.feats_to_remove = model_truncation.feats_to_remove if model_truncation is not None else []
+        if feats_to_remove is not None:
+            self.feats_to_remove += feats_to_remove
 
         self.motif_lens = motif_lens
 
@@ -66,17 +72,15 @@ class HierarchicalMotifFeatureGenerator(CombinedFeatureGenerator):
                         )
                     )
 
-        self.update_feats_after_removing(model_truncation)
+        self.update_feats_after_removing(self.feats_to_remove)
 
-    def update_feats_after_removing(self, model_truncation):
+    def update_feats_after_removing(self, feats_to_remove=[]):
         """
         Updates feature generator properties after removing features.
         This feature generator also has motif_list and mutating_pos_list that must be updated.
         """
-        super(HierarchicalMotifFeatureGenerator, self).update_feats_after_removing(model_truncation)
-
-    def update_feats_after_removing(self, feats_to_remove):
         super(HierarchicalMotifFeatureGenerator, self).update_feats_after_removing(feats_to_remove)
+
         # construct motif dictionary and lists of parameters
         self.motif_list = []
         self.mutating_pos_list = []
