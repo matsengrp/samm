@@ -9,6 +9,7 @@ class MethodResults:
         self.penalty_params = penalty_params
         self.has_refit_data = False
         self.has_residuals = False
+        self.has_conf_ints = False
         self.num_not_crossing_zero = 0
         self.percent_not_crossing_zero = 1
         self.num_p = 0
@@ -52,6 +53,13 @@ class MethodResults:
         """
         self.has_residuals = True
         self.sampler_results = sampler_results
+
+    def set_confidence_intervals(self, conf_ints):
+        """
+        Store the confidence intervals
+        """
+        self.has_conf_ints = True
+        self.conf_ints = conf_ints
 
     def __str__(self):
         pen_param_str = ",".join(map(str, self.penalty_params))

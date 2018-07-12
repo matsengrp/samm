@@ -97,11 +97,13 @@ def get_batched_list(my_list, num_batches):
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
-def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2):
+def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, left_motif_flank_len=None):
     """
     Known hot and cold spots were constructed on a 5mer model, so "N" pad
     longer motifs and subset shorter ones
     """
+    if left_motif_flank_len is None:
+        left_motif_flank_len = motif_len / 2
     kmer_list = []
     hot_or_cold_list = []
     hot_or_cold_complements = []
@@ -112,13 +114,13 @@ def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2)
                 'hot_or_cold': spot['hot_or_cold']})
 
     for spot in hot_or_cold_dicts + hot_or_cold_complements:
-        if len(spot['left_flank']) > half_motif_len or \
-            len(spot['right_flank']) > motif_len - half_motif_len - 1:
+        if len(spot['left_flank']) > left_motif_flank_len or \
+            len(spot['right_flank']) > motif_len - left_motif_flank_len - 1:
                 # this hot/cold spot is not a part of our motif size
                 continue
 
-        left_pad = spot['left_flank'].rjust(half_motif_len, 'N')
-        right_pad = spot['right_flank'].ljust(motif_len - half_motif_len - 1, 'N')
+        left_pad = spot['left_flank'].rjust(left_motif_flank_len, 'N')
+        right_pad = spot['right_flank'].ljust(motif_len - left_motif_flank_len - 1, 'N')
         kmer_list.append(left_pad + spot['central'] + right_pad)
         hot_or_cold_list.append(spot['hot_or_cold'])
 
@@ -401,3 +403,27 @@ def get_zero_theta_mask(theta):
     zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
     feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
     return zeroed_thetas[~feats_to_remove_mask,:]
+
+def get_model_result_print_lines(model_result):
+    """
+    @return a string that summarizes the theta vector/matrix
+    """
+    feat_gen = model_result.refit_feature_generator
+    lines = []
+    if model_result.has_refit_data:
+        theta = model_result.refit_theta
+    else:
+        theta = model_result.penalized_theta
+    for i in range(theta.shape[0]):
+        for j in range(theta.shape[1]):
+            if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
+                # print the whole line if any element in the theta is nonzero
+                thetas = theta[i,]
+                print_str = "%.3f" % theta[i,0]
+                if model_result.has_conf_ints:
+                    print_str += ", [%.3f, %.3f]" % (model_result.conf_ints[i, 0], model_result.conf_ints[i, 2])
+                print_str += ", (%s)" % feat_gen.print_label_from_idx(i)
+                lines.append((thetas[np.isfinite(thetas)].sum(), print_str))
+                break
+    sorted_lines = sorted(lines, key=lambda s: s[0])
+    return "\n".join([l[1] for l in sorted_lines])
