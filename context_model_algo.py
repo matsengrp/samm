@@ -179,7 +179,7 @@ class ContextModelAlgo:
             possible_theta_mask_refit,
         )
 
-    def calculate_residuals(self, model_result):
+    def calculate_residuals(self, model_result, obs_data):
         """
         Similar to refit_unpenalized, but calculates residuals from refit theta
         Modifies model_result
@@ -193,10 +193,10 @@ class ContextModelAlgo:
             theta = model_result.refit_theta
             # needed for when passing in user-supplied feats_to_remove
             all_feats_to_remove = model_result.model_masks.feats_to_remove + self.feat_generator.feats_to_remove
-            feat_generator_stage2.update_feats_after_removing(model_result.model_masks.feats_to_remove)
+            feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
 
         # Get the data ready - using ALL data
-        obs_data_stage2 = [copy.deepcopy(o) for o in self.obs_data]
+        obs_data_stage2 = [copy.deepcopy(o) for o in obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
 
         sampler_collection = SamplerCollection(
