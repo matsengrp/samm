@@ -172,7 +172,7 @@ def write_partis_data_from_annotations(
             'region',
         ]
 
-        for key, _ in filters.iteritems():
+        for key, _ in partition_info[0].iteritems():
             seq_header += [key]
 
         seq_writer = csv.DictWriter(seqs_file, seq_header)
@@ -232,8 +232,8 @@ def write_partis_data_from_annotations(
                             'region': region,
                         }
 
-                        for key, _ in filters.iteritems():
-                            base_dict[key] = data_info[key]
+                        for key, value in data_info.iteritems():
+                            base_dict[key] = value
 
                         seq_writer.writerow(base_dict)
 
