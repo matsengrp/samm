@@ -155,6 +155,7 @@ def main(args=sys.argv[1:]):
                 'group': [args.group],
                 'locus': [args.locus],
                 'species': [args.species],
+                'subject': [],
             },
             seq_filters=seq_filters,
             region=args.region,

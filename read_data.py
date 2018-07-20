@@ -178,7 +178,7 @@ def write_partis_data_from_annotations(
         seq_writer = csv.DictWriter(seqs_file, seq_header)
         seq_writer.writeheader()
         for data_idx, data_info in enumerate(partition_info):
-            if any([data_info[key] not in values for key, values in filters.iteritems()]):
+            if any([len(values) > 0 and data_info[key] not in values for key, values in filters.iteritems()]):
                 continue
             glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
             with open(data_info['annotations_file'], "r") as csvfile:

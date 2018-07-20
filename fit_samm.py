@@ -167,7 +167,8 @@ def parse_args():
     if len(args.penalty_params) > 1:
         assert args.tuning_sample_ratio > 0 or args.k_folds > 1
 
-    assert(args.hessian_check_iter is not None and not args.omit_hessian)
+    if not args.omit_hessian:
+        assert(args.hessian_check_iter is not None)
 
     return args
 
