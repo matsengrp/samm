@@ -1,4 +1,6 @@
 """
+Compare log likelihood on test set (using the lower bound heuristic)
+Comparing logistic vs samm vs shazam
 """
 
 import sys
