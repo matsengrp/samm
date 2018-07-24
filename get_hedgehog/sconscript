@@ -22,16 +22,16 @@ nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_enviro
 LOCUS = 'igk' # only kappa chain is relevant for Cui data
 
 nest.add(
-    'test_mouse',
+    'replicate',
     range(1),
-)
+    label_func='{:02d}'.format)
 
 # Nest for processing all data
 @nest.add_target_with_env(localenv)
 def process_all_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--seed',
-               c['test_mouse'],
+               c['replicate'],
                '--path-to-annotations',
                CUI_DATA_PATH,
                '--metadata-path',
@@ -46,23 +46,15 @@ def process_all_data(env, outdir, c):
                'v',
                '--germline-family',
                'v',
-               '--test-idx',
-               c['test_mouse'],
-               '--test-column',
-               'subject',
                '--filter-indels',
                '--scratch-directory',
                SCRATCH_DIR,
                '--output-genes ${TARGETS[0]}',
-               '--output-seqs ${TARGETS[1]}',
-               '--output-train-seqs ${TARGETS[2]}',
-               '--output-test-seqs ${TARGETS[3]}']
+               '--output-seqs ${TARGETS[1]}']
 
     return env.Command(
         [
             join(outdir, 'processed_genes_all_data.csv'), join(outdir, 'processed_seqs_all_data.csv'),
-            join(outdir, 'processed_seqs_train.csv'),
-            join(outdir, 'processed_seqs_test.csv'),
         ],
         [],
         ' '.join(map(str, cmd)))
@@ -72,11 +64,22 @@ def process_all_data(env, outdir, c):
 def process_data(env, outdir, c):
     cmd = ['python preprocess_data.py',
                '--seed',
-               c['test_mouse'],
-               '--input-genes',
-               '${SOURCES[0]}',
-               '--input-seqs',
-               '${SOURCES[2]}',
+               c['replicate'],
+               '--path-to-annotations',
+               CUI_DATA_PATH,
+               '--metadata-path',
+               CUI_DATA_PATH + '/meta.csv',
+               '--group',
+               'immunized',
+               '--locus',
+               LOCUS,
+               '--species',
+               'mouse',
+               '--region',
+               'v',
+               '--germline-family',
+               'v',
+               '--filter-indels',
                '--sample-from-family',
                '--scratch-directory',
                SCRATCH_DIR,
@@ -87,7 +90,7 @@ def process_data(env, outdir, c):
         [
             join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv'),
         ],
-        c['process_all_data'],
+        [],
         ' '.join(map(str, cmd)))
 
 motif_params_dict = [
@@ -120,7 +123,7 @@ def fit_logistic(env, outdir, c):
 
     cmd = ['python fit_logistic_model.py',
            '--seed',
-           c['test_mouse'],
+           c['replicate'],
            '--input-mutated',
            '${SOURCES[0]}',
            '--input-naive',
@@ -137,8 +140,7 @@ def fit_logistic(env, outdir, c):
            '--tuning 0',
            '--model-pkl ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}',
-           '--validation-col germline_family',
-           ]
+           '--validation-col germline_family']
 
     return env.Command(
         [join(outdir, 'logistic_model.pkl'), join(outdir, 'logistic_log.txt')],
@@ -156,7 +158,7 @@ def fit_survival(env, outdir, c):
 
     cmd = ['python fit_samm.py',
            '--seed',
-           c['test_mouse'],
+           c['replicate'],
            '--input-naive ${SOURCES[0]}',
            '--input-mutated ${SOURCES[1]}',
            '--motif-lens',
@@ -166,9 +168,9 @@ def fit_survival(env, outdir, c):
            '--penalty-params',
            penalty_params,
            '--num-cpu-threads',
-           14,
+           10,
            '--num-jobs',
-           50,
+           10,
            '--burn-in',
            16,
            '--num-e-samples',
@@ -219,10 +221,10 @@ def plot_hedgehog(env, outdir, c):
 def fit_shazam(env, outdir, c):
 
     cmd = ['python fit_shmulate_model.py',
+           '--input-file',
+           '${SOURCES[1]}',
            '--input-genes',
            '${SOURCES[0]}',
-           '--input-file',
-           '${SOURCES[2]}',
            '--model-pkl ${TARGETS[0]}',
            '--log-file ${TARGETS[1]}']
 
