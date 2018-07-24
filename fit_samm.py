@@ -279,7 +279,7 @@ def main(args=sys.argv[1:]):
         log.info("Log lik ratios %s" % log_lik_ratios)
         if any(nonzeros) and param_i > 0:
             cv_interval = get_interval(log_lik_ratios, zscore=1)
-            log.info("log lik interval (%f, %f)" % cv_interval)
+            log.info("log lik interval %s", cv_interval)
             if cv_interval[0] < -ZERO_THRES:
                 # Make sure that the penalty isnt so big that theta is empty
                 # One std error below the mean for the log lik ratios surrogate is negative
@@ -314,6 +314,7 @@ def main(args=sys.argv[1:]):
             init_theta=prev_pen_theta,
             pool=all_runs_pool,
         )
+        results_list[best_model_idx].append(method_res)
 
     # Finally ready to refit as unpenalized model
     if args.num_cpu_threads > 1 and all_runs_pool is None:

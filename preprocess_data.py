@@ -1,4 +1,5 @@
 import sys
+import logging as log
 import argparse
 import os
 import os.path
@@ -21,6 +22,10 @@ def parse_args():
         type=int,
         help='Random number generator seed for replicability',
         default=1)
+    parser.add_argument('--log-file',
+        type=str,
+        help='Log file',
+        default='_output/log_preprocess.txt')
     parser.add_argument('--path-to-annotations',
         type=str,
         help='path to partis annotations')
@@ -134,6 +139,7 @@ def write_train_test(output_seqs, sampled_set):
 
 def main(args=sys.argv[1:]):
     args = parse_args()
+    log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     random.seed(args.seed)
     np.random.seed(args.seed)
     scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
@@ -155,7 +161,6 @@ def main(args=sys.argv[1:]):
                 'group': [args.group],
                 'locus': [args.locus],
                 'species': [args.species],
-                'subject': [],
             },
             seq_filters=seq_filters,
             region=args.region,
