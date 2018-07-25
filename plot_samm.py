@@ -43,7 +43,7 @@ def parse_args():
         help="Center nucleotides to plot")
     parser.add_argument('--y-lab',
         type=str,
-        default='aggregate theta',
+        default='Aggregate Theta',
         help="y label of hedgehog plot")
 
     parser.set_defaults(no_conf_int=False)

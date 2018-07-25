@@ -47,7 +47,7 @@ def parse_args():
         help="logistic pickle file")
     parser.add_argument('--y-lab',
         type=str,
-        default='aggregate theta',
+        default='Aggregate Theta',
         help="y label of hedgehog plot")
 
     args = parser.parse_args()
