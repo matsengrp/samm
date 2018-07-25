@@ -313,6 +313,7 @@ def main(args=sys.argv[1:]):
             init_theta=prev_pen_theta,
             pool=all_runs_pool,
         )
+        method_res = results_list[best_model_idx][0]
 
     # Finally ready to refit as unpenalized model
     if args.num_cpu_threads > 1 and all_runs_pool is None:

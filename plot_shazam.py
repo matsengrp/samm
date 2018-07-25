@@ -11,8 +11,10 @@ import csv
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from compare_simulated_shazam_vs_samm import ShazamModel
 from common import *
+from read_data import load_logistic_model
 
 from plot_samm import plot_theta
+from fit_logistic_model import LogisticModel
 
 def parse_args():
     ''' parse command line arguments '''
@@ -35,8 +37,22 @@ def parse_args():
         type=str,
         help='PDF file to save output to',
         default='_output/out.pdf')
+    parser.add_argument('--center-nucs',
+        type=str,
+        default='A,T,G,C',
+        help="Center nucleotides to plot")
+    parser.add_argument('--logistic-pkl',
+        type=str,
+        default=None,
+        help="logistic pickle file")
+    parser.add_argument('--y-lab',
+        type=str,
+        default='Aggregate Theta',
+        help="y label of hedgehog plot")
 
     args = parser.parse_args()
+
+    assert(args.mut is not None or args.logistic_pkl is not None)
 
     return args
 
@@ -76,10 +92,13 @@ def main(args=sys.argv[1:]):
     )
 
     # Load fitted theta file
-    # If it came from fit_shumlate_model.py, it's in wide format
-    shazam_model = ShazamModel(MOTIF_LEN, args.mut, args.sub, wide_format=True)
+    if args.logistic_pkl is not None:
+        fitted_model = load_logistic_model(args.logistic_pkl)
+    elif args.mut is not None:
+        # If it came from fit_shumlate_model.py, it's in wide format
+        fitted_model = ShazamModel(MOTIF_LEN, args.mut, args.sub, wide_format=True)
 
-    full_theta = shazam_model.agg_refit_theta
+    full_theta = fitted_model.agg_refit_theta
     # center median
     theta_med = np.median(full_theta[~np.isinf(full_theta)])
     full_theta -= theta_med
@@ -87,7 +106,7 @@ def main(args=sys.argv[1:]):
     theta_upper = full_theta
 
     per_target_model = full_theta.shape[1] > 1
-    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, MOTIF_LEN)
+    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, MOTIF_LEN, args.center_nucs, args.y_lab)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

@@ -172,7 +172,7 @@ def write_partis_data_from_annotations(
             'region',
         ]
 
-        for key, _ in filters.iteritems():
+        for key, _ in partition_info[0].iteritems():
             seq_header += [key]
 
         seq_writer = csv.DictWriter(seqs_file, seq_header)
@@ -232,8 +232,8 @@ def write_partis_data_from_annotations(
                             'region': region,
                         }
 
-                        for key, _ in filters.iteritems():
-                            base_dict[key] = data_info[key]
+                        for key, value in data_info.iteritems():
+                            base_dict[key] = value
 
                         seq_writer.writerow(base_dict)
 
@@ -601,7 +601,7 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
     n_sequences = len(obs_data)
     total_mutations = 0
     total_skipped_mutations = 0
-    avg_seq_len = 0.
+    seq_lens = []
     avg_mutation_frequency = 0.
     motif_set = set([])
     mute_set = set([])
@@ -610,26 +610,18 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
     for obs_seq in obs_data:
         total_mutations += obs_seq.num_mutations
         total_skipped_mutations += obs_seq.skipped_mutations
-        avg_seq_len += float(obs_seq.seq_len) / n_sequences
+        seq_lens.append(obs_seq.seq_len)
         avg_mutation_frequency += (float(obs_seq.num_mutations) / obs_seq.seq_len) / n_sequences
         motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
         motif_set.update([item for sublist in motifs.values() for item in sublist])
-        # for mutation_pos, _ in obs_seq.mutation_pos_dict.iteritems():
-        #     central_base_mutes[motifs[mutation_pos]] += 1
-        #     for pos in range(max(mutation_pos-feat_generator.half_motif_len, 0),
-        #             min(mutation_pos+feat_generator.half_motif_len+1, obs_seq.seq_len)):
-        #         any_mutes[motifs[pos]] += 1
 
     return '\n'.join([
                 '  Number of sequences: %d' % n_sequences,
                 '  Number of mutations: %d' % total_mutations,
                 '  Number of skipped mutations (flanks): %d' % total_skipped_mutations,
-                '  Average sequence length: %f' % avg_seq_len,
-                '  Average mutation frequency: %f' % avg_mutation_frequency,
+                '  Median sequence length: %d' % int(np.median(seq_lens)),
+                '  Average mutation frequency: %.2f' % (avg_mutation_frequency * 100),
                 '  Number of motifs in dataset in the germline sequences: %d' % len(motif_set),
-                # '  Number of motifs w/ >1 central base mutation: %d' % len([val for val in central_base_mutes if val > 0]),
-                # '  Number of motifs w/ <20 mutes in central base: %d' % len([val for val in central_base_mutes if val < 20]),
-                # '  Number of motifs w/ <500 mutes in any base: %d' % len([val for val in any_mutes if val < 500]),
             ]
         )
 

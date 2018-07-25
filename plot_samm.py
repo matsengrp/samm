@@ -37,6 +37,14 @@ def parse_args():
     parser.add_argument('--no-conf-int',
         action='store_true',
         help="Remove confidence interval estimates")
+    parser.add_argument('--center-nucs',
+        type=str,
+        default='A,T,G,C',
+        help="Center nucleotides to plot")
+    parser.add_argument('--y-lab',
+        type=str,
+        default='Aggregate Theta',
+        help="y label of hedgehog plot")
 
     parser.set_defaults(no_conf_int=False)
     args = parser.parse_args()
@@ -69,7 +77,7 @@ def convert_to_csv(output_csv, theta_vals, theta_lower, theta_upper, full_feat_g
         writer.writerow(header)
         writer.writerows(data)
 
-def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per_target_model, full_feat_generator, max_motif_len):
+def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per_target_model, full_feat_generator, max_motif_len, center_nucs, y_lab):
     if per_target_model:
         targets = 'A,C,G,T'
     else:
@@ -88,7 +96,7 @@ def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, output_csv, str(max_motif_len), output_pdf, targets]
+    cmd = [command, script_file, output_csv, str(max_motif_len), output_pdf, targets, center_nucs, y_lab]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
@@ -122,7 +130,7 @@ def main(args=sys.argv[1:]):
     for col_idx in range(num_agg_cols):
         full_theta[:,col_idx], theta_lower[:,col_idx], theta_upper[:,col_idx] = feat_generator.combine_thetas_and_get_conf_int(
             method_res.refit_theta,
-            sample_obs_info=method_res.sample_obs_info,
+            variance_est=method_res.variance_est,
             col_idx=col_idx + agg_start_col,
             add_targets=False,
         )
@@ -136,7 +144,7 @@ def main(args=sys.argv[1:]):
         theta_lower = full_theta
         theta_upper = full_theta
 
-    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, max_motif_len)
+    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, max_motif_len, args.center_nucs, args.y_lab)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
