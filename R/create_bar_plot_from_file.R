@@ -18,6 +18,7 @@ motif_str <- arg[2]
 output_file <- arg[3]
 target_nucs <- unlist(strsplit(arg[4], ','))
 center_nucs <- unlist(strsplit(arg[5], ','))
+y_lab <- arg[6]
 
 motif_lens <- as.integer(unlist(strsplit(motif_str, ',')))
 
@@ -39,7 +40,8 @@ plot_list <- plotBarchart(raw_data,
                           style='bar',
                           bar.size=.25,
                           y_lim=y_lim,
-                          rect_height=0.6)
+                          rect_height=0.6,
+                          y_lab=y_lab)
 image <- do.call('grid.arrange', args = c(plot_list, ncol = max(1, length(center_nucs)/2)))
 if (length(center_nucs) > 1) {
     ggsave(file=output_file, plot=image, width=15, height=8*length(target_nucs) * 2, limitsize=FALSE)

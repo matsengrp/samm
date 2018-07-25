@@ -45,6 +45,10 @@ def parse_args():
         type=str,
         default=None,
         help="logistic pickle file")
+    parser.add_argument('--y-lab',
+        type=str,
+        default='aggregate theta',
+        help="y label of hedgehog plot")
 
     args = parser.parse_args()
 
@@ -102,7 +106,7 @@ def main(args=sys.argv[1:]):
     theta_upper = full_theta
 
     per_target_model = full_theta.shape[1] > 1
-    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, MOTIF_LEN, args.center_nucs)
+    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, MOTIF_LEN, args.center_nucs, args.y_lab)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

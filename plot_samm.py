@@ -41,6 +41,10 @@ def parse_args():
         type=str,
         default='A,T,G,C',
         help="Center nucleotides to plot")
+    parser.add_argument('--y-lab',
+        type=str,
+        default='aggregate theta',
+        help="y label of hedgehog plot")
 
     parser.set_defaults(no_conf_int=False)
     args = parser.parse_args()
@@ -73,7 +77,7 @@ def convert_to_csv(output_csv, theta_vals, theta_lower, theta_upper, full_feat_g
         writer.writerow(header)
         writer.writerows(data)
 
-def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per_target_model, full_feat_generator, max_motif_len, center_nucs):
+def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per_target_model, full_feat_generator, max_motif_len, center_nucs, y_lab):
     if per_target_model:
         targets = 'A,C,G,T'
     else:
@@ -92,7 +96,7 @@ def plot_theta(output_csv, full_theta, theta_lower, theta_upper, output_pdf, per
     command = 'Rscript'
     script_file = 'R/create_bar_plot_from_file.R'
 
-    cmd = [command, script_file, output_csv, str(max_motif_len), output_pdf, targets, center_nucs]
+    cmd = [command, script_file, output_csv, str(max_motif_len), output_pdf, targets, center_nucs, y_lab]
     print "Calling:", " ".join(cmd)
     res = subprocess.call(cmd)
 
@@ -140,7 +144,7 @@ def main(args=sys.argv[1:]):
         theta_lower = full_theta
         theta_upper = full_theta
 
-    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, max_motif_len, args.center_nucs)
+    plot_theta(args.output_csv, full_theta, theta_lower, theta_upper, args.output_pdf, per_target_model, full_feat_generator, max_motif_len, args.center_nucs, args.y_lab)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
