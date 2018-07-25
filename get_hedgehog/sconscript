@@ -240,13 +240,53 @@ def plot_hedgehog_shazam(env, outdir, c):
 
     cmd = ['python plot_shazam.py',
            '--mut',
+           '${SOURCES[2]}',
+           '--output-csv',
+           '${TARGETS[0]}',
+           '--output-pdf',
+           '${TARGETS[1]}',
+           '--center-nucs C']
+
+    return env.Command(
+        [join(outdir, 'fitted_shazam_C_only.csv'), join(outdir, 'fitted_shazam_C_only.pdf')],
+        c['fit_shazam'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def plot_hedgehog_sammcomp(env, outdir, c):
+    motif_len = c['motif_params']['motif_length']
+    left_flanks = c['motif_params']['left_motif_flanks']
+
+    cmd = ['python plot_samm.py',
+           '--input-pkl',
            '${SOURCES[0]}',
            '--output-csv',
            '${TARGETS[0]}',
            '--output-pdf',
-           '${TARGETS[1]}']
+           '${TARGETS[1]}',
+           '--center-nucs C',
+           '--no-conf-int']
 
     return env.Command(
-        [join(outdir, 'fitted_shazam.csv'), join(outdir, 'fitted_shazam.pdf')],
-        [join(outdir, 'fitted_shazam_mut.csv')],
+        [join(outdir, 'fitted_samm_C_only.csv'), join(outdir, 'fitted_samm_C_only.pdf')],
+        c['fit_survival'],
+        ' '.join(map(str, cmd)))
+
+@nest.add_target_with_env(localenv)
+def plot_hedgehog_logistic(env, outdir, c):
+    motif_len = c['motif_params']['motif_length']
+    left_flanks = c['motif_params']['left_motif_flanks']
+
+    cmd = ['python plot_shazam.py',
+           '--logistic-pkl',
+           '${SOURCES[0]}',
+           '--output-csv',
+           '${TARGETS[0]}',
+           '--output-pdf',
+           '${TARGETS[1]}',
+           '--center-nucs C']
+
+    return env.Command(
+        [join(outdir, 'fitted_logistic_C_only.csv'), join(outdir, 'fitted_logistic_C_only.pdf')],
+        c['fit_logistic'],
         ' '.join(map(str, cmd)))
