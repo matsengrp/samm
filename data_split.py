@@ -1,4 +1,5 @@
 import numpy as np
+import logging as log
 
 from sklearn.model_selection import KFold
 from sklearn.model_selection import GroupKFold
@@ -72,8 +73,8 @@ def split_train_val(num_obs, metadata, tuning_sample_ratio, validation_column=No
             val_categories = set([list(categories)[val_column_idx]])
 
         train_categories = categories - val_categories
-        print "val cate", val_categories
-        print "train cate", train_categories
+        log.info("val cate %s", val_categories)
+        log.info("train cate %s", train_categories)
         assert len(train_categories) > 0
         train_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in train_categories]
         val_idx = [idx for idx, elt in enumerate(metadata) if elt[validation_column] in val_categories]
