@@ -53,6 +53,15 @@ nest.add(
     [True, False],
 )
 
+nest.add(
+    'mutation_rate',
+    [
+        (1, 5),
+        (5, 15),
+    ],
+    label_func=lambda c: "mut%d_%d" % c,
+)
+
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
     replacement_flag = '--with-replacement' if c["replace"] else ''
@@ -68,9 +77,9 @@ def simulate(env, outdir, c):
             '--tot-mutated',
             300,
             '--min-percent-mutated',
-            0.01,
+            c['mutation_rate'][0] * 0.01,
             '--max-percent-mutated',
-            0.05,
+            c['mutation_rate'][1] * 0.01,
             '--output-mutated ${TARGETS[0]}',
             '--output-naive ${TARGETS[1]}',
             '--use-partis',
@@ -84,7 +93,7 @@ def simulate(env, outdir, c):
 
 @nest.add_target_with_env(localenv)
 def fit_survival(env, outdir, c):
-    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.0, -7.0, step=-.5)).tolist()))
+    penalty_params = ",".join(map(str, np.power(10, np.arange(-1.5, -7.0, step=-.5)).tolist()))
 
     cmd = ['python fit_samm.py',
         '--input-naive ${SOURCES[1]}',
@@ -108,9 +117,11 @@ def fit_survival(env, outdir, c):
         '--num-e-samples',
         4,
         '--sampling-rate',
-        4,
+        8,
         '--em-max-iters',
         10,
+        '--unpenalized-em-max-iters',
+        20,
         '--validation-col germline_family',
         '--num-val-burnin',
         16,

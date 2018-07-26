@@ -9,6 +9,8 @@ import csv
 import random
 import numpy as np
 
+from common import get_randint
+
 from read_data import write_partis_data_from_annotations, write_data_after_imputing, write_data_after_sampling
 from data_split import split_train_val
 from shutil import copyfile
@@ -142,7 +144,7 @@ def main(args=sys.argv[1:]):
     log.basicConfig(format="%(message)s", filename=args.log_file, level=log.DEBUG)
     random.seed(args.seed)
     np.random.seed(args.seed)
-    scratch_dir = os.path.join(args.scratch_directory, str(time.time()))
+    scratch_dir = os.path.join(args.scratch_directory, str(time.time() + get_randint()))
     if not os.path.exists(scratch_dir):
         os.makedirs(scratch_dir)
 
