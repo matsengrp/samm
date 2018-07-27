@@ -29,7 +29,6 @@ MOTIF_LEN = 5
 MUTATING_POSITION = 2
 N_CLONAL_FAMILIES = 3000
 RATIO_NONZERO = .75
-#PENALTY_PARAMS = ",".join(map(str, np.power(10, np.arange(-4.0, -7.0, step=-0.5)).tolist()))
 PENALTY_PARAMS = ",".join(map(str, [0]))
 PENALTY_PARAMS_SAMPLE = ",".join(map(str, np.power(10, np.arange(-2.0, -7.0, step=-0.5)).tolist()))
 
@@ -135,11 +134,6 @@ def convert_truth(env, outdir, c):
         control=c)
 
 tree_size_dict = [
-    #{
-    #    'n_taxa': N_CLONAL_FAMILIES,
-    #    'n_clonal_families': 2,
-    #    'size': 'one_big_tree',
-    #},
     {
         'n_taxa': None,
         'n_clonal_families': N_CLONAL_FAMILIES,
@@ -156,7 +150,6 @@ nest.add(
     'pct_mutated',
     [
         .025,
-        #.05,
     ],
     label_func='pct_mutated{:.3f}'.format)
 
@@ -204,7 +197,6 @@ nest.add(
         'imputed_ancestors',
         'all_data',
         'sample_random',
-        #'sample_highest_mutated',
     ])
 
 @nest.add_target_with_env(localenv)
@@ -286,6 +278,9 @@ def fit_survival(env, outdir, c):
                8,
                '--em-max-iters',
                10,
+               # we aren't fitting a hessian so only need 20 iters
+               '--unpenalized-em-max-iters',
+               20,
                '--num-val-burnin',
                16,
                '--num-val-samples',
