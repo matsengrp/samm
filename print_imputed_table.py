@@ -9,6 +9,12 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description=__doc__)
 
+    parser.add_argument('--input-naive',
+        type=str,
+        help='Input CSV file with naive sequences')
+    parser.add_argument('--input-mutated',
+        type=str,
+        help='Input CSV file with naive sequences')
     parser.add_argument('--true-csv',
         type=str,
         help='csv with true theta values')
@@ -40,6 +46,30 @@ def print_fcn(x):
 def main(args=sys.argv[1:]):
     args = parse_args()
 
+    ### First get cluster size statistics
+    out_str = ''
+    genes = pd.read_csv(args.input_naive)
+    seqs = pd.read_csv(args.input_mutated)
+
+    full_data = pd.merge(genes, seqs, on='germline_name')
+
+    cluster_sizes = []
+    n_singletons = 0
+    for _, cluster in full_data.groupby(['germline_name']):
+        cluster_sizes.append(len(cluster))
+        if len(cluster) == 1:
+            n_singletons += 1
+    out_str += "Cluster statistics"
+    out_str += """
+        Min cluster size: %d
+        Max cluster size: %d
+        Median cluster size: %d
+        Pct singletons: %.0f\n
+    """ % (min(cluster_sizes), max(cluster_sizes), np.median(cluster_sizes), 100 * np.mean([1. if csize == 1 else 0. for csize in cluster_sizes]))
+
+
+    ### Now get Table 3 of the manuscript (error and correlation of each processing strategy)
+    out_str += "Table 3\n"
     MODEL_LABEL = {
         "SHazaM": r"\texttt{SHazaM}",
         "samm": r"\texttt{samm}",
@@ -61,8 +91,9 @@ def main(args=sys.argv[1:]):
         'Model',
     ]
     print_df = all_df.groupby(group_cols).apply(print_fcn)
+    out_str += print_df.to_latex(escape=False)
     with open(args.outtable, 'w') as f:
-        f.write(print_df.to_latex(escape=False))
+        f.write(out_str)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
