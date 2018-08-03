@@ -3,7 +3,8 @@ plotBarchart <- function (model,
                           nucleotides = c("A", "C", "G", "T"),
                           target = c("N"),
                           style = c("hedgehog", "bar"), size = 2,
-                          bar.size = 0, y_lim = c(-5, 5), rect_height=0.5)
+                          bar.size = 0, y_lim = c(-5, 5), rect_height=0.5,
+                          y_lab = "Theta")
 {
     # Plots bar chart of mutabilities
     #
@@ -287,7 +288,7 @@ plotBarchart <- function (model,
                           legend.position = "top") +
                     guides(color = guide_legend(override.aes = list(fill = sub_colors,
                                                                     linetype = 0))) +
-                    ylab("Theta") +
+                    ylab(y_lab) +
                     scale_x_continuous(expand = c(0, 1)) +
                     scale_y_continuous(limits = y_limits,
                                        breaks = y_breaks,
