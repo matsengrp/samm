@@ -9,7 +9,7 @@ class SurvivalModelSimulator:
     A simple model that will mutate sequences based on the survival model we've assumed.
     We will suppose that the hazard is constant over time.
     """
-    def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False):
+    def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False, obs_seq_mutation=None):
         """
         @param start_seq: string for the original sequence; includes flanks unless they are provided by left_flank/right_flank
         @param left_flank: the left flank
@@ -33,9 +33,9 @@ class SurvivalModelSimulator:
         while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
             if with_replacement:
-                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank)
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, obs_seq_mutation=obs_seq_mutation)
             else:
-                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, do_feat_vec_pos=pos_to_mutate)
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, do_feat_vec_pos=pos_to_mutate, obs_seq_mutation=obs_seq_mutation)
 
             mutate_time_delta, mutate_pos, nucleotide_target = self._sample_mutation(feature_vec_dict, intermediate_seq, pos_to_mutate)
             mutate_time = last_mutate_time + mutate_time_delta
@@ -78,7 +78,7 @@ class SurvivalModelSimulator:
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
-            sample = self.simulate(start_seq=obs_seq_mutation.start_seq, left_flank=obs_seq_mutation.left_flank, right_flank=obs_seq_mutation.right_flank, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len)
+            sample = self.simulate(start_seq=obs_seq_mutation.start_seq, left_flank=obs_seq_mutation.left_flank, right_flank=obs_seq_mutation.right_flank, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len, obs_seq_mutation=obs_seq_mutation)
             raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
             raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
 

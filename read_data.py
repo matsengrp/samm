@@ -612,7 +612,7 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
         total_skipped_mutations += obs_seq.skipped_mutations
         seq_lens.append(obs_seq.seq_len)
         avg_mutation_frequency += (float(obs_seq.num_mutations) / obs_seq.seq_len) / n_sequences
-        motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
+        motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank, obs_seq_mutation=obs_seq)
         motif_set.update([item for sublist in motifs.values() for item in sublist])
 
     return '\n'.join([

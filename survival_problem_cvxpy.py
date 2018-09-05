@@ -30,6 +30,7 @@ class SurvivalProblemCVXPY(SurvivalProblem):
                 sample.obs_seq_mutation.left_flank,
                 sample.obs_seq_mutation.right_flank,
                 set(range(sample.obs_seq_mutation.seq_len)) - set(sample.mutation_order[:i])
+                obs_seq_mutation=sample.obs_seq_mutation,
             )
             # vecs_at_mutation_step[i] are the feature vectors of the at-risk group after mutation i
             feature_idx_mutated = feature_dict[mutating_pos]

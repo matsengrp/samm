@@ -83,7 +83,7 @@ class MotifFeatureGenerator(GenericFeatureGenerator):
             print_str = "motif: %s, distance to motif start: %d" % (info[0], info[1])
         return print_str
 
-    def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
+    def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks, obs_seq_mutation=None):
         """
         The fact that this module takes a flanked sequence means that some of the submotif length information is contained
         in seq_with_flanks, and we need to use flank_len_offset to get the correct feature.

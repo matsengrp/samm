@@ -83,6 +83,20 @@ class ObservedSequenceMutations:
         self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
         self.collapse_list = collapse_list
+        self.raw_pos = {}
+        # !! need to take into account offsets and collapsed nucleotides
+        for pos in range(self.seq_len):
+            raw_pos = pos + self.left_position_offset
+            for collapse_tuple in sorted(self.collapse_list, key=lambda val: val[1]):
+                start_idx = collapse_tuple[0] + collapse_tuple[1]
+                if raw_pos <= start_idx:
+                    break
+                else:
+                    # !! ?
+                    raw_pos += collapse_tuple[2] - collapse_tuple[0] - collapse_tuple[1]
+
+            self.raw_pos[pos] = raw_pos
+
         assert(self.seq_len > 0)
 
     def set_start_feats(self, feat_matrix):
