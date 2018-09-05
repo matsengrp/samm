@@ -84,17 +84,15 @@ class ObservedSequenceMutations:
         self.seq_len = len(self.start_seq)
         self.collapse_list = collapse_list
         self.raw_pos = {}
-        # !! need to take into account offsets and collapsed nucleotides
+        # need to take into account offsets and collapsed nucleotides
         for pos in range(self.seq_len):
             raw_pos = pos + self.left_position_offset
-            for collapse_tuple in sorted(self.collapse_list, key=lambda val: val[1]):
-                start_idx = collapse_tuple[0] + collapse_tuple[1]
+            for half_motif_len, string_start, string_end in sorted(self.collapse_list, key=lambda val: val[1]):
+                start_idx = self.left_position_offset + string_start - half_motif_len
                 if raw_pos <= start_idx:
                     break
                 else:
-                    # !! ?
-                    raw_pos += collapse_tuple[2] - collapse_tuple[0] - collapse_tuple[1]
-
+                    raw_pos += string_end - string_start - half_motif_len
             self.raw_pos[pos] = raw_pos
 
         assert(self.seq_len > 0)
