@@ -78,7 +78,14 @@ class SurvivalModelSimulator:
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
-            sample = self.simulate(start_seq=obs_seq_mutation.start_seq, left_flank=obs_seq_mutation.left_flank, right_flank=obs_seq_mutation.right_flank, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len, obs_seq_mutation=obs_seq_mutation)
+            sample = self.simulate(
+                start_seq=obs_seq_mutation.start_seq,
+                left_flank=obs_seq_mutation.left_flank,
+                right_flank=obs_seq_mutation.right_flank,
+                with_replacement=with_replacement,
+                percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len,
+                obs_seq_mutation=obs_seq_mutation
+            )
             raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
             raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
 
