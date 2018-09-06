@@ -1,4 +1,5 @@
 from generic_feature_generator import GenericFeatureGenerator
+from itertools import izip
 
 class PositionFeatureGenerator(GenericFeatureGenerator):
     """
@@ -9,28 +10,45 @@ class PositionFeatureGenerator(GenericFeatureGenerator):
     def __init__(
             self,
             breaks=[],
+            labels=None,
             max_seq_len=500,
             model_truncation=None,
-            feats_to_remove=[],
+            feats_to_remove=None,
         ):
         """
         @param breaks: numeric vector with one or more break to divide sequence; cuts sequence into intervals [a,b)
-            e.g., a sequence of length 10 and breaks [1, 5] yields three regions:
+            e.g., a sequence of length 10 and breaks [0, 1, 5, 10] yields three regions:
                 [0,1) (i.e., just the first position),
                 [1, 5),
                 [5, 10) (latter half of sequence)
             defaults to each position being a separate feature, i.e., breaks=range(len(seq))
             position of sequence starts at beginning of *raw* sequence before end-processing
+        @param labels: character vector of labels for each interval; must be same length as breaks minus one
+            e.g., in the above breaks=[0, 1, 5, 10], if we pass labels=['A', 'B', 'A'] then [0,1) and [5,10) will have the
+            same coefficient and be labeled 'A'.
+            defaults to each region having a unique, numeric label ([0, 1, 2] in the above example)
         @param model_truncation: ModelTruncation object
         @param feats_to_remove: list of features to remove if a model has not been fit yet
         """
         self.max_seq_len = max_seq_len
 
-        breaks = self._process_breaks(breaks)
         if not breaks:
             breaks = range(self.max_seq_len)
 
+        breaks = sorted(breaks)
+        if len(breaks) > len(set(breaks)):
+            raise ValueError('Cut points must be unique')
+        if min(breaks) < 0 or max(breaks) > max_seq_len:
+            raise ValueError('Invalid cut point provided')
+
+        if labels is None:
+            labels = [idx for idx in range(len(breaks)-1)]
+
+        if len(labels) != len(breaks) - 1:
+            raise ValueError('Invalid labels provided')
+
         self.breaks = breaks
+        self.labels = labels
 
         self.feats_to_remove = model_truncation.feats_to_remove if model_truncation is not None else []
         if feats_to_remove is not None:
@@ -38,36 +56,24 @@ class PositionFeatureGenerator(GenericFeatureGenerator):
 
         self.update_feats_after_removing(self.feats_to_remove)
 
-    def _process_breaks(self, breaks):
-        """
-        process break vector
-        """
-        processed_breaks = []
-        for brk in sorted(list(set(breaks))):
-            if brk < 0:
-                continue
-            elif brk >= self.max_seq_len:
-                processed_breaks.append(self.max_seq_len)
-                break
-            processed_breaks.append(brk)
-
-        return processed_breaks
-
     def update_feats_after_removing(self, feats_to_remove=[]):
         """
         take existing MotifGenerator and update it with features to remove
         """
+        label_dict = {lab: [] for lab in self.labels}
+        for start, end, lab in izip(self.breaks, self.breaks[1:], self.labels):
+            label_dict[lab].append((start, end))
 
-        all_feature_info_list = [('position', start, end) for start, end in zip(self.breaks, self.breaks[1:])]
+        all_feature_info_list = [(lab, break_list) for lab, break_list in sorted(label_dict.iteritems())]
         self.feature_info_list = [feat_tuple for feat_tuple in all_feature_info_list if feat_tuple not in feats_to_remove]
 
         self.pos_dict = {i: None for i in range(self.max_seq_len)}
-        for idx, (lab, start, end) in enumerate(all_feature_info_list):
-            if (lab, start, end) in feats_to_remove:
-                continue
+        for idx, (lab, break_list) in enumerate(self.feature_info_list):
             for pos in range(self.max_seq_len):
-                if pos in range(start, end):
-                    self.pos_dict[pos] = idx
+                for start, end in break_list:
+                    if pos in range(start, end):
+                        self.pos_dict[pos] = idx
+                        break
 
         self.feature_vec_len = len(self.feature_info_list)
 
@@ -77,13 +83,10 @@ class PositionFeatureGenerator(GenericFeatureGenerator):
 
         @param info: an element of feature_info_list
         """
-        _, start, end = info
-        if start == 0:
-            print_str = "position: [start, %d)" % end
-        elif end == self.max_seq_len:
-            print_str = "position: [%d, end)" % start
-        else:
-            print_str = "position: [%d, %d)" % (start, end)
+        lab, break_list = info
+        print_str = "position: %s, " % lab
+        print_str += "; ".join(["[%d, %d)" % (start, end) for start, end in break_list])
+
         return print_str
 
     def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks, obs_seq_mutation):
