@@ -257,16 +257,16 @@ def soft_threshold(theta, thres):
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
 
-def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
+def process_degenerates_and_impute_nucleotides(start_seq, end_seq, max_flank_len, threshold=0.1):
     """
     Process the degenerate characters in sequences:
     1. Replace unknown characters with "n"
-    2. Collapse runs of "n"s into one of motif_len/2
+    2. Collapse runs of "n"s into one of max_flank_len
     3. Replace all interior "n"s with nonmutating random nucleotide
 
     @param start_seq: starting sequence
     @param end_seq: ending sequence
-    @param motif_len: motif length; needed to determine length of collapsed "n" run
+    @param max_flank_len: max flank length; needed to determine length of collapsed "n" run
     @param threshold: if proportion of "n"s in a sequence is larger than this then
         throw a warning
 
@@ -281,9 +281,8 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     processed_end_seq = re.sub('[^agctn]', 'n', end_seq)
 
     # conform unknowns and collapse "n"s
-    # !! should this be changed based on adjacent motifs?
-    repl = 'n' * (motif_len/2)
-    pattern = repl + '+' if motif_len > 1 else 'n'
+    repl = 'n' * (max_flank_len)
+    pattern = repl + 'n+' if max_flank_len > 0 else 'n'
     collapse_list = []
     if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
         # if one sequence has an "n" but the other doesn't, make them both have "n"s
@@ -310,7 +309,7 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
         for match in re.finditer(pattern, interior_end_seq):
             # num "n"s removed
             # starting position of "n"s removed
-            collapse_list.append((motif_len/2, match.regs[0][0], match.regs[0][1]))
+            collapse_list.append((max_flank_len, match.regs[0][0], match.regs[0][1]))
 
         interior_start_seq = processed_start_seq[start_idx:end_idx]
         interior_start_seq = re.sub(pattern, repl, interior_start_seq)

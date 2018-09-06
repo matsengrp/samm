@@ -65,16 +65,23 @@ class SurvivalModelSimulator:
             mutations,
         )
 
-    def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5):
+    def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5, left_flank_len=None, right_flank_len=None):
         """
         Simulates a dataset with similar germlines and mutation positions/rates as an observed dataset
 
         @param obs_data: data to mimic in simulation
         @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
         @param motif_len: length of motif, for data processing
+        @param left_flank_len: maximum left flank length for this motif length
+        @param right_flank_len: maximum right flank length for this motif length
 
         @return list of ObservedSequenceMutations
         """
+        if left_flank_len is None or right_flank_len is None:
+            # default to central base mutating
+            left_flank_len = motif_len/2
+            right_flank_len = motif_len/2
+
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
@@ -92,7 +99,7 @@ class SurvivalModelSimulator:
             start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
                 raw_start_seq,
                 raw_end_seq,
-                motif_len,
+                max(left_flank_len, right_flank_len),
             )
 
             sim_seq_mutation = ObservedSequenceMutations(

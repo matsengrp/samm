@@ -510,7 +510,7 @@ def get_sequence_mutations_from_tree(tree, motif_len=5, left_flank_len=None, rig
             start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
                 descendant.up.sequence.lower(),
                 descendant.sequence.lower(),
-                motif_len
+                max(left_flank_len, right_flank_len),
             )
 
             obs_seq_mutation = ObservedSequenceMutations(
@@ -562,7 +562,7 @@ def read_gene_seq_csv_data(
         for idx, elt in cluster.iterrows():
             n_mutes = 0
             current_obs_seq_mutation = None
-            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), max(left_flank_len, right_flank_len))
 
             obs_seq_mutation = ObservedSequenceMutations(
                     start_seq=start_seq,
