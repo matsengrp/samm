@@ -44,8 +44,8 @@ class MethodResults:
         """
         if get_saturated:
             self.has_saturated_fit = True
-            self.saturated_feature_generator = saturated_feature_generator
-            self.saturated_theta = saturated_theta
+            self.saturated_feature_generator = refit_feature_generator
+            self.saturated_theta = refit_theta
         else:
             self.has_refit_data = True
             self.refit_feature_generator = refit_feature_generator
