@@ -127,38 +127,50 @@ class ContextModelAlgo:
         log.info(get_nonzero_theta_print_lines(penalized_theta, self.feat_generator))
         return curr_model_results
 
-    def refit_unpenalized(self, obs_data, model_result, max_em_iters, hessian_check_iter=None, get_hessian=True, pool=None):
+    def refit_unpenalized(self, obs_data, model_result, max_em_iters, hessian_check_iter=None, get_hessian=True, pool=None, get_saturated=False):
         """
         Refit the model
         Modifies model_result
         """
-        model_masks = model_result.model_masks
-
-        log.info("Refit theta size: %d" % model_masks.zero_theta_mask_refit.size)
-        if model_masks.zero_theta_mask_refit.size == 0:
-            return
-
         # Create a feature generator for this shrunken model
         feat_generator_stage2 = copy.deepcopy(self.feat_generator)
-        # needed for when passing in user-supplied feats_to_remove
-        all_feats_to_remove = model_masks.feats_to_remove + self.feat_generator.feats_to_remove
-        feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
+
+        if get_saturated:
+            get_hessian = False
+            hessian_check_iter = None
+            model_masks = model_result.model_masks
+            possible_theta_mask_refit = self.possible_theta_mask
+            init_theta = initialize_theta(self.theta_shape, self.possible_theta_mask, self.zero_theta_mask)
+            zero_theta_mask_refit = self.zero_theta_mask
+        else:
+            model_masks = model_result.model_masks
+
+            # needed for when passing in user-supplied feats_to_remove
+            all_feats_to_remove = model_masks.feats_to_remove + self.feat_generator.feats_to_remove
+            feat_generator_stage2.update_feats_after_removing(all_feats_to_remove)
+
+            # Create the theta mask for the shrunken theta
+            possible_theta_mask_refit = feat_generator_stage2.get_possible_motifs_to_targets(
+                model_masks.zero_theta_mask_refit.shape,
+            )
+            # Refit over the support from the penalized problem
+            init_theta = model_result.penalized_theta[~model_masks.feats_to_remove_mask,:]
+            init_theta[model_masks.zero_theta_mask_refit] = 0
+            zero_theta_mask_refit = model_masks.zero_theta_mask_refit
+
+        log.info("Refit theta size: %d" % zero_theta_mask_refit.size)
+        if zero_theta_mask_refit.size == 0:
+            return
+
         # Get the data ready - using ALL data
         obs_data_stage2 = [copy.deepcopy(o) for o in obs_data]
         feat_generator_stage2.add_base_features_for_list(obs_data_stage2)
-        # Create the theta mask for the shrunken theta
-        possible_theta_mask_refit = feat_generator_stage2.get_possible_motifs_to_targets(
-            model_masks.zero_theta_mask_refit.shape,
-        )
-        # Refit over the support from the penalized problem
-        init_theta = model_result.penalized_theta[~model_masks.feats_to_remove_mask,:]
-        init_theta[model_masks.zero_theta_mask_refit] = 0
         refit_theta, variance_est, sample_obs_info, _ = self.em_algo.run(
             obs_data_stage2,
             feat_generator_stage2,
             theta=init_theta, # initialize from the lasso version
             possible_theta_mask=possible_theta_mask_refit,
-            zero_theta_mask=model_masks.zero_theta_mask_refit,
+            zero_theta_mask=zero_theta_mask_refit,
             burn_in=self.burn_in,
             penalty_params=(0,0), # now fit with no penalty
             max_em_iters=max_em_iters,
@@ -177,16 +189,24 @@ class ContextModelAlgo:
             variance_est,
             sample_obs_info,
             possible_theta_mask_refit,
+            get_saturated=get_saturated,
         )
 
-    def calculate_residuals(self, model_result, obs_data):
+    def calculate_residuals(self, model_result, obs_data, use_null_model=False, use_saturated=False):
         """
         Similar to refit_unpenalized, but calculates residuals from refit theta
         Modifies model_result
         """
+        assert(not (use_null_model and use_saturated))
+
         # Create a feature generator for this shrunken model
         feat_generator_stage2 = copy.deepcopy(self.feat_generator)
-        if not model_result.has_refit_data:
+        if use_null_model:
+            theta = np.zeros(self.theta_shape)
+        elif use_saturated:
+            assert(model_result.has_saturated_fit)
+            theta = model_result.saturated_theta
+        elif not model_result.has_refit_data:
             # no refit data to get residuals from
             theta = model_result.penalized_theta
         else:
@@ -218,7 +238,7 @@ class ContextModelAlgo:
             self.burn_in,
             sampling_rate=self.sampling_rate,
         )
-        model_result.set_sampler_results(sampler_results)
+        model_result.set_sampler_results(sampler_results, use_null_model=use_null_model, use_saturated=use_saturated)
 
     def calculate_confidence_intervals(self, model_result, z=1.96):
         """
