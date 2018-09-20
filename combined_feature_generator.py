@@ -122,12 +122,12 @@ class CombinedFeatureGenerator(FeatureGenerator):
         self.num_feat_gens = len(self.feat_gens)
         self.feature_vec_len = np.sum(feat_offsets)
 
-    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None, obs_seq_mutation=None):
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
         feat_vec_dict = {pos:[] for pos in do_feat_vec_pos}
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos)
+            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos, obs_seq_mutation)
             for pos in do_feat_vec_pos:
                 feat = f_dict[pos]
                 if feat is not None:

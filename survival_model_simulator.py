@@ -9,7 +9,7 @@ class SurvivalModelSimulator:
     A simple model that will mutate sequences based on the survival model we've assumed.
     We will suppose that the hazard is constant over time.
     """
-    def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False):
+    def simulate(self, start_seq, left_flank=None, right_flank=None, censoring_time=None, percent_mutated=None, with_replacement=False, obs_seq_mutation=None):
         """
         @param start_seq: string for the original sequence; includes flanks unless they are provided by left_flank/right_flank
         @param left_flank: the left flank
@@ -33,9 +33,9 @@ class SurvivalModelSimulator:
         while len(pos_to_mutate) > 0:
             # TODO: For speedup, we don't need to recalculate all the features.
             if with_replacement:
-                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank)
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, obs_seq_mutation=obs_seq_mutation)
             else:
-                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, do_feat_vec_pos=pos_to_mutate)
+                feature_vec_dict = self.feature_generator.create_for_sequence(intermediate_seq, left_flank, right_flank, do_feat_vec_pos=pos_to_mutate, obs_seq_mutation=obs_seq_mutation)
 
             mutate_time_delta, mutate_pos, nucleotide_target = self._sample_mutation(feature_vec_dict, intermediate_seq, pos_to_mutate)
             mutate_time = last_mutate_time + mutate_time_delta
@@ -65,27 +65,41 @@ class SurvivalModelSimulator:
             mutations,
         )
 
-    def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5):
+    def simulate_dataset_from_observed(self, obs_data, with_replacement=False, motif_len=5, left_flank_len=None, right_flank_len=None):
         """
         Simulates a dataset with similar germlines and mutation positions/rates as an observed dataset
 
         @param obs_data: data to mimic in simulation
         @param with_replacement: True = a position can mutate multiple times, False = a position can mutate at most once
         @param motif_len: length of motif, for data processing
+        @param left_flank_len: maximum left flank length for this motif length
+        @param right_flank_len: maximum right flank length for this motif length
 
         @return list of ObservedSequenceMutations
         """
+        if left_flank_len is None or right_flank_len is None:
+            # default to central base mutating
+            left_flank_len = motif_len/2
+            right_flank_len = motif_len/2
+
         simulated_data = []
         for idx, obs_seq_mutation in enumerate(obs_data):
             pos_to_mutate = obs_seq_mutation.mutation_pos_dict.keys()
-            sample = self.simulate(start_seq=obs_seq_mutation.start_seq, left_flank=obs_seq_mutation.left_flank, right_flank=obs_seq_mutation.right_flank, with_replacement=with_replacement, percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len)
+            sample = self.simulate(
+                start_seq=obs_seq_mutation.start_seq,
+                left_flank=obs_seq_mutation.left_flank,
+                right_flank=obs_seq_mutation.right_flank,
+                with_replacement=with_replacement,
+                percent_mutated=float(obs_seq_mutation.num_mutations)/obs_seq_mutation.seq_len,
+                obs_seq_mutation=obs_seq_mutation
+            )
             raw_start_seq = sample.left_flank + sample.start_seq + sample.right_flank
             raw_end_seq = sample.left_flank + sample.end_seq + sample.right_flank
 
             start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
                 raw_start_seq,
                 raw_end_seq,
-                motif_len,
+                max(left_flank_len, right_flank_len),
             )
 
             sim_seq_mutation = ObservedSequenceMutations(

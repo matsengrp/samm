@@ -12,7 +12,7 @@ class ObservedSequenceMutations:
         @param collapse_list: list of tuples of (index offset, start index of run of "n"s, end index of run of "n"s) for bookkeeping later
 
         This class goes through half the sequence forward and finds the position where
-        there are motif_len/2 conserved nucleotides, and does the same in reverse.
+        there are left_flank_len conserved nucleotides, and does the same in reverse with right_flank_len nucleotides.
 
         Additionally, since we aren't generating features for any of the flanking nucleotides,
         it keeps an extra property self.flanks while saying that the start and end sequence
@@ -34,9 +34,6 @@ class ObservedSequenceMutations:
         start_idx = 0
         end_idx = len(start_seq)
 
-        skipped_left = 0
-        skipped_right= 0
-
         # Go through half the sequence forward to find beginning conserved nucleotides
         # Also skip ns
         for flank_start_idx in range(len(start_seq)/2):
@@ -46,7 +43,6 @@ class ObservedSequenceMutations:
                  start_seq[flank_start_idx] == DEGENERATE_NUCLEOTIDE or \
                  end_seq[flank_start_idx] == DEGENERATE_NUCLEOTIDE:
                 start_idx = flank_start_idx + 1
-                skipped_left += 1
 
         # Go through remaining half the sequence backward to find ending conserved nucleotides
         # Also skip ns
@@ -56,8 +52,10 @@ class ObservedSequenceMutations:
             elif start_seq[flank_end_idx] != end_seq[flank_end_idx] or \
                  start_seq[flank_end_idx] == DEGENERATE_NUCLEOTIDE or \
                  end_seq[flank_end_idx] == DEGENERATE_NUCLEOTIDE:
-                end_idx = flank_end_idx + 1
-                skipped_right += 1
+                end_idx = flank_end_idx
+
+        skipped_left = start_idx
+        skipped_right = len(start_seq) - end_idx
 
         self.left_flank = start_seq[start_idx:start_idx + left_flank_len]
         self.right_flank = start_seq[end_idx - right_flank_len:end_idx]
@@ -83,6 +81,17 @@ class ObservedSequenceMutations:
         self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
         self.collapse_list = collapse_list
+        self.raw_pos = {}
+        # need to take into account offsets and collapsed nucleotides
+        for pos in range(self.seq_len):
+            raw_pos = pos + self.left_position_offset
+            for half_motif_len, string_start, string_end in sorted(self.collapse_list, key=lambda val: val[1]):
+                if raw_pos <= self.left_position_offset + string_start - half_motif_len:
+                    break
+                else:
+                    raw_pos += string_end - string_start - half_motif_len
+            self.raw_pos[pos] = raw_pos
+
         assert(self.seq_len > 0)
 
     def set_start_feats(self, feat_matrix):
