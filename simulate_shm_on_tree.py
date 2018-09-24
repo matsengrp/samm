@@ -202,7 +202,7 @@ def _get_clonal_family_stats(path_to_annotations, metadata, use_np=False, use_im
         from utils import add_implicit_info, process_input_line
         import glutils
         glfo = glutils.read_glfo(data_info['germline_file'], locus=data_info['locus'])
-        with open(data_info['annotations_file'][0], "r") as csvfile:
+        with open(data_info['annotations_file'], "r") as csvfile:
             reader = csv.DictReader(csvfile)
             for idx, line in enumerate(reader):
                 # add goodies from partis
