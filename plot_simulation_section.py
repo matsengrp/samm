@@ -95,6 +95,9 @@ FIT_TYPES = [
 ]
 
 def _collect_statistics(fitted_models, args, true_thetas, stat, fit_type):
+    """
+    @param fit_type: either "refit" or "penalized"
+    """
     statistics = []
     stat_func = _get_stat_func(stat)
     for fmodel in fitted_models:
