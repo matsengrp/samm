@@ -109,7 +109,7 @@ def _get_flat_processed_residuals(residual_list, metadata=None, trim_proportion=
 
     return xval, residuals, flat_residuals, offset
 
-def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start', region_bounds=[], title='Residuals vs. Position', xlabel='residual', alpha=1., pointsize=5, linesize=1, fontsize=8):
+def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start', region_bounds=[], region_labels=[], title='Residuals vs. Position', ylabel='residual', alpha=1., pointsize=5, linesize=1, fontsize=8):
     """
     Plot martingale residuals per nucleotide position
 
@@ -124,8 +124,9 @@ def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_pr
     @param recenter: recenter plot around value at center_col
     @param center_col: column in metadata that has the centering position
     @param region_bounds: list of positions showing where to plot FW/CDR region boundaries
+    @param region_labels: list of labels showing what region is what
     @param title: title of plot
-    @param xlabel: xlabel of plot
+    @param ylabel: ylabel of plot
     @param alpha: alpha parameter for points
     @param pointsize: size of scatterplot points
     @param linesize: thickness of lowess line
@@ -154,26 +155,41 @@ def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_pr
         xval,
         flat_residuals,
         dropna=True,
-        scatter_kws={'alpha': alpha, 's': pointsize, 'color': 'black'},
         line_kws={'color': 'black', 'lw': linesize},
-        #lowess=True,
         fit_reg=False,
         ax=ax
     )
     ax.axhline(y=0, color='black', linestyle='--', linewidth=linesize)
     ax.set_xlabel('nucleotide position', fontsize=fontsize)
-    ax.set_ylabel(xlabel, fontsize=fontsize)
+    ax.set_ylabel(ylabel, fontsize=fontsize)
     ax.tick_params(labelsize=fontsize)
     ax.set_title(title, fontsize=fontsize)
     increment = int(AXIS_INCREMENT * round(float(seq_len)/(10*AXIS_INCREMENT)))
     ax.set_xticks(np.arange(np.min(xval), np.max(xval), increment))
     ax.set_xticklabels(np.arange(np.min(xval), np.max(xval), increment), fontsize=fontsize/2)
+
     if recenter:
         ax.axvline(x=0, color='black', linestyle='--', linewidth=linesize)
-    if align:
-        for bound in region_bounds:
-            if bound < seq_len:
-                ax.axvline(x=bound-offset, color='black', linestyle=':', linewidth=1)
+    top_ticks = []
+    top_labels = []
+    if region_bounds:
+        for idx, (bound1, bound2) in enumerate(pairwise(region_bounds)):
+            top_ticks.append(.5 * (bound1 + bound2))
+            if not (idx % 2):
+                top_labels.append(region_labels[idx])
+                continue
+            top_labels.append(region_labels[idx])
+            ax.axvspan(bound1, bound2, ymin=.01, ymax=.99, alpha=0.5, color='gray')
+
+    ax.legend()
+
+    ax2 = ax.twiny()
+    ax2.set_xticks(top_ticks)
+    ax2.set_xticklabels(top_labels)
+    ax2.xaxis.set_ticks_position('top')
+    ax2.xaxis.set_label_position('top')
+    ax2.set_xlim(ax.get_xlim())
+
     return residuals
 
 def plot_model_scatter(all_df, fname, hue_var=None, df_labels=['1', '2'], alpha=.5, linesize=3, legend_labels=None, title=''):
