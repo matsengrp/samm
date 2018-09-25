@@ -12,6 +12,17 @@ AXIS_INCREMENT = 5
 THETA_MIN = -5
 THETA_MAX = 5
 
+# Colors used in theta plots; RGB values plus an alpha value (courtesy Kleinstein group)
+GRAY = (153. / 255, 153. / 255, 153. / 255, 1.)
+GREEN = (77. / 255, 175. / 255, 74. / 255, 1.)
+RED = (239. / 255, 26. / 255, 28. / 255, 1.)
+BLUE = (9. / 255, 77. / 255, 133. / 255, 1.)
+
+# additional colors
+YELLOW = (255. / 255, 215. / 255, 0. / 255, 1.)
+PURPLE = (128. / 255, 0. / 255, 255. / 255, 1.)
+YELLOW_ORANGE = (252. / 255, 209. / 255, 22. / 255, 1.)
+
 def _align(metadata, residual_list, gap_dict):
     """
     Align to IMGT gaps
@@ -267,3 +278,139 @@ def plot_model_scatter_on_axis(all_df, ax, df_labels=['1', '2'], alpha=.5, lines
     sns_plot.set(xlim=(THETA_MIN, THETA_MAX))
     sns_plot.set(title=title)
 
+def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
+    """
+    Plot theta values linearly---plot the top n positive and top n negative values
+
+    TODO: documentation
+    """
+    sort_indices = [i[0] for i in sorted(enumerate(input_mutabilities), key=lambda k: k[1][1], reverse=True)]
+    if n < len(sort_indices) / 2:
+        indices = sort_indices[:n] + sort_indices[-n:]
+        title += '\n (top {} values)'.format(len(indices)/2)
+    else:
+        # these are all the theta values
+        indices = sort_indices
+        title += '\n (num nonzeros={})'.format(len(indices))
+
+    mutability_info = [input_info[i] for i in indices]
+
+    # Add dummy values to vectors
+    if n < len(sort_indices) / 2:
+        mutability_info.insert(
+            n,
+            {
+                'mutability': (0., 0., 0.),
+                'feature_type': None
+                'label': r'$\vdots$',
+                'color': None,
+                'mut_pos': None,
+                'motif': None,
+            }
+        )
+
+    # Color features; default color is light gray
+    colors = np.array([GRAY] * len(mutability_info))
+    y = []
+    ylo = []
+    yhi = []
+    for idx, info in enumerate(mutability_info):
+        # Currently hard-coded to assume fwr/cdr with yellow-orange as the default for any position feature
+        if info['feature_type'] == 'position':
+            if 'fwr' in feat_label:
+                colors[idx,:] = PURPLE
+            else:
+                colors[idx,:] = YELLOW_ORANGE
+        if info['feature_type'] == 'motif':
+            motif = info['motif']
+            motif_len = len(info['motif'])
+            if info['mut_pos'] not in range(motif_len):
+                colors[idx,:] = YELLOW
+            else:
+                known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, mut_pos)
+                str_name = ''
+                for spot_name, spot_regex in known_hot_cold:
+                    if is_re_match(spot_regex, motif):
+                        if 'hot' in spot_name and motif[mut_pos] == 'a' or motif[mut_pos] == 't':
+                            colors[idx,:] = GREEN
+                        elif 'hot' in spot_name:
+                            colors[idx,:] = RED
+                        elif 'cold' in spot_name:
+                            colors[idx,:] = BLUE
+                        break
+        # change alpha value of features that have CIs overlapping with zero
+        if not (info['mutability'][2] < 0 or info['mutability'][0] > 0):
+            colors[idx,3] = .2
+        y.append(info['mutability'][1])
+        ylo.append(info['mutability'][1]-info['mutability'][0])
+        yhi.append(info['mutability'][2]-info['mutability'][1])
+
+    nobs = len(y)
+    x = np.array(range(nobs))
+    errors = np.array([ylo, yhi])
+    errors = np.reshape(errors, (2, len(ylo)))
+
+    ax.scatter(x, y, s=15, c=colors)
+    ax.errorbar(x, y, yerr=errors, xerr=None, ls='none', elinewidth=1.7, c=colors)
+    ax.axhline(y=0, color='black', linestyle='--', linewidth=1)
+    ax.set_xticks(range(nobs))
+
+    # change font sizes based on how many labels we have
+    if nobs < 60:
+        fontsize = 12
+    elif nobs < 100:
+        fontsize = 10
+    else:
+        fontsize = 8
+
+    ax.set_xticklabels(feat_labels, rotation='vertical', fontsize=fontsize)
+    ax.yaxis.set_tick_params(labelsize=16)
+    ax.set_ylabel(ylabel, fontsize=16)
+    ax.set_title(title, fontsize=24)
+    for xtick, color in zip(ax.get_xticklabels(), colors):
+        xtick.set_color(color)
+
+def get_mutability_info(method_res):
+    """
+    Compute list of dicts for input into plot_linear_top_n
+
+    TODO: documentation
+    """
+    feat_gen = method_res.refit_feature_generator
+    theta = method_res.refit_theta
+
+    output_info = []
+    for i, info in enumerate(zip(feat_gen.feature_info_list)):
+        out_dict = {}
+        if method_res.has_conf_ints:
+            out_dict['mutability'] = (method_res.conf_ints[i, 0], theta[i, 0], method_res.conf_ints[i, 2])
+        else:
+            out_dict['mutability'] = (theta[i, 0], theta[i, 0], theta[i, 0])
+
+        # currently a bit of a hack so already-fit models can be plotted
+        # basically if the second element of feature info is a list it's a position feature
+        if isinstance(info[1], list):
+            # position feature
+            out_dict['feature_type'] = 'position'
+            out_dict['motif'] = None
+            out_dict['mut_pos'] = None
+            out_dict['label'] = r"%s" % info[0]
+        else:
+            # motif feature
+            motif, pos = info
+            out_dict['feature_type'] = 'motif'
+            out_dict['motif'] = motif
+            out_dict['mut_pos'] = -pos
+            motif, pos = info
+            mlen = len(motif)
+            if pos <= 0 and -pos <= mlen - 1:
+                # kmer
+                out_dict['label'] = r'\texttt{%s\underline{%s}%s}' % (motif[:-pos], motif[-pos], motif[-pos+1:])
+            else:
+                # adjacent motif
+                if pos < 0:
+                    out_dict['label'] = r"$\texttt{%s}$-%d" % (motif, -pos)
+                else:
+                    out_dict['label'] = r"$\texttt{%s}$+%d" % (motif, pos)
+        output_info.append(out_dict)
+    return output_info
