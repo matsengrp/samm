@@ -320,7 +320,7 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
     for idx, info in enumerate(mutability_info):
         # Currently hard-coded to assume fwr/cdr with yellow-orange as the default for any position feature
         if info['feature_type'] == 'position':
-            if 'fwr' in feat_label:
+            if 'fwr' in info['label']:
                 colors[idx,:] = PURPLE
             else:
                 colors[idx,:] = YELLOW_ORANGE
@@ -362,11 +362,11 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
 
     # change font sizes based on how many labels we have
     if nobs < 60:
-        fontsize = 12
-    elif nobs < 100:
         fontsize = 10
-    else:
+    elif nobs < 100:
         fontsize = 8
+    else:
+        fontsize = 6
 
     ax.set_xticklabels(feat_labels, rotation='vertical', fontsize=fontsize)
     ax.yaxis.set_tick_params(labelsize=16)
