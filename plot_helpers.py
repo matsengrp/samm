@@ -284,7 +284,14 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
     """
     Plot theta values linearly---plot the top n positive and top n negative values
 
-    TODO: documentation
+    @param mutability_info: list of dictionaries that is the output of get_mutability_info
+    @param ax: axis on which to plot current residuals; useful for plt.subplots calls
+    @param n: number of highest and lowest theta values to plot---if the number of nonzeros is greater than 2*n then plot all variables
+    @param n: number of highest and lowest theta values to plot---if the number of nonzeros is greater than 2*n then plot all variables
+    @param title: title of plot
+    @param ylabel: ylabel of plot
+
+    @return: None, just plot
     """
     # first sort by mutability and only take top (and bottom) n of them
     num_nonzero = len(mutability_info)
@@ -379,8 +386,12 @@ def get_mutability_info(method_res):
     """
     Compute list of dicts for input into plot_linear_top_n
 
-    TODO: documentation
+    @param method_res: a MethodResults() object from a samm fit; must have refit data
+
+    @return list of dictionaries for input into plot_linear_top_n
     """
+    assert(method_res.has_refit_data)
+
     feat_gen = method_res.refit_feature_generator
     theta = method_res.refit_theta
 
