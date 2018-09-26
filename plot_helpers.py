@@ -8,6 +8,8 @@ import seaborn as sns
 sns.set_style('white')
 sns.set_style('ticks')
 
+from common import is_re_match, compute_known_hot_and_cold, HOT_COLD_SPOT_REGS
+
 AXIS_INCREMENT = 5
 THETA_MIN = -5
 THETA_MAX = 5
@@ -284,24 +286,24 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
 
     TODO: documentation
     """
-    sort_indices = [i[0] for i in sorted(enumerate(input_mutabilities), key=lambda k: k[1][1], reverse=True)]
-    if n < len(sort_indices) / 2:
-        indices = sort_indices[:n] + sort_indices[-n:]
-        title += '\n (top {} values)'.format(len(indices)/2)
+    # first sort by mutability and only take top (and bottom) n of them
+    num_nonzero = len(mutability_info)
+    sorted_mutability_info = [info for info in sorted(mutability_info, key=lambda k: k['mutability'][1], reverse=True)]
+    if n < num_nonzero / 2:
+        mutability_info = sorted_mutability_info[:n] + sorted_mutability_info[-n:]
+        title += '\n (top {} values)'.format(len(mutability_info)/2)
     else:
+        mutability_info = sorted_mutability_info
         # these are all the theta values
-        indices = sort_indices
-        title += '\n (num nonzeros={})'.format(len(indices))
-
-    mutability_info = [input_info[i] for i in indices]
+        title += '\n (num nonzeros={})'.format(len(mutability_info))
 
     # Add dummy values to vectors
-    if n < len(sort_indices) / 2:
+    if n < num_nonzero / 2:
         mutability_info.insert(
             n,
             {
-                'mutability': (0., 0., 0.),
-                'feature_type': None
+                'mutability': [0., 0., 0.],
+                'feature_type': None,
                 'label': r'$\vdots$',
                 'color': None,
                 'mut_pos': None,
@@ -314,6 +316,7 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
     y = []
     ylo = []
     yhi = []
+    feat_labels = []
     for idx, info in enumerate(mutability_info):
         # Currently hard-coded to assume fwr/cdr with yellow-orange as the default for any position feature
         if info['feature_type'] == 'position':
@@ -324,7 +327,8 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
         if info['feature_type'] == 'motif':
             motif = info['motif']
             motif_len = len(info['motif'])
-            if info['mut_pos'] not in range(motif_len):
+            mut_pos = info['mut_pos']
+            if mut_pos not in range(motif_len):
                 colors[idx,:] = YELLOW
             else:
                 known_hot_cold = compute_known_hot_and_cold(HOT_COLD_SPOT_REGS, motif_len, mut_pos)
@@ -344,6 +348,7 @@ def plot_linear_top_n(mutability_info, ax, n, title, ylabel):
         y.append(info['mutability'][1])
         ylo.append(info['mutability'][1]-info['mutability'][0])
         yhi.append(info['mutability'][2]-info['mutability'][1])
+        feat_labels.append(info['label'])
 
     nobs = len(y)
     x = np.array(range(nobs))
@@ -380,12 +385,12 @@ def get_mutability_info(method_res):
     theta = method_res.refit_theta
 
     output_info = []
-    for i, info in enumerate(zip(feat_gen.feature_info_list)):
+    for i, info in enumerate(feat_gen.feature_info_list):
         out_dict = {}
         if method_res.has_conf_ints:
-            out_dict['mutability'] = (method_res.conf_ints[i, 0], theta[i, 0], method_res.conf_ints[i, 2])
+            out_dict['mutability'] = [method_res.conf_ints[i, 0], theta[i, 0], method_res.conf_ints[i, 2]]
         else:
-            out_dict['mutability'] = (theta[i, 0], theta[i, 0], theta[i, 0])
+            out_dict['mutability'] = [theta[i, 0], theta[i, 0], theta[i, 0]]
 
         # currently a bit of a hack so already-fit models can be plotted
         # basically if the second element of feature info is a list it's a position feature
