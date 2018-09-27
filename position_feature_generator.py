@@ -69,11 +69,9 @@ class PositionFeatureGenerator(GenericFeatureGenerator):
 
         self.pos_dict = {i: None for i in range(self.max_seq_len)}
         for idx, (lab, break_list) in enumerate(self.feature_info_list):
-            for pos in range(self.max_seq_len):
-                for start, end in break_list:
-                    if pos in range(start, end):
-                        self.pos_dict[pos] = idx
-                        break
+            for start, end in break_list:
+                for pos in range(start, end):
+                    self.pos_dict[pos] = idx
 
         self.feature_vec_len = len(self.feature_info_list)
 

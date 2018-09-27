@@ -81,8 +81,13 @@ class ObservedSequenceMutations:
         self.end_seq_with_flanks = self.left_flank + end_seq + self.right_flank
         self.seq_len = len(self.start_seq)
         self.collapse_list = collapse_list
+
+        # We need to take into account offsets and collapsed nucleotides
+        # e.g., if we process data that has a string of "n"s in the middle, we collapse them
+        # so that position information is lost---raw_pos keeps the "raw position," i.e.,
+        # if we had collapsed two "n"s in the middle of a sequence, all subsequent positions
+        # will have a raw_pos 2 greater than the pos value.
         self.raw_pos = {}
-        # need to take into account offsets and collapsed nucleotides
         for pos in range(self.seq_len):
             raw_pos = pos + self.left_position_offset
             for half_motif_len, string_start, string_end in sorted(self.collapse_list, key=lambda val: val[1]):
