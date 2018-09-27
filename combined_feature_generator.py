@@ -7,7 +7,7 @@ class CombinedFeatureGenerator(FeatureGenerator):
     """
     Class that combines GenericFeatureGenerators.
     """
-    def __init__(self, feat_gen_list, model_truncation=None, left_update_region=0, right_update_region=0):
+    def __init__(self, feat_gen_list, model_truncation=None, left_update_region=0, right_update_region=0, feats_to_remove=None):
         """
         @param feat_gen_list: list of GenericFeatureGenerators
         @param model_truncation: ModelTruncation
@@ -15,14 +15,18 @@ class CombinedFeatureGenerator(FeatureGenerator):
             features correctly
         @param right_update_region: number of positions to consider right of mutating position to update
             features correctly
+        @param feats_to_remove: list of features to remove if a model has not been fit yet
         """
         self.feat_gens = feat_gen_list
-        self.feats_to_remove = feats_to_remove
+        self.model_truncation = model_truncation
+        self.feats_to_remove = model_truncation.feats_to_remove if model_truncation is not None else []
+        if feats_to_remove is not None:
+            self.feats_to_remove += feats_to_remove
 
         self.left_update_region = left_update_region
         self.right_update_region = right_update_region
 
-        self.update_feats_after_removing(model_truncation)
+        self.update_feats_after_removing(self.feats_to_remove)
 
     def add_base_features_for_list(self, obs_data):
         """
@@ -97,21 +101,19 @@ class CombinedFeatureGenerator(FeatureGenerator):
         """
         return np.ones(mask_shape, dtype=bool)
 
-    def update_feats_after_removing(self, model_truncation):
+    def update_feats_after_removing(self, feats_to_remove=[]):
         """
         Updates feature generator properties after removing features
 
-        @param model_truncation: ModelTruncation
+        @param feats_to_remove: list of features to remove
         """
-        self.model_truncation = model_truncation
-        self.feats_to_remove = model_truncation.feats_to_remove if model_truncation is not None else []
 
         # Create list of feature generators for different motif lengths and different flank lengths
         old_feat_gens = self.feat_gens
         self.feat_gens = []
         self.feature_info_list = []
         for feat_gen in old_feat_gens:
-            feat_gen.update_feats_after_removing(self.model_truncation)
+            feat_gen.update_feats_after_removing(feats_to_remove)
             self.feat_gens.append(feat_gen)
             self.feature_info_list += feat_gen.feature_info_list
 
@@ -120,12 +122,12 @@ class CombinedFeatureGenerator(FeatureGenerator):
         self.num_feat_gens = len(self.feat_gens)
         self.feature_vec_len = np.sum(feat_offsets)
 
-    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None, obs_seq_mutation=None):
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
         feat_vec_dict = {pos:[] for pos in do_feat_vec_pos}
         for offset, feat_gen in zip(self.feat_offsets, self.feat_gens):
-            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos)
+            f_dict = feat_gen.create_for_sequence(seq_str, left_flank, right_flank, do_feat_vec_pos, obs_seq_mutation)
             for pos in do_feat_vec_pos:
                 feat = f_dict[pos]
                 if feat is not None:

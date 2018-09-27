@@ -510,7 +510,7 @@ def get_sequence_mutations_from_tree(tree, motif_len=5, left_flank_len=None, rig
             start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(
                 descendant.up.sequence.lower(),
                 descendant.sequence.lower(),
-                motif_len
+                max(left_flank_len, right_flank_len),
             )
 
             obs_seq_mutation = ObservedSequenceMutations(
@@ -562,7 +562,7 @@ def read_gene_seq_csv_data(
         for idx, elt in cluster.iterrows():
             n_mutes = 0
             current_obs_seq_mutation = None
-            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), motif_len)
+            start_seq, end_seq, collapse_list = process_degenerates_and_impute_nucleotides(gl_seq, elt['sequence'].lower(), max(left_flank_len, right_flank_len))
 
             obs_seq_mutation = ObservedSequenceMutations(
                     start_seq=start_seq,
@@ -612,7 +612,7 @@ def get_data_statistics_print_lines(obs_data, feat_generator):
         total_skipped_mutations += obs_seq.skipped_mutations
         seq_lens.append(obs_seq.seq_len)
         avg_mutation_frequency += (float(obs_seq.num_mutations) / obs_seq.seq_len) / n_sequences
-        motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank)
+        motifs = feat_generator.create_for_sequence(obs_seq.start_seq, obs_seq.left_flank, obs_seq.right_flank, obs_seq_mutation=obs_seq)
         motif_set.update([item for sublist in motifs.values() for item in sublist])
 
     return '\n'.join([
@@ -648,7 +648,7 @@ def load_fitted_model(file_name, keep_col0=False, add_targets=True):
 
     # for penalized theta create full feature generator with no features removed
     full_feat_gen = copy.deepcopy(hier_feat_gen)
-    full_feat_gen.update_feats_after_removing(None)
+    full_feat_gen.update_feats_after_removing([])
     best_model.agg_penalized_theta = full_feat_gen.create_aggregate_theta(
         best_model.penalized_theta,
         keep_col0=keep_col0,

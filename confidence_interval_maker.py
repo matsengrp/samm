@@ -27,7 +27,7 @@ class ConfidenceIntervalMaker:
         sample_obs_information = (sample_obs_information[self.theta_mask_flat,:])[:,self.theta_mask_flat]
 
         if sample_obs_information.size == 0:
-            return None
+            return None, sample_obs_information
         return np.linalg.pinv(sample_obs_information), sample_obs_information
 
     def _get_confidence_interval_print_lines(self, conf_ints, feat_gen):

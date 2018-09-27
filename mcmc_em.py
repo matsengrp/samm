@@ -131,16 +131,8 @@ class MCMC_EM:
                         theta,
                         e_step_samples,
                         problem)
-                try:
-                    num_agg_cols = NUM_NUCLEOTIDES if self.per_target_model else 1
-                    agg_start_col = 1 if self.per_target_model else 0
-                    for col_idx in range(num_agg_cols):
-                        feat_generator.combine_thetas_and_get_conf_int(
-                                theta,
-                                variance_est,
-                                col_idx=col_idx + agg_start_col,
-                                add_targets=self.per_target_model)
+                if np.any(np.diag(variance_est) < 0):
+                    log.info("found negative variance estimates.. EM iteration %d", run)
+                else:
                     break
-                except ValueError as e:
-                    log.info("found negative variance estimates.. EM iteration %d, ERROR: %s", run, e)
         return theta, variance_est, sample_obs_info, all_traces

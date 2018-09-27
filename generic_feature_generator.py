@@ -26,7 +26,7 @@ class GenericFeatureGenerator(FeatureGenerator):
         indptr = [start_idx]
 
         for pos in range(obs_seq_mutation.seq_len):
-            feat_idx = self._get_mutating_pos_feat_idx(pos, obs_seq_mutation.start_seq_with_flanks)
+            feat_idx = self._get_mutating_pos_feat_idx(pos, obs_seq_mutation.start_seq_with_flanks, obs_seq_mutation)
             if feat_idx is not None:
                 start_idx += 1
                 indices.append(feat_idx)
@@ -72,7 +72,7 @@ class GenericFeatureGenerator(FeatureGenerator):
                 left_update_region=left_update_region,
                 right_update_region=right_update_region,
             )
-            mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, intermediate_seq)
+            mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, intermediate_seq, seq_mut_order.obs_seq_mutation)
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat_idx,
                 mutation_pos,
@@ -131,7 +131,7 @@ class GenericFeatureGenerator(FeatureGenerator):
                 left_update_region=left_update_region,
                 right_update_region=right_update_region,
             )
-            mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, flanked_seq)
+            mutating_pos_feat_idx = self._get_mutating_pos_feat_idx(mutation_pos, flanked_seq, seq_mut_order.obs_seq_mutation)
             feat_mutation_steps.append(MultiFeatureMutationStep(
                 mutating_pos_feat_idx,
                 mutation_pos,
@@ -182,7 +182,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             left_update_region=left_update_region,
             right_update_region=right_update_region,
         )
-        first_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(first_mutation_pos, flanked_seq)
+        first_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(first_mutation_pos, flanked_seq, seq_mut_order.obs_seq_mutation)
 
         # Apply mutation
         curr_mutation_pos = first_mutation_pos + seq_mut_order.obs_seq_mutation.left_flank_len
@@ -203,7 +203,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             left_update_region=left_update_region,
             right_update_region=right_update_region,
         )
-        second_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(second_mutation_pos, flanked_seq)
+        second_mut_pos_feat_idx = self._get_mutating_pos_feat_idx(second_mutation_pos, flanked_seq, seq_mut_order.obs_seq_mutation)
 
         return first_mut_pos_feat_idx, MultiFeatureMutationStep(
             second_mut_pos_feat_idx,
@@ -250,7 +250,7 @@ class GenericFeatureGenerator(FeatureGenerator):
             feat_dict_curr = self._get_feature_dict_for_region(
                 old_mutation_pos,
                 intermediate_seq,
-                seq_mut_order.obs_seq_mutation.seq_len,
+                seq_mut_order,
                 already_mutated_pos,
                 left_update_region,
                 right_update_region,
@@ -262,28 +262,28 @@ class GenericFeatureGenerator(FeatureGenerator):
             feat_dict_future = self._get_feature_dict_for_region(
                 mutation_pos,
                 intermediate_seq,
-                seq_mut_order.obs_seq_mutation.seq_len,
+                seq_mut_order,
                 already_mutated_pos,
                 left_update_region,
                 right_update_region,
             )
         return feat_dict_curr, feat_dict_future
 
-    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None):
+    def create_for_sequence(self, seq_str, left_flank, right_flank, do_feat_vec_pos=None, obs_seq_mutation=None):
         feat_vec_dict = dict()
         seq_len = len(seq_str)
         if do_feat_vec_pos is None:
             do_feat_vec_pos = range(len(seq_str))
         # only generate feature vectors for positions in do_feat_vec_pos---others not in the risk group
         for pos in do_feat_vec_pos:
-            feat_vec_dict[pos] = self._get_mutating_pos_feat_idx(pos, left_flank + seq_str + right_flank)
+            feat_vec_dict[pos] = self._get_mutating_pos_feat_idx(pos, left_flank + seq_str + right_flank, obs_seq_mutation)
         return feat_vec_dict
 
     def _get_feature_dict_for_region(
         self,
         position,
         intermediate_seq,
-        seq_len,
+        seq_mut_order,
         already_mutated_pos,
         left_update_region,
         right_update_region,
@@ -291,30 +291,30 @@ class GenericFeatureGenerator(FeatureGenerator):
         """
         @param position: the position around which to calculate the feature indices for
         @param intermediate_seq: the nucleotide sequence
-        @param seq_len: the length of this sequence
+        @param seq_mut_order: observed sequence mutation order
         @param already_mutated_pos: which positions already mutated - dont calculate features for these positions
 
         @return a dict with the positions next to the given position and their feature index
         """
         feat_dict = dict()
         start_region_idx = max(position - left_update_region, 0)
-        end_region_idx = min(position + right_update_region, seq_len - 1)
+        end_region_idx = min(position + right_update_region, seq_mut_order.obs_seq_mutation.seq_len - 1)
         update_positions = range(start_region_idx, position) + range(position + 1, end_region_idx + 1)
         for pos in update_positions:
             if pos not in already_mutated_pos:
                 # Only update the positions that are in the risk group (the ones that haven't mutated yet)
-                feat_dict[pos] = self._get_mutating_pos_feat_idx(pos, intermediate_seq)
+                feat_dict[pos] = self._get_mutating_pos_feat_idx(pos, intermediate_seq, seq_mut_order.obs_seq_mutation)
         return feat_dict
 
-    def update_feats_after_removing(self, model_truncation=None):
+    def update_feats_after_removing(self, feats_to_remove=[]):
         """
         Update the feature generator given that we need to strip away certain features
 
-        @param model_truncation: ModelTruncation
+        @param feats_to_remove: list of features to remove
         """
         raise NotImplementedError()
 
-    def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks):
+    def _get_mutating_pos_feat_idx(self, pos, seq_with_flanks, obs_seq_mutation=None):
         """
         Feature generator--specific function.
         Take sequence and mutating position and return the index of the feature vector.

@@ -105,7 +105,7 @@ def _collect_statistics(fitted_models, args, true_thetas, stat, fit_type):
             if stat == 'discovered':
                 # don't use aggregate fit for false discovery rate
                 feat_gen = fmodel.refit_feature_generator
-                feat_gen.update_feats_after_removing(None)
+                feat_gen.update_feats_after_removing([])
                 true_theta = true_thetas[1]
                 possible_mask = feat_gen.get_possible_motifs_to_targets(
                     true_theta.shape,

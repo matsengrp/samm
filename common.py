@@ -97,11 +97,13 @@ def get_batched_list(my_list, num_batches):
 def return_complement(kmer):
     return ''.join([COMPLEMENT_DICT[nuc] for nuc in kmer[::-1]])
 
-def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2):
+def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, left_motif_flank_len=None):
     """
     Known hot and cold spots were constructed on a 5mer model, so "N" pad
     longer motifs and subset shorter ones
     """
+    if left_motif_flank_len is None:
+        left_motif_flank_len = motif_len / 2
     kmer_list = []
     hot_or_cold_list = []
     hot_or_cold_complements = []
@@ -112,13 +114,13 @@ def compute_known_hot_and_cold(hot_or_cold_dicts, motif_len=5, half_motif_len=2)
                 'hot_or_cold': spot['hot_or_cold']})
 
     for spot in hot_or_cold_dicts + hot_or_cold_complements:
-        if len(spot['left_flank']) > half_motif_len or \
-            len(spot['right_flank']) > motif_len - half_motif_len - 1:
+        if len(spot['left_flank']) > left_motif_flank_len or \
+            len(spot['right_flank']) > motif_len - left_motif_flank_len - 1:
                 # this hot/cold spot is not a part of our motif size
                 continue
 
-        left_pad = spot['left_flank'].rjust(half_motif_len, 'N')
-        right_pad = spot['right_flank'].ljust(motif_len - half_motif_len - 1, 'N')
+        left_pad = spot['left_flank'].rjust(left_motif_flank_len, 'N')
+        right_pad = spot['right_flank'].ljust(motif_len - left_motif_flank_len - 1, 'N')
         kmer_list.append(left_pad + spot['central'] + right_pad)
         hot_or_cold_list.append(spot['hot_or_cold'])
 
@@ -255,16 +257,16 @@ def soft_threshold(theta, thres):
     """
     return np.maximum(theta - thres, 0) + np.minimum(theta + thres, 0)
 
-def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, threshold=0.1):
+def process_degenerates_and_impute_nucleotides(start_seq, end_seq, max_flank_len, threshold=0.1):
     """
     Process the degenerate characters in sequences:
     1. Replace unknown characters with "n"
-    2. Collapse runs of "n"s into one of motif_len/2
+    2. Collapse runs of "n"s into one of max_flank_len
     3. Replace all interior "n"s with nonmutating random nucleotide
 
     @param start_seq: starting sequence
     @param end_seq: ending sequence
-    @param motif_len: motif length; needed to determine length of collapsed "n" run
+    @param max_flank_len: max flank length; needed to determine length of collapsed "n" run
     @param threshold: if proportion of "n"s in a sequence is larger than this then
         throw a warning
 
@@ -279,8 +281,8 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
     processed_end_seq = re.sub('[^agctn]', 'n', end_seq)
 
     # conform unknowns and collapse "n"s
-    repl = 'n' * (motif_len/2)
-    pattern = repl + '+' if motif_len > 1 else 'n'
+    repl = 'n' * (max_flank_len)
+    pattern = repl + 'n+' if max_flank_len > 0 else 'n'
     collapse_list = []
     if re.search('n', processed_end_seq) or re.search('n', processed_start_seq):
         # if one sequence has an "n" but the other doesn't, make them both have "n"s
@@ -307,18 +309,25 @@ def process_degenerates_and_impute_nucleotides(start_seq, end_seq, motif_len, th
         for match in re.finditer(pattern, interior_end_seq):
             # num "n"s removed
             # starting position of "n"s removed
-            collapse_list.append((start_idx + motif_len/2, match.regs[0][0], match.regs[0][1]))
+            collapse_list.append((max_flank_len, match.regs[0][0], match.regs[0][1]))
 
-        processed_start_seq = re.sub(pattern, repl, processed_start_seq)
-        processed_end_seq = re.sub(pattern, repl, processed_end_seq)
+        interior_start_seq = processed_start_seq[start_idx:end_idx]
+        interior_start_seq = re.sub(pattern, repl, interior_start_seq)
+        interior_end_seq = re.sub(pattern, repl, interior_end_seq)
 
         # generate random nucleotide if an "n" occurs in the middle of a sequence
-        for match in re.compile('n').finditer(processed_start_seq):
+        for match in re.compile('n').finditer(interior_start_seq):
             random_nuc = random.choice(NUCLEOTIDES)
-            processed_start_seq = mutate_string(processed_start_seq, match.start(), random_nuc)
-            processed_end_seq = mutate_string(processed_end_seq, match.start(), random_nuc)
+            interior_start_seq = mutate_string(interior_start_seq, match.start(), random_nuc)
+            interior_end_seq = mutate_string(interior_end_seq, match.start(), random_nuc)
 
-    return processed_start_seq, processed_end_seq, collapse_list
+        out_start_seq = processed_start_seq[:start_idx] + interior_start_seq + processed_start_seq[end_idx:]
+        out_end_seq = processed_end_seq[:start_idx] + interior_end_seq + processed_end_seq[end_idx:]
+    else:
+        out_start_seq = processed_start_seq
+        out_end_seq = processed_end_seq
+
+    return out_start_seq, out_end_seq, collapse_list
 
 def get_idx_differ_by_one_character(s1, s2):
     """
@@ -399,3 +408,27 @@ def get_zero_theta_mask(theta):
     zeroed_or_inf_thetas = zeroed_thetas | (~np.isfinite(theta))
     feats_to_remove_mask = np.sum(zeroed_or_inf_thetas, axis=1) == theta.shape[1]
     return zeroed_thetas[~feats_to_remove_mask,:]
+
+def get_model_result_print_lines(model_result):
+    """
+    @return a string that summarizes the theta vector/matrix
+    """
+    feat_gen = model_result.refit_feature_generator
+    lines = []
+    if model_result.has_refit_data:
+        theta = model_result.refit_theta
+    else:
+        theta = model_result.penalized_theta
+    for i in range(theta.shape[0]):
+        for j in range(theta.shape[1]):
+            if np.isfinite(theta[i,j]) and np.abs(theta[i,j]) > ZERO_THRES:
+                # print the whole line if any element in the theta is nonzero
+                thetas = theta[i,]
+                print_str = "%.3f" % theta[i,0]
+                if model_result.has_conf_ints:
+                    print_str += ", [%.3f, %.3f]" % (model_result.conf_ints[i, 0], model_result.conf_ints[i, 2])
+                print_str += ", (%s)" % feat_gen.print_label_from_idx(i)
+                lines.append((thetas[np.isfinite(thetas)].sum(), print_str))
+                break
+    sorted_lines = sorted(lines, key=lambda s: s[0])
+    return "\n".join([l[1] for l in sorted_lines])

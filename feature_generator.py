@@ -9,7 +9,7 @@ class FeatureGenerator(object):
     first). We call these "sparse feature vectors".
     """
 
-    def create_for_sequence(self, seq_str, do_feat_vec_pos=None):
+    def create_for_sequence(self, seq_str, do_feat_vec_pos=None, obs_seq_mutation=None):
         """
         @param sequence: current sequence (string)
         @param do_feat_vec_pos: do generate feature vectors for these positions.
