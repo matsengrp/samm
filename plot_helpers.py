@@ -25,6 +25,11 @@ YELLOW = (255. / 255, 215. / 255, 0. / 255, 1.)
 PURPLE = (128. / 255, 0. / 255, 255. / 255, 1.)
 YELLOW_ORANGE = (252. / 255, 209. / 255, 22. / 255, 1.)
 
+def pairwise(iterable):
+    a, b = itertools.tee(iterable)
+    next(b, None)
+    return zip(a, b)
+
 def _align(metadata, residual_list, gap_dict):
     """
     Align to IMGT gaps
@@ -122,7 +127,7 @@ def _get_flat_processed_residuals(residual_list, metadata=None, trim_proportion=
 
     return xval, residuals, flat_residuals, offset
 
-def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start', region_bounds=[], region_labels=[], title='Residuals vs. Position', ylabel='residual', alpha=1., pointsize=5, linesize=1, fontsize=8):
+def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_proportion=None, plot_average=False, align=False, gap_dict=None, recenter=False, center_col='j_gene_start', region_bounds=[], region_labels=[], ylabel='residual', alpha=1., pointsize=5, linesize=1, fontsize=8):
     """
     Plot martingale residuals per nucleotide position
 
@@ -138,12 +143,11 @@ def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_pr
     @param center_col: column in metadata that has the centering position
     @param region_bounds: list of positions showing where to plot FW/CDR region boundaries
     @param region_labels: list of labels showing what region is what
-    @param title: title of plot
     @param ylabel: ylabel of plot
     @param alpha: alpha parameter for points
     @param pointsize: size of scatterplot points
     @param linesize: thickness of lowess line
-    @param fontsize: size of font for axes/title
+    @param fontsize: size of font for axes
 
     @return: numpy array of n_obs x seq_len martingale residuals and plot
     """
@@ -176,7 +180,6 @@ def plot_martingale_residuals_on_axis(residuals_list, ax, metadata=None, trim_pr
     ax.set_xlabel('nucleotide position', fontsize=fontsize)
     ax.set_ylabel(ylabel, fontsize=fontsize)
     ax.tick_params(labelsize=fontsize)
-    ax.set_title(title, fontsize=fontsize)
     increment = int(AXIS_INCREMENT * round(float(seq_len)/(10*AXIS_INCREMENT)))
     ax.set_xticks(np.arange(np.min(xval), np.max(xval), increment))
     ax.set_xticklabels(np.arange(np.min(xval), np.max(xval), increment), fontsize=fontsize/2)
