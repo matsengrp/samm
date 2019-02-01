@@ -42,7 +42,7 @@ class SurvivalModelSimulator:
 
             if censoring_time is not None and censoring_time < mutate_time:
                 break
-            elif percent_mutated is not None and len(mutations) > percent_mutated * len(start_seq):
+            elif percent_mutated is not None and len(mutations) >= percent_mutated * len(start_seq):
                 break
 
             last_mutate_time = mutate_time

@@ -160,9 +160,10 @@ class FullSequenceMutations:
         return [m.pos for m in self.mutations]
 
     def __str__(self):
-        return "%s => %s" % (
-            self.obs_seq_mutation.start_seq,
-            self.obs_seq_mutation.end_seq
+        return "%s => %s (%d)" % (
+            self.start_seq,
+            self.end_seq,
+            len(self.mutations)
         )
 
 class MutationEvent:

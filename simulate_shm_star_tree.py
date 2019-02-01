@@ -1,5 +1,5 @@
 """
-Generate mutated sequences using the survival model, shmulate, or a tree given
+Generate mutated sequences using the survival model or shmulate on a star tree given
 mutation model parameters. This can generate naive sequences using partis or
 construct random nucleotide sequences.
 """
@@ -116,7 +116,7 @@ def dump_germline_data(germline_seqs, args):
         for gene, seq_metadata in germline_seqs.iteritems():
             germline_freq_file.writerow([gene, seq_metadata.freq])
 
-def run_survival(args, germline_seqs):
+def create_simulator(args):
     feat_generator = HierarchicalMotifFeatureGenerator(
         motif_lens=[args.agg_motif_len],
         left_motif_flank_len_list=[[args.agg_motif_len/2]],
@@ -134,6 +134,10 @@ def run_survival(args, germline_seqs):
         simulator = SurvivalModelSimulatorSingleColumn(agg_theta, probability_matrix, feat_generator, lambda0=args.lambda0)
     else:
         raise ValueError("Aggregate theta shape is wrong")
+    return simulator
+
+def run_survival(args, germline_seqs):
+    simulator = create_simulator(args)
 
     # For each germline gene, run survival model to obtain mutated sequences.
     # Write sequences to file with three columns: name of germline gene
