@@ -40,8 +40,8 @@ def parse_args():
         default=5)
     parser.add_argument('--input-tree',
         type=str,
-        help='Input file with tree',
-        default='_output/tree_in.pkl')
+        help='Input newick file with tree',
+        default='_output/tree_in.tree')
     parser.add_argument('--output-tree',
         type=str,
         help='Input file with tree',
@@ -87,8 +87,8 @@ def _get_germline_nucleotides(args, nonzero_motifs=[]):
         g = GermlineSimulatorPartis(organism=args.organism, locus=args.locus, output_dir=out_dir)
         fn_args = dict(
             num_sets=args.n_subjects,
-            n_genes_per_region='42:18:6' if args.organism == "human" else "20:1:1",
-            n_sim_alleles_per_gene='1.33:1.2:1.2' if args.organism == "human" else "1.5:1:1",
+            n_genes_per_region='42:18:6' if args.organism == "human" and args.locus == "igh" else "20:1:1",
+            n_sim_alleles_per_gene='1.33:1.2:1.2' if args.organism == "human" and args.locus == "igh" else "1.5:1:1",
             min_sim_allele_prevalence_freq=0.1
         )
         germline_seqs = g.generate_germline_sets(**fn_args)
@@ -135,11 +135,9 @@ def main(args=sys.argv[1:]):
     germline_seqs = _get_germline_nucleotides(args)
     rand_germline_seq = get_random_germline(germline_seqs)
 
-    with open(args.input_tree, 'r') as f:
-        subtree = pickle.load(f)
-    # add in the root edge
     tree = ete3.Tree()
-    tree.add_child(subtree)
+    # this adds in the root edge
+    tree.add_child(ete3.Tree(args.input_tree))
     run_survival(args, tree, rand_germline_seq)
     with open(args.output_tree, 'wb') as f:
         pickle.dump(tree, f)
