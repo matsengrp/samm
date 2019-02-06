@@ -19,12 +19,13 @@ class GermlineSimulatorPartis:
 
     GERMLINE_FOLDER = "./partis/data/germlines"
 
-    def __init__(self, organism="mouse", output_dir="_output", debug=False):
+    def __init__(self, organism="mouse", locus="igk", output_dir="_output", debug=False):
         assert(organism in ["human", "mouse"])
         self.organism = organism
+        self.locus = locus
         self.output_dir = output_dir
         self.allele_freq_file = self.output_dir + "/allele_freq.csv"
-        self.ig_file = self.output_dir + "/igk/igkv.fasta"
+        self.ig_file = self.output_dir + "/" + self.locus + "/" + self.locus + "v.fasta"
         self.debug = debug
 
     def generate_germline_sets(self, num_sets=1, n_genes_per_region="20:1:1", n_sim_alleles_per_gene="1.5:1:1", min_sim_allele_prevalence_freq=0.1):
@@ -59,7 +60,7 @@ class GermlineSimulatorPartis:
         PARTIS_PATH = './partis'
         sys.path.insert(1, PARTIS_PATH + '/python')
         import glutils
-        glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + self.organism, "igk")
+        glfo = glutils.read_glfo(self.GERMLINE_FOLDER + "/"  + self.organism, self.locus)
         glutils.generate_germline_set(
             glfo,
             n_genes_per_region,
@@ -76,7 +77,7 @@ class GermlineSimulatorPartis:
             allele_reader = csv.reader(f)
             allele_reader.next()
             for row in allele_reader:
-                if row[0].startswith("IGKV"):
+                if row[0].startswith(self.locus.upper() + "V"):
                     germline_freqs[row[0]] = float(row[1])
 
         # Read the selected germline alleles
