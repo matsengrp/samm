@@ -154,6 +154,7 @@ class FullSequenceMutations:
         self.end_seq = end_seq
         self.left_flank = left_flank
         self.right_flank = right_flank
+        self.end_seq_with_flanks = self.left_flank + self.end_seq + self.right_flank
         self.mutations = mutations
 
     def get_mutation_order(self):
