@@ -9,6 +9,7 @@ it will output the new tree with the ancestral states. It does not do anything e
 import pickle
 import ete3
 import sys
+import math
 import argparse
 import scipy
 import numpy as np
@@ -135,9 +136,14 @@ def main(args=sys.argv[1:]):
     germline_seqs = _get_germline_nucleotides(args)
     rand_germline_seq = get_random_germline(germline_seqs)
 
-    tree = ete3.Tree()
-    # this adds in the root edge
-    tree.add_child(ete3.Tree(args.input_tree))
+    subtree = ete3.Tree(args.input_tree)
+    # this adds in the root edge (if necessary)
+    if math.fabs(subtree.dist - 0.0) <= 1e-10:
+        tree = subtree
+    else:
+        tree = ete3.Tree()
+        tree.add_child(subtree)
+
     run_survival(args, tree, rand_germline_seq)
     with open(args.output_tree, 'wb') as f:
         pickle.dump(tree, f)
