@@ -45,7 +45,7 @@ def parse_args():
         default='_output/tree_in.tree')
     parser.add_argument('--output-tree',
         type=str,
-        help='Input file with tree',
+        help='Output pickle file with tree',
         default='_output/tree_out.pkl')
     parser.add_argument('--input-model',
         type=str,
