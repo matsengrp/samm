@@ -85,7 +85,7 @@ def run_survival(args, tree, naive_seq):
     for node in tree.traverse("preorder"):
         sequence = node.sequence
         for children in node.children:
-            num_to_mutate = scipy.random.poisson(children.dist * args.lambda0)
+            num_to_mutate = scipy.random.poisson(children.dist * len(sequence) * args.lambda0)
             percent_to_mutate = float(num_to_mutate)/len(sequence)
             full_seq_mutations = simulator.simulate(
                 start_seq=sequence,
