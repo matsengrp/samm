@@ -10,6 +10,7 @@ import argparse
 import ete3
 import math
 import numpy as np
+import os
 import pickle
 import scipy
 import subprocess
@@ -65,16 +66,19 @@ def parse_args():
     return args
 
 def simulate_naive_seq(args):
-    cmd_str = "partis/bin/partis simulate --outfname simu.yaml --simulate-from-scratch"
+    output_dir = os.path.dirname(args.output_tree)
+
+    cmd_str = "partis/bin/partis simulate --simulate-from-scratch"
+    cmd_str += " --outfname " + output_dir + "/simu.yaml"
     cmd_str += " --seed " + str(args.seed)
     cmd_str += " --species " + args.organism
     cmd_str += " --locus " + args.locus
     subprocess.check_call(cmd_str.split())
 
-    with open("simu.yaml", "rU") as f:
+    with open(output_dir + "/simu.yaml", "rU") as f:
         sim_output = yaml.load(f)
 
-    subprocess.check_call("rm simu.yaml".split())
+    subprocess.check_call(("rm " + output_dir + "/simu.yaml").split())
 
     return sim_output["events"][0]["naive_seq"]
 
