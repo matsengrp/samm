@@ -27,37 +27,37 @@ nest.add(
     label_func='{:02d}'.format)
 
 # Nest for processing all data
-@nest.add_target_with_env(localenv)
-def process_all_data(env, outdir, c):
-    cmd = ['python preprocess_data.py',
-               '--seed',
-               c['replicate'],
-               '--path-to-annotations',
-               CUI_DATA_PATH,
-               '--metadata-path',
-               CUI_DATA_PATH + '/meta.csv',
-               '--group',
-               'immunized',
-               '--locus',
-               LOCUS,
-               '--species',
-               'mouse',
-               '--region',
-               'v',
-               '--germline-family',
-               'v',
-               '--filter-indels',
-               '--scratch-directory',
-               SCRATCH_DIR,
-               '--output-genes ${TARGETS[0]}',
-               '--output-seqs ${TARGETS[1]}']
-
-    return env.Command(
-        [
-            join(outdir, 'processed_genes_all_data.csv'), join(outdir, 'processed_seqs_all_data.csv'),
-        ],
-        [],
-        ' '.join(map(str, cmd)))
+#@nest.add_target_with_env(localenv)
+#def process_all_data(env, outdir, c):
+#    cmd = ['python preprocess_data.py',
+#               '--seed',
+#               c['replicate'],
+#               '--path-to-annotations',
+#               CUI_DATA_PATH,
+#               '--metadata-path',
+#               CUI_DATA_PATH + '/meta.csv',
+#               '--group',
+#               'immunized',
+#               '--locus',
+#               LOCUS,
+#               '--species',
+#               'mouse',
+#               '--region',
+#               'v',
+#               '--germline-family',
+#               'v',
+#               '--filter-indels',
+#               '--scratch-directory',
+#               SCRATCH_DIR,
+#               '--output-genes ${TARGETS[0]}',
+#               '--output-seqs ${TARGETS[1]}']
+#
+#    return env.Command(
+#        [
+#            join(outdir, 'processed_genes_all_data.csv'), join(outdir, 'processed_seqs_all_data.csv'),
+#        ],
+#        [],
+#        ' '.join(map(str, cmd)))
 
 # Nest for processing data - sample one per clonal family
 @nest.add_target_with_env(localenv)
@@ -110,7 +110,7 @@ nest.add(
 nest.add(
     'per_target',
     [
-         False,
+         True,
     ]
 )
 
@@ -148,145 +148,145 @@ def fit_logistic(env, outdir, c):
         ' '.join(map(str, cmd)))
 
 
-# fit survival
-@nest.add_target_with_env(localenv)
-def fit_survival(env, outdir, c):
-    cmd = []
-    motif_len = c['motif_params']['motif_length']
-    left_flanks = c['motif_params']['left_motif_flanks']
-    penalty_params = c['motif_params']['penalty_params']
-
-    cmd = ['python fit_samm.py',
-           '--seed',
-           c['replicate'],
-           '--input-naive ${SOURCES[0]}',
-           '--input-mutated ${SOURCES[1]}',
-           '--motif-lens',
-           motif_len,
-           '--positions-mutating',
-           left_flanks,
-           '--penalty-params',
-           penalty_params,
-           '--num-cpu-threads',
-           10,
-           '--num-jobs',
-           10,
-           '--burn-in',
-           16,
-           '--num-e-samples',
-           4,
-           '--sampling-rate',
-           8,
-           '--em-max-iters',
-           10,
-           '--num-val-burnin',
-           16,
-           '--num-val-samples',
-           16,
-           '--scratch-directory',
-           SCRATCH_DIR,
-           '--out-file ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}',
-           '--k-folds',
-           5,
-           '--tuning 0',
-           '--validation-col germline_family',
-           ]
-    if c["per_target"]:
-        cmd += ['--per-target-model']
-    return env.Command(
-        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
-        c['process_data'],
-        ' '.join(map(str, cmd)))
-
-@nest.add_target_with_env(localenv)
-def plot_hedgehog(env, outdir, c):
-    motif_len = c['motif_params']['motif_length']
-    left_flanks = c['motif_params']['left_motif_flanks']
-
-    cmd = ['python plot_samm.py',
-           '--input-pkl',
-           '${SOURCES[0]}',
-           '--output-csv',
-           '${TARGETS[0]}',
-           '--output-pdf',
-           '${TARGETS[1]}']
-
-    return env.Command(
-        [join(outdir, 'fitted.csv'), join(outdir, 'fitted.pdf')],
-        c['fit_survival'],
-        ' '.join(map(str, cmd)))
-
-@nest.add_target_with_env(localenv)
-def fit_shazam(env, outdir, c):
-
-    cmd = ['python fit_shmulate_model.py',
-           '--input-file',
-           '${SOURCES[1]}',
-           '--input-genes',
-           '${SOURCES[0]}',
-           '--model-pkl ${TARGETS[0]}',
-           '--log-file ${TARGETS[1]}']
-
-    return env.Command(
-        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt'), join(outdir, 'fitted_shazam_mut.csv')],
-        c['process_all_data'],
-        ' '.join(map(str, cmd)))
-
-@nest.add_target_with_env(localenv)
-def plot_hedgehog_shazam(env, outdir, c):
-    motif_len = c['motif_params']['motif_length']
-    left_flanks = c['motif_params']['left_motif_flanks']
-
-    cmd = ['python plot_shazam.py',
-           '--mut',
-           '${SOURCES[2]}',
-           '--output-csv',
-           '${TARGETS[0]}',
-           '--output-pdf',
-           '${TARGETS[1]}',
-           '--center-nucs C']
-
-    return env.Command(
-        [join(outdir, 'fitted_shazam_C_only.csv'), join(outdir, 'fitted_shazam_C_only.pdf')],
-        c['fit_shazam'],
-        ' '.join(map(str, cmd)))
-
-@nest.add_target_with_env(localenv)
-def plot_hedgehog_sammcomp(env, outdir, c):
-    motif_len = c['motif_params']['motif_length']
-    left_flanks = c['motif_params']['left_motif_flanks']
-
-    cmd = ['python plot_samm.py',
-           '--input-pkl',
-           '${SOURCES[0]}',
-           '--output-csv',
-           '${TARGETS[0]}',
-           '--output-pdf',
-           '${TARGETS[1]}',
-           '--center-nucs C',
-           '--no-conf-int']
-
-    return env.Command(
-        [join(outdir, 'fitted_samm_C_only.csv'), join(outdir, 'fitted_samm_C_only.pdf')],
-        c['fit_survival'],
-        ' '.join(map(str, cmd)))
-
-@nest.add_target_with_env(localenv)
-def plot_hedgehog_logistic(env, outdir, c):
-    motif_len = c['motif_params']['motif_length']
-    left_flanks = c['motif_params']['left_motif_flanks']
-
-    cmd = ['python plot_shazam.py',
-           '--logistic-pkl',
-           '${SOURCES[0]}',
-           '--output-csv',
-           '${TARGETS[0]}',
-           '--output-pdf',
-           '${TARGETS[1]}',
-           '--center-nucs C']
-
-    return env.Command(
-        [join(outdir, 'fitted_logistic_C_only.csv'), join(outdir, 'fitted_logistic_C_only.pdf')],
-        c['fit_logistic'],
-        ' '.join(map(str, cmd)))
+## fit survival
+#@nest.add_target_with_env(localenv)
+#def fit_survival(env, outdir, c):
+#    cmd = []
+#    motif_len = c['motif_params']['motif_length']
+#    left_flanks = c['motif_params']['left_motif_flanks']
+#    penalty_params = c['motif_params']['penalty_params']
+#
+#    cmd = ['python fit_samm.py',
+#           '--seed',
+#           c['replicate'],
+#           '--input-naive ${SOURCES[0]}',
+#           '--input-mutated ${SOURCES[1]}',
+#           '--motif-lens',
+#           motif_len,
+#           '--positions-mutating',
+#           left_flanks,
+#           '--penalty-params',
+#           penalty_params,
+#           '--num-cpu-threads',
+#           10,
+#           '--num-jobs',
+#           10,
+#           '--burn-in',
+#           16,
+#           '--num-e-samples',
+#           4,
+#           '--sampling-rate',
+#           8,
+#           '--em-max-iters',
+#           10,
+#           '--num-val-burnin',
+#           16,
+#           '--num-val-samples',
+#           16,
+#           '--scratch-directory',
+#           SCRATCH_DIR,
+#           '--out-file ${TARGETS[0]}',
+#           '--log-file ${TARGETS[1]}',
+#           '--k-folds',
+#           5,
+#           '--tuning 0',
+#           '--validation-col germline_family',
+#           ]
+#    if c["per_target"]:
+#        cmd += ['--per-target-model']
+#    return env.Command(
+#        [join(outdir, 'fitted.pkl'), join(outdir, 'log.txt')],
+#        c['process_data'],
+#        ' '.join(map(str, cmd)))
+#
+#@nest.add_target_with_env(localenv)
+#def plot_hedgehog(env, outdir, c):
+#    motif_len = c['motif_params']['motif_length']
+#    left_flanks = c['motif_params']['left_motif_flanks']
+#
+#    cmd = ['python plot_samm.py',
+#           '--input-pkl',
+#           '${SOURCES[0]}',
+#           '--output-csv',
+#           '${TARGETS[0]}',
+#           '--output-pdf',
+#           '${TARGETS[1]}']
+#
+#    return env.Command(
+#        [join(outdir, 'fitted.csv'), join(outdir, 'fitted.pdf')],
+#        c['fit_survival'],
+#        ' '.join(map(str, cmd)))
+#
+#@nest.add_target_with_env(localenv)
+#def fit_shazam(env, outdir, c):
+#
+#    cmd = ['python fit_shmulate_model.py',
+#           '--input-file',
+#           '${SOURCES[1]}',
+#           '--input-genes',
+#           '${SOURCES[0]}',
+#           '--model-pkl ${TARGETS[0]}',
+#           '--log-file ${TARGETS[1]}']
+#
+#    return env.Command(
+#        [join(outdir, 'fitted_shazam.pkl'), join(outdir, 'log_shazam.txt'), join(outdir, 'fitted_shazam_mut.csv')],
+#        c['process_all_data'],
+#        ' '.join(map(str, cmd)))
+#
+#@nest.add_target_with_env(localenv)
+#def plot_hedgehog_shazam(env, outdir, c):
+#    motif_len = c['motif_params']['motif_length']
+#    left_flanks = c['motif_params']['left_motif_flanks']
+#
+#    cmd = ['python plot_shazam.py',
+#           '--mut',
+#           '${SOURCES[2]}',
+#           '--output-csv',
+#           '${TARGETS[0]}',
+#           '--output-pdf',
+#           '${TARGETS[1]}',
+#           '--center-nucs C']
+#
+#    return env.Command(
+#        [join(outdir, 'fitted_shazam_C_only.csv'), join(outdir, 'fitted_shazam_C_only.pdf')],
+#        c['fit_shazam'],
+#        ' '.join(map(str, cmd)))
+#
+#@nest.add_target_with_env(localenv)
+#def plot_hedgehog_sammcomp(env, outdir, c):
+#    motif_len = c['motif_params']['motif_length']
+#    left_flanks = c['motif_params']['left_motif_flanks']
+#
+#    cmd = ['python plot_samm.py',
+#           '--input-pkl',
+#           '${SOURCES[0]}',
+#           '--output-csv',
+#           '${TARGETS[0]}',
+#           '--output-pdf',
+#           '${TARGETS[1]}',
+#           '--center-nucs C',
+#           '--no-conf-int']
+#
+#    return env.Command(
+#        [join(outdir, 'fitted_samm_C_only.csv'), join(outdir, 'fitted_samm_C_only.pdf')],
+#        c['fit_survival'],
+#        ' '.join(map(str, cmd)))
+#
+#@nest.add_target_with_env(localenv)
+#def plot_hedgehog_logistic(env, outdir, c):
+#    motif_len = c['motif_params']['motif_length']
+#    left_flanks = c['motif_params']['left_motif_flanks']
+#
+#    cmd = ['python plot_shazam.py',
+#           '--logistic-pkl',
+#           '${SOURCES[0]}',
+#           '--output-csv',
+#           '${TARGETS[0]}',
+#           '--output-pdf',
+#           '${TARGETS[1]}',
+#           '--center-nucs C']
+#
+#    return env.Command(
+#        [join(outdir, 'fitted_logistic_C_only.csv'), join(outdir, 'fitted_logistic_C_only.pdf')],
+#        c['fit_logistic'],
+#        ' '.join(map(str, cmd)))

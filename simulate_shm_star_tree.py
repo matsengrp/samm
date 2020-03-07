@@ -40,6 +40,10 @@ def parse_args():
         type=str,
         help='Input file with true theta parameters',
         default='_output/true_model.pkl')
+    parser.add_argument('--germline-seq-fasta',
+        type=str,
+        default=None,
+        help='fasta file with naive seqs')
     parser.add_argument('--use-partis',
         action="store_true",
         help='Use partis to gernerate germline/naive sequences')
@@ -70,6 +74,10 @@ def parse_args():
         type=int,
         help='Number of subjects (so number of germline sets) - used by partis',
         default=1)
+    parser.add_argument('--censor-time',
+        type=float,
+        help='time to mutate',
+        default=None)
     parser.add_argument('--min-percent-mutated',
         type=float,
         help='Minimum percent of sequence to mutate',
@@ -88,7 +96,20 @@ def parse_args():
     return args
 
 def _get_germline_nucleotides(args, nonzero_motifs=[]):
-    if args.use_partis:
+    if args.germline_seq_fasta:
+        with open(args.germline_seq_fasta) as f:
+            lines = f.readlines()
+        germline_seqs = {}
+        for i in range(len(lines)/2):
+            name = lines[2 * i].strip()
+            seq = lines[2 * i + 1].strip()
+            print(seq)
+            germline_seqs[name] = GermlineMetadata(
+                    seq,
+                    name,
+                    1,
+                    None)
+    elif args.use_partis:
         out_dir = os.path.dirname(os.path.realpath(args.output_naive))
         g = GermlineSimulatorPartis(output_dir=out_dir)
         germline_seqs = g.generate_germline_sets(num_sets=args.n_subjects)
@@ -125,6 +146,7 @@ def create_simulator(args):
         agg_theta, _ = pickle.load(f)
 
     if agg_theta.shape[1] == NUM_NUCLEOTIDES:
+        print("MULTI COLUMN")
         simulator = SurvivalModelSimulatorMultiColumn(agg_theta, feat_generator, lambda0=args.lambda0)
     elif agg_theta.shape[1] == 1:
         agg_theta_shape = (agg_theta.size, NUM_NUCLEOTIDES)
@@ -148,20 +170,24 @@ def run_survival(args, germline_seqs):
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name', 'sequence_name', 'sequence'])
         germline_keys = germline_seqs.keys()
+
         mult_sample = np.random.multinomial(
             args.tot_mutated,
             [germline_seqs[g_key].freq for g_key in germline_keys],
         )
         for idx, gene in enumerate(germline_keys):
             sequence = germline_seqs[gene].val
+            seq_len = len(sequence)
             # Decide amount to mutate -- just random uniform
-            percent_to_mutate = np.random.uniform(low=args.min_percent_mutated, high=args.max_percent_mutated)
+            percent_to_mutate = np.random.uniform(low=args.min_percent_mutated, high=args.max_percent_mutated) if args.censor_time is None else None
+
             # Decide number of taxa. Must be at least one.
             n_germ_taxa = mult_sample[idx]
             if n_germ_taxa > 0:
                 full_data_samples = [
                     simulator.simulate(
                         start_seq=sequence.lower(),
+                        censoring_time=args.censor_time,
                         percent_mutated=percent_to_mutate,
                         with_replacement=args.with_replacement,
                     ) for i in range(n_germ_taxa)
@@ -172,7 +198,10 @@ def run_survival(args, germline_seqs):
                 for i, sample in enumerate(full_data_samples):
                     num_mutations.append(len(sample.mutations))
                     seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
+
+                print("Length of germline", seq_len)
                 print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
+                print "Percent mutated: %f" % (np.mean(num_mutations)/seq_len)
 
 def run_shmulate(args):
     # Call Rscript

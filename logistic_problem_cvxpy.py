@@ -49,7 +49,7 @@ class LogisticRegressionMotif:
                         if j != orig_i:
                             theta_3col.append(self.theta[:,j + 1] + self.theta_intercept)
 
-                    theta_3col = cp.hstack(theta_3col)
+                    theta_3col = cp.hstack(*theta_3col)
                     target_ll = (
                             # log of numerator in softmax
                             - (mutate_X_targ * (self.theta[:,i + 1] + self.theta_intercept))
