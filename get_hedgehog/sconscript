@@ -60,38 +60,38 @@ nest.add(
 #        ' '.join(map(str, cmd)))
 
 # Nest for processing data - sample one per clonal family
-@nest.add_target_with_env(localenv)
-def process_data(env, outdir, c):
-    cmd = ['python preprocess_data.py',
-               '--seed',
-               c['replicate'],
-               '--path-to-annotations',
-               CUI_DATA_PATH,
-               '--metadata-path',
-               CUI_DATA_PATH + '/meta.csv',
-               '--group',
-               'immunized',
-               '--locus',
-               LOCUS,
-               '--species',
-               'mouse',
-               '--region',
-               'v',
-               '--germline-family',
-               'v',
-               '--filter-indels',
-               '--sample-from-family',
-               '--scratch-directory',
-               SCRATCH_DIR,
-               '--output-genes ${TARGETS[0]}',
-               '--output-seqs ${TARGETS[1]}']
-
-    return env.Command(
-        [
-            join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv'),
-        ],
-        [],
-        ' '.join(map(str, cmd)))
+#@nest.add_target_with_env(localenv)
+#def process_data(env, outdir, c):
+#    cmd = ['python preprocess_data.py',
+#               '--seed',
+#               c['replicate'],
+#               '--path-to-annotations',
+#               CUI_DATA_PATH,
+#               '--metadata-path',
+#               CUI_DATA_PATH + '/meta.csv',
+#               '--group',
+#               'immunized',
+#               '--locus',
+#               LOCUS,
+#               '--species',
+#               'mouse',
+#               '--region',
+#               'v',
+#               '--germline-family',
+#               'v',
+#               '--filter-indels',
+#               '--sample-from-family',
+#               '--scratch-directory',
+#               SCRATCH_DIR,
+#               '--output-genes ${TARGETS[0]}',
+#               '--output-seqs ${TARGETS[1]}']
+#
+#    return env.Command(
+#        [
+#            join(outdir, 'processed_genes.csv'), join(outdir, 'processed_seqs.csv'),
+#        ],
+#        [],
+#        ' '.join(map(str, cmd)))
 
 motif_params_dict = [
     {
@@ -125,9 +125,9 @@ def fit_logistic(env, outdir, c):
            '--seed',
            c['replicate'],
            '--input-mutated',
-           '${SOURCES[0]}',
+           'get_hedgehog/_output/00/processed_seqs.csv',
            '--input-naive',
-           '${SOURCES[1]}',
+           'get_hedgehog/_output/00/processed_genes.csv',
            '--motif-lens',
            motif_lens,
            '--positions-mutating',
@@ -144,7 +144,7 @@ def fit_logistic(env, outdir, c):
 
     return env.Command(
         [join(outdir, 'logistic_model.pkl'), join(outdir, 'logistic_log.txt')],
-        c['process_data'],
+        [],
         ' '.join(map(str, cmd)))
 
 

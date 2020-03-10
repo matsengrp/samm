@@ -52,23 +52,23 @@ Export('env')
 
 env.SConsignFile()
 
-flag = 'simulation_section'
+flag = 'simulation_tyler'
 SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'simulated_shazam_vs_samm'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'multiple_mutations'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'imputed_ancestors_comparison'
-SConscript(flag + '/sconscript', exports=['flag'])
-
-flag = 'shazam_vs_samm'
-SConscript(flag + '/sconscript', exports=['flag'])
+#
+#flag = 'simulated_shazam_vs_samm'
+#SConscript(flag + '/sconscript', exports=['flag'])
+#
+#flag = 'multiple_mutations'
+#SConscript(flag + '/sconscript', exports=['flag'])
+#
+#flag = 'imputed_ancestors_comparison'
+#SConscript(flag + '/sconscript', exports=['flag'])
+#
+#flag = 'shazam_vs_samm'
+#SConscript(flag + '/sconscript', exports=['flag'])
 
 flag = 'get_hedgehog'
 SConscript(flag + '/sconscript', exports=['flag'])
 
-flag = 'run_pipeline_tests'
-SConscript(flag + '/sconscript', exports=['flag'])
+#flag = 'run_pipeline_tests'
+#SConscript(flag + '/sconscript', exports=['flag'])

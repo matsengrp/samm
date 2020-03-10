@@ -18,14 +18,11 @@ base = {'nreps': localenv['NREPS'],
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-FILE_DICT = {
-    "naive_light": "../data/naive_light.fasta",
-}
 MODEL_DICT = {
     # Run load_logistic_model.py first
     "logistic": "simulation_tyler/data/logistic_model.pkl",
 }
-NUM_SIMULATE = 10
+NUM_SIMULATE = 100000
 
 nest.add(
     'model',
@@ -34,24 +31,41 @@ nest.add(
 
 nest.add(
     'seq',
-    ["naive_light"],
+    [
+        "naive_light",
+        "naive_heavy",
+        "mature_light",
+        "mature_heavy",
+    ],
 )
 
 nest.add(
     'censor_time',
     [60],
-    label_func=lambda c: "mutate_%d" % c,
+    label_func=lambda c: "censor_%d" % c,
 )
+
+nest.add_aggregate(
+    'agg_germline', list)
+nest.add_aggregate(
+    'agg_mutate', list)
+
+nest.add(
+    'seed',
+    range(1))
 
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
-    cmd = ['python simulate_shm_star_tree.py',
-           '--seed 0',
+    cmd = [
+           'srun',
+           'python simulate_shm_star_tree.py',
+           '--seed',
+           c['seed'],
            '--agg-motif-len 5',
            '--input-model',
            MODEL_DICT[c['model']],
            '--germline-seq-fasta',
-           FILE_DICT[c['seq']],
+           join("../data/", "%s.fasta" % c['seq']),
            '--n-subjects',
            1,
            '--tot-mutated',
@@ -62,19 +76,28 @@ def simulate(env, outdir, c):
            c['censor_time'],
            '--output-mutated ${TARGETS[0]}',
            '--output-naive ${TARGETS[1]}']
+    targets = [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')]
+    c["agg_mutate"].append(targets[0])
+    c["agg_germline"].append(targets[1])
     return env.Command(
-        [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')],
+        targets,
         [],
         ' '.join(map(str, cmd)))
 
+nest.pop('seed')
+
 @nest.add_target_with_env(localenv)
 def count_codons(env, outdir, c):
+    input_template = join(
+        "simulation_tyler",
+        c["agg_mutate"][0].replace("/0/", "/*/"))
     cmd = ['python count_codons.py',
-           '--input-mutated ${SOURCES[0]}',
-           '--input-naive ${SOURCES[1]}',
+           '--input-mutated',
+           '"%s"' % input_template,
+           '--input-naive ${SOURCES[0]}',
            '--output-codon ${TARGETS[0]}',
     ]
     return env.Command(
         [join(outdir, 'codons.csv')],
-        c['simulate'],
+        [c["agg_germline"], c["agg_mutate"]],
         ' '.join(map(str, cmd)))
