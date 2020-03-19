@@ -44,10 +44,6 @@ def parse_args():
         type=str,
         help='CSV file to output for mutated sequences',
         default='_output/mutated.csv')
-    parser.add_argument('--input-naive',
-        type=str,
-        help='CSV file to output for naive sequences',
-        default='_output/naive.csv')
     parser.add_argument('--output-codon',
         default=str,
         help='codon output file')
@@ -69,27 +65,11 @@ def translate(seq):
         protein+= AA_TABLE[codon]
     return protein
 
+def count_mutations(naive_seq, mut_seqs):
+    naive_protein = translate(naive_seq)
 
-def main(args=sys.argv[1:]):
-    args = parse_args()
-    np.random.seed(args.seed)
-
-    # Read naive protein
-    with open(args.input_naive, "r") as f:
-        seqreader = csv.DictReader(f, delimiter=',')
-        for row in seqreader:
-            naive_protein = translate(row["germline_sequence"])
-            assert "_" not in naive_protein
-
-    mut_proteins = []
-    for input_mut in glob.glob(args.input_mutated_template):
-        print(input_mut)
-        # Read mutated protiens
-        with open(input_mut, "r") as f:
-            seqreader = csv.DictReader(f, delimiter=',')
-            for row in seqreader:
-                mut_protein = translate(row["sequence"])
-                mut_proteins.append(mut_protein)
+    # Read mutated protiens
+    mut_proteins = [translate(mut_seq) for mut_seq in mut_seqs]
     print("TOTAL NUM MUT SEQUENCES", len(mut_proteins))
 
     # Look at what mutations occurred
@@ -112,12 +92,23 @@ def main(args=sys.argv[1:]):
     mutation_table = pd.DataFrame(
             mutation_table,
             columns=aa_cols)
-    mutation_table.to_csv(args.output_codon)
+    return mutation_table
 
-    fig = plt.imshow(mutation_table.values)
-    plt.colorbar(fig)
-    plt.tight_layout()
-    plt.savefig(args.output_codon.replace("csv", "png"))
+def main(args=sys.argv[1:]):
+    args = parse_args()
+    np.random.seed(args.seed)
+
+    tot_input_mut_counts = 0
+    for input_mut in glob.glob(args.input_mutated_template):
+        input_mut_counts = pd.read_csv(input_mut)
+        tot_input_mut_counts += input_mut_counts
+
+    tot_input_mut_counts.to_csv(args.output_codon)
+
+    #fig = plt.imshow(mutation_table.values)
+    #plt.colorbar(fig)
+    #plt.tight_layout()
+    #plt.savefig(args.output_codon.replace("csv", "png"))
 
 
 if __name__ == "__main__":

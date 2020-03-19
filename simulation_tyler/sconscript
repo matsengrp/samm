@@ -22,7 +22,7 @@ MODEL_DICT = {
     # Run load_logistic_model.py first
     "logistic": "simulation_tyler/data/logistic_model.pkl",
 }
-NUM_SIMULATE = 100000
+NUM_SIMULATE = 10000
 
 nest.add(
     'model',
@@ -52,12 +52,12 @@ nest.add_aggregate(
 
 nest.add(
     'seed',
-    range(1))
+    range(100))
 
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
     cmd = [
-           'srun',
+           #'srun -p restart',
            'python simulate_shm_star_tree.py',
            '--seed',
            c['seed'],
@@ -74,9 +74,9 @@ def simulate(env, outdir, c):
            '--max-percent-mutated 0.1',
            '--censor-time',
            c['censor_time'],
-           '--output-mutated ${TARGETS[0]}',
+           '--output-summary ${TARGETS[0]}',
            '--output-naive ${TARGETS[1]}']
-    targets = [join(outdir, 'seqs.csv'), join(outdir, 'genes.csv')]
+    targets = [join(outdir, 'counts.csv'), join(outdir, 'naive.csv')]
     c["agg_mutate"].append(targets[0])
     c["agg_germline"].append(targets[1])
     return env.Command(
@@ -94,10 +94,9 @@ def count_codons(env, outdir, c):
     cmd = ['python count_codons.py',
            '--input-mutated',
            '"%s"' % input_template,
-           '--input-naive ${SOURCES[0]}',
            '--output-codon ${TARGETS[0]}',
     ]
     return env.Command(
         [join(outdir, 'codons.csv')],
-        [c["agg_germline"], c["agg_mutate"]],
+        [c["agg_germline"]],
         ' '.join(map(str, cmd)))

@@ -17,6 +17,7 @@ from survival_model_simulator import SurvivalModelSimulatorSingleColumn
 from survival_model_simulator import SurvivalModelSimulatorMultiColumn
 from hier_motif_feature_generator import HierarchicalMotifFeatureGenerator
 from simulate_germline import GermlineSimulatorPartis, GermlineMetadata
+from count_codons import count_mutations
 from common import *
 
 def parse_args():
@@ -53,7 +54,11 @@ def parse_args():
     parser.add_argument('--output-mutated',
         type=str,
         help='CSV file to output for mutated sequences',
-        default='_output/mutated.csv')
+        default=None)
+    parser.add_argument('--output-summary',
+        type=str,
+        help='CSV file to output for summary of mutated sequences',
+        default=None)
     parser.add_argument('--output-naive',
         type=str,
         help='CSV file to output for naive sequences',
@@ -166,42 +171,55 @@ def run_survival(args, germline_seqs):
     # used, name of simulated sequence and corresponding sequence.
     tot_mutated = 0
     tot_germline = len(germline_seqs)
+    germline_keys = germline_seqs.keys()
+
+    mult_sample = np.random.multinomial(
+        args.tot_mutated,
+        [germline_seqs[g_key].freq for g_key in germline_keys],
+    )
+    output_dicts = []
+    for idx, gene in enumerate(germline_keys):
+        sequence = germline_seqs[gene].val
+        seq_len = len(sequence)
+        # Decide amount to mutate -- just random uniform
+        percent_to_mutate = np.random.uniform(low=args.min_percent_mutated, high=args.max_percent_mutated) if args.censor_time is None else None
+
+        # Decide number of taxa. Must be at least one.
+        n_germ_taxa = mult_sample[idx]
+        if n_germ_taxa > 0:
+            full_data_samples = [
+                simulator.simulate(
+                    start_seq=sequence.lower(),
+                    censoring_time=args.censor_time,
+                    percent_mutated=percent_to_mutate,
+                    with_replacement=args.with_replacement,
+                ) for i in range(n_germ_taxa)
+            ]
+            output_dicts.append({
+                "gene": gene,
+                "germline_seq": germline_seqs[gene].val,
+                "full_data_samples": full_data_samples,
+                })
+    return output_dicts
+
+def write_to_csv(args, output_dicts):
     with open(args.output_mutated, 'w') as outseqs:
         seq_file = csv.writer(outseqs)
         seq_file.writerow(['germline_name', 'sequence_name', 'sequence'])
-        germline_keys = germline_seqs.keys()
 
-        mult_sample = np.random.multinomial(
-            args.tot_mutated,
-            [germline_seqs[g_key].freq for g_key in germline_keys],
-        )
-        for idx, gene in enumerate(germline_keys):
-            sequence = germline_seqs[gene].val
-            seq_len = len(sequence)
-            # Decide amount to mutate -- just random uniform
-            percent_to_mutate = np.random.uniform(low=args.min_percent_mutated, high=args.max_percent_mutated) if args.censor_time is None else None
 
-            # Decide number of taxa. Must be at least one.
-            n_germ_taxa = mult_sample[idx]
-            if n_germ_taxa > 0:
-                full_data_samples = [
-                    simulator.simulate(
-                        start_seq=sequence.lower(),
-                        censoring_time=args.censor_time,
-                        percent_mutated=percent_to_mutate,
-                        with_replacement=args.with_replacement,
-                    ) for i in range(n_germ_taxa)
-                ]
+        for output_dict in output_dicts:
+            gene = output_dict["gene"]
+            full_data_samples = output_dict["full_data_samples"]
+            # write to file in csv format
+            num_mutations = []
+            for i, sample in enumerate(full_data_samples):
+                num_mutations.append(len(sample.mutations))
+                seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
 
-                # write to file in csv format
-                num_mutations = []
-                for i, sample in enumerate(full_data_samples):
-                    num_mutations.append(len(sample.mutations))
-                    seq_file.writerow([gene, "%s-sample-%d" % (gene, i) , sample.left_flank + sample.end_seq + sample.right_flank])
-
-                print("Length of germline", seq_len)
-                print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
-                print "Percent mutated: %f" % (np.mean(num_mutations)/seq_len)
+            print("Length of germline", seq_len)
+            print "Number of mutations: %f (%f)" % (np.mean(num_mutations), np.sqrt(np.var(num_mutations)))
+            print "Percent mutated: %f" % (np.mean(num_mutations)/seq_len)
 
 def run_shmulate(args):
     # Call Rscript
@@ -240,7 +258,20 @@ def main(args=sys.argv[1:]):
     if args.use_shmulate:
         run_shmulate(args)
     else:
-        run_survival(args, germline_seqs)
+        output_dicts = run_survival(args, germline_seqs)
+
+        if args.output_mutated is not None:
+            write_to_csv(args, output_dicts)
+        if args.output_summary is not None:
+            assert len(output_dicts) == 1
+            mut_seqs = [
+                    sample.left_flank + sample.end_seq + sample.right_flank
+                    for sample in output_dicts[0]["full_data_samples"]]
+            mut_table = count_mutations(
+                    output_dicts[0]["germline_seq"], mut_seqs
+                    )
+            mut_table.to_csv(args.output_summary)
+
 
 if __name__ == "__main__":
     main(sys.argv[1:])
