@@ -1,0 +1,114 @@
+# Test model fits against one another - data generated from a survival model
+
+import os
+
+from os.path import join
+from nestly.scons import SConsWrap
+from nestly import Nest
+from SCons.Script import Environment, Command, AddOption
+import numpy as np
+
+from data_paths import SCRATCH_DIR
+
+Import('env')
+localenv = env.Clone()
+# Set up state
+base = {'nreps': localenv['NREPS'],
+        'output_name': localenv['OUTPUT_NAME']}
+
+nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
+
+NUM_SIMULATE = 10000
+
+nest.add(
+    'chain',
+    [
+        "light",
+        "heavy",
+    ],
+)
+
+
+@nest.add_target_with_env(localenv)
+def generate_theta(env, outdir, c):
+    cmd = [
+           'python generate_theta.py',
+           '--use-shmulate',
+           '--per-target',
+           '--muta',
+           'R/shmulate_params/mut_human_%s.csv' % c['chain'],
+           '--sub',
+           'R/shmulate_params/sub_human_%s.csv' % c['chain'],
+           '--out ${TARGETS[0]}',
+           ]
+    targets = [join(outdir, 'model.pkl')]
+    return env.Command(
+        targets,
+        [],
+        ' '.join(map(str, cmd)))
+
+nest.add(
+    'seq',
+    lambda c: ['naive_' + c['chain'], 'mature_' + c['chain']]
+)
+
+nest.add(
+    'censor_time',
+    [60],
+    label_func=lambda c: "censor_%d" % c,
+)
+
+nest.add_aggregate(
+    'agg_germline', list)
+nest.add_aggregate(
+    'agg_mutate', list)
+
+nest.add(
+    'seed',
+    range(100))
+
+@nest.add_target_with_env(localenv)
+def simulate(env, outdir, c):
+    cmd = [
+           #'srun -p restart',
+           'python simulate_shm_star_tree.py',
+           '--seed',
+           c['seed'],
+           '--agg-motif-len 5',
+           '--input-model ${SOURCES[0]}',
+           '--germline-seq-fasta',
+           join("../data/", "%s.fasta" % c['seq']),
+           '--n-subjects',
+           1,
+           '--tot-mutated',
+           NUM_SIMULATE,
+           '--min-percent-mutated 0',
+           '--max-percent-mutated 0.1',
+           '--censor-time',
+           c['censor_time'],
+           '--output-summary ${TARGETS[0]}',
+           '--output-naive ${TARGETS[1]}']
+    targets = [join(outdir, 'counts.csv'), join(outdir, 'naive.csv')]
+    c["agg_mutate"].append(targets[0])
+    c["agg_germline"].append(targets[1])
+    return env.Command(
+        targets,
+        c['generate_theta'],
+        ' '.join(map(str, cmd)))
+
+nest.pop('seed')
+
+@nest.add_target_with_env(localenv)
+def count_codons(env, outdir, c):
+    input_template = join(
+        "simulation_tyler_human",
+        c["agg_mutate"][0].replace("/0/", "/*/"))
+    cmd = ['python count_codons.py',
+           '--input-mutated',
+           '"%s"' % input_template,
+           '--output-codon ${TARGETS[0]}',
+    ]
+    return env.Command(
+        [join(outdir, 'codons.csv')],
+        [c["agg_germline"]],
+        ' '.join(map(str, cmd)))

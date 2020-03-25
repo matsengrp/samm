@@ -67,31 +67,24 @@ def translate(seq):
 
 def count_mutations(naive_seq, mut_seqs):
     naive_protein = translate(naive_seq)
-
-    # Read mutated protiens
-    mut_proteins = [translate(mut_seq) for mut_seq in mut_seqs]
-    print("TOTAL NUM MUT SEQUENCES", len(mut_proteins))
+    prot_len = len(naive_protein)
+    print("TOTAL NUM MUT SEQUENCES", len(mut_seqs))
 
     # Look at what mutations occurred
-    aa_index = {}
-    aa_cols = []
-    for i, a in enumerate(set(AA_TABLE.values())):
-        aa_index[a] = i
-        aa_cols.append(a)
+    codon_index = {}
+    codon_cols = []
+    for i, a in enumerate(set(AA_TABLE.keys())):
+        codon_index[a] = i
+        codon_cols.append(a)
 
-    mutation_table = np.zeros((len(naive_protein), len(aa_index)))
-    for prot_idx, mut_protein in enumerate(mut_proteins):
-        #print("protein", prot_idx)
-        #if "_" in mut_protein:
-        #    print("early stop codon")
-
-        for pos_idx, (naive_aa, mut_aa) in enumerate(zip(naive_protein, mut_protein)):
-            if naive_aa != mut_aa:
-                #print(pos_idx, "%s -> %s" % (naive_aa, mut_aa))
-                mutation_table[pos_idx, aa_index[mut_aa]] += 1
+    mutation_table = np.zeros((prot_len, len(codon_index)))
+    for seq_idx, mut_seq in enumerate(mut_seqs):
+        for pos_idx in range(prot_len):
+            mut_codon = mut_seq[pos_idx * 3: (pos_idx + 1) * 3]
+            mutation_table[pos_idx, codon_index[mut_codon]] += 1
     mutation_table = pd.DataFrame(
             mutation_table,
-            columns=aa_cols)
+            columns=codon_cols)
     return mutation_table
 
 def main(args=sys.argv[1:]):

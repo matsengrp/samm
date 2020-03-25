@@ -52,7 +52,9 @@ Export('env')
 
 env.SConsignFile()
 
-flag = 'simulation_tyler'
+#flag = 'simulation_tyler'
+#SConscript(flag + '/sconscript', exports=['flag'])
+flag = 'simulation_tyler_human'
 SConscript(flag + '/sconscript', exports=['flag'])
 #
 #flag = 'simulated_shazam_vs_samm'
