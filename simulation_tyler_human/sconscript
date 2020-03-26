@@ -18,7 +18,12 @@ base = {'nreps': localenv['NREPS'],
 
 nest = SConsWrap(Nest(base_dict=base), '_'+localenv['OUTPUT_NAME'], alias_environment=localenv)
 
-NUM_SIMULATE = 10000
+NUM_SIMULATE = 50000
+
+CENSOR_TIME = {
+    "heavy": 300,
+    "light": 400,
+}
 
 nest.add(
     'chain',
@@ -27,7 +32,6 @@ nest.add(
         "heavy",
     ],
 )
-
 
 @nest.add_target_with_env(localenv)
 def generate_theta(env, outdir, c):
@@ -52,12 +56,6 @@ nest.add(
     lambda c: ['naive_' + c['chain'], 'mature_' + c['chain']]
 )
 
-nest.add(
-    'censor_time',
-    [60],
-    label_func=lambda c: "censor_%d" % c,
-)
-
 nest.add_aggregate(
     'agg_germline', list)
 nest.add_aggregate(
@@ -65,7 +63,7 @@ nest.add_aggregate(
 
 nest.add(
     'seed',
-    range(100))
+    range(20))
 
 @nest.add_target_with_env(localenv)
 def simulate(env, outdir, c):
@@ -82,10 +80,10 @@ def simulate(env, outdir, c):
            1,
            '--tot-mutated',
            NUM_SIMULATE,
-           '--min-percent-mutated 0',
-           '--max-percent-mutated 0.1',
+           #'--min-percent-mutated 0',
+           #'--max-percent-mutated 0.1',
            '--censor-time',
-           c['censor_time'],
+           CENSOR_TIME[c['chain']],
            '--output-summary ${TARGETS[0]}',
            '--output-naive ${TARGETS[1]}']
     targets = [join(outdir, 'counts.csv'), join(outdir, 'naive.csv')]
@@ -109,6 +107,6 @@ def count_codons(env, outdir, c):
            '--output-codon ${TARGETS[0]}',
     ]
     return env.Command(
-        [join(outdir, 'codons.csv')],
+        [join(outdir, 'codons_final.csv')],
         [c["agg_germline"]],
         ' '.join(map(str, cmd)))
